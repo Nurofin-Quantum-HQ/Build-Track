@@ -374,7 +374,7 @@ export default function AssignRolesPage() {
             <div style={{ display: 'flex', gap: 8 }}>
               {roleOptions.map((r) => (
                 <button key={r} onClick={() => handleRoleChange(r)}
-                  style={{ flex: 1, padding: '10px', borderRadius: radius.sm, border: selectedRole === r ? `2px solid ${colors.primaryBlue}` : `1px solid ${colors.cardBorder}`, background: selectedRole === r ? '#ECEBFF' : colors.cardBg, cursor: 'pointer', textAlign: 'center' }}>
+                  style={{ flex: 1, padding: '10px', borderRadius: radius.sm, border: selectedRole === r ? `2px solid ${colors.primaryBlue}` : `1px solid ${colors.cardBorder}`, background: selectedRole === r ? '#FFF5F0' : colors.cardBg, cursor: 'pointer', textAlign: 'center' }}>
                   <div style={{ fontSize: 14, fontWeight: 700, color: colors.textPrimary }}>{r === '__custom_role__' ? 'Custom Role' : r}</div>
                 </button>
               ))}

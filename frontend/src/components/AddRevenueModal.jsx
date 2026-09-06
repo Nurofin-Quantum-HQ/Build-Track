@@ -10,7 +10,7 @@ import {
 } from "lucide-react";
 import { transactionAPI, esignAPI } from "../api";
 
-const primaryBlue = "#173EEA";
+const primaryBlue = "#F97316";
 
 const PAYMENT_METHODS = [
   { value: "UPI", icon: Smartphone },
@@ -249,7 +249,7 @@ export default function AddRevenueModal({ open, projects, onClose, onSaved }) {
                       padding: "10px 14px",
                       borderRadius: 10,
                       border: `1.5px solid ${isSelected ? primaryBlue : "#E5E7EB"}`,
-                      background: isSelected ? "#EEF2FF" : "#FFF",
+                      background: isSelected ? "#FFF5F0" : "#FFF",
                       display: "flex", alignItems: "center", gap: 6,
                       cursor: "pointer", transition: "all 0.2s"
                     }}
@@ -295,7 +295,7 @@ export default function AddRevenueModal({ open, projects, onClose, onSaved }) {
                   />
                   {esignPolling ? (
                     <div style={{ display: "flex", alignItems: "center", gap: 8, color: primaryBlue, fontSize: 13, fontWeight: 600 }}>
-                      <div style={{ width: 14, height: 14, borderRadius: "50%", border: "2px solid rgba(23,62,234,0.3)", borderTopColor: primaryBlue, animation: "spin 0.8s linear infinite" }} />
+                      <div style={{ width: 14, height: 14, borderRadius: "50%", border: "2px solid rgba(249,115,22,0.3)", borderTopColor: primaryBlue, animation: "spin 0.8s linear infinite" }} />
                       {esignStatusText}
                       <button onClick={() => setEsignPolling(false)} style={{ marginLeft: "auto", border: "none", background: "none", color: "#EF4444", fontSize: 12, cursor: "pointer", fontWeight: "bold" }}>Cancel</button>
                     </div>

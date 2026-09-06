@@ -13,7 +13,7 @@ const colorMap = {
   success: { bg: colors.successLight, icon: colors.success, border: '#BBF7D0' },
   error: { bg: colors.dangerLight, icon: colors.danger, border: '#FECACA' },
   warning: { bg: colors.warningLight, icon: colors.warning, border: '#FDE68A' },
-  info: { bg: colors.primaryLight, icon: colors.primary, border: '#C7D2FE' },
+  info: { bg: colors.primaryLight, icon: colors.primary, border: '#FDE8D8' },
 };
 
 export default function Toast({ message, type = 'info', onClose }) {

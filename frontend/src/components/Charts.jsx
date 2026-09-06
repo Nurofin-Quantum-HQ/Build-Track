@@ -8,12 +8,12 @@ const fmtINR = (n) => {
 };
 
 const COLORS = {
-  material: "#3730a3",
-  labour: "#7c3aed",
+  material: "#F97316",
+  labour: "#EA580C",
   equipment: "#0891b2",
   misc: "#6b7280",
   budget: "#dc2626",
-  actual: "#2563eb",
+  actual: "#FB923C",
 };
 
 export function SpendVsBudgetChart({ data }) {
@@ -100,7 +100,7 @@ export function CategoryPieChart({ data }) {
               formatter={(value, name) => [fmtINR(value), name]}
               contentStyle={{ borderRadius: 10, border: "1px solid #e5e5e5", fontSize: 13 }}
             />
-            <Area type="monotone" dataKey="value" stroke="none" fill="#3730a3" />
+            <Area type="monotone" dataKey="value" stroke="none" fill="#F97316" />
           </AreaChart>
         </ResponsiveContainer>
       </div>

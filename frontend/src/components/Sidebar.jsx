@@ -117,7 +117,7 @@ export default function Sidebar() {
               ...linkStyle,
               color: isActive ? "#FFFFFF" : colors.textSecondary,
               background: isActive ? gradients.primaryGradient : "transparent",
-              boxShadow: isActive ? "0 8px 16px -4px rgba(23, 62, 234, 0.35)" : "none",
+              boxShadow: isActive ? "0 8px 16px -4px rgba(249, 115, 22, 0.4)" : "none",
               fontWeight: isActive ? 600 : 500,
             })}
           >
@@ -147,7 +147,7 @@ export default function Sidebar() {
                   ...linkStyle,
                   color: isActive ? "#FFFFFF" : colors.textSecondary,
                   background: isActive ? gradients.primaryGradient : "transparent",
-                  boxShadow: isActive ? "0 8px 16px -4px rgba(23, 62, 234, 0.35)" : "none",
+                  boxShadow: isActive ? "0 8px 16px -4px rgba(249, 115, 22, 0.4)" : "none",
                   fontWeight: isActive ? 600 : 500,
                 })}
               >

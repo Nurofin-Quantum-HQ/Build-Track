@@ -247,7 +247,7 @@ export default function VoiceReviewSheet({
               width: 44, height: 44, borderRadius: '50%',
               background: gradients.primaryGradient,
               display: 'flex', alignItems: 'center', justifyContent: 'center',
-              color: '#fff', boxShadow: '0 4px 12px rgba(23, 62, 234, 0.2)',
+              color: '#fff', boxShadow: '0 4px 12px rgba(249, 115, 22, 0.2)',
             }}>
               <Mic size={18} />
             </div>
@@ -1098,7 +1098,7 @@ function renderStep({ step, data, updateField, goNext, customInput, setCustomInp
             padding: '20px 24px', borderRadius: 14, marginBottom: 20,
             background: gradients.primaryGradient,
             color: '#fff',
-            boxShadow: '0 8px 20px rgba(23, 62, 234, 0.25)',
+            boxShadow: '0 8px 20px rgba(249, 115, 22, 0.25)',
           }}>
             <div style={{ fontSize: 11, fontWeight: 700, opacity: 0.8, letterSpacing: '0.06em', marginBottom: 6 }}>TOTAL AMOUNT</div>
             <div style={{ fontSize: 32, fontWeight: 800, fontFamily: typography.fontFamily }}>₹{formatINR(totalAmount)}</div>

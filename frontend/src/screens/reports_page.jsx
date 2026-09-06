@@ -11,18 +11,18 @@ import {
 import ModuleTour from "../components/ModuleTour";
 
 const TYPE_COLORS = {
-  Materials: { bg: "#EEF0FF", color: "#5B5CEB" },
+  Materials: { bg: "#FFF5F0", color: "#F97316" },
   Wages: { bg: "#F0FDF4", color: "#22C55E" },
-  Expense: { bg: "#F3E8FF", color: "#8B5CF6" },
+  Expense: { bg: "#FFF7F0", color: "#EA580C" },
   Income: { bg: "#ECFDF5", color: "#10B981" },
-  Equipment: { bg: "#F3E8FF", color: "#8B5CF6" },
+  Equipment: { bg: "#FFF7F0", color: "#EA580C" },
 };
 
 const PAYMENT_COLORS = {
   Paid: { bg: "#F0FDF4", color: "#166534" },
   Partial: { bg: "#FFFBEB", color: "#B45309" },
   Pending: { bg: "#FEF2F2", color: "#DC2626" },
-  Advance: { bg: "#EEF0FF", color: "#5B5CEB" },
+  Advance: { bg: "#FFF5F0", color: "#F97316" },
 };
 
 const DATE_PRESETS = [
@@ -114,7 +114,7 @@ export default function ReportsPage() {
   }, [transactions, selectedProject, selectedType, dateRange, search]);
 
   const stats = useMemo(() => ({
-    total: filtered.reduce((s, t) => s + (t.amount || 0), 0),
+    total: filtered.filter(t => t.type !== "Income").reduce((s, t) => s + (t.amount || 0), 0),
     material: filtered.filter(t => t.type === "Materials").reduce((s, t) => s + (t.amount || 0), 0),
     labour: filtered.filter(t => t.type === "Wages").reduce((s, t) => s + (t.amount || 0), 0),
     equipment: filtered.filter(t => t.type === "Expense" || t.type === "Equipment").reduce((s, t) => s + (t.amount || 0), 0),
@@ -170,7 +170,7 @@ export default function ReportsPage() {
     doc.text(`Project: ${projName} | Type: ${displayType} | Period: ${DATE_PRESETS.find(p => p.value === datePreset)?.label || "All"}`, 14, 34);
     doc.setFontSize(12); doc.setTextColor(0);
     doc.text(`Total: Rs.${stats.total.toLocaleString("en-IN")}  Material: Rs.${stats.material.toLocaleString("en-IN")}  Labour: Rs.${stats.labour.toLocaleString("en-IN")}  Equipment: Rs.${stats.equipment.toLocaleString("en-IN")}`, 14, 44);
-    doc.autoTable({ startY: 50, head: [["Date", "Description", "Type", "Amount", "Status"]], body: filtered.map(t => [t.date ? new Date(t.date).toLocaleDateString("en-IN") : "", t.title || "", t.type === "Wages" ? "Labour" : t.type === "Expense" ? "Equipment" : t.type || "", `Rs.${(t.amount || 0).toLocaleString("en-IN")}`, t.paymentStatus || ""]), theme: "grid", headStyles: { fillColor: [91, 92, 235] } });
+    doc.autoTable({ startY: 50, head: [["Date", "Description", "Type", "Amount", "Status"]], body: filtered.map(t => [t.date ? new Date(t.date).toLocaleDateString("en-IN") : "", t.title || "", t.type === "Wages" ? "Labour" : t.type === "Expense" ? "Equipment" : t.type || "", `Rs.${(t.amount || 0).toLocaleString("en-IN")}`, t.paymentStatus || ""]), theme: "grid", headStyles: { fillColor: [249, 115, 22] } });
     doc.save(`BuildTrack_Report_${Date.now()}.pdf`);
   };
 
@@ -196,7 +196,7 @@ export default function ReportsPage() {
           <button onClick={() => setRunTour(true)} title="Help" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 36, height: 36, background: '#fff', border: '1px solid #E5E7EB', borderRadius: 8, cursor: 'pointer' }}>
             <HelpCircle size={16} color="#64748B" />
           </button>
-          <Button variant="primary" size="md" onClick={() => navigate("/ai-chat")} style={{ background: "linear-gradient(135deg, #8B5CF6, #A855F7)", border: "none" }}>
+          <Button variant="primary" size="md" onClick={() => navigate("/ai-chat")} style={{ background: "linear-gradient(135deg, #F97316, #FB923C)", border: "none" }}>
             <Sparkles size={14} /> Ask AI
           </Button>
         </div>
@@ -249,7 +249,7 @@ export default function ReportsPage() {
           <div style={{ display: "flex", gap: 6, marginTop: 14, flexWrap: "wrap" }}>
             {TYPES.map(t => (
               <button key={t.value} onClick={() => setSelectedType(t.value)}
-                style={{ padding: "6px 14px", borderRadius: 6, border: `1px solid ${selectedType === t.value ? "#5B5CEB" : "#E5E7EB"}`, background: selectedType === t.value ? "#5B5CEB" : "#fff", color: selectedType === t.value ? "#fff" : "#475569", fontSize: 13, fontWeight: 600, cursor: "pointer", transition: "all 0.15s", fontFamily: "inherit" }}>
+                style={{ padding: "6px 14px", borderRadius: 6, border: `1px solid ${selectedType === t.value ? "#F97316" : "#E5E7EB"}`, background: selectedType === t.value ? "#F97316" : "#fff", color: selectedType === t.value ? "#fff" : "#475569", fontSize: 13, fontWeight: 600, cursor: "pointer", transition: "all 0.15s", fontFamily: "inherit" }}>
                 {t.label}
               </button>
             ))}
@@ -258,9 +258,9 @@ export default function ReportsPage() {
         </div>
 
         <div className="tour-metrics" style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr 1fr" : "repeat(4, 1fr)", gap: 14, marginBottom: 16 }}>
-          <MetricCard icon={<BarChart3 size={16} />} label="Total Cost" value={stats.total} budget={projects.find(p => (p._id || p.id) === selectedProject)?.budget?.["total"] || projects.find(p => (p._id || p.id) === selectedProject)?.totalBudget || 0} color="#3B82F6" />
-          <MetricCard icon={<Layers size={16} />} label="Material" value={stats.material} budget={projects.find(p => (p._id || p.id) === selectedProject)?.budgetMaterial || 0} color="#5B5CEB" />
-          <MetricCard icon={<Users size={16} />} label="Labour" value={stats.labour} budget={projects.find(p => (p._id || p.id) === selectedProject)?.budgetLabour || 0} color="#8B5CF6" />
+          <MetricCard icon={<BarChart3 size={16} />} label="Total Cost" value={stats.total} budget={projects.find(p => (p._id || p.id) === selectedProject)?.budget?.["total"] || projects.find(p => (p._id || p.id) === selectedProject)?.totalBudget || 0} color="#F97316" />
+          <MetricCard icon={<Layers size={16} />} label="Material" value={stats.material} budget={projects.find(p => (p._id || p.id) === selectedProject)?.budgetMaterial || 0} color="#F97316" />
+          <MetricCard icon={<Users size={16} />} label="Labour" value={stats.labour} budget={projects.find(p => (p._id || p.id) === selectedProject)?.budgetLabour || 0} color="#EA580C" />
           <MetricCard icon={<DollarSign size={16} />} label="Equipment" value={stats.equipment} budget={projects.find(p => (p._id || p.id) === selectedProject)?.budgetEquipment || 0} color="#06B6D4" />
         </div>
 
@@ -271,8 +271,8 @@ export default function ReportsPage() {
           </Card>
           <Card padding="20px">
             <div style={{ fontSize: 15, fontWeight: 700, color: "#111827", marginBottom: 14 }}>Category Breakdown</div>
-            <CategoryBudgetBar name="Material" spent={stats.material} budget={projects.find(p => (p._id || p.id) === selectedProject)?.budgetMaterial || 0} color="#5B5CEB" />
-            <CategoryBudgetBar name="Labour" spent={stats.labour} budget={projects.find(p => (p._id || p.id) === selectedProject)?.budgetLabour || 0} color="#8B5CF6" />
+            <CategoryBudgetBar name="Material" spent={stats.material} budget={projects.find(p => (p._id || p.id) === selectedProject)?.budgetMaterial || 0} color="#F97316" />
+            <CategoryBudgetBar name="Labour" spent={stats.labour} budget={projects.find(p => (p._id || p.id) === selectedProject)?.budgetLabour || 0} color="#EA580C" />
             <CategoryBudgetBar name="Equipment" spent={stats.equipment} budget={projects.find(p => (p._id || p.id) === selectedProject)?.budgetEquipment || 0} color="#06B6D4" />
           </Card>
         </div>

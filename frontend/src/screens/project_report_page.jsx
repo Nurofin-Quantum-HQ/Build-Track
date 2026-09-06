@@ -7,19 +7,19 @@ import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 
 const TYPE_DOT = {
-  Materials: "#3730a3",
-  Wages: "#7c3aed",
+  Materials: "#F97316",
+  Wages: "#EA580C",
   Expense: "#ea580c",
   Income: "#16a34a",
   Equipment: "#ea580c",
 };
 
 const TYPE_BADGE = {
-  Materials: { bg: "#eef2ff", color: "#3730a3" },
+  Materials: { bg: "#FFF5F0", color: "#F97316" },
   Wages: { bg: "#f0fdf4", color: "#166534" },
-  Expense: { bg: "#f5f3ff", color: "#7c3aed" },
+  Expense: { bg: "#FFF5F0", color: "#EA580C" },
   Income: { bg: "#ecfdf5", color: "#047857" },
-  Equipment: { bg: "#f5f3ff", color: "#7c3aed" },
+  Equipment: { bg: "#FFF5F0", color: "#EA580C" },
 };
 
 export default function ProjectReportPage() {
@@ -82,7 +82,7 @@ export default function ProjectReportPage() {
     material: transactions.filter(t => t.type === "Materials").reduce((s, t) => s + (t.amount || 0), 0),
     labour: transactions.filter(t => t.type === "Wages").reduce((s, t) => s + (t.amount || 0), 0),
     equipment: transactions.filter(t => t.type === "Expense" || t.type === "Equipment").reduce((s, t) => s + (t.amount || 0), 0),
-    total: transactions.reduce((s, t) => s + (t.amount || 0), 0),
+    total: transactions.filter(t => t.type !== "Income").reduce((s, t) => s + (t.amount || 0), 0),
   };
   const budget = Number(project.budget || project.totalBudget) || 0;
   const remaining = budget - stats.total;
@@ -143,7 +143,7 @@ export default function ProjectReportPage() {
           </div>
         </div>
         <div style={{ display: "flex", gap: 8 }}>
-          <button onClick={exportPdf} style={{ padding: "8px 14px", background: "#5B5CEB", border: "none", borderRadius: 8, fontSize: 12, fontWeight: 600, color: "#fff", cursor: "pointer" }}>📄 Export PDF</button>
+          <button onClick={exportPdf} style={{ padding: "8px 14px", background: "#F97316", border: "none", borderRadius: 8, fontSize: 12, fontWeight: 600, color: "#fff", cursor: "pointer" }}>📄 Export PDF</button>
           <button onClick={exportCsv} style={{ padding: "8px 14px", background: "#f3f4f6", border: "1px solid #e5e5e5", borderRadius: 8, fontSize: 12, fontWeight: 600, color: "#555", cursor: "pointer" }}>📥 Export CSV</button>
         </div>
       </div>
@@ -191,8 +191,8 @@ export default function ProjectReportPage() {
 
         <div style={{ ...cardStyle, marginBottom: 20 }}>
           <div style={{ fontSize: 15, fontWeight: 700, color: "#1a1a1a", marginBottom: 16 }}>Category Breakdown</div>
-          <CategoryBudgetBar name="Material" spent={stats.material} budget={project.budgetMaterial || project.budget?.material || 0} color="#3730a3" />
-          <CategoryBudgetBar name="Labour" spent={stats.labour} budget={project.budgetLabour || project.budget?.labour || 0} color="#7c3aed" />
+          <CategoryBudgetBar name="Material" spent={stats.material} budget={project.budgetMaterial || project.budget?.material || 0} color="#F97316" />
+          <CategoryBudgetBar name="Labour" spent={stats.labour} budget={project.budgetLabour || project.budget?.labour || 0} color="#EA580C" />
           <CategoryBudgetBar name="Equipment" spent={stats.equipment} budget={project.budgetEquipment || project.budget?.equipment || 0} color="#0891b2" />
         </div>
 

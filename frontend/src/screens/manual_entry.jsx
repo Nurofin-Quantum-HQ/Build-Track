@@ -91,7 +91,8 @@ export default function ManualEntryPage() {
 
 
   const tourSteps = [
-    { target: '.tour-entry-types', content: 'Here you can manually log materials, labour, or equipment. Choose the type of entry you want to record.', disableBeacon: true },
+    { target: '.tour-header', content: 'Here you can manually log materials, labour, or equipment.', disableBeacon: true },
+    { target: '.tour-entry-types', content: 'Choose the type of entry you want to record.' },
     { target: '.tour-project-context', content: 'Select the project, phase, and activity for this entry.' },
     { target: '.tour-field-item', content: 'Fill in the details for the specific item, rate, and quantity.' },
     { target: '.tour-amount-calc', content: 'The total amount is calculated automatically.' },
@@ -397,12 +398,11 @@ export default function ManualEntryPage() {
 
   useEffect(() => {
     if (selectedProject) {
-      const typeMap = { material: "Materials", labour: "Wages", equipment: "Expense" };
-      transactionAPI.getAll({ project: selectedProject, type: typeMap[entryType], limit: 5 })
+      transactionAPI.getAll({ project: selectedProject, limit: 5 })
         .then(({ data }) => setRecentEntries(data.transactions || []))
         .catch(() => setRecentEntries([]));
     }
-  }, [selectedProject, entryType]);
+  }, [selectedProject]);
 
   const qty = parseFloat(values.quantity) || 0;
   const rate = parseFloat(values.rate) || 0;
@@ -658,7 +658,7 @@ export default function ManualEntryPage() {
         <div className="tour-project-context" style={{ background: colors.cardBg, borderRadius: radius.lg, border: `1px solid ${colors.cardBorder}`, padding: 20, marginBottom: 24, boxShadow: shadows.card }}>
 
           <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 16 }}>
-            <div style={{ width: 34, height: 34, background: "rgba(23, 62, 234, 0.1)", borderRadius: 8, display: "flex", alignItems: "center", justifyContent: "center", color: colors.primaryBlue, flexShrink: 0 }}>
+            <div style={{ width: 34, height: 34, background: "rgba(249, 115, 22, 0.1)", borderRadius: 8, display: "flex", alignItems: "center", justifyContent: "center", color: colors.primaryBlue, flexShrink: 0 }}>
               <Building size={16} />
             </div>
             <div>
