@@ -54,7 +54,7 @@ export default function MasonDashboard() {
         padding: 24,
         borderRadius: 16,
         color: '#fff',
-        boxShadow: '0 10px 25px rgba(23,62,234,0.2)'
+        boxShadow: '0 10px 25px rgba(249,115,22,0.2)'
       }}>
         <h1 style={{ fontSize: 28, margin: 0, fontWeight: 800, letterSpacing: '-0.02em' }}>
           Good Morning, {firstName} 👋

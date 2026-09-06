@@ -134,7 +134,6 @@ export const aiDashboardAPI = {
 export const taskAPI = {
   getDaily: () => api.get("/tasks/daily"),
   createTask: (data) => api.post("/tasks", data),
-  getUsers: () => api.get("/tasks/users"),
 };
 
 export const subscriptionAPI = {

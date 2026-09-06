@@ -6,7 +6,7 @@ const variantMap = {
   danger: { bg: colors.dangerLight, color: '#DC2626' },
   warning: { bg: colors.warningLight, color: '#B45309' },
   info: { bg: colors.primaryLight, color: colors.primary },
-  gradient: { bg: 'linear-gradient(90deg, #6366f1 0%, #a855f7 100%)', color: '#FFFFFF' },
+  gradient: { bg: 'linear-gradient(90deg, #F97316 0%, #FB923C 100%)', color: '#FFFFFF' },
 };
 
 export default function Badge({ children, variant = 'default', style, size = 'md' }) {

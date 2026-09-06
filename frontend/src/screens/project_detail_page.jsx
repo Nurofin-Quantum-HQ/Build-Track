@@ -17,9 +17,9 @@ import {
 const TABS = ["Overview", "Financial", "Construction Progress", "Project Members", "Documents", "Inventory"];
 
 const TYPE_STYLE = {
-  Materials: { bg: "#EEF0FF", color: "#5B5CEB" },
+  Materials: { bg: "#FFF5F0", color: "#F97316" },
   Wages: { bg: "#F0FDF4", color: "#22C55E" },
-  Equipment: { bg: "#F3E8FF", color: "#8B5CF6" },
+  Equipment: { bg: "#FFF7F0", color: "#EA580C" },
   Income: { bg: "#ECFDF5", color: "#10B981" },
   Expense: { bg: "#FFFBEB", color: "#F59E0B" },
 };
@@ -100,7 +100,7 @@ export default function ProjectDetailPage() {
     return (
       <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100vh", background: "#F8FAFC", fontFamily: "Inter, 'Segoe UI', sans-serif" }}>
         <div style={{ textAlign: "center" }}>
-          <div style={{ width: 28, height: 28, borderRadius: "50%", border: "2px solid #F1F5F9", borderTopColor: "#5B5CEB", animation: "spin 0.7s linear infinite", margin: "0 auto 12px" }} />
+          <div style={{ width: 28, height: 28, borderRadius: "50%", border: "2px solid #F1F5F9", borderTopColor: "#F97316", animation: "spin 0.7s linear infinite", margin: "0 auto 12px" }} />
           <div style={{ fontSize: 13, color: "#64748B" }}>Loading...</div>
         </div>
       </div>
@@ -132,7 +132,7 @@ export default function ProjectDetailPage() {
 
   const renderTab = (btnLabel) => (
     <button key={btnLabel} onClick={() => setActiveTab(TABS.indexOf(btnLabel))}
-      style={{ padding: "8px 16px", borderRadius: 6, border: "none", cursor: "pointer", fontSize: 13, fontWeight: 600, background: TABS[activeTab] === btnLabel ? "#5B5CEB" : "#F1F5F9", color: TABS[activeTab] === btnLabel ? "#fff" : "#475569", transition: "all 0.15s", fontFamily: "inherit" }}>
+      style={{ padding: "8px 16px", borderRadius: 6, border: "none", cursor: "pointer", fontSize: 13, fontWeight: 600, background: TABS[activeTab] === btnLabel ? "#F97316" : "#F1F5F9", color: TABS[activeTab] === btnLabel ? "#fff" : "#475569", transition: "all 0.15s", fontFamily: "inherit" }}>
       {btnLabel}
     </button>
   );
@@ -184,9 +184,9 @@ export default function ProjectDetailPage() {
               <div style={statLabel}>Land Area</div>
               <div style={{ fontSize: 16, fontWeight: 700, color: "#111827" }}>{landArea} {p.landUnit || "Sq ft"}</div>
             </div>
-            <div style={{ background: "#EEF0FF", borderRadius: 8, padding: "12px 14px" }}>
+            <div style={{ background: "#FFF5F0", borderRadius: 8, padding: "12px 14px" }}>
               <div style={statLabel}>Cost per {p.landUnit || "Sq ft"}</div>
-              <div style={{ fontSize: 16, fontWeight: 700, color: "#5B5CEB" }}>₹{sqftCost}</div>
+              <div style={{ fontSize: 16, fontWeight: 700, color: "#F97316" }}>₹{sqftCost}</div>
             </div>
           </div>
         </Card>
@@ -237,7 +237,7 @@ export default function ProjectDetailPage() {
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))", gap: 12 }}>
               {members.map((m, i) => (
                 <div key={i} style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 14px", borderRadius: 10, background: "#F8FAFC", border: "1px solid #E5E7EB" }}>
-                  <div style={{ width: 38, height: 38, borderRadius: "50%", background: "#5B5CEB", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 700, fontSize: 14 }}>
+                  <div style={{ width: 38, height: 38, borderRadius: "50%", background: "#F97316", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 700, fontSize: 14 }}>
                     {m.name ? m.name.charAt(0).toUpperCase() : "U"}
                   </div>
                   <div>
@@ -266,7 +266,7 @@ export default function ProjectDetailPage() {
           <h3 style={{ fontSize: 14, fontWeight: 700, color: "#111827", margin: "0 0 14px" }}>Financial Summary</h3>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
             {[
-              { icon: <DollarSign size={14} />, label: "Total Budget", val: fmtINR(budget), color: "#5B5CEB" },
+              { icon: <DollarSign size={14} />, label: "Total Budget", val: fmtINR(budget), color: "#F97316" },
               { icon: <TrendingUp size={14} />, label: "Spent", val: fmtINR(spent), color: spent > budget ? "#EF4444" : "#111827" },
               { icon: <DollarSign size={14} />, label: "Income", val: fmtINR(income), color: "#22C55E" },
               { icon: <Target size={14} />, label: "Remaining", val: fmtINR(Math.max(budget - spent, 0)), color: budget - spent >= 0 ? "#22C55E" : "#EF4444" },
@@ -284,10 +284,10 @@ export default function ProjectDetailPage() {
             <div style={{ marginTop: 14 }}>
               <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
                 <span style={statLabel}>Budget Usage</span>
-                <span style={{ fontSize: 13, fontWeight: 700, color: (spent / budget) >= 1 ? "#EF4444" : (spent / budget) >= 0.8 ? "#F59E0B" : "#5B5CEB" }}>{Math.round((spent / budget) * 100)}%</span>
+                <span style={{ fontSize: 13, fontWeight: 700, color: (spent / budget) >= 1 ? "#EF4444" : (spent / budget) >= 0.8 ? "#F59E0B" : "#F97316" }}>{Math.round((spent / budget) * 100)}%</span>
               </div>
               <div style={{ height: 6, background: "#F1F5F9", borderRadius: 8, overflow: "hidden" }}>
-                <div style={{ width: `${Math.min((spent / budget) * 100, 100)}%`, height: "100%", borderRadius: 8, background: (spent / budget) >= 1 ? "#EF4444" : (spent / budget) >= 0.8 ? "#F59E0B" : "#5B5CEB", transition: "width 0.4s" }} />
+                <div style={{ width: `${Math.min((spent / budget) * 100, 100)}%`, height: "100%", borderRadius: 8, background: (spent / budget) >= 1 ? "#EF4444" : (spent / budget) >= 0.8 ? "#F59E0B" : "#F97316", transition: "width 0.4s" }} />
               </div>
             </div>
           )}
@@ -296,7 +296,7 @@ export default function ProjectDetailPage() {
         <Card padding="20px">
           <h3 style={{ fontSize: 14, fontWeight: 700, color: "#111827", margin: "0 0 12px" }}>Budget Breakdown</h3>
           <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-            {bMat > 0 && <CatRow label="Materials" amount={bMat} color="#5B5CEB" />}
+            {bMat > 0 && <CatRow label="Materials" amount={bMat} color="#F97316" />}
             {bLab > 0 && <CatRow label="Labour" amount={bLab} color="#22C55E" />}
             {bEq > 0 && <CatRow label="Equipment" amount={bEq} color="#F59E0B" />}
             {!bMat && !bLab && !bEq && <span style={{ fontSize: 12, color: "#94A3B8" }}>No budget data</span>}
@@ -340,10 +340,10 @@ export default function ProjectDetailPage() {
         <Card padding="20px">
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
           <h3 style={{ fontSize: 14, fontWeight: 700, color: "#111827", margin: 0 }}>Execution Tracker</h3>
-          <span style={{ fontSize: 13, fontWeight: 700, color: "#5B5CEB" }}>{progress.toFixed(1)}%</span>
+          <span style={{ fontSize: 13, fontWeight: 700, color: "#F97316" }}>{progress.toFixed(1)}%</span>
         </div>
         <div style={{ height: 6, background: "#F1F5F9", borderRadius: 8, overflow: "hidden", marginBottom: 16 }}>
-          <div style={{ width: `${Math.min(progress, 100)}%`, height: "100%", borderRadius: 8, background: progress >= 100 ? "#22C55E" : "#5B5CEB", transition: "width 0.4s" }} />
+          <div style={{ width: `${Math.min(progress, 100)}%`, height: "100%", borderRadius: 8, background: progress >= 100 ? "#22C55E" : "#F97316", transition: "width 0.4s" }} />
         </div>
         {phases.length === 0 ? (
           <div style={{ textAlign: "center", padding: "24px 0", color: "#94A3B8" }}>
@@ -360,13 +360,13 @@ export default function ProjectDetailPage() {
               return (
                 <div key={phase.id} style={{ background: "#fff", borderRadius: 8, border: "1px solid #E5E7EB", overflow: "hidden" }}>
                   <div onClick={() => setExpandedPhase(isExpanded ? null : phase.id)} style={{ padding: "10px 14px", display: "flex", alignItems: "center", gap: 10, cursor: "pointer" }}>
-                    <div style={{ width: 28, height: 28, borderRadius: 6, background: "#EEF0FF", display: "flex", alignItems: "center", justifyContent: "center", color: "#5B5CEB" }}><Settings size={14} /></div>
+                    <div style={{ width: 28, height: 28, borderRadius: 6, background: "#FFF5F0", display: "flex", alignItems: "center", justifyContent: "center", color: "#F97316" }}><Settings size={14} /></div>
                     <div style={{ flex: 1 }}>
                       <div style={{ fontSize: 13, fontWeight: 600, color: "#111827" }}>{phase.phaseName}</div>
                       <div style={{ fontSize: 11, color: "#64748B" }}>{pDone}/{pTotal} done</div>
                     </div>
                     <div style={{ textAlign: "right" }}>
-                      <div style={{ fontSize: 12, fontWeight: 700, color: pPct >= 1 ? "#22C55E" : "#5B5CEB" }}>{Math.round(pPct * 100)}%</div>
+                      <div style={{ fontSize: 12, fontWeight: 700, color: pPct >= 1 ? "#22C55E" : "#F97316" }}>{Math.round(pPct * 100)}%</div>
                       <ChevronDown size={12} color="#94A3B8" style={{ transform: isExpanded ? "rotate(180deg)" : "none", transition: "transform 0.18s", marginLeft: "auto" }} />
                     </div>
                   </div>
@@ -459,10 +459,10 @@ export default function ProjectDetailPage() {
       <div style={{ background: "#fff", borderBottom: "1px solid #E5E7EB", padding: "14px 24px" }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
           <span style={{ fontSize: 12, fontWeight: 600, color: "#475569" }}>Overall Progress</span>
-          <span style={{ fontSize: 12, fontWeight: 700, color: "#5B5CEB" }}>{progress.toFixed(1)}%</span>
+          <span style={{ fontSize: 12, fontWeight: 700, color: "#F97316" }}>{progress.toFixed(1)}%</span>
         </div>
         <div style={{ height: 6, background: "#F1F5F9", borderRadius: 8, overflow: "hidden" }}>
-          <div style={{ width: `${Math.min(progress, 100)}%`, height: "100%", borderRadius: 8, background: progress >= 100 ? "#22C55E" : "#5B5CEB", transition: "width 0.4s" }} />
+          <div style={{ width: `${Math.min(progress, 100)}%`, height: "100%", borderRadius: 8, background: progress >= 100 ? "#22C55E" : "#F97316", transition: "width 0.4s" }} />
         </div>
       </div>
 

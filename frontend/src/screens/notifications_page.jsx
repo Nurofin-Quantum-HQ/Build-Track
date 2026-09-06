@@ -30,11 +30,11 @@ const typeIcons = {
 };
 
 const typeColors = {
-  approval: { bg: '#EEF0FF', color: '#5B5CEB' },
+  approval: { bg: '#FFF5F0', color: '#F97316' },
   payment: { bg: '#F0FDF4', color: '#22C55E' },
   inventory: { bg: '#FFF7ED', color: '#F97316' },
-  project: { bg: '#F3E8FF', color: '#8B5CF6' },
-  worker: { bg: '#EFF6FF', color: '#3B82F6' },
+  project: { bg: '#FFF7F0', color: '#EA580C' },
+  worker: { bg: '#FFF5F0', color: '#FB923C' },
   system: { bg: '#F1F5F9', color: '#64748B' },
 };
 
@@ -110,7 +110,7 @@ export default function NotificationsPage() {
             style={{
               padding: '8px 18px', borderRadius: 8,
               border: filter === t.id ? 'none' : `1px solid #E5E7EB`,
-              background: filter === t.id ? '#5B5CEB' : '#fff',
+              background: filter === t.id ? '#F97316' : '#fff',
               color: filter === t.id ? '#FFF' : '#64748B',
               fontWeight: 600, fontSize: 14, cursor: 'pointer',
               display: 'flex', alignItems: 'center', gap: 6, fontFamily: 'inherit',
@@ -132,7 +132,7 @@ export default function NotificationsPage() {
             return (
               <Card key={n._id || n.id} padding="16px 20px" hoverable
                 onClick={() => markAsRead(n._id || n.id)}
-                style={{ opacity: n.read ? 0.7 : 1, borderLeft: n.read ? `1px solid #E5E7EB` : `3px solid #5B5CEB` }}>
+                style={{ opacity: n.read ? 0.7 : 1, borderLeft: n.read ? `1px solid #E5E7EB` : `3px solid #F97316` }}>
                 <div style={{ display: 'flex', gap: 14, alignItems: 'flex-start' }}>
                   <div style={{ width: 38, height: 38, borderRadius: 10, background: n.read ? '#F1F5F9' : tc.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', color: n.read ? '#94A3B8' : tc.color, flexShrink: 0 }}>
                     {typeIcons[n.type] || <Bell size={18} />}

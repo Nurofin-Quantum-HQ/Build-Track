@@ -8,7 +8,7 @@ const ITEMS_PER_PAGE = 15;
 
 const ACTION_META = {
   create:   { icon: "+", bg: "#dcfce7", color: "#16a34a", border: "#bbf7d0", label: "Created" },
-  update:   { icon: "~", bg: "#dbeafe", color: "#2563eb", border: "#93c5fd", label: "Updated" },
+  update:   { icon: "~", bg: "#FFF5F0", color: "#EA580C", border: "#FDE8D8", label: "Updated" },
   delete:   { icon: "×", bg: "#fee2e2", color: "#dc2626", border: "#fca5a5", label: "Deleted" },
   approve:  { icon: "✓", bg: "#ccfbf1", color: "#0d9488", border: "#99f6e4", label: "Approved" },
 };
@@ -429,16 +429,16 @@ export default function AuditLogsPage() {
           </div>
           <div
             style={{
-              background: "#dbeafe",
+              background: "#FFF5F0",
               borderRadius: 14,
               padding: "18px 22px",
-              border: "1px solid #93c5fd",
+              border: "1px solid #FDE8D8",
             }}
           >
-            <div style={{ fontSize: 11, fontWeight: 700, color: "#2563eb", letterSpacing: "0.08em", marginBottom: 8 }}>
+            <div style={{ fontSize: 11, fontWeight: 700, color: "#EA580C", letterSpacing: "0.08em", marginBottom: 8 }}>
               UPDATES
             </div>
-            <div style={{ fontSize: 26, fontWeight: 800, color: "#1d4ed8" }}>{counts.update}</div>
+            <div style={{ fontSize: 26, fontWeight: 800, color: "#F97316" }}>{counts.update}</div>
           </div>
           <div
             style={{

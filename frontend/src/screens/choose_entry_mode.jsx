@@ -31,8 +31,8 @@ export default function ChooseEntryMode() {
       icon: <Mic size={28} />,
       title: "Voice Entry",
       desc: "Use speech-to-text for quick hands-free data entry",
-      color: "#8B5CF6",
-      bgColor: "#F3E8FF",
+      color: "#EA580C",
+      bgColor: "#FFF7F0",
       features: ["Natural speech input", "AI extracts quantities & costs", "Smart categorization"],
     },
     {
@@ -40,8 +40,8 @@ export default function ChooseEntryMode() {
       icon: <FileText size={28} />,
       title: "Manual Entry",
       desc: "Fill in transaction details manually with precision",
-      color: "#5B5CEB",
-      bgColor: "#EEF0FF",
+      color: "#F97316",
+      bgColor: "#FFF5F0",
       features: ["Structured form input", "Per-item transaction fields", "Full control over data"],
     },
   ];

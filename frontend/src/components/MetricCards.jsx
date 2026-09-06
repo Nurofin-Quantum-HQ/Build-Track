@@ -5,7 +5,7 @@ const fmtINR = (n) => {
   return `₹${Number(n).toLocaleString("en-IN")}`;
 };
 
-export function MetricCard({ icon, label, value, budget, color = "#2563eb", trend }) {
+export function MetricCard({ icon, label, value, budget, color = "#F97316", trend }) {
   const pct = budget > 0 ? Math.round((value / budget) * 100) : 0;
   const isOver = value > budget && budget > 0;
   const remaining = budget - value;

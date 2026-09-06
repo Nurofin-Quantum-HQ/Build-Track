@@ -14,6 +14,7 @@ import {
   AlertTriangle
 } from "lucide-react";
 import LightPremiumInput from "../components/ui/LightPremiumInput";
+import nurofinLogo from "../assets/nurofin-black.svg";
 
 const features = [
   { title: "Real-time dashboards",  desc: "Track every project metric live."  },
@@ -146,6 +147,7 @@ export default function SignUpPage() {
 
   return (
     <div
+      className="animated-orange-bg"
       style={{
         display: "flex",
         width: "100vw",
@@ -155,7 +157,6 @@ export default function SignUpPage() {
         alignItems: "center",
         justifyContent: "center",
         position: "relative",
-        background: "linear-gradient(135deg, #C7D2FE 0%, #EDE9FE 50%, #BAE6FD 100%)",
         boxSizing: "border-box"
       }}
     >
@@ -183,34 +184,70 @@ export default function SignUpPage() {
         {isDesktop && (
           <div style={{ display: "flex", flexDirection: "column", justifyContent: "center" }}>
 
-            <div className="animate-fade-up" style={{ display: "flex", alignItems: "center", gap: 10, animationDelay: "0.1s" }}>
-              <div style={{ width: 38, height: 38, borderRadius: 10, background: "linear-gradient(90deg, #6366f1 0%, #a855f7 100%)", display: "flex", alignItems: "center", justifyContent: "center", boxShadow: "0 4px 12px rgba(99, 102, 241, 0.15)" }}>
-                <Building size={19} color="#FFF" />
-              </div>
-              <div style={{ fontFamily: "'Outfit', sans-serif", fontSize: 23, fontWeight: "800", letterSpacing: "-0.5px" }}>
-                <span style={{ color: "#1F2937" }}>Build</span><span style={{ color: "#4F46E5" }}>Track</span>
-              </div>
+            <div className="animate-fade-up" style={{ display: "flex", alignItems: "center", gap: 20, animationDelay: "0.1s" }}>
+              <img
+                src="/buildtrack-logo.png"
+                alt="BuildTrack"
+                style={{
+                  width: 72,
+                  height: 72,
+                  borderRadius: 18,
+                  objectFit: "contain",
+                  boxShadow: "0 12px 32px rgba(249, 115, 22, 0.25)"
+                }}
+              />
+              <span style={{ fontFamily: "'Outfit', sans-serif", fontSize: 42, fontWeight: "800", color: "#0F172A", letterSpacing: "-1px", lineHeight: 1 }}>
+                BuildTrack
+              </span>
             </div>
 
-            <div style={{ marginTop: 36 }}>
-              <h1 className="animate-fade-up" style={{ fontFamily: "'Outfit', sans-serif", fontSize: "44px", fontWeight: "900", color: "#1F2937", lineHeight: 1.15, margin: "0 0 16px", letterSpacing: "-1.5px", animationDelay: "0.2s" }}>
+            <div
+              className="animate-fade-up"
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 8,
+                marginTop: 14,
+                padding: "6px 14px",
+                background: "rgba(255, 255, 255, 0.88)",
+                backdropFilter: "blur(16px)",
+                WebkitBackdropFilter: "blur(16px)",
+                border: "1px solid rgba(255, 255, 255, 0.9)",
+                borderRadius: "20px",
+                boxShadow: "0 4px 16px rgba(234, 88, 12, 0.12)",
+                width: "fit-content",
+                animationDelay: "0.15s"
+              }}
+            >
+              <span style={{ fontSize: "11px", fontWeight: "700", color: "#64748B", textTransform: "uppercase", letterSpacing: "0.06em", lineHeight: 1 }}>
+                Powered by
+              </span>
+              <img
+                src={nurofinLogo}
+                alt="Nurofin"
+                style={{ height: 18, width: "auto", objectFit: "contain", display: "block" }}
+              />
+            </div>
+
+            <div style={{ marginTop: 28 }}>
+              <h1 className="animate-fade-up" style={{ fontFamily: "'Outfit', sans-serif", fontSize: "44px", fontWeight: "900", color: "#0F172A", lineHeight: 1.15, margin: "0 0 16px", letterSpacing: "-1.5px", animationDelay: "0.2s" }}>
                 Build smarter.<br />
-                <span style={{ background: "linear-gradient(135deg, #4F46E5 0%, #06B6D4 100%)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>Track everything.</span>
+                <span style={{ background: "linear-gradient(135deg, #EA580C 0%, #F97316 100%)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>Track everything.</span>
               </h1>
 
-              <p className="animate-fade-up" style={{ fontSize: "16px", color: "#6F7C8F", lineHeight: 1.7, margin: "0 0 44px", animationDelay: "0.3s" }}>
+              <p className="animate-fade-up" style={{ fontSize: "16px", color: "#334155", lineHeight: 1.7, margin: "0 0 44px", animationDelay: "0.3s", fontWeight: "500" }}>
                 From site management to financial reporting — everything your construction team needs, in one place.
               </p>
 
               <div className="animate-fade-up" style={{ display: "flex", flexDirection: "column", gap: "24px", animationDelay: "0.4s" }}>
                 {features.map((item, idx) => (
                   <div key={idx} style={{ display: "flex", alignItems: "flex-start", gap: "14px" }}>
-                    <div style={{ width: "20px", height: "20px", borderRadius: "50%", background: "#EEF2FF", border: "1px solid #C7D2FE", display: "flex", alignItems: "center", justifyContent: "center", color: "#4F46E5", flexShrink: 0, marginTop: "2px" }}>
-                      <CheckCircle size={12} />
+                    <div style={{ width: "24px", height: "24px", borderRadius: "50%", background: "#FFFFFF", border: "1.5px solid rgba(249, 115, 22, 0.4)", display: "flex", alignItems: "center", justifyContent: "center", color: "#EA580C", flexShrink: 0, marginTop: "1px", boxShadow: "0 2px 8px rgba(234, 88, 12, 0.12)" }}>
+                      <CheckCircle size={14} />
                     </div>
                     <div>
-                      <h4 style={{ margin: "0 0 2px", fontSize: "14px", fontWeight: "700", color: "#1F2937" }}>{item.title}</h4>
-                      <p style={{ margin: 0, fontSize: "13px", color: "#8E9AA8", lineHeight: 1.45 }}>{item.desc}</p>
+                      <h4 style={{ margin: "0 0 2px", fontSize: "14px", fontWeight: "700", color: "#0F172A" }}>{item.title}</h4>
+                      <p style={{ margin: 0, fontSize: "13px", color: "#475569", lineHeight: 1.45, fontWeight: "500" }}>{item.desc}</p>
                     </div>
                   </div>
                 ))}
@@ -223,7 +260,7 @@ export default function SignUpPage() {
 
         <div style={{ display: "flex", alignItems: "center", justifyContent: "center", width: "100%" }}>
           <div
-            className={`glass-card animate-fade-up ${shake ? "shake-trigger" : ""}`}
+            className={`login-glass-card animate-fade-up ${shake ? "shake-trigger" : ""}`}
             style={{
               width: "100%",
               maxWidth: 440,
@@ -237,19 +274,53 @@ export default function SignUpPage() {
           >
 
             {!isDesktop && (
-              <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 28, justifyContent: "center" }}>
-                <div style={{ width: 34, height: 34, borderRadius: 8, background: "linear-gradient(90deg, #6366f1 0%, #a855f7 100%)", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                  <Building size={16} color="#FFF" />
+              <div style={{ display: "flex", flexDirection: "column", alignItems: "center", marginBottom: 28 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 14, justifyContent: "center" }}>
+                  <img
+                    src="/buildtrack-logo.png"
+                    alt="BuildTrack"
+                    style={{
+                      width: 54,
+                      height: 54,
+                      borderRadius: 14,
+                      objectFit: "contain",
+                      boxShadow: "0 10px 26px rgba(249, 115, 22, 0.22)"
+                    }}
+                  />
+                  <span style={{ fontFamily: "'Outfit', sans-serif", fontSize: 32, fontWeight: "800", color: "#111827", letterSpacing: "-0.8px", lineHeight: 1 }}>
+                    BuildTrack
+                  </span>
                 </div>
-                <div style={{ fontFamily: "'Outfit', sans-serif", fontSize: 20, fontWeight: "800", letterSpacing: "-0.5px" }}>
-                  <span style={{ color: "#1F2937" }}>Build</span><span style={{ color: "#4F46E5" }}>Track</span>
+                <div
+                  style={{
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: 7,
+                    marginTop: 10,
+                    padding: "5px 12px",
+                    background: "rgba(255, 255, 255, 0.75)",
+                    backdropFilter: "blur(12px)",
+                    WebkitBackdropFilter: "blur(12px)",
+                    border: "1px solid rgba(255, 255, 255, 0.8)",
+                    borderRadius: "20px",
+                    boxShadow: "0 2px 8px rgba(15, 23, 42, 0.04)"
+                  }}
+                >
+                  <span style={{ fontSize: "10.5px", fontWeight: "700", color: "#64748B", textTransform: "uppercase", letterSpacing: "0.06em", lineHeight: 1 }}>
+                    Powered by
+                  </span>
+                  <img
+                    src={nurofinLogo}
+                    alt="Nurofin"
+                    style={{ height: 16, width: "auto", objectFit: "contain", display: "block" }}
+                  />
                 </div>
               </div>
             )}
 
             <div style={{ marginBottom: 32, textAlign: isDesktop ? "left" : "center" }}>
-              <h2 style={{ fontSize: "23px", fontWeight: "800", color: "#1F2937", margin: "0 0 6px", letterSpacing: "-0.5px" }}>Create your account</h2>
-              <p style={{ margin: 0, fontSize: "13.5px", color: "#8E9AA8", fontWeight: "500" }}>Start your 14-day free trial. No credit card required.</p>
+              <h2 style={{ fontSize: "24px", fontWeight: "800", color: "#111827", margin: "0 0 6px", letterSpacing: "-0.5px" }}>Create your account</h2>
+              <p style={{ margin: 0, fontSize: "14px", color: "#64748B", fontWeight: "500" }}>Start your 14-day free trial. No credit card required.</p>
             </div>
 
             {serverErr && (
@@ -311,7 +382,7 @@ export default function SignUpPage() {
                     onClick={handleSendOtp}
                     disabled={otpLoading || !email.trim()}
                     style={{
-                      background: "linear-gradient(90deg, #6366f1 0%, #a855f7 100%)",
+                      background: "linear-gradient(90deg, #F97316 0%, #FB923C 100%)",
                       color: "#fff",
                       border: "none",
                       borderRadius: 8,
@@ -321,7 +392,7 @@ export default function SignUpPage() {
                       fontWeight: "700",
                       cursor: (otpLoading || !email.trim()) ? "not-allowed" : "pointer",
                       opacity: (otpLoading || !email.trim()) ? 0.6 : 1,
-                      boxShadow: "0 4px 14px rgba(99, 102, 241, 0.18)"
+                      boxShadow: "0 4px 14px rgba(249, 115, 22, 0.18)"
                     }}
                   >
                     {otpLoading ? "SENDING..." : "VERIFY"}
@@ -381,78 +452,76 @@ export default function SignUpPage() {
                     </button>
                   </div>
                   <div style={{ display: 'flex', justifyContent: 'flex-start', marginTop: -14, marginBottom: 14 }}>
-                    <button type="button" onClick={handleSendOtp} style={{ background: 'none', border: 'none', color: '#6366F1', fontSize: '11px', fontWeight: '700', cursor: 'pointer', padding: 0 }}>Resend Code</button>
+                    <button type="button" onClick={handleSendOtp} style={{ background: 'none', border: 'none', color: '#F97316', fontSize: '11px', fontWeight: '700', cursor: 'pointer', padding: 0 }}>Resend Code</button>
                   </div>
                 </div>
               )}
 
               {isEmailVerified && (
                 <>
-                  <div style={{ position: "relative" }}>
-                    <LightPremiumInput
-                      type={showPass ? "text" : "password"}
-                      label="Password"
-                      icon={Lock}
-                      value={password}
-                      onChange={e => {
-                        setPassword(e.target.value);
-                        setErrors(p => ({...p, password: ""}));
-                        setServerErr("");
-                      }}
-                      error={errors.password}
-                      autoComplete="new-password"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setShowPass(!showPass)}
-                      style={{
-                        position: "absolute",
-                        right: 14,
-                        top: 17,
-                        background: "none",
-                        border: "none",
-                        color: "#8E9AA8",
-                        cursor: "pointer",
-                        padding: 4,
-                        zIndex: 30
-                      }}
-                    >
-                      {showPass ? <EyeOff size={16} /> : <Eye size={16} />}
-                    </button>
-                  </div>
+                  <LightPremiumInput
+                    type={showPass ? "text" : "password"}
+                    label="Password"
+                    icon={Lock}
+                    value={password}
+                    onChange={e => {
+                      setPassword(e.target.value);
+                      setErrors(p => ({...p, password: ""}));
+                      setServerErr("");
+                    }}
+                    error={errors.password}
+                    autoComplete="new-password"
+                    rightElement={
+                      <button
+                        type="button"
+                        onClick={() => setShowPass(!showPass)}
+                        style={{
+                          background: "none",
+                          border: "none",
+                          color: "#94A3B8",
+                          cursor: "pointer",
+                          padding: 4,
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center"
+                        }}
+                      >
+                        {showPass ? <EyeOff size={16} /> : <Eye size={16} />}
+                      </button>
+                    }
+                  />
 
-                  <div style={{ position: "relative" }}>
-                    <LightPremiumInput
-                      type={showConfirm ? "text" : "password"}
-                      label="Confirm Password"
-                      icon={Shield}
-                      value={confirm}
-                      onChange={e => {
-                        setConfirm(e.target.value);
-                        setErrors(p => ({...p, confirm: ""}));
-                        setServerErr("");
-                      }}
-                      error={errors.confirm}
-                      autoComplete="new-password"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setShowConfirm(!showConfirm)}
-                      style={{
-                        position: "absolute",
-                        right: 14,
-                        top: 17,
-                        background: "none",
-                        border: "none",
-                        color: "#8E9AA8",
-                        cursor: "pointer",
-                        padding: 4,
-                        zIndex: 30
-                      }}
-                    >
-                      {showConfirm ? <EyeOff size={16} /> : <Eye size={16} />}
-                    </button>
-                  </div>
+                  <LightPremiumInput
+                    type={showConfirm ? "text" : "password"}
+                    label="Confirm Password"
+                    icon={Shield}
+                    value={confirm}
+                    onChange={e => {
+                      setConfirm(e.target.value);
+                      setErrors(p => ({...p, confirm: ""}));
+                      setServerErr("");
+                    }}
+                    error={errors.confirm}
+                    autoComplete="new-password"
+                    rightElement={
+                      <button
+                        type="button"
+                        onClick={() => setShowConfirm(!showConfirm)}
+                        style={{
+                          background: "none",
+                          border: "none",
+                          color: "#94A3B8",
+                          cursor: "pointer",
+                          padding: 4,
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center"
+                        }}
+                      >
+                        {showConfirm ? <EyeOff size={16} /> : <Eye size={16} />}
+                      </button>
+                    }
+                  />
 
                   <div style={{ marginBottom: 24, marginTop: 10 }}>
                     <label style={{ display: "flex", alignItems: "flex-start", gap: 10, cursor: "pointer" }}>
@@ -460,8 +529,8 @@ export default function SignUpPage() {
                         onClick={() => { setAgreed(v => !v); setErrors(p => ({...p, agreed: ""})); }}
                         style={{
                           width: 18, height: 18, borderRadius: 5, flexShrink: 0, marginTop: 2,
-                          border: `2px solid ${errors.agreed ? "#dc2626" : agreed ? "#6366F1" : "#d0d0d0"}`,
-                          background: agreed ? "#6366F1" : "#fff",
+                          border: `2px solid ${errors.agreed ? "#dc2626" : agreed ? "#F97316" : "#d0d0d0"}`,
+                          background: agreed ? "#F97316" : "#fff",
                           display: "flex", alignItems: "center", justifyContent: "center",
                           transition: "all 0.15s", cursor: "pointer",
                         }}>
@@ -473,9 +542,9 @@ export default function SignUpPage() {
                       </div>
                       <span style={{ fontSize: "13px", color: "#71717A", lineHeight: 1.6, fontWeight: "500" }}>
                         By creating an account, you agree to our{" "}
-                        <span style={{ color: "#6366F1", fontWeight: "700", cursor: "pointer" }}>Terms</span>
+                        <span style={{ color: "#F97316", fontWeight: "700", cursor: "pointer" }}>Terms</span>
                         {" "}and{" "}
-                        <span style={{ color: "#6366F1", fontWeight: "700", cursor: "pointer" }}>Privacy Policy</span>.
+                        <span style={{ color: "#F97316", fontWeight: "700", cursor: "pointer" }}>Privacy Policy</span>.
                       </span>
                     </label>
                     {errors.agreed && (
@@ -495,7 +564,7 @@ export default function SignUpPage() {
                       padding: "14px",
                       borderRadius: 12,
                       border: "none",
-                      background: "linear-gradient(90deg, #6366f1 0%, #a855f7 100%)",
+                      background: "linear-gradient(90deg, #F97316 0%, #FB923C 100%)",
                       color: "#FFF",
                       fontWeight: "800",
                       fontSize: "13.5px",
@@ -506,7 +575,7 @@ export default function SignUpPage() {
                       alignItems: "center",
                       justifyContent: "center",
                       gap: 8,
-                      boxShadow: "0 4px 14px rgba(99, 102, 241, 0.18)",
+                      boxShadow: "0 4px 14px rgba(249, 115, 22, 0.18)",
                     }}
                   >
                     {loading && <span className="spinner-spin" style={{ width: 14, height: 14, border: "2px solid rgba(255,255,255,0.3)", borderTopColor: "#FFF", borderRadius: "50%" }} />}
@@ -519,7 +588,7 @@ export default function SignUpPage() {
             </form>
 
             <div style={{ textAlign: "center", marginTop: 28 }}>
-              <p style={{ margin: "0 0 20px", fontSize: "13px", color: "#8E9AA8", fontWeight: "500" }}>
+              <p style={{ margin: "0 0 20px", fontSize: "13.5px", color: "#64748B", fontWeight: "500" }}>
                 Already have an account?{" "}
                 <button
                   type="button"
@@ -530,15 +599,16 @@ export default function SignUpPage() {
                     border: "none",
                     padding: 0,
                     cursor: "pointer",
-                    color: "#4F46E5",
-                    fontWeight: "700"
+                    color: "#EA580C",
+                    fontWeight: "700",
+                    fontSize: "13.5px"
                   }}
                 >
                   Log in
                 </button>
               </p>
 
-              <div className="login-footer-links" style={{ display: "flex", justifyItems: "center", justifyContent: "center", gap: 12, fontSize: "11px", color: "#8E9AA8", fontWeight: "600" }}>
+              <div className="login-footer-links" style={{ display: "flex", justifyItems: "center", justifyContent: "center", gap: 12, fontSize: "11px", color: "#94A3B8", fontWeight: "600" }}>
                 <span className="login-footer-link">Privacy Policy</span>
                 <span>·</span>
                 <span className="login-footer-link">Terms</span>

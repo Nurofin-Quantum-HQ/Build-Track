@@ -52,7 +52,7 @@ function Accordion({ title, icon, defaultOpen, children, count, subtitle }) {
   return (
     <div style={{ marginBottom: 14, background: "#fff", borderRadius: 12, border: "1px solid #E5E7EB", overflow: "hidden" }}>
       <div onClick={() => setOpen(!open)} style={{ padding: "14px 18px", display: "flex", alignItems: "center", gap: 10, cursor: "pointer", userSelect: "none" }}>
-        <span style={{ fontSize: 16, flexShrink: 0, color: '#5B5CEB', display: 'flex' }}>{icon}</span>
+        <span style={{ fontSize: 16, flexShrink: 0, color: '#F97316', display: 'flex' }}>{icon}</span>
         <div style={{ flex: 1 }}>
           <span style={{ fontSize: 14, fontWeight: 600, color: "#111827" }}>{title}</span>
           {(count !== undefined || subtitle) && (
@@ -85,9 +85,9 @@ function ChipSelect({ options, selected, onChange, multi }) {
             style={{
               padding: "6px 14px", borderRadius: 6, fontSize: 13, fontWeight: 500,
               cursor: "pointer", transition: "all 0.15s",
-              background: isOn ? "#5B5CEB" : "#F8FAFC",
+              background: isOn ? "#F97316" : "#F8FAFC",
               color: isOn ? "#fff" : "#475569",
-              border: `1px solid ${isOn ? "#5B5CEB" : "#E5E7EB"}`,
+              border: `1px solid ${isOn ? "#F97316" : "#E5E7EB"}`,
               fontFamily: 'inherit',
             }}>
             {opt}
@@ -124,8 +124,8 @@ function CheckboxGroup({ items, selected, onChange, columns = 2 }) {
         const isOn = selected.includes(item);
         return (
           <label key={item} onClick={() => onChange(isOn ? selected.filter(s => s !== item) : [...selected, item])}
-            style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 10px", borderRadius: 6, cursor: "pointer", fontSize: 13, color: "#475569", userSelect: "none", background: isOn ? "#EEF0FF" : "transparent", transition: "background 0.15s" }}>
-            <div style={{ width: 16, height: 16, borderRadius: 4, border: `2px solid ${isOn ? "#5B5CEB" : "#CBD5E1"}`, background: isOn ? "#5B5CEB" : "transparent", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, transition: "all 0.15s" }}>
+            style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 10px", borderRadius: 6, cursor: "pointer", fontSize: 13, color: "#475569", userSelect: "none", background: isOn ? "#FFF5F0" : "transparent", transition: "background 0.15s" }}>
+            <div style={{ width: 16, height: 16, borderRadius: 4, border: `2px solid ${isOn ? "#F97316" : "#CBD5E1"}`, background: isOn ? "#F97316" : "transparent", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, transition: "all 0.15s" }}>
               {isOn && <Check size={10} color="#fff" strokeWidth={3} />}
             </div>
             {item}
@@ -762,10 +762,10 @@ export default function NewProjectPage() {
             </div>
           </div>
           <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-            <button onClick={downloadPhaseTemplate} style={{ flex: 1, padding: "9px 14px", background: "#fff", border: "1.5px solid #E5E7EB", borderRadius: 8, fontSize: 13, fontWeight: 700, color: "#5B5CEB", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 6, fontFamily: "inherit" }}>
+            <button onClick={downloadPhaseTemplate} style={{ flex: 1, padding: "9px 14px", background: "#fff", border: "1.5px solid #E5E7EB", borderRadius: 8, fontSize: 13, fontWeight: 700, color: "#F97316", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 6, fontFamily: "inherit" }}>
               <Upload size={14} style={{ transform: "rotate(180deg)" }} /> Download Template
             </button>
-            <button onClick={() => csvFileInputRef.current?.click()} disabled={isUploadingCsv} style={{ flex: 1, padding: "9px 14px", background: "#5B5CEB", border: "none", borderRadius: 8, fontSize: 13, fontWeight: 700, color: "#fff", cursor: isUploadingCsv ? "not-allowed" : "pointer", opacity: isUploadingCsv ? 0.7 : 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 6, fontFamily: "inherit" }}>
+            <button onClick={() => csvFileInputRef.current?.click()} disabled={isUploadingCsv} style={{ flex: 1, padding: "9px 14px", background: "#F97316", border: "none", borderRadius: 8, fontSize: 13, fontWeight: 700, color: "#fff", cursor: isUploadingCsv ? "not-allowed" : "pointer", opacity: isUploadingCsv ? 0.7 : 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 6, fontFamily: "inherit" }}>
               <Upload size={14} /> {isUploadingCsv ? "Uploading..." : "Upload Phase CSV"}
             </button>
             <button onClick={exportCurrentPhasesCsv} style={{ padding: "9px 14px", background: "#F1F5F9", border: "1px solid #E5E7EB", borderRadius: 8, fontSize: 13, fontWeight: 600, color: "#475569", cursor: "pointer", fontFamily: "inherit" }}>
@@ -787,8 +787,8 @@ export default function NewProjectPage() {
 
         <div style={{ maxWidth: 800, margin: "0 auto" }}>
           {!isEditMode && limitMaxProjects !== -1 && (
-            <div style={{ padding: '12px', background: '#EEF2FF', borderRadius: 8, border: '1px solid #C7D2FE', display: 'flex', gap: 8, marginBottom: 20 }}>
-              <div style={{ flexShrink: 0, color: '#5B5CEB' }}>
+            <div style={{ padding: '12px', background: '#FFF5F0', borderRadius: 8, border: '1px solid #FDE8D8', display: 'flex', gap: 8, marginBottom: 20 }}>
+              <div style={{ flexShrink: 0, color: '#F97316' }}>
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>
               </div>
               <div style={{ fontSize: 13, color: '#111827' }}>
@@ -822,7 +822,7 @@ export default function NewProjectPage() {
             <div style={{ marginBottom: 14 }}>
               <label style={labelStyle}>Project Code</label>
               <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 14px", background: "#F8FAFC", borderRadius: 8, border: "1px solid #E5E7EB" }}>
-                <Hash size={14} color="#5B5CEB" />
+                <Hash size={14} color="#F97316" />
                 <span style={{ fontSize: 14, fontWeight: 700, color: "#111827", fontFamily: "monospace" }}>{projectCode}</span>
               </div>
             </div>
@@ -837,7 +837,7 @@ export default function NewProjectPage() {
 
             <div className="tour-client" style={{ marginBottom: 14 }}>
               <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 10 }}>
-                <User size={14} color="#5B5CEB" />
+                <User size={14} color="#F97316" />
                 <span style={{ fontSize: 13, fontWeight: 600, color: "#111827" }}>Client Details</span>
               </div>
               <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: 10 }}>
@@ -848,7 +848,7 @@ export default function NewProjectPage() {
 
             <div className="tour-manager">
               <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 10 }}>
-                <HardHat size={14} color="#5B5CEB" />
+                <HardHat size={14} color="#F97316" />
                 <span style={{ fontSize: 13, fontWeight: 600, color: "#111827" }}>Site Team</span>
               </div>
               <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: 10 }}>
@@ -978,7 +978,7 @@ export default function NewProjectPage() {
                 <div>
                   <label style={labelStyle}>Materials</label>
                   <div style={{ display: "flex", alignItems: "center", gap: 6, background: "#fff", border: "1px solid #E5E7EB", borderRadius: 8, padding: "10px 12px" }}>
-                    <DollarSign size={14} color="#5B5CEB" />
+                    <DollarSign size={14} color="#F97316" />
                     <input value={budgetMaterial} onChange={e => setBudgetMaterial(e.target.value)} placeholder="0" type="number" style={{ flex: 1, border: "none", background: "transparent", outline: "none", fontSize: 14, color: "#111827", fontFamily: "inherit" }} />
                   </div>
                 </div>
@@ -992,7 +992,7 @@ export default function NewProjectPage() {
                 <div>
                   <label style={labelStyle}>Equipment</label>
                   <div style={{ display: "flex", alignItems: "center", gap: 6, background: "#fff", border: "1px solid #E5E7EB", borderRadius: 8, padding: "10px 12px" }}>
-                    <DollarSign size={14} color="#8B5CF6" />
+                    <DollarSign size={14} color="#EA580C" />
                     <input value={budgetEquipment} onChange={e => setBudgetEquipment(e.target.value)} placeholder="0" type="number" style={{ flex: 1, border: "none", background: "transparent", outline: "none", fontSize: 14, color: "#111827", fontFamily: "inherit" }} />
                   </div>
                 </div>
@@ -1021,12 +1021,12 @@ export default function NewProjectPage() {
             <div style={{ background: "#F8FAFC", borderRadius: 8, border: "1px solid #E5E7EB", padding: "12px 14px", marginBottom: 10 }}>
               <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
                 <span style={{ fontSize: 13, fontWeight: 700, color: "#111827" }}>CONSTRUCTION PHASES</span>
-                <span style={{ fontSize: 12, fontWeight: 600, color: "#5B5CEB", cursor: "pointer" }} onClick={selectAllPhases}>Select All</span>
+                <span style={{ fontSize: 12, fontWeight: 600, color: "#F97316", cursor: "pointer" }} onClick={selectAllPhases}>Select All</span>
                 <span style={{ fontSize: 12, color: "#CBD5E1" }}>|</span>
                 <span style={{ fontSize: 12, fontWeight: 600, color: "#94A3B8", cursor: "pointer" }} onClick={clearAllPhases}>Clear</span>
               </div>
               <div style={{ fontSize: 12, color: "#64748B", marginTop: 2 }}>Select phases and activities required.</div>
-              <div style={{ fontSize: 13, fontWeight: 700, color: "#5B5CEB", marginTop: 6 }}>{selectedCount} of {totalCount} activities selected</div>
+              <div style={{ fontSize: 13, fontWeight: 700, color: "#F97316", marginTop: 6 }}>{selectedCount} of {totalCount} activities selected</div>
             </div>
             <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
               {phases.map((phase, idx) => {
@@ -1038,7 +1038,7 @@ export default function NewProjectPage() {
                   <div key={phase.id} style={{ background: "#fff", borderRadius: 8, border: "1px solid #E5E7EB", overflow: "hidden" }}>
                     <div style={{ display: "flex", alignItems: "center", padding: "10px 14px", gap: 10 }}>
                       <div onClick={() => togglePhaseSelection(phase.id)}
-                        style={{ width: 20, height: 20, borderRadius: 5, border: `1.5px solid ${allSel ? "#5B5CEB" : "#CBD5E1"}`, background: allSel ? "#5B5CEB" : "transparent", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, cursor: "pointer", transition: "all 0.15s" }}>
+                        style={{ width: 20, height: 20, borderRadius: 5, border: `1.5px solid ${allSel ? "#F97316" : "#CBD5E1"}`, background: allSel ? "#F97316" : "transparent", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, cursor: "pointer", transition: "all 0.15s" }}>
                         {allSel && <Check size={11} color="#fff" strokeWidth={3} />}
                       </div>
                       <div style={{ flex: 1, minWidth: 0 }}>
@@ -1060,7 +1060,7 @@ export default function NewProjectPage() {
                           return (
                             <div key={act.id} onClick={() => toggleActivitySelection(act.id)}
                               style={{ display: "flex", alignItems: "center", padding: "8px 14px 8px 18px", gap: 8, cursor: "pointer", borderTop: "1px solid #F8FAFC" }}>
-                              <div style={{ width: 18, height: 18, borderRadius: 4, border: `1.5px solid ${isSel ? "#5B5CEB" : "#CBD5E1"}`, background: isSel ? "#5B5CEB" : "transparent", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, transition: "all 0.15s" }}>
+                              <div style={{ width: 18, height: 18, borderRadius: 4, border: `1.5px solid ${isSel ? "#F97316" : "#CBD5E1"}`, background: isSel ? "#F97316" : "transparent", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, transition: "all 0.15s" }}>
                                 {isSel && <Check size={10} color="#fff" strokeWidth={3} />}
                               </div>
                               <span style={{ flex: 1, fontSize: 13, fontWeight: isSel ? 500 : 400, color: isSel ? "#111827" : "#64748B" }}>{act.name}</span>
@@ -1068,7 +1068,7 @@ export default function NewProjectPage() {
                           );
                         })}
                         <div onClick={() => handleAddCustomActivity(phase.id)} style={{ padding: "6px 14px 10px 18px", cursor: "pointer" }}>
-                          <span style={{ fontSize: 13, fontWeight: 600, color: "#5B5CEB" }}>+ Add Custom Activity</span>
+                          <span style={{ fontSize: 13, fontWeight: 600, color: "#F97316" }}>+ Add Custom Activity</span>
                         </div>
                       </div>
                     )}
@@ -1077,14 +1077,14 @@ export default function NewProjectPage() {
               })}
             </div>
             <div onClick={handleAddCustomPhase} style={{ marginTop: 10, cursor: "pointer", padding: "4px 0" }}>
-              <span style={{ fontSize: 14, fontWeight: 600, color: "#5B5CEB" }}>+ Add Custom Phase</span>
+              <span style={{ fontSize: 14, fontWeight: 600, color: "#F97316" }}>+ Add Custom Phase</span>
             </div>
           </Accordion>
 
           <Accordion title="Site Photo" icon={<Camera size={16} />}>
             <div className="tour-site-photos">
               <input ref={fileInputRef} type="file" accept="image/png, image/jpeg, image/gif, image/webp" style={{ display: "none" }} onChange={e => handlePhotoFile(e.target.files[0])} />
-            <div onClick={() => fileInputRef.current.click()} style={{ border: `2px dashed ${photoPreview ? "#5B5CEB" : "#E5E7EB"}`, borderRadius: 8, padding: photoPreview ? 0 : "24px 20px", background: photoPreview ? "transparent" : "#F8FAFC", display: "flex", flexDirection: "column", alignItems: "center", gap: 10, cursor: "pointer", transition: "all 0.2s", overflow: "hidden", minHeight: 100, justifyContent: "center" }}>
+            <div onClick={() => fileInputRef.current.click()} style={{ border: `2px dashed ${photoPreview ? "#F97316" : "#E5E7EB"}`, borderRadius: 8, padding: photoPreview ? 0 : "24px 20px", background: photoPreview ? "transparent" : "#F8FAFC", display: "flex", flexDirection: "column", alignItems: "center", gap: 10, cursor: "pointer", transition: "all 0.2s", overflow: "hidden", minHeight: 100, justifyContent: "center" }}>
               {photoPreview ? (
                 <div style={{ position: "relative", width: "100%" }}>
                   <img src={photoPreview} alt="preview" style={{ width: "100%", maxHeight: 180, objectFit: "cover", display: "block", borderRadius: 8 }} />
@@ -1094,8 +1094,8 @@ export default function NewProjectPage() {
                 </div>
               ) : (
                 <>
-                  <div style={{ width: 40, height: 40, borderRadius: "50%", background: "#EEF0FF", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                    <Upload size={18} color="#5B5CEB" />
+                  <div style={{ width: 40, height: 40, borderRadius: "50%", background: "#FFF5F0", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                    <Upload size={18} color="#F97316" />
                   </div>
                   <div style={{ textAlign: "center" }}>
                     <div style={{ fontSize: 14, fontWeight: 600, color: "#475569" }}>Click to upload site photo</div>
@@ -1110,8 +1110,8 @@ export default function NewProjectPage() {
           <Accordion title="Project Documents & Blueprints" icon={<FileText size={16} />} count={documentFiles.length + documents.length}>
             <input type="file" multiple accept=".pdf,image/*,.doc,.docx" onChange={handleDocumentFiles} style={{ display: "none" }} id="doc-upload-input" />
             <label htmlFor="doc-upload-input" style={{ border: "2px dashed #E5E7EB", borderRadius: 8, padding: "16px", background: "#F8FAFC", display: "flex", alignItems: "center", justifyContent: "center", gap: 8, cursor: "pointer", marginBottom: 12 }}>
-              <Upload size={16} color="#5B5CEB" />
-              <span style={{ fontSize: 13, fontWeight: 600, color: "#5B5CEB" }}>Upload Documents / Blueprints (PDF, Images)</span>
+              <Upload size={16} color="#F97316" />
+              <span style={{ fontSize: 13, fontWeight: 600, color: "#F97316" }}>Upload Documents / Blueprints (PDF, Images)</span>
             </label>
 
             {(documents.length > 0 || documentFiles.length > 0) && (
@@ -1123,8 +1123,8 @@ export default function NewProjectPage() {
                   </div>
                 ))}
                 {documentFiles.map((file, idx) => (
-                  <div key={idx} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", background: "#EEF0FF", padding: "8px 12px", borderRadius: 6, fontSize: 13 }}>
-                    <span style={{ color: "#3B82F6", fontWeight: 500, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{file.name} (New)</span>
+                  <div key={idx} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", background: "#FFF5F0", padding: "8px 12px", borderRadius: 6, fontSize: 13 }}>
+                    <span style={{ color: "#F97316", fontWeight: 500, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{file.name} (New)</span>
                     <button onClick={() => removeDocumentFile(idx)} style={{ border: "none", background: "none", color: "#DC2626", cursor: "pointer" }}><X size={14} /></button>
                   </div>
                 ))}
@@ -1151,7 +1151,7 @@ export default function NewProjectPage() {
 
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginTop: 12 }}>
             <button className="tour-save-btn" onClick={handleSubmit} disabled={saving}
-              style={{ minHeight: 46, padding: "12px 0", background: "#5B5CEB", color: "#fff", border: "none", borderRadius: 8, fontWeight: 700, fontSize: 14, cursor: saving ? "not-allowed" : "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 8, opacity: saving ? 0.6 : 1, transition: "background 0.2s", fontFamily: 'inherit' }}>
+              style={{ minHeight: 46, padding: "12px 0", background: "#F97316", color: "#fff", border: "none", borderRadius: 8, fontWeight: 700, fontSize: 14, cursor: saving ? "not-allowed" : "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 8, opacity: saving ? 0.6 : 1, transition: "background 0.2s", fontFamily: 'inherit' }}>
               {saving ? <><SpinnerIcon /> Saving\u2026</> : isEditMode ? <><Check size={16} /> Update Project</> : <><Plus size={16} /> Create Project</>}
             </button>
             <button onClick={() => navigate("/projects")} disabled={saving}

@@ -72,8 +72,8 @@ export default function ProjectMemberModal({ isOpen, onClose, project, onUpdateM
       <div style={{ background: "#fff", borderRadius: 16, maxWidth: 520, width: "100%", padding: 24, boxShadow: "0 20px 25px -5px rgba(0,0,0,0.1)", animation: "fadeUp 200ms ease" }}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-            <div style={{ width: 36, height: 36, borderRadius: "50%", background: "#EEF0FF", display: "flex", alignItems: "center", justifyContent: "center" }}>
-              <UserPlus size={18} color="#5B5CEB" />
+            <div style={{ width: 36, height: 36, borderRadius: "50%", background: "#FFF5F0", display: "flex", alignItems: "center", justifyContent: "center" }}>
+              <UserPlus size={18} color="#F97316" />
             </div>
             <div>
               <h3 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: "#111827" }}>Manage Project Members</h3>
@@ -98,7 +98,7 @@ export default function ProjectMemberModal({ isOpen, onClose, project, onUpdateM
               <option value="Contractor">Contractor</option>
               <option value="Worker">Worker</option>
             </select>
-            <button onClick={handleAddMember} style={{ padding: "8px 14px", background: "#5B5CEB", color: "#fff", border: "none", borderRadius: 8, fontWeight: 600, fontSize: 13, cursor: "pointer" }}>
+            <button onClick={handleAddMember} style={{ padding: "8px 14px", background: "#F97316", color: "#fff", border: "none", borderRadius: 8, fontWeight: 600, fontSize: 13, cursor: "pointer" }}>
               Add
             </button>
           </div>
@@ -114,7 +114,7 @@ export default function ProjectMemberModal({ isOpen, onClose, project, onUpdateM
               {team.map(m => (
                 <div key={m.userId} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", background: "#fff", border: "1px solid #E5E7EB", borderRadius: 10, padding: "10px 14px" }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                    <div style={{ width: 32, height: 32, borderRadius: "50%", background: "#5B5CEB", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 13, fontWeight: 700 }}>
+                    <div style={{ width: 32, height: 32, borderRadius: "50%", background: "#F97316", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 13, fontWeight: 700 }}>
                       {m.name ? m.name.charAt(0).toUpperCase() : "U"}
                     </div>
                     <div>
@@ -123,7 +123,7 @@ export default function ProjectMemberModal({ isOpen, onClose, project, onUpdateM
                     </div>
                   </div>
                   <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                    <span style={{ background: "#EEF0FF", color: "#5B5CEB", padding: "4px 10px", borderRadius: 20, fontSize: 11, fontWeight: 700 }}>
+                    <span style={{ background: "#FFF5F0", color: "#F97316", padding: "4px 10px", borderRadius: 20, fontSize: 11, fontWeight: 700 }}>
                       {m.role}
                     </span>
                     <button onClick={() => handleRemoveMember(m.userId)} style={{ border: "none", background: "none", cursor: "pointer", color: "#DC2626" }}>
@@ -138,7 +138,7 @@ export default function ProjectMemberModal({ isOpen, onClose, project, onUpdateM
 
         <div style={{ display: "flex", justifyContent: "flex-end", gap: 10 }}>
           <button onClick={onClose} style={{ padding: "8px 16px", background: "#fff", border: "1px solid #CBD5E1", borderRadius: 8, fontSize: 13, fontWeight: 600, color: "#475569", cursor: "pointer" }}>Cancel</button>
-          <button onClick={handleSave} disabled={saving} style={{ padding: "8px 20px", background: "#5B5CEB", color: "#fff", border: "none", borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: saving ? "not-allowed" : "pointer" }}>
+          <button onClick={handleSave} disabled={saving} style={{ padding: "8px 20px", background: "#F97316", color: "#fff", border: "none", borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: saving ? "not-allowed" : "pointer" }}>
             {saving ? "Saving..." : "Save Members"}
           </button>
         </div>

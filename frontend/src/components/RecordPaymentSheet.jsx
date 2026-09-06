@@ -13,7 +13,7 @@ import {
 } from "lucide-react";
 import { transactionAPI, esignAPI } from "../api";
 
-const primaryBlue = "#173EEA";
+const primaryBlue = "#F97316";
 
 const PAYMENT_METHODS = [
   { value: "UPI", icon: Smartphone },
@@ -390,7 +390,7 @@ export default function RecordPaymentSheet({ open, entry, projects, onClose, onS
               width: "100%",
               padding: 18,
               borderRadius: 18,
-              background: "linear-gradient(135deg, #173EEA 0%, #6B2FD9 100%)",
+              background: "linear-gradient(135deg, #F97316 0%, #EA580C 100%)",
               marginBottom: 20,
             }}
           >
@@ -546,7 +546,7 @@ export default function RecordPaymentSheet({ open, entry, projects, onClose, onS
                     cursor: "pointer",
                     transition: "all 0.16s ease",
 
-                    boxShadow: sel ? "0 2px 6px rgba(23,62,234,0.18)" : "none",
+                    boxShadow: sel ? "0 2px 6px rgba(249,115,22,0.18)" : "none",
                   }}
                 >
                   <Icon
@@ -597,7 +597,7 @@ export default function RecordPaymentSheet({ open, entry, projects, onClose, onS
                       onClick={esignPolling ? () => setEsignPolling(false) : startEsignFlow}
                       style={{
                         padding: "10px", borderRadius: 8, border: "none",
-                        background: esignPolling ? "#FEE2E2" : "#173EEA",
+                        background: esignPolling ? "#FEE2E2" : "#F97316",
                         color: esignPolling ? "#DC2626" : "#FFF",
                         fontWeight: 700, fontSize: 12, cursor: "pointer",
                         fontFamily: "inherit"
@@ -831,7 +831,7 @@ export default function RecordPaymentSheet({ open, entry, projects, onClose, onS
               flex: 2,
               height: 46,
               borderRadius: 11,
-              border: "1.5px solid #DDE0F0",
+              border: "1.5px solid #EBEBEB",
               background: "#FFF",
               fontSize: 13,
               fontWeight: 700,
@@ -848,7 +848,7 @@ export default function RecordPaymentSheet({ open, entry, projects, onClose, onS
               flex: 5,
               height: 46,
               borderRadius: 11,
-              background: "linear-gradient(135deg, #173EEA, #6B2FD9)",
+              background: "linear-gradient(135deg, #F97316, #EA580C)",
               border: "none",
               fontSize: 12,
               fontWeight: 800,
@@ -859,7 +859,7 @@ export default function RecordPaymentSheet({ open, entry, projects, onClose, onS
               alignItems: "center",
               justifyContent: "center",
               gap: 6,
-              boxShadow: "0 3px 8px rgba(23,62,234,0.25)",
+              boxShadow: "0 3px 8px rgba(249,115,22,0.25)",
             }}
           >
             {saving ? (

@@ -59,7 +59,7 @@ function CollapsibleCard({ title, icon, defaultOpen = true, count, subtitle, hea
   return (
     <div style={{ background: "#fff", borderRadius: 12, border: "1px solid #E5E7EB", overflow: "hidden" }}>
       <div onClick={() => setOpen(!open)} style={{ padding: "14px 18px", display: "flex", alignItems: "center", gap: 10, cursor: "pointer", userSelect: "none" }}>
-        {icon && <span style={{ fontSize: 16, flexShrink: 0, color: '#5B5CEB', display: 'flex' }}>{icon}</span>}
+        {icon && <span style={{ fontSize: 16, flexShrink: 0, color: '#F97316', display: 'flex' }}>{icon}</span>}
         <div style={{ flex: 1, minWidth: 0 }}>
           <span style={{ fontSize: 14, fontWeight: 600, color: "#111827" }}>{title}</span>
           {(count !== undefined || subtitle) && (
@@ -291,7 +291,7 @@ export default function ManageSitePage() {
     return (
       <CollapsibleCard title={SECTIONS.buildingType} icon={<Building2 size={16} />} defaultOpen={defaultOpen}>
         <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-          <div style={{ width: 40, height: 40, borderRadius: 10, background: "#F1F5F9", display: "flex", alignItems: "center", justifyContent: "center", color: "#5B5CEB", flexShrink: 0 }}>
+          <div style={{ width: 40, height: 40, borderRadius: 10, background: "#F1F5F9", display: "flex", alignItems: "center", justifyContent: "center", color: "#F97316", flexShrink: 0 }}>
             <Building2 size={18} />
           </div>
           <div style={{ flex: 1 }}>
@@ -314,7 +314,7 @@ export default function ManageSitePage() {
       <CollapsibleCard title={SECTIONS.landFloors} icon={<Layers size={16} />} defaultOpen={defaultOpen}>
         {hasLand && (
           <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: floors.length > 0 ? 14 : 0 }}>
-            <div style={{ width: 32, height: 32, borderRadius: 8, background: "#F1F5F9", display: "flex", alignItems: "center", justifyContent: "center", color: "#5B5CEB", flexShrink: 0 }}>
+            <div style={{ width: 32, height: 32, borderRadius: 8, background: "#F1F5F9", display: "flex", alignItems: "center", justifyContent: "center", color: "#F97316", flexShrink: 0 }}>
               <MapPin size={14} />
             </div>
             <div style={{ flex: 1 }}>
@@ -350,7 +350,7 @@ export default function ManageSitePage() {
             <div style={labelStyle}>ROOMS</div>
             <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 6, marginBottom: hasBath ? 14 : 0 }}>
               {Object.entries(rooms).filter(([, v]) => (v || 0) > 0).map(([k, v]) => (
-                <div key={k} style={{ padding: "6px 12px", borderRadius: 8, background: "#EEF0FF", border: "1px solid #DDE0FF", fontSize: 13, fontWeight: 600, color: "#5B5CEB", display: "inline-flex", alignItems: "center", gap: 4 }}>
+                <div key={k} style={{ padding: "6px 12px", borderRadius: 8, background: "#FFF5F0", border: "1px solid #FDE8D8", fontSize: 13, fontWeight: 600, color: "#F97316", display: "inline-flex", alignItems: "center", gap: 4 }}>
                   {k} <span style={{ fontSize: 15 }}>{v || 0}</span>
                 </div>
               ))}
@@ -394,7 +394,7 @@ export default function ManageSitePage() {
     const startDate = p.startDate ? new Date(p.startDate) : null;
     const expectedEnd = p.expectedEndDate ? new Date(p.expectedEndDate) : (p.endDate ? new Date(p.endDate) : null);
     const actualEnd = p.actualEndDate ? new Date(p.actualEndDate) : null;
-    const statusColor = status === "Completed" ? "#22C55E" : status === "In Progress" ? "#5B5CEB" : status === "On Hold" ? "#F59E0B" : status === "Cancelled" ? "#EF4444" : "#64748B";
+    const statusColor = status === "Completed" ? "#22C55E" : status === "In Progress" ? "#F97316" : status === "On Hold" ? "#F59E0B" : status === "Cancelled" ? "#EF4444" : "#64748B";
     return (
       <CollapsibleCard title={SECTIONS.timeline} icon={<Calendar size={16} />} defaultOpen={defaultOpen}>
         <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 12 }}>
@@ -406,7 +406,7 @@ export default function ManageSitePage() {
         </div>
         <div style={labelStyle}>PROJECT TIMELINE</div>
         <div style={{ display: "flex", gap: 10, marginTop: 8, flexWrap: "wrap" }}>
-          <DateBox label="Start Date" val={startDate ? _fmtDate(startDate) : "\u2014"} icon={<PlayIcon />} color="#5B5CEB" />
+          <DateBox label="Start Date" val={startDate ? _fmtDate(startDate) : "\u2014"} icon={<PlayIcon />} color="#F97316" />
           {expectedEnd && <DateBox label="Expected End" val={_fmtDate(expectedEnd)} icon={<Calendar size={12} />} color="#F59E0B" />}
           {actualEnd && <DateBox label="Actual End Date" val={_fmtDate(actualEnd)} icon={<Check size={12} />} color="#22C55E" />}
         </div>
@@ -418,16 +418,16 @@ export default function ManageSitePage() {
     <CollapsibleCard title={SECTIONS.financial} icon={<DollarSign size={16} />} defaultOpen>
       <div style={{ background: "#F8FAFC", borderRadius: 8, border: "1px solid #E5E7EB", padding: "12px 14px", marginBottom: 12 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          <div style={{ width: 36, height: 36, borderRadius: 8, background: "#EEF0FF", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-            <CreditCard size={16} color="#5B5CEB" />
+          <div style={{ width: 36, height: 36, borderRadius: 8, background: "#FFF5F0", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+            <CreditCard size={16} color="#F97316" />
           </div>
           <div style={{ flex: 1 }}>
             <div style={labelStyle}>TOTAL BUDGET</div>
-            <div style={{ fontSize: 20, fontWeight: 700, color: "#5B5CEB", letterSpacing: "-0.03em" }}>{fmtINR(totalBudget)}</div>
+            <div style={{ fontSize: 20, fontWeight: 700, color: "#F97316", letterSpacing: "-0.03em" }}>{fmtINR(totalBudget)}</div>
           </div>
         </div>
       </div>
-      <FinRow label="Spent Amount" value={fmtINR(Math.max(spent, 0))} color={spent > totalBudget ? "#EF4444" : "#5B5CEB"} icon={<ArrowUpIcon />} />
+      <FinRow label="Spent Amount" value={fmtINR(Math.max(spent, 0))} color={spent > totalBudget ? "#EF4444" : "#F97316"} icon={<ArrowUpIcon />} />
       <FinRow label="Total Income" value={fmtINR(totalIncome)} color="#22C55E" icon={<PiggyBank size={14} />} />
       <FinRow label="Remaining" value={fmtINR(Math.max(remaining, 0))} color={remaining >= 0 ? "#22C55E" : "#EF4444"} icon={<Target size={14} />} />
       {hasBrk && (
@@ -435,9 +435,9 @@ export default function ManageSitePage() {
           <div style={{ height: 1, background: "#F1F5F9", margin: "10px 0" }} />
           <div style={labelStyle}>BUDGET BREAKDOWN</div>
           <div style={{ marginTop: 8, display: "flex", flexDirection: "column", gap: 6 }}>
-            {bMat > 0 && <CatRow label="Material" amount={bMat} color="#5B5CEB" />}
+            {bMat > 0 && <CatRow label="Material" amount={bMat} color="#F97316" />}
             {bLab > 0 && <CatRow label="Labour" amount={bLab} color="#0EA5E9" />}
-            {bEq > 0 && <CatRow label="Equipment" amount={bEq} color="#8B5CF6" />}
+            {bEq > 0 && <CatRow label="Equipment" amount={bEq} color="#EA580C" />}
             {bMisc > 0 && <CatRow label="Miscellaneous" amount={bMisc} color="#F59E0B" />}
           </div>
         </>
@@ -445,10 +445,10 @@ export default function ManageSitePage() {
       <div style={{ marginTop: 12 }}>
         <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
           <span style={{ ...labelStyle, fontSize: 11 }}>Budget Used</span>
-          <span style={{ fontSize: 13, fontWeight: 700, color: util >= 1 ? "#EF4444" : util >= 0.8 ? "#F59E0B" : "#5B5CEB" }}>{Math.round(util * 100)}%</span>
+          <span style={{ fontSize: 13, fontWeight: 700, color: util >= 1 ? "#EF4444" : util >= 0.8 ? "#F59E0B" : "#F97316" }}>{Math.round(util * 100)}%</span>
         </div>
         <div style={{ height: 6, background: "#F1F5F9", borderRadius: 8, overflow: "hidden" }}>
-          <div style={{ width: `${Math.min(util * 100, 100)}%`, height: "100%", borderRadius: 8, background: util >= 1 ? "#EF4444" : util >= 0.8 ? "#F59E0B" : "#5B5CEB", transition: "width 0.4s ease" }} />
+          <div style={{ width: `${Math.min(util * 100, 100)}%`, height: "100%", borderRadius: 8, background: util >= 1 ? "#EF4444" : util >= 0.8 ? "#F59E0B" : "#F97316", transition: "width 0.4s ease" }} />
         </div>
       </div>
     </CollapsibleCard>
@@ -518,7 +518,7 @@ export default function ManageSitePage() {
             return (
               <div key={phase.id} style={{ background: "#fff", borderRadius: 10, border: "1px solid #E5E7EB", overflow: "hidden" }}>
                 <div onClick={() => setExpandedPhase(isExpanded ? null : phase.id)} style={{ padding: "12px 14px", display: "flex", alignItems: "center", gap: 10, cursor: "pointer", userSelect: "none" }}>
-                  <div style={{ width: 32, height: 32, borderRadius: 8, background: phase.isCustom ? "#F3E8FF" : "#EEF0FF", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, color: phase.isCustom ? "#8B5CF6" : "#5B5CEB" }}>
+                  <div style={{ width: 32, height: 32, borderRadius: 8, background: phase.isCustom ? "#FFF7F0" : "#FFF5F0", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, color: phase.isCustom ? "#EA580C" : "#F97316" }}>
                     {phase.isCustom ? <Sparkles size={14} /> : <Settings size={14} />}
                   </div>
                   <div style={{ flex: 1, minWidth: 0 }}>
@@ -526,14 +526,14 @@ export default function ManageSitePage() {
                     <div style={{ fontSize: 11, color: "#64748B", fontWeight: 500 }}>{pDone} of {pTotal} activities done</div>
                   </div>
                   <div style={{ textAlign: "right" }}>
-                    <div style={{ fontSize: 12, fontWeight: 700, color: pPct >= 1 ? "#22C55E" : "#5B5CEB" }}>{Math.round(pPct * 100)}%</div>
+                    <div style={{ fontSize: 12, fontWeight: 700, color: pPct >= 1 ? "#22C55E" : "#F97316" }}>{Math.round(pPct * 100)}%</div>
                     <ChevronDown size={14} color="#94A3B8" style={{ transform: isExpanded ? "rotate(180deg)" : "none", transition: "transform 0.18s", marginLeft: "auto" }} />
                   </div>
                 </div>
                 {pTotal > 0 && (
                   <div style={{ padding: "0 14px 6px" }}>
                     <div style={{ height: 3, background: "#F1F5F9", borderRadius: 8, overflow: "hidden" }}>
-                      <div style={{ width: `${pPct * 100}%`, height: "100%", background: pPct >= 1 ? "#22C55E" : "#5B5CEB", borderRadius: 8, transition: "width 0.3s" }} />
+                      <div style={{ width: `${pPct * 100}%`, height: "100%", background: pPct >= 1 ? "#22C55E" : "#F97316", borderRadius: 8, transition: "width 0.3s" }} />
                     </div>
                   </div>
                 )}
@@ -566,7 +566,7 @@ export default function ManageSitePage() {
                           </div>
                           <Badge variant={_isC(act) ? "success" : "warning"} size="sm">{_isC(act) ? "Done" : "Pending"}</Badge>
                           <div onClick={e => { e.stopPropagation(); navigate("/add-entry", { state: { project: p, prefill: { phase: phase.phaseName, activity: act.name } } }); }}
-                            style={{ padding: "4px 8px", borderRadius: 6, background: "#EEF0FF", border: "1px solid #DDE0FF", fontSize: 10, fontWeight: 700, color: "#5B5CEB", cursor: "pointer", fontFamily: 'inherit' }}>
+                            style={{ padding: "4px 8px", borderRadius: 6, background: "#FFF5F0", border: "1px solid #FDE8D8", fontSize: 10, fontWeight: 700, color: "#F97316", cursor: "pointer", fontFamily: 'inherit' }}>
                             ADD
                           </div>
                           {_isC(act) && (
@@ -583,18 +583,18 @@ export default function ManageSitePage() {
                           <div style={{ margin: "8px 0 4px", padding: 12, background: "#F8FAFC", borderRadius: 8, border: "1px solid #E5E7EB" }}>
                             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
                               <span style={{ fontSize: 12, fontWeight: 600, color: "#111827" }}>Activity Budget Allocation</span>
-                              <div onClick={e => { e.stopPropagation(); openBudgetDialog(act); }} style={{ padding: "3px 8px", borderRadius: 6, background: "#EEF0FF", display: "flex", alignItems: "center", gap: 4, cursor: "pointer" }}>
-                                <Pencil size={10} color="#5B5CEB" />
-                                <span style={{ fontSize: 10, fontWeight: 700, color: "#5B5CEB" }}>Update Budget</span>
+                              <div onClick={e => { e.stopPropagation(); openBudgetDialog(act); }} style={{ padding: "3px 8px", borderRadius: 6, background: "#FFF5F0", display: "flex", alignItems: "center", gap: 4, cursor: "pointer" }}>
+                                <Pencil size={10} color="#F97316" />
+                                <span style={{ fontSize: 10, fontWeight: 700, color: "#F97316" }}>Update Budget</span>
                               </div>
                             </div>
-                            <BudgetRow label="Materials" allocated={act.budgetMaterial || 0} spent={spentMat} color="#5B5CEB" />
+                            <BudgetRow label="Materials" allocated={act.budgetMaterial || 0} spent={spentMat} color="#F97316" />
                             <div style={{ height: 6 }} />
                             <BudgetRow label="Labour" allocated={act.budgetLabour || 0} spent={spentLab} color="#22C55E" />
                             <div style={{ height: 6 }} />
                             <BudgetRow label="Equipment" allocated={act.budgetEquipment || 0} spent={spentEqu} color="#F59E0B" />
                             <div style={{ height: 1, background: "#F1F5F9", margin: "10px 0" }} />
-                            <BudgetRow label="Total Budget" allocated={actBud} spent={spentForAct} color="#8B5CF6" bold />
+                            <BudgetRow label="Total Budget" allocated={actBud} spent={spentForAct} color="#EA580C" bold />
                           </div>
                         )}
                       </div>
@@ -640,12 +640,12 @@ export default function ManageSitePage() {
 
   const renderRecentEntries = () => {
     const typeConfig = {
-      Materials: { color: '#8B5CF6', bg: '#F3E8FF', label: 'Materials' },
+      Materials: { color: '#EA580C', bg: '#FFF7F0', label: 'Materials' },
       Wages: { color: '#22C55E', bg: '#F0FDF4', label: 'Labour' },
       Labour: { color: '#22C55E', bg: '#F0FDF4', label: 'Labour' },
       Expense: { color: '#F59E0B', bg: '#FFFBEB', label: 'Equipment' },
       Equipment: { color: '#F59E0B', bg: '#FFFBEB', label: 'Equipment' },
-      Income: { color: '#3B82F6', bg: '#EFF6FF', label: 'Income' },
+      Income: { color: '#EA580C', bg: '#FFF5F0', label: 'Income' },
     };
 
     const projectName = p?.projectName || p?.name || "Site Project";
@@ -664,7 +664,7 @@ export default function ManageSitePage() {
               cursor: 'pointer',
               fontSize: 13,
               fontWeight: 700,
-              color: '#5B5CEB',
+              color: '#F97316',
               display: 'flex',
               alignItems: 'center',
               gap: 4,
@@ -801,7 +801,7 @@ export default function ManageSitePage() {
 
       <div style={{ background: "#fff", borderBottom: "1px solid #E5E7EB", padding: "14px 24px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexShrink: 0 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 14 }}>
-          <span onClick={() => navigate("/projects")} style={{ color: "#5B5CEB", cursor: "pointer", fontWeight: 500, fontSize: 13 }}>Projects</span>
+          <span onClick={() => navigate("/projects")} style={{ color: "#F97316", cursor: "pointer", fontWeight: 500, fontSize: 13 }}>Projects</span>
           <ArrowRight size={12} color="#94A3B8" />
           <span style={{ color: "#111827", fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: 300, fontSize: 13 }}>{projectName}</span>
         </div>
@@ -837,7 +837,7 @@ export default function ManageSitePage() {
                     }
                   }
                   return activePhase ? (
-                    <span style={{ padding: "3px 8px", borderRadius: 6, background: "#EEF0FF", border: "1px solid #DDE0FF", fontSize: 11, fontWeight: 600, color: "#5B5CEB", display: "flex", alignItems: "center", gap: 4 }}>
+                    <span style={{ padding: "3px 8px", borderRadius: 6, background: "#FFF5F0", border: "1px solid #FDE8D8", fontSize: 11, fontWeight: 600, color: "#F97316", display: "flex", alignItems: "center", gap: 4 }}>
                       <ArrowRight size={10} /> {activePhase}
                     </span>
                   ) : null;
@@ -861,10 +861,10 @@ export default function ManageSitePage() {
             <div style={{ display: "flex", flexDirection: "column", justifyContent: "center", gap: 8, minWidth: isMobile ? "100%" : 220 }}>
               <div style={{ display: "flex", justifyContent: "space-between", width: "100%" }}>
                 <span style={{ fontSize: 13, fontWeight: 600, color: "#475569" }}>Overall Completion</span>
-                <span style={{ fontSize: 13, fontWeight: 700, color: "#5B5CEB" }}>{progress.toFixed(1)}%</span>
+                <span style={{ fontSize: 13, fontWeight: 700, color: "#F97316" }}>{progress.toFixed(1)}%</span>
               </div>
               <div style={{ width: "100%", height: 8, background: "#F1F5F9", borderRadius: 8, overflow: "hidden" }}>
-                <div style={{ width: `${Math.min(progress, 100)}%`, height: "100%", background: status === "Completed" ? "#22C55E" : status === "On Hold" ? "#F59E0B" : status === "Cancelled" ? "#EF4444" : "#5B5CEB", borderRadius: 8, transition: "width 0.4s ease" }} />
+                <div style={{ width: `${Math.min(progress, 100)}%`, height: "100%", background: status === "Completed" ? "#22C55E" : status === "On Hold" ? "#F59E0B" : status === "Cancelled" ? "#EF4444" : "#F97316", borderRadius: 8, transition: "width 0.4s ease" }} />
               </div>
               <div style={{ fontSize: 11, color: "#94A3B8", textAlign: "right" }}>{trackerDone}/{trackerTotal || (progress > 0 ? "\u2014" : 0)} activities</div>
             </div>
@@ -890,8 +890,8 @@ export default function ManageSitePage() {
         <CollapsibleCard title="Actions" icon={<Zap size={16} />} defaultOpen>
           <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr 1fr" : "repeat(4, 1fr)", gap: 10 }}>
             <ActionBtn icon={<FileText size={18} />} label="Add Entry" onClick={() => navigate("/add-entry", { state: { project: p } })} borderColor="#EA580C" />
-            <ActionBtn icon={<MicIcon />} label="Voice Entry" onClick={() => navigate("/voice", { state: { project: p } })} borderColor="#8B5CF6" />
-            <ActionBtn icon={<BarChartIcon />} label="View Reports" onClick={() => navigate("/reports/:id", { state: { project: p } })} borderColor="#3B82F6" />
+            <ActionBtn icon={<MicIcon />} label="Voice Entry" onClick={() => navigate("/voice", { state: { project: p } })} borderColor="#EA580C" />
+            <ActionBtn icon={<BarChartIcon />} label="View Reports" onClick={() => navigate("/reports/:id", { state: { project: p } })} borderColor="#FB923C" />
             <ActionBtn icon={<Building2 size={18} />} label="Full Details" onClick={() => navigate("/project-detail/" + projectId, { state: { project: p } })} borderColor="#22C55E" />
           </div>
         </CollapsibleCard>
@@ -1008,7 +1008,7 @@ function ActivityDetailSheet({ activity, phaseName, onClose }) {
           </div>
           {notes && notes.trim() ? (
             <div style={{ marginBottom: 20 }}>
-              <div style={{ fontSize: 12, fontWeight: 600, color: "#5B5CEB", letterSpacing: 0.3, marginBottom: 8, textTransform: 'uppercase' }}>Notes & Remarks</div>
+              <div style={{ fontSize: 12, fontWeight: 600, color: "#F97316", letterSpacing: 0.3, marginBottom: 8, textTransform: 'uppercase' }}>Notes & Remarks</div>
               <div style={{ width: "100%", padding: 14, background: "#F8FAFC", borderRadius: 8, border: "1px solid #E5E7EB", fontSize: 13, lineHeight: 1.5, color: "#111827", fontWeight: 400 }}>{notes}</div>
             </div>
           ) : (
@@ -1019,7 +1019,7 @@ function ActivityDetailSheet({ activity, phaseName, onClose }) {
           )}
           {photos.length > 0 && (
             <div>
-              <div style={{ fontSize: 12, fontWeight: 600, color: "#5B5CEB", letterSpacing: 0.3, marginBottom: 8, textTransform: 'uppercase' }}>Progress Photos</div>
+              <div style={{ fontSize: 12, fontWeight: 600, color: "#F97316", letterSpacing: 0.3, marginBottom: 8, textTransform: 'uppercase' }}>Progress Photos</div>
               <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
                 {photos.map((url, i) => (
                   <div key={i} style={{ width: 80, height: 80, borderRadius: 8, border: "1px solid #E5E7EB", overflow: "hidden" }}>

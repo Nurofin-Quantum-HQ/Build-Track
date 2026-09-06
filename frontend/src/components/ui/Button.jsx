@@ -16,7 +16,7 @@ export default function Button({ children, variant = 'primary', size = 'md', ico
           background: gradients.primaryGradient,
           color: colors.textInverse,
           border: 'none',
-          boxShadow: '0 4px 10px rgba(23, 62, 234, 0.15)',
+          boxShadow: '0 4px 10px rgba(249, 115, 22, 0.15)',
         };
       case 'secondary':
         return {
@@ -78,7 +78,7 @@ export default function Button({ children, variant = 'primary', size = 'md', ico
         if (disabled) return;
         e.currentTarget.style.transform = 'translateY(-2px)';
         if (variant === 'primary') {
-          e.currentTarget.style.boxShadow = '0 8px 20px -4px rgba(23, 62, 234, 0.45)';
+          e.currentTarget.style.boxShadow = '0 8px 20px -4px rgba(249, 115, 22, 0.45)';
         } else if (variant === 'secondary') {
           e.currentTarget.style.background = '#F8FAFC';
           e.currentTarget.style.borderColor = '#CBD5E1';
@@ -95,7 +95,7 @@ export default function Button({ children, variant = 'primary', size = 'md', ico
       onMouseLeave={(e) => {
         e.currentTarget.style.transform = 'none';
         if (variant === 'primary') {
-          e.currentTarget.style.boxShadow = '0 4px 10px rgba(23, 62, 234, 0.15)';
+          e.currentTarget.style.boxShadow = '0 4px 10px rgba(249, 115, 22, 0.15)';
         } else if (variant === 'secondary') {
           e.currentTarget.style.background = colors.card;
           e.currentTarget.style.borderColor = colors.border;

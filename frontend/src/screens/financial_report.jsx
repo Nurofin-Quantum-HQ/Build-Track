@@ -39,15 +39,24 @@ import {
   Search,
   FileText,
   User,
+  Users,
   Package,
   Wrench,
   IndianRupee,
-  HelpCircle
+  HelpCircle,
+  CheckCircle,
+  Clock
 } from "lucide-react";
 import ModuleTour from "../components/ModuleTour";
+import {
+  isReportEntry,
+  mapTransactionToEntry,
+  getPaymentStatusLabel,
+  calculateFilteredCostSummary
+} from "../utils/reportCalculations";
 
-const primaryBlue = "#173EEA";
-const primaryPurple = "#8B5CF6";
+const primaryBlue = "#F97316";
+const primaryPurple = "#EA580C";
 const primaryLightBlue = "#06B6D4";
 
 function formatINR(n) {
@@ -80,138 +89,18 @@ function formatDateLong(dt) {
   return `${day} ${month} ${year} ${hour}:${minute} ${ampm}`;
 }
 
-function getPaymentStatusLabel(status, tx = null) {
-  if (tx && typeof tx === 'object') {
-    const rawAmt = tx.amount || 0;
-    const rawPaid = tx.paidAmount || 0;
-    if (rawAmt > 0) {
-      if (rawPaid >= rawAmt) return 'Fully Paid';
-      if (rawPaid > 0) return 'Partial';
-    }
-  }
-  switch ((status || '').toLowerCase().trim()) {
-    case 'paid':
-    case 'fully paid':
-    case 'fullypaid':
-      return 'Fully Paid';
-    case 'partial':
-    case 'partially paid':
-    case 'partially':
-      return 'Partial';
-    case 'pending':
-    case 'not paid':
-    case 'notpaid':
-    case 'unpaid':
-    default:
-      return 'Not Paid';
-  }
-}
-
-function mapTransactionToEntry(tx) {
-  let parsedType = "material";
-  const rawType = (tx.type || '').toLowerCase();
-  if (rawType === 'labour' || rawType === 'wages') {
-    parsedType = "labour";
-  } else if (rawType === 'equipment' || rawType === 'expense') {
-    parsedType = "equipment";
-  }
-
-  let entryProjectId = '';
-  if (tx.project && typeof tx.project === 'object') {
-    entryProjectId = tx.project._id || '';
-  } else if (tx.project) {
-    entryProjectId = tx.project.toString();
-  }
-  if (!entryProjectId && tx.projectId) {
-    if (typeof tx.projectId === 'object') {
-      entryProjectId = tx.projectId._id || '';
-    } else {
-      entryProjectId = tx.projectId.toString();
-    }
-  }
-  entryProjectId = entryProjectId.trim();
-  if (!entryProjectId) entryProjectId = '';
-
-  let amount = 0;
-  const paymentStatus = (tx.paymentStatus || '').toLowerCase().trim();
-  const paidAmount = tx.paidAmount;
-
-  if (paymentStatus === 'paid') {
-    if (paidAmount !== undefined && paidAmount !== null && typeof paidAmount === 'number' && paidAmount > 0) {
-      amount = paidAmount;
-    } else {
-      const v = tx.amount;
-      if (v !== undefined && v !== null && typeof v === 'number' && v > 0) {
-        amount = v;
-      } else {
-        const qty = tx.quantity;
-        const rate = tx.rate;
-        if (typeof qty === 'number' && typeof rate === 'number' && qty > 0 && rate > 0) {
-          amount = qty * rate;
-        }
-      }
-    }
-  } else if (paymentStatus === 'partial') {
-    if (paidAmount !== undefined && paidAmount !== null && typeof paidAmount === 'number' && paidAmount > 0) {
-      amount = paidAmount;
-    }
-  } else {
-    const v = tx.amount;
-    if (v !== undefined && v !== null && typeof v === 'number' && v > 0) {
-      amount = v;
-    } else {
-      const qty = tx.quantity;
-      const rate = tx.rate;
-      if (typeof qty === 'number' && typeof rate === 'number' && qty > 0 && rate > 0) {
-        amount = qty * rate;
-      }
-    }
-  }
-
-  const createdByRaw = tx.createdBy || tx.addedBy || tx.submittedBy || tx.userId || tx.user;
-  let createdBy = '';
-  if (createdByRaw && typeof createdByRaw === 'object') {
-    createdBy = createdByRaw._id || createdByRaw.id || '';
-  } else if (createdByRaw) {
-    createdBy = createdByRaw.toString();
-  }
-
-  return {
-    id: tx._id || new Date().getTime().toString(),
-    projectId: entryProjectId,
-    type: parsedType,
-    amount: amount,
-    date: tx.date ? new Date(tx.date) : (tx.createdAt ? new Date(tx.createdAt) : new Date()),
-    description: String(tx.materialName || tx.title || tx.description || tx.name || 'Entry'),
-    brand: String(tx.brand || tx.materialName || tx.name || ''),
-    ratePerUnit: typeof tx.rate === 'number' ? tx.rate : 0,
-    floor: tx.floor || '',
-    phase: tx.phase || '',
-    phaseId: tx.phaseId || '',
-    activity: tx.activity || '',
-    activityId: tx.activityId || '',
-    unit: tx.unit || '',
-    createdBy: createdBy,
-    approvalStatus: tx.approvalStatus || 'Pending',
-    paymentStatus: tx.paymentStatus || 'Pending',
-    paymentDate: tx.paymentDate ? new Date(tx.paymentDate) : null,
-    rejectionReason: tx.rejectionReason || '',
-    rawTx: tx
-  };
-}
-
 const DEFAULT_COLS = {
-  All: ['Purchased Date', 'Project', 'Type', 'Description', 'Brand', 'Floor', 'Phase', 'Activity', 'Unit', 'Status', 'Amount', 'Payment Date'],
-  Materials: ['Purchased Date', 'Project', 'Material', 'Brand', 'Rate', 'Qty', 'Unit', 'Status', 'Amount', 'Payment Date'],
-  Labour: ['Purchased Date', 'Project', 'Worker Type', 'Rate/Day', 'Days', 'Status', 'Amount', 'Payment Date'],
-  Equipment: ['Purchased Date', 'Project', 'Equipment', 'Rent Rate', 'Duration', 'Status', 'Amount', 'Payment Date']
+  All: ['Purchased Date', 'Project', 'Type', 'Description', 'Brand', 'Floor', 'Phase', 'Activity', 'Unit', 'Status', 'Amount', 'Paid', 'Remaining', 'Payment Date'],
+  Materials: ['Purchased Date', 'Project', 'Material', 'Brand', 'Rate', 'Qty', 'Unit', 'Status', 'Amount', 'Paid', 'Remaining', 'Payment Date'],
+  Labour: ['Purchased Date', 'Project', 'Worker Type', 'Rate/Day', 'Days', 'Status', 'Amount', 'Paid', 'Remaining', 'Payment Date'],
+  Equipment: ['Purchased Date', 'Project', 'Equipment', 'Rent Rate', 'Duration', 'Status', 'Amount', 'Paid', 'Remaining', 'Payment Date']
 };
 
 const ALL_COLS = {
-  All: ['Purchased Date', 'Project', 'Type', 'Description', 'Brand', 'Floor', 'Phase', 'Activity', 'Unit', 'Status', 'Amount', 'Payment Date'],
-  Materials: ['Purchased Date', 'Project', 'Material', 'Brand', 'Rate', 'Qty', 'Unit', 'Floor', 'Phase', 'Activity', 'Status', 'Amount', 'Payment Date'],
-  Labour: ['Purchased Date', 'Project', 'Worker Type', 'Rate/Day', 'Days', 'Unit', 'Floor', 'Phase', 'Activity', 'Status', 'Amount', 'Payment Date'],
-  Equipment: ['Purchased Date', 'Project', 'Equipment', 'Rent Rate', 'Duration', 'Unit', 'Floor', 'Phase', 'Activity', 'Status', 'Amount', 'Payment Date']
+  All: ['Purchased Date', 'Project', 'Type', 'Description', 'Brand', 'Floor', 'Phase', 'Activity', 'Unit', 'Status', 'Amount', 'Paid', 'Remaining', 'Payment Date'],
+  Materials: ['Purchased Date', 'Project', 'Material', 'Brand', 'Rate', 'Qty', 'Unit', 'Floor', 'Phase', 'Activity', 'Status', 'Amount', 'Paid', 'Remaining', 'Payment Date'],
+  Labour: ['Purchased Date', 'Project', 'Worker Type', 'Rate/Day', 'Days', 'Unit', 'Floor', 'Phase', 'Activity', 'Status', 'Amount', 'Paid', 'Remaining', 'Payment Date'],
+  Equipment: ['Purchased Date', 'Project', 'Equipment', 'Rent Rate', 'Duration', 'Unit', 'Floor', 'Phase', 'Activity', 'Status', 'Amount', 'Paid', 'Remaining', 'Payment Date']
 };
 
 export default function FinancialReportPage() {
@@ -239,7 +128,7 @@ export default function FinancialReportPage() {
   const [reportGenerated, setReportGenerated] = useState(false);
   const [showSuggestions, setShowSuggestions] = useState(false);
 
-  const [selectedStatus, setSelectedStatus] = useState("All");
+  const [selectedPaymentStatus, setSelectedPaymentStatus] = useState("All");
   const [sortColumn, setSortColumn] = useState("date");
   const [sortAscending, setSortAscending] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
@@ -301,8 +190,8 @@ export default function FinancialReportPage() {
 
         const list = rawList || txStore || [];
         const mappedList = list
-          .map(tx => mapTransactionToEntry(tx))
-          .filter(entry => (entry?.approvalStatus || "").toLowerCase() !== "rejected");
+          .filter(isReportEntry)
+          .map(tx => mapTransactionToEntry(tx));
         setTransactions(mappedList);
       })
       .catch(() => setError("Failed to load project details and reports log."))
@@ -467,7 +356,10 @@ export default function FinancialReportPage() {
         const activityMatch = (entry.activity || '').toLowerCase().includes(q);
         const amountMatch = entry.amount.toString().includes(q);
         const typeMatch = entry.type.toLowerCase().includes(q);
-        const statusMatch = getPaymentStatusLabel(entry.paymentStatus).toLowerCase().includes(q);
+        const statusMatch = getPaymentStatusLabel(entry.paymentStatus, {
+          amount: entry.amount,
+          paidAmount: entry.paidAmount,
+        }).toLowerCase().includes(q);
         const dateMatch = formatDateShort(entry.date).toLowerCase().includes(q);
         const payDateMatch = entry.paymentDate ? formatDateShort(entry.paymentDate).toLowerCase().includes(q) : false;
 
@@ -477,8 +369,14 @@ export default function FinancialReportPage() {
         }
       }
 
-      if (selectedStatus !== "All" && entry.approvalStatus.toLowerCase() !== selectedStatus.toLowerCase()) {
-        return false;
+      if (selectedPaymentStatus !== "All") {
+        const computedLabel = getPaymentStatusLabel(entry.paymentStatus, {
+          amount: entry.amount,
+          paidAmount: entry.paidAmount,
+        });
+        if (computedLabel.toLowerCase() !== selectedPaymentStatus.toLowerCase()) {
+          return false;
+        }
       }
 
       if (startDate) {
@@ -488,13 +386,13 @@ export default function FinancialReportPage() {
       }
       if (endDate) {
         const eDate = new Date(entry.date.getFullYear(), entry.date.getMonth(), entry.date.getDate());
-        const edDate = new Date(endDate.getFullYear(), endDate.getMonth(), endDate.getDate());
-        if (eDate.getTime() > edDate.getTime()) return false;
+        const edDate = new Date(endDate.getFullYear(), endDate.getMonth(), endDate.getDate() + 1);
+        if (eDate.getTime() >= edDate.getTime()) return false;
       }
 
       return true;
     });
-  }, [transactions, selectedProjectId, selectedFloor, selectedPhaseId, selectedActivityName, selectedTypes, activeTab, reportGenerated, searchQuery, selectedItemName, selectedStatus, startDate, endDate, getProjectName, phases]);
+  }, [transactions, selectedProjectId, selectedFloor, selectedPhaseId, selectedActivityName, selectedTypes, activeTab, reportGenerated, searchQuery, selectedItemName, selectedPaymentStatus, startDate, endDate, getProjectName, phases]);
 
   const sortedEntries = useMemo(() => {
     return [...filteredEntries].sort((a, b) => {
@@ -510,21 +408,14 @@ export default function FinancialReportPage() {
     });
   }, [filteredEntries, sortColumn, sortAscending, getProjectName]);
 
-  const materialTotal = useMemo(() => {
-    return filteredEntries.filter(e => e.type === "material").reduce((sum, e) => sum + e.amount, 0);
+  const costSummary = useMemo(() => {
+    return calculateFilteredCostSummary(filteredEntries);
   }, [filteredEntries]);
 
-  const labourTotal = useMemo(() => {
-    return filteredEntries.filter(e => e.type === "labour").reduce((sum, e) => sum + e.amount, 0);
-  }, [filteredEntries]);
-
-  const equipmentTotal = useMemo(() => {
-    return filteredEntries.filter(e => e.type === "equipment").reduce((sum, e) => sum + e.amount, 0);
-  }, [filteredEntries]);
-
-  const grandTotal = useMemo(() => {
-    return materialTotal + labourTotal + equipmentTotal;
-  }, [materialTotal, labourTotal, equipmentTotal]);
+  const materialTotal = costSummary.material;
+  const labourTotal = costSummary.labour;
+  const equipmentTotal = costSummary.equipment;
+  const grandTotal = costSummary.totalBilled;
 
   const totalCount = sortedEntries.length;
   const totalPages = Math.ceil(totalCount / rowsPerPage) || 1;
@@ -674,6 +565,11 @@ export default function FinancialReportPage() {
             rowValues.push(statusStr);
           } else if (col === 'Amount') {
             rowValues.push(amountStr);
+          } else if (col === 'Paid') {
+            rowValues.push((entry.paidAmount || 0).toFixed(2));
+          } else if (col === 'Remaining') {
+            const rem = Math.max(0, (entry.amount || 0) - (entry.paidAmount || 0));
+            rowValues.push(rem.toFixed(2));
           } else if (col === 'Rate' || col === 'Rate/Day' || col === 'Rent Rate') {
             rowValues.push((entry.ratePerUnit || 0).toFixed(2));
           } else if (col === 'Qty' || col === 'Days' || col === 'Duration') {
@@ -729,12 +625,12 @@ export default function FinancialReportPage() {
         parts.push("All Projects");
       }
       parts.push(`Types: ${[...selectedTypes].map(t => t.toUpperCase()).join(", ")}`);
-      parts.push(`Status: ${selectedStatus}`);
+      parts.push(`Payment Status: ${selectedPaymentStatus}`);
       parts.push(`Date Preset: ${datePreset}`);
       doc.text(parts.join(" | "), 14, 23);
 
       doc.setFontSize(10);
-      doc.text(`Total Expense: ${formatINR(grandTotal)}  |  Materials: ${formatINR(materialTotal)}  |  Labour: ${formatINR(labourTotal)}  |  Equipment: ${formatINR(equipmentTotal)}`, 14, 30);
+      doc.text(`Total Billed: ${formatINR(costSummary.totalBilled)}  |  Paid: ${formatINR(costSummary.paid)}  |  Remaining: ${formatINR(costSummary.remaining)}  |  Material: ${formatINR(costSummary.material)}  |  Labour: ${formatINR(costSummary.labour)}  |  Equipment: ${formatINR(costSummary.equipment)}`, 14, 30);
 
       const activeCols = (activeColumns && activeColumns[activeTab]) || DEFAULT_COLS[activeTab] || [];
       const headers = activeCols.map(col => col === "Amount" ? "Amount (INR)" : col);
@@ -763,9 +659,14 @@ export default function FinancialReportPage() {
           } else if (col === 'Unit') {
             row.push(entry.unit || '—');
           } else if (col === 'Status') {
-            row.push(getPaymentStatusLabel(entry.paymentStatus));
+            row.push(getPaymentStatusLabel(entry.paymentStatus, { amount: entry.amount, paidAmount: entry.paidAmount }));
           } else if (col === 'Amount') {
             row.push(entry.amount.toFixed(2));
+          } else if (col === 'Paid') {
+            row.push((entry.paidAmount || 0).toFixed(2));
+          } else if (col === 'Remaining') {
+            const rem = Math.max(0, (entry.amount || 0) - (entry.paidAmount || 0));
+            row.push(rem.toFixed(2));
           } else if (col === 'Rate' || col === 'Rate/Day' || col === 'Rent Rate') {
             row.push((entry.ratePerUnit || 0).toFixed(2));
           } else if (col === 'Qty' || col === 'Days' || col === 'Duration') {
@@ -782,7 +683,7 @@ export default function FinancialReportPage() {
         head: [headers],
         body: body,
         styles: { fontSize: 8 },
-        headStyles: { fillColor: [23, 62, 234], textColor: 255 }
+        headStyles: { fillColor: [249, 115, 22], textColor: 255 }
       });
 
       doc.save(`BuildTrack_Report_${new Date().getTime()}.pdf`);
@@ -888,7 +789,7 @@ export default function FinancialReportPage() {
         <div
           onClick={() => navigate("/ai-chat")}
           style={{
-            background: "linear-gradient(135deg, #5B5FCF 0%, rgba(23, 62, 234, 0.8) 100%)",
+            background: "linear-gradient(135deg, #F97316 0%, rgba(249, 115, 22, 0.8) 100%)",
             borderRadius: radius.lg,
             padding: "16px 20px",
             marginBottom: 24,
@@ -914,7 +815,7 @@ export default function FinancialReportPage() {
         <div className="tour-project-filter" style={{ background: colors.cardBg, borderRadius: radius.lg, border: `1px solid ${colors.cardBorder}`, padding: 20, marginBottom: 24, boxShadow: shadows.card }}>
 
           <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 16 }}>
-            <div style={{ width: 34, height: 34, background: "rgba(23, 62, 234, 0.1)", borderRadius: 8, display: "flex", alignItems: "center", justifyContent: "center", color: primaryBlue, flexShrink: 0 }}>
+            <div style={{ width: 34, height: 34, background: "rgba(249, 115, 22, 0.1)", borderRadius: 8, display: "flex", alignItems: "center", justifyContent: "center", color: primaryBlue, flexShrink: 0 }}>
               <Building size={16} />
             </div>
             <div>
@@ -1035,6 +936,26 @@ export default function FinancialReportPage() {
               </div>
             </div>
 
+            <div>
+              <label style={{ display: "block", fontSize: 11.5, fontWeight: "600", color: colors.textSecondary, marginBottom: 6 }}>Payment Status</label>
+              <div style={{ position: "relative" }}>
+                <select
+                  value={selectedPaymentStatus}
+                  onChange={e => {
+                    setSelectedPaymentStatus(e.target.value);
+                    setCurrentPage(1);
+                  }}
+                  style={{ width: "100%", padding: "10px 14px", borderRadius: 10, border: `1.2px solid #E2E4FA`, background: "#FFF", fontSize: 13, fontWeight: "600", color: colors.textPrimary, outline: "none", appearance: "none", cursor: "pointer" }}
+                >
+                  <option value="All">All Statuses</option>
+                  <option value="Fully Paid">Fully Paid</option>
+                  <option value="Partial">Partial</option>
+                  <option value="Not Paid">Not Paid</option>
+                </select>
+                <ChevronDown size={14} color="#757299" style={{ position: "absolute", right: 14, top: "50%", transform: "translateY(-50%)", pointerEvents: "none" }} />
+              </div>
+            </div>
+
             {datePreset === "Custom" && (
               <>
                 <div>
@@ -1069,39 +990,57 @@ export default function FinancialReportPage() {
         </div>
 
         <div style={{ marginBottom: 20 }}>
-          <h2 style={{ fontSize: 15, fontWeight: "800", color: colors.textPrimary, margin: "0 0 12px" }}>Filtered Cost Summary</h2>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 14 }}>
+          <h2 style={{ fontSize: 16, fontWeight: "800", color: colors.textPrimary, margin: "0 0 12px", letterSpacing: "-0.3px" }}>Filtered Cost Summary</h2>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 14 }}>
 
-            <div style={{ background: "linear-gradient(135deg, #173EEA 0%, #4667FF 100%)", borderRadius: radius.lg, padding: "20px 24px", boxShadow: shadows.card, display: "flex", flexDirection: "column", justifyContent: "space-between", height: 110 }}>
+            {/* ROW 1: Total Billed, Paid, Remaining */}
+            <div style={{ background: "linear-gradient(135deg, #F97316 0%, #EA580C 100%)", borderRadius: radius.lg, padding: "18px 20px", boxShadow: shadows.card, display: "flex", flexDirection: "column", justifyContent: "space-between", minHeight: 104 }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
-                <span style={{ fontSize: 12, fontWeight: "700", color: "rgba(255,255,255,0.7)" }}>Grand Total Expense</span>
-                <span style={{ width: 28, height: 28, borderRadius: 8, background: "rgba(255,255,255,0.2)", display: "flex", alignItems: "center", justifyContent: "center" }}><IndianRupee size={16} color="#FFF" /></span>
+                <span style={{ fontSize: 13, fontWeight: "700", color: "rgba(255,255,255,0.85)" }}>Total Billed</span>
+                <span style={{ width: 28, height: 28, borderRadius: 8, background: "rgba(255,255,255,0.2)", display: "flex", alignItems: "center", justifyContent: "center" }}><CreditCard size={16} color="#FFF" /></span>
               </div>
-              <div style={{ color: "#FFF", fontSize: 24, fontWeight: "900", letterSpacing: "-0.5px" }}>{formatINR(grandTotal)}</div>
+              <div style={{ color: "#FFF", fontSize: 22, fontWeight: "900", letterSpacing: "-0.3px" }}>{formatINR(costSummary.totalBilled)}</div>
             </div>
 
-            <div style={{ background: colors.cardBg, borderRadius: radius.lg, border: `1px solid ${colors.cardBorder}`, padding: "20px 24px", boxShadow: shadows.card, display: "flex", flexDirection: "column", justifyContent: "space-between", height: 110 }}>
+            <div style={{ background: colors.cardBg, borderRadius: radius.lg, border: `1px solid ${colors.cardBorder}`, padding: "18px 20px", boxShadow: shadows.card, display: "flex", flexDirection: "column", justifyContent: "space-between", minHeight: 104 }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
-                <span style={{ fontSize: 12, fontWeight: "700", color: colors.textLight }}>Material Cost</span>
-                <span style={{ width: 28, height: 28, borderRadius: 8, background: "#5B5FCF15", display: "flex", alignItems: "center", justifyContent: "center", color: "#5B5FCF" }}><Package size={16} /></span>
+                <span style={{ fontSize: 13, fontWeight: "700", color: colors.textSecondary }}>Paid</span>
+                <span style={{ width: 28, height: 28, borderRadius: 8, background: "rgba(21, 128, 61, 0.1)", display: "flex", alignItems: "center", justifyContent: "center", color: "#15803D" }}><CheckCircle size={16} /></span>
               </div>
-              <div style={{ color: colors.textPrimary, fontSize: 24, fontWeight: "900", letterSpacing: "-0.5px" }}>{formatINR(materialTotal)}</div>
+              <div style={{ color: colors.textPrimary, fontSize: 22, fontWeight: "900", letterSpacing: "-0.3px" }}>{formatINR(costSummary.paid)}</div>
             </div>
 
-            <div style={{ background: colors.cardBg, borderRadius: radius.lg, border: `1px solid ${colors.cardBorder}`, padding: "20px 24px", boxShadow: shadows.card, display: "flex", flexDirection: "column", justifyContent: "space-between", height: 110 }}>
+            <div style={{ background: colors.cardBg, borderRadius: radius.lg, border: `1px solid ${colors.cardBorder}`, padding: "18px 20px", boxShadow: shadows.card, display: "flex", flexDirection: "column", justifyContent: "space-between", minHeight: 104 }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
-                <span style={{ fontSize: 12, fontWeight: "700", color: colors.textLight }}>Labour Cost</span>
-                <span style={{ width: 28, height: 28, borderRadius: 8, background: `${primaryPurple}15`, display: "flex", alignItems: "center", justifyContent: "center", color: primaryPurple }}><User size={16} /></span>
+                <span style={{ fontSize: 13, fontWeight: "700", color: colors.textSecondary }}>Remaining</span>
+                <span style={{ width: 28, height: 28, borderRadius: 8, background: costSummary.remaining > 0 ? "rgba(220, 38, 38, 0.1)" : "rgba(21, 128, 61, 0.1)", display: "flex", alignItems: "center", justifyContent: "center", color: costSummary.remaining > 0 ? "#DC2626" : "#15803D" }}><Clock size={16} /></span>
               </div>
-              <div style={{ color: colors.textPrimary, fontSize: 24, fontWeight: "900", letterSpacing: "-0.5px" }}>{formatINR(labourTotal)}</div>
+              <div style={{ color: colors.textPrimary, fontSize: 22, fontWeight: "900", letterSpacing: "-0.3px" }}>{formatINR(costSummary.remaining)}</div>
             </div>
 
-            <div style={{ background: colors.cardBg, borderRadius: radius.lg, border: `1px solid ${colors.cardBorder}`, padding: "20px 24px", boxShadow: shadows.card, display: "flex", flexDirection: "column", justifyContent: "space-between", height: 110 }}>
+            {/* ROW 2: Material, Labour, Equipment */}
+            <div style={{ background: colors.cardBg, borderRadius: radius.lg, border: `1px solid ${colors.cardBorder}`, padding: "18px 20px", boxShadow: shadows.card, display: "flex", flexDirection: "column", justifyContent: "space-between", minHeight: 104 }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
-                <span style={{ fontSize: 12, fontWeight: "700", color: colors.textLight }}>Equipment Cost</span>
+                <span style={{ fontSize: 13, fontWeight: "700", color: colors.textSecondary }}>Material</span>
+                <span style={{ width: 28, height: 28, borderRadius: 8, background: "rgba(91, 95, 207, 0.1)", display: "flex", alignItems: "center", justifyContent: "center", color: "#5B5FCF" }}><Package size={16} /></span>
+              </div>
+              <div style={{ color: colors.textPrimary, fontSize: 22, fontWeight: "900", letterSpacing: "-0.3px" }}>{formatINR(costSummary.material)}</div>
+            </div>
+
+            <div style={{ background: colors.cardBg, borderRadius: radius.lg, border: `1px solid ${colors.cardBorder}`, padding: "18px 20px", boxShadow: shadows.card, display: "flex", flexDirection: "column", justifyContent: "space-between", minHeight: 104 }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+                <span style={{ fontSize: 13, fontWeight: "700", color: colors.textSecondary }}>Labour</span>
+                <span style={{ width: 28, height: 28, borderRadius: 8, background: `${primaryPurple}15`, display: "flex", alignItems: "center", justifyContent: "center", color: primaryPurple }}><Users size={16} /></span>
+              </div>
+              <div style={{ color: colors.textPrimary, fontSize: 22, fontWeight: "900", letterSpacing: "-0.3px" }}>{formatINR(costSummary.labour)}</div>
+            </div>
+
+            <div style={{ background: colors.cardBg, borderRadius: radius.lg, border: `1px solid ${colors.cardBorder}`, padding: "18px 20px", boxShadow: shadows.card, display: "flex", flexDirection: "column", justifyContent: "space-between", minHeight: 104 }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+                <span style={{ fontSize: 13, fontWeight: "700", color: colors.textSecondary }}>Equipment</span>
                 <span style={{ width: 28, height: 28, borderRadius: 8, background: `${primaryLightBlue}15`, display: "flex", alignItems: "center", justifyContent: "center", color: primaryLightBlue }}><Wrench size={16} /></span>
               </div>
-              <div style={{ color: colors.textPrimary, fontSize: 24, fontWeight: "900", letterSpacing: "-0.5px" }}>{formatINR(equipmentTotal)}</div>
+              <div style={{ color: colors.textPrimary, fontSize: 22, fontWeight: "900", letterSpacing: "-0.3px" }}>{formatINR(costSummary.equipment)}</div>
             </div>
 
           </div>
@@ -1144,22 +1083,20 @@ export default function FinancialReportPage() {
                   setSearchQuery(e.target.value);
                   setCurrentPage(1);
                 }}
-                placeholder="Search description, brand, project, floor, status..."
+                placeholder="Search by description, brand, project, phase, activity..."
                 style={{ border: "none", background: "transparent", width: "100%", outline: "none", fontSize: 13, color: colors.textPrimary }}
               />
-            </div>
-
-            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-              <label style={{ fontSize: 12, fontWeight: "600", color: colors.textSecondary }}>Status</label>
-              <select
-                value={selectedStatus}
-                onChange={e => setSelectedStatus(e.target.value)}
-                style={{ padding: "8px 12px", borderRadius: 8, border: `1px solid #E2E4FA`, outline: "none", fontSize: 12, fontWeight: "600", color: colors.textPrimary }}
-              >
-                <option value="All">All Approval Statuses</option>
-                <option value="Approved">Approved Only</option>
-                <option value="Pending">Pending Only</option>
-              </select>
+              {searchQuery.trim().length > 0 && (
+                <button
+                  onClick={() => {
+                    setSearchQuery("");
+                    setCurrentPage(1);
+                  }}
+                  style={{ background: "none", border: "none", cursor: "pointer", color: "#757299", display: "flex", alignItems: "center", padding: 0 }}
+                >
+                  <X size={16} />
+                </button>
+              )}
             </div>
           </div>
         ) : (
@@ -1222,19 +1159,6 @@ export default function FinancialReportPage() {
                 </select>
                 <ChevronDown size={14} color="#757299" style={{ position: "absolute", right: 14, top: "50%", transform: "translateY(-50%)", pointerEvents: "none" }} />
               </div>
-
-              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                <label style={{ fontSize: 12, fontWeight: "600", color: colors.textSecondary }}>Status</label>
-                <select
-                  value={selectedStatus}
-                  onChange={e => setSelectedStatus(e.target.value)}
-                  style={{ padding: "10px 14px", borderRadius: 10, border: `1px solid #E2E4FA`, outline: "none", fontSize: 12, fontWeight: "600", color: colors.textPrimary }}
-                >
-                  <option value="All">All Approval Statuses</option>
-                  <option value="Approved">Approved Only</option>
-                  <option value="Pending">Pending Only</option>
-                </select>
-              </div>
             </div>
 
             <div style={{ width: "100%", marginTop: 14 }}>
@@ -1246,7 +1170,7 @@ export default function FinancialReportPage() {
                 style={{
                   width: "100%",
                   padding: "12px",
-                  background: activeTab === "Materials" ? "#5B5FCF" : activeTab === "Labour" ? primaryPurple : primaryLightBlue,
+                  background: activeTab === "Materials" ? "#F97316" : activeTab === "Labour" ? primaryPurple : primaryLightBlue,
                   borderRadius: 10,
                   color: "#FFFFFF",
                   fontWeight: "700",
@@ -1269,7 +1193,7 @@ export default function FinancialReportPage() {
         {activeTab !== "All" && !reportGenerated ? (
 
           <div style={{ background: colors.cardBg, borderRadius: radius.lg, border: `1px solid ${colors.cardBorder}`, padding: "60px 20px", textAlign: "center", boxShadow: shadows.card }}>
-            <div style={{ width: 56, height: 56, borderRadius: "50%", background: activeTab === "Materials" ? "#5B5FCF15" : activeTab === "Labour" ? `${primaryPurple}15` : `${primaryLightBlue}15`, display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 16px", color: activeTab === "Materials" ? "#5B5FCF" : activeTab === "Labour" ? primaryPurple : primaryLightBlue }}>
+            <div style={{ width: 56, height: 56, borderRadius: "50%", background: activeTab === "Materials" ? "#F9731615" : activeTab === "Labour" ? `${primaryPurple}15` : `${primaryLightBlue}15`, display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 16px", color: activeTab === "Materials" ? "#F97316" : activeTab === "Labour" ? primaryPurple : primaryLightBlue }}>
               <FileText size={24} />
             </div>
             <h3 style={{ fontSize: 15, fontWeight: "700", color: colors.textPrimary, margin: "0 0 6px" }}>Configure Filters</h3>
@@ -1358,8 +1282,8 @@ export default function FinancialReportPage() {
                             } else if (colName === "Project") {
                               return <td key={colName} style={{ ...valStyle, fontWeight: "600" }}>{projectName}</td>;
                             } else if (colName === "Type") {
-                              const chipColor = entry.type === "material" ? "#5B5FCF" : entry.type === "labour" ? primaryPurple : primaryLightBlue;
-                              const chipBg = entry.type === "material" ? "#5B5FCF15" : entry.type === "labour" ? `${primaryPurple}15` : `${primaryLightBlue}15`;
+                              const chipColor = entry.type === "material" ? "#F97316" : entry.type === "labour" ? primaryPurple : primaryLightBlue;
+                              const chipBg = entry.type === "material" ? "#F9731615" : entry.type === "labour" ? `${primaryPurple}15` : `${primaryLightBlue}15`;
                               return (
                                 <td key={colName} style={valStyle}>
                                   <span style={{ padding: "3px 10px", borderRadius: 6, fontSize: 10.5, fontWeight: "700", background: chipBg, color: chipColor }}>
@@ -1417,6 +1341,19 @@ export default function FinancialReportPage() {
                               return (
                                 <td key={colName} style={{ ...valStyle, textAlign: "right", fontWeight: "700" }}>
                                   {formatINR(entry.amount)}
+                                </td>
+                              );
+                            } else if (colName === "Paid") {
+                              return (
+                                <td key={colName} style={{ ...valStyle, textAlign: "right", fontWeight: "600", color: "#16a34a" }}>
+                                  {formatINR(entry.paidAmount || 0)}
+                                </td>
+                              );
+                            } else if (colName === "Remaining") {
+                              const rem = Math.max(0, (entry.amount || 0) - (entry.paidAmount || 0));
+                              return (
+                                <td key={colName} style={{ ...valStyle, textAlign: "right", fontWeight: "600", color: rem > 0 ? "#dc2626" : "#16a34a" }}>
+                                  {formatINR(rem)}
                                 </td>
                               );
                             } else if (colName === "Rate" || colName === "Rate/Day" || colName === "Rent Rate") {
@@ -1668,11 +1605,11 @@ export default function FinancialReportPage() {
                           {formatINR(ph.amount)}
                         </span>
                         <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
-                          <span style={{ fontSize: 11, padding: "2px 6px", background: "#e0e7ff", color: "#3730a3", borderRadius: 4, fontWeight: 600 }}>
+                          <span style={{ fontSize: 11, padding: "2px 6px", background: "#FDE8D8", color: "#F97316", borderRadius: 4, fontWeight: 600 }}>
                             {ph.method || "—"}
                           </span>
                           {ph.receipt && (
-                            <a href={ph.receipt} target="_blank" rel="noopener noreferrer" style={{ fontSize: 11, color: "#4F46E5", fontWeight: 600, textDecoration: "none" }}>
+                            <a href={ph.receipt} target="_blank" rel="noopener noreferrer" style={{ fontSize: 11, color: "#EA580C", fontWeight: 600, textDecoration: "none" }}>
                               Receipt ↗
                             </a>
                           )}
