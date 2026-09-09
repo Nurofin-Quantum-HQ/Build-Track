@@ -322,7 +322,9 @@ router.post('/callback', async (req, res) => {
     if (isBrowser) {
       console.log('[AirPay IPN] Redirecting browser to frontend after error.');
       const frontendUrl = process.env.CLIENT_URL || 'https://buildtrack.nurofin.com';
-      return res.redirect(`${frontendUrl}/subscription?status=failed`);
+      // URL encode the error message so we can debug it on the frontend
+      const encodedError = encodeURIComponent(err.message || 'unknown_error');
+      return res.redirect(`${frontendUrl}/subscription?status=failed&reason=${encodedError}`);
     }
 
     // Do NOT redirect to buildtrack:// — this is a server-to-server endpoint

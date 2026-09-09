@@ -275,7 +275,12 @@ export default function SubscriptionPage() {
       // Clear query params
       window.history.replaceState({}, "", window.location.pathname);
     } else if (status === "failed") {
-      setError("Payment was not completed. Please try again.");
+      const reason = params.get("reason");
+      if (reason) {
+        setError(`Payment failed: ${reason}`);
+      } else {
+        setError("Payment was not completed. Please try again.");
+      }
       window.history.replaceState({}, "", window.location.pathname);
     } else if (status === "pending") {
       setError("Payment is being confirmed. Please wait a moment and refresh.");
