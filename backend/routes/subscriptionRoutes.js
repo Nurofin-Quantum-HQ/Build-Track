@@ -179,7 +179,18 @@ router.post('/callback', async (req, res) => {
   }
 
   try {
-    // ── 1. Decrypt and verify ──────────────────────────────────────────────
+    // ── 0. Handle Browser Redirect ─────────────────────────────────────────
+    // If the request doesn't have an encrypted `response` field, it's likely 
+    // Airpay redirecting the user's browser back via form POST.
+    if (!req.body || !req.body.response) {
+      console.log('[AirPay IPN] No encrypted response found. Treating as browser redirect.');
+      const status = (req.body?.TRANSACTIONSTATUS || req.body?.transaction_status || '').toString().toUpperCase();
+      const isSuccess = status === 'SUCCESS' || status === '200';
+      const frontendUrl = process.env.CLIENT_URL || 'https://buildtrack.nurofin.com';
+      return res.redirect(`${frontendUrl}/subscription?status=${isSuccess ? 'success' : 'failed'}`);
+    }
+
+    // ── 1. Decrypt and verify IPN ──────────────────────────────────────────
     const { data: txnData } = verifyAndDecryptCallbackData(req.body);
 
     const orderId       = txnData.orderid       || txnData.order_id;
