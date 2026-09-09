@@ -584,7 +584,12 @@ router.put("/:id", protect, async (req, res) => {
     const existing = await Project.findById(req.params.id);
     if (!existing) return res.status(404).json({ message: "Project not found" });
     const userPerms = Array.isArray(req.user.permissions) ? req.user.permissions : [];
-    const hasEdit = req.user.role === 'Admin' || userPerms.includes("edit_project") || userPerms.includes("manage_team") || userPerms.includes("add_entry");
+    const hasEdit = req.user.role === 'Admin' || 
+                    userPerms.includes("edit_project") || 
+                    userPerms.includes("manage_team") || 
+                    userPerms.includes("add_entry") ||
+                    userPerms.includes("submit_daily_update") ||
+                    userPerms.includes("approve_updates");
     if (!hasEdit) {
       const Task = require("../models/Task");
       const hasTask = await Task.exists({ project: existing._id, assignedTo: req.user._id });
