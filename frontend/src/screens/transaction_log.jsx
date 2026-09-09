@@ -34,7 +34,7 @@ const TYPE_STYLES = {
   Materials: { bg: colors.primaryLight, color: colors.primary, label: "Materials", icon: Package },
   Wages:     { bg: colors.successLight, color: colors.success, label: "Labour", icon: Users },
   Expense:   { bg: colors.warningLight, color: colors.warning, label: "Equipment", icon: Wrench },
-  Income:    { bg: "#F5F3FF", color: "#8B5CF6", label: "Income", icon: TrendingUp },
+  Income:    { bg: "#FFF5F0", color: "#EA580C", label: "Income", icon: TrendingUp },
 };
 
 const FILTERS = [
@@ -201,7 +201,7 @@ export default function TransactionLog() {
           padding: '0 14px', height: 42, gap: 10, minWidth: 320,
           transition: 'all 150ms ease',
         }}
-          onFocus={(e) => { e.currentTarget.style.borderColor = colors.primary; e.currentTarget.style.boxShadow = '0 0 0 3px rgba(23, 62, 234, 0.1)'; }}
+          onFocus={(e) => { e.currentTarget.style.borderColor = colors.primary; e.currentTarget.style.boxShadow = '0 0 0 3px rgba(249, 115, 22, 0.1)'; }}
           onBlur={(e) => { e.currentTarget.style.borderColor = colors.border; e.currentTarget.style.boxShadow = 'none'; }}
         >
           <Search size={16} color={colors.textTertiary} />
@@ -350,7 +350,7 @@ export default function TransactionLog() {
                         background: p === page ? gradients.primaryGradient : colors.card,
                         color: p === page ? '#fff' : colors.textPrimary,
                         fontWeight: 700, fontSize: 13, cursor: 'pointer', minWidth: 38, fontFamily: typography.fontFamily,
-                        boxShadow: p === page ? '0 2px 8px rgba(23, 62, 234, 0.15)' : 'none',
+                        boxShadow: p === page ? '0 2px 8px rgba(249, 115, 22, 0.15)' : 'none',
                         border: p === page ? 'none' : `1px solid ${colors.border}`,
                       }}
                     >

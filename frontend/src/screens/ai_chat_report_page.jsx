@@ -313,7 +313,7 @@ export default function AiChatReportPage() {
                     <div
                       key={p}
                       onClick={() => { setQueryInput(p); submitSearch(p); }}
-                      style={{ background: '#FFF', borderRadius: 16, border: '1px solid #DDE0F0', padding: 16, cursor: 'pointer', transition: 'all 0.15s ease', boxShadow: shadows.sm }}
+                      style={{ background: '#FFF', borderRadius: 16, border: '1px solid #EBEBEB', padding: 16, cursor: 'pointer', transition: 'all 0.15s ease', boxShadow: shadows.sm }}
                       className="hover-lift-sm"
                     >
                       <TrendingUp size={16} color={colors.primaryBlue} style={{ marginBottom: 10 }} />
@@ -406,7 +406,7 @@ export default function AiChatReportPage() {
                 );
               })}
 
-              <div style={{ background: 'linear-gradient(135deg, #E8EAF6 0%, #C5CAE9 100%)', border: '2.5px solid #FFF', borderRadius: 20, padding: 20, boxShadow: shadows.md }}>
+              <div style={{ background: 'linear-gradient(135deg, #FFF5F0 0%, #FDE8D8 100%)', border: '2.5px solid #FFF', borderRadius: 20, padding: 20, boxShadow: shadows.md }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12, color: colors.primaryBlue }}>
                   <Sparkles size={16} />
                   <span style={{ fontSize: 12, fontWeight: '800', letterSpacing: '0.5px', textTransform: 'uppercase' }}>Executive Summary</span>
@@ -593,7 +593,7 @@ export default function AiChatReportPage() {
                           padding: '8px 14px',
                           borderRadius: 20,
                           border: 'none',
-                          background: '#ECEBFF',
+                          background: '#FFF5F0',
                           color: colors.primaryBlue,
                           fontSize: 12.5,
                           fontWeight: '700',

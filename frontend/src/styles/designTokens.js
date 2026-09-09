@@ -3,8 +3,8 @@ export const colors = {
   card: 'var(--glass-bg)',
   subtle: 'var(--bg-subtle)',
   hover: 'var(--bg-hover)',
-  primary: '#6366f1',
-  primaryHover: '#4f46e5',
+  primary: '#F97316',
+  primaryHover: '#EA580C',
   primaryLight: 'var(--primary-light)',
   primarySubtle: 'var(--primary-subtle)',
   border: 'var(--border)',
@@ -19,7 +19,7 @@ export const colors = {
   dangerLight: 'var(--danger-light)',
   warning: '#F59E0B',
   warningLight: 'var(--warning-light)',
-  info: '#6366f1',
+  info: '#F97316',
   infoLight: 'var(--info-light)',
 };
 
@@ -52,12 +52,12 @@ export const typography = {
 };
 
 export const gradients = {
-  primaryGradient: 'linear-gradient(90deg, #6366f1 0%, #a855f7 100%)',
-  primaryButton: 'linear-gradient(90deg, #6366f1 0%, #a855f7 100%)',
-  progressBar: 'linear-gradient(90deg, #6366f1 0%, #a855f7 100%)',
-  navActiveItem: 'linear-gradient(90deg, #6366f1 0%, #a855f7 100%)',
-  authBackground: 'linear-gradient(135deg, #6366f1 0%, #a855f7 100%)',
-  pageBackground: 'radial-gradient(circle at top right, #e0e7ff, #ffffff)',
+  primaryGradient: 'linear-gradient(90deg, #F97316 0%, #FB923C 100%)',
+  primaryButton: 'linear-gradient(90deg, #F97316 0%, #F97316 100%)',
+  progressBar: 'linear-gradient(90deg, #F97316 0%, #FB923C 100%)',
+  navActiveItem: 'linear-gradient(90deg, #F97316 0%, #FB923C 100%)',
+  authBackground: 'linear-gradient(135deg, #EA580C 0%, #F97316 50%, #FB923C 100%)',
+  pageBackground: 'radial-gradient(circle at top right, #FFF1E8, #ffffff)',
 };
 
 export const buttonStyles = {
@@ -78,12 +78,12 @@ colors.textLight = colors.textSecondary;
 colors.textMedium = colors.textSecondary;
 colors.inputBorder = colors.border;
 colors.divider = colors.border;
-colors.gradientStart = '#6366f1';
-colors.gradientMid = '#a855f7';
-colors.gradientEnd = '#a855f7';
-colors.authStart = '#6366f1';
-colors.authMid = '#a855f7';
-colors.authEnd = '#a855f7';
+colors.gradientStart = '#F97316';
+colors.gradientMid = '#FB923C';
+colors.gradientEnd = '#FB923C';
+colors.authStart = '#EA580C';
+colors.authMid = '#F97316';
+colors.authEnd = '#FB923C';
 colors.bgBase1 = colors.bg;
 colors.bgBase2 = colors.subtle;
 colors.bgBase3 = colors.subtle;

@@ -18,7 +18,7 @@ import perfLogger from "../utils/performanceLogger";
 function Toggle({ on, onToggle }) {
   return (
     <div onClick={onToggle}
-      style={{ width: 46, height: 24, borderRadius: 12, cursor: "pointer", background: on ? "#5B5CEB" : "#CBD5E1", position: "relative", transition: "background 0.2s", flexShrink: 0 }}>
+      style={{ width: 46, height: 24, borderRadius: 12, cursor: "pointer", background: on ? "#F97316" : "#CBD5E1", position: "relative", transition: "background 0.2s", flexShrink: 0 }}>
       <div style={{ position: "absolute", top: 2, left: on ? 24 : 2, width: 20, height: 20, borderRadius: "50%", background: "#fff", boxShadow: "0 1px 3px rgba(0,0,0,0.15)", transition: "left 0.2s" }} />
     </div>
   );
@@ -259,7 +259,7 @@ export default function SettingsPage() {
                 <div style={{ width: 76, height: 76, borderRadius: "50%", background: "#F1F5F9", overflow: "hidden", display: "flex", alignItems: "center", justifyContent: "center", border: "2px solid #E5E7EB" }}>
                   {profileImage ? <img src={profileImage} alt="Profile" style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : <User size={32} color="#94A3B8" />}
                 </div>
-                <div onClick={() => profileInputRef.current.click()} style={{ position: "absolute", bottom: 0, right: 0, width: 24, height: 24, borderRadius: "50%", background: "#5B5CEB", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", border: "2px solid #fff" }}>
+                <div onClick={() => profileInputRef.current.click()} style={{ position: "absolute", bottom: 0, right: 0, width: 24, height: 24, borderRadius: "50%", background: "#F97316", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", border: "2px solid #fff" }}>
                   <Camera size={12} color="#fff" />
                 </div>
               </div>
@@ -335,7 +335,7 @@ export default function SettingsPage() {
           </SectionCard>
 
           {subscription && (
-            <SectionCard gradient="linear-gradient(135deg, #5B5CEB, #8B5CF6)" title="Subscription">
+            <SectionCard gradient="linear-gradient(135deg, #F97316, #EA580C)" title="Subscription">
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
                 <div>
                   <div style={{ fontSize: 11, fontWeight: 600, opacity: 0.7, letterSpacing: "0.05em", marginBottom: 4, color: "#fff", textTransform: "uppercase" }}>CURRENT PLAN</div>

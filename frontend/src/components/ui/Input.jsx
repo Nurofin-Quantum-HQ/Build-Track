@@ -39,7 +39,7 @@ export default function Input({
             e.currentTarget.style.borderColor = error ? colors.danger : colors.primary;
             e.currentTarget.style.boxShadow = error
               ? `0 0 0 3px ${colors.danger}20`
-              : `0 0 0 3px rgba(23, 62, 234, 0.12)`;
+              : `0 0 0 3px rgba(249, 115, 22, 0.12)`;
             e.currentTarget.style.background = 'rgba(255, 255, 255, 0.8)';
           }}
           onBlur={(e) => {

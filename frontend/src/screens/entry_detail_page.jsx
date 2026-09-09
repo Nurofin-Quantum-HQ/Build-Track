@@ -12,10 +12,10 @@ import {
 } from 'lucide-react';
 
 const typeConfig = {
-  Materials: { label: 'Material', bg: '#EEF0FF', color: '#5B5CEB', icon: <Package size={18} /> },
+  Materials: { label: 'Material', bg: '#FFF5F0', color: '#F97316', icon: <Package size={18} /> },
   Wages: { label: 'Labour', bg: '#F0FDF4', color: '#22C55E', icon: <User size={18} /> },
   Expense: { label: 'Equipment', bg: '#FFF7ED', color: '#F97316', icon: <Wrench size={18} /> },
-  Income: { label: 'Income', bg: '#F3E8FF', color: '#8B5CF6', icon: <DollarSign size={18} /> },
+  Income: { label: 'Income', bg: '#FFF7F0', color: '#EA580C', icon: <DollarSign size={18} /> },
 };
 
 function formatCurrency(amount) {
@@ -198,7 +198,7 @@ export default function EntryDetailPage() {
           <div style={{ fontSize: 13, fontWeight: 700, color: '#111827', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Payment Summary</div>
           {canRecordPayment && outstandingAmt > 0 && (
             <button onClick={() => setShowPaymentSheet(true)}
-              style={{ border: 'none', background: '#5B5CEB', color: '#fff', padding: '6px 12px', borderRadius: 6, fontSize: 12, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}>
+              style={{ border: 'none', background: '#F97316', color: '#fff', padding: '6px 12px', borderRadius: 6, fontSize: 12, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}>
               <Receipt size={14} /> Record Payment
             </button>
           )}
@@ -223,7 +223,7 @@ export default function EntryDetailPage() {
         <Card padding="20px" style={{ marginBottom: 16, border: '1px solid #E2E8F0' }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
             <div style={{ fontSize: 13, fontWeight: 700, color: '#111827', textTransform: 'uppercase', letterSpacing: '0.05em', display: 'flex', alignItems: 'center', gap: 6 }}>
-              <FileCheck size={16} color="#5B5CEB" /> GST & Tax Breakdown
+              <FileCheck size={16} color="#F97316" /> GST & Tax Breakdown
             </div>
             <Badge variant="info" size="sm">{gstPct > 0 ? `${gstPct}% GST` : 'GST Included'}</Badge>
           </div>
@@ -234,7 +234,7 @@ export default function EntryDetailPage() {
             </div>
             <div>
               <div style={{ fontSize: 11, color: '#64748B' }}>GST Tax ({gstPct}%)</div>
-              <div style={{ fontSize: 14, fontWeight: 600, color: '#5B5CEB', marginTop: 2 }}>{formatCurrency(gstTaxAmt)}</div>
+              <div style={{ fontSize: 14, fontWeight: 600, color: '#F97316', marginTop: 2 }}>{formatCurrency(gstTaxAmt)}</div>
             </div>
             <div>
               <div style={{ fontSize: 11, color: '#64748B' }}>Net Total</div>
@@ -246,7 +246,7 @@ export default function EntryDetailPage() {
 
       <Card padding="20px" style={{ marginBottom: 16 }}>
         <h3 style={{ fontSize: 14, fontWeight: 700, color: '#111827', margin: '0 0 14px', display: 'flex', alignItems: 'center', gap: 6 }}>
-          <Clock size={16} color="#5B5CEB" /> Payment History Timeline ({paymentHistory.length})
+          <Clock size={16} color="#F97316" /> Payment History Timeline ({paymentHistory.length})
         </h3>
         {paymentHistory.length === 0 ? (
           <div style={{ fontSize: 13, color: '#94A3B8', fontStyle: 'italic', textAlign: 'center', padding: '12px 0' }}>
@@ -256,7 +256,7 @@ export default function EntryDetailPage() {
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
             {paymentHistory.map((log, idx) => (
               <div key={idx} style={{ display: 'flex', gap: 12, paddingBottom: 12, borderBottom: idx < paymentHistory.length - 1 ? '1px dashed #E2E8F0' : 'none' }}>
-                <div style={{ width: 32, height: 32, borderRadius: '50%', background: '#EEF0FF', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#5B5CEB', flexShrink: 0, fontSize: 12, fontWeight: 700 }}>
+                <div style={{ width: 32, height: 32, borderRadius: '50%', background: '#FFF5F0', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#F97316', flexShrink: 0, fontSize: 12, fontWeight: 700 }}>
                   #{idx + 1}
                 </div>
                 <div style={{ flex: 1 }}>
@@ -269,7 +269,7 @@ export default function EntryDetailPage() {
                     {log.note && <span style={{ color: '#64748B' }}>{log.note}</span>}
                   </div>
                   {log.receipt && (
-                    <a href={log.receipt} target="_blank" rel="noopener noreferrer" style={{ fontSize: 12, color: '#5B5CEB', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: 4, marginTop: 4, fontWeight: 600 }}>
+                    <a href={log.receipt} target="_blank" rel="noopener noreferrer" style={{ fontSize: 12, color: '#F97316', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: 4, marginTop: 4, fontWeight: 600 }}>
                       <ExternalLink size={12} /> View Receipt
                     </a>
                   )}
@@ -288,7 +288,7 @@ export default function EntryDetailPage() {
               <span style={{ color: '#94A3B8', display: 'flex', flexShrink: 0 }}>{f.icon}</span>
               <div style={{ minWidth: 0 }}>
                 <div style={{ fontSize: 10, fontWeight: 600, color: '#94A3B8', letterSpacing: '0.03em', textTransform: 'uppercase' }}>{f.label}</div>
-                <div style={{ fontSize: 13, fontWeight: f.highlight ? 700 : 500, color: f.highlight ? '#5B5CEB' : '#111827' }}>{f.value}</div>
+                <div style={{ fontSize: 13, fontWeight: f.highlight ? 700 : 500, color: f.highlight ? '#F97316' : '#111827' }}>{f.value}</div>
               </div>
             </div>
           ))}
@@ -302,7 +302,7 @@ export default function EntryDetailPage() {
         </Card>
       )}
 
-      {((entry.eSignStatus && entry.eSignStatus.toLowerCase() !== 'not requested') || entry.signatureData) && (
+      {((entry.eSignStatus && entry.eSignStatus !== 'Not requested') || entry.signatureData) && (
         <Card padding="20px" style={{ marginBottom: 16 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
             <h3 style={{ fontSize: 14, fontWeight: 700, color: '#111827', margin: 0, display: 'flex', alignItems: 'center', gap: 6 }}>

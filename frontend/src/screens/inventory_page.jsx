@@ -21,7 +21,7 @@ const STATUS_META = {
 const PAYMENT_STATUS_COLORS = {
   paid:    { bg: "#E8F5E9", text: "#2E7D32", border: "#43A047" },
   partial: { bg: "#FFF8E1", text: "#F57F17", border: "#FFC107" },
-  pending: { bg: "#ECEBFF", text: "#6C63FF", border: "#6C63FF" },
+  pending: { bg: "#FFF5F0", text: "#F97316", border: "#F97316" },
   overdue: { bg: "#FFEBEE", text: "#C62828", border: "#E53935" },
 };
 
@@ -99,16 +99,16 @@ function getVendorLabel(type) {
 }
 
 function getCategoryIcon(categoryName, type) {
-  if (type === "labour") return { path: "M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z", bg: "#EEF2FF", color: colors.primaryBlue };
+  if (type === "labour") return { path: "M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z", bg: "#FFF5F0", color: colors.primaryBlue };
   if (type === "equipment") return { path: "M22 9V7h-2V5c0-1.1-.9-2-2-2H4c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2v-2h2v-2h-2v-2h2v-2h-2V9h2zm-4 10H4V5h14v14zM6 13h5v4H6v-4zm6-6h4v3h-4V7zM6 7h5v5H6V7zm6 4h4v6h-4v-6z", bg: "#ECFDF5", color: "#16A34A" };
   const cat = (categoryName || "").toLowerCase();
   if (cat.includes("cement")) return { path: "M12 2l9 4.5v9L12 20l-9-4.5v-9L12 2z", bg: "#E8F5E9", color: "#4CAF50" };
-  if (cat.includes("steel") || cat.includes("iron")) return { path: "M3 17v2h6v-2H3zM3 5v2h10V5H3zm10 16v-2h8v-2h-8v-2h-2v6h2zM7 9v2H3v2h4v2h2V9H7zm14 4v-2H11v2h10zm-6-4h2V7h4V5h-4V3h-2v6z", bg: "#E3F2FD", color: "#1565C0" };
+  if (cat.includes("steel") || cat.includes("iron")) return { path: "M3 17v2h6v-2H3zM3 5v2h10V5H3zm10 16v-2h8v-2h-8v-2h-2v6h2zM7 9v2H3v2h4v2h2V9H7zm14 4v-2H11v2h10zm-6-4h2V7h4V5h-4V3h-2v6z", bg: "#FFF5F0", color: "#F97316" };
   if (cat.includes("sand") || cat.includes("aggregate")) return { path: "M2 20h20v2H2v-2zm2-3h2v2H4v-2zm4-3h2v2H8v-2zm4-3h2v2h-2V11zm4-3h2v2h-2V8zm4-3h2v2h-2V5z", bg: "#FFF8E1", color: "#F59E0B" };
   if (cat.includes("brick") || cat.includes("block")) return { path: "M2 20h20v2H2v-2zm2-3h2v2H4v-2zm4-3h2v2H8v-2zm4-3h2v2h-2V11zm4-3h2v2h-2V8z", bg: "#FBE9E7", color: "#E64A19" };
-  if (cat.includes("electric")) return { path: "M7 2v11h3v9l7-12h-4l4-8z", bg: "#F3E5F5", color: "#7B1FA2" };
-  if (cat.includes("plumb") || cat.includes("pipe")) return { path: "M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2z", bg: "#E8EAF6", color: "#3949AB" };
-  return { path: "M20 8h-2.81c-.45-.78-1.07-1.45-1.82-1.96L17 4.41 15.59 3l-2.17 2.17C12.96 5.06 12.49 5 12 5c-.49 0-.96.06-1.41.17L8.41 3 7 4.41l1.62 1.63C7.88 6.55 7.26 7.22 6.81 8H4v2h2.09c-.05.33-.09.66-.09 1v1H4v2h2v1c0 .34.04.67.09 1H4v2h2.81c1.04 1.79 2.97 3 5.19 3s4.15-1.21 5.19-3H20v-2h-2.09c.05-.33.09-.66.09-1v-1h2v-2h-2v-1c0-.34-.04-.67-.09-1H20V8z", bg: "#EEF2FF", color: colors.primaryBlue };
+  if (cat.includes("electric")) return { path: "M7 2v11h3v9l7-12h-4l4-8z", bg: "#FFF7F0", color: "#EA580C" };
+  if (cat.includes("plumb") || cat.includes("pipe")) return { path: "M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2z", bg: "#FFF5F0", color: "#FB923C" };
+  return { path: "M20 8h-2.81c-.45-.78-1.07-1.45-1.82-1.96L17 4.41 15.59 3l-2.17 2.17C12.96 5.06 12.49 5 12 5c-.49 0-.96.06-1.41.17L8.41 3 7 4.41l1.62 1.63C7.88 6.55 7.26 7.22 6.81 8H4v2h2.09c-.05.33-.09.66-.09 1v1H4v2h2v1c0 .34.04.67.09 1H4v2h2.81c1.04 1.79 2.97 3 5.19 3s4.15-1.21 5.19-3H20v-2h-2.09c.05-.33.09-.66.09-1v-1h2v-2h-2v-1c0-.34-.04-.67-.09-1H20V8z", bg: "#FFF5F0", color: colors.primaryBlue };
 }
 
 const MONTHS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
@@ -463,15 +463,14 @@ export default function InventoryPage() {
         }}
       />
 
-      <div style={{ flex: 1, overflowY: "auto", padding: "16px 24px 40px" }}>
-
         <div className="tour-header" style={{
-          padding: "8px 0 24px",
+          padding: "18px 24px 14px", borderBottom: `1px solid ${colors.border}`,
+          background: "#fff", zIndex: 10,
           display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 12
         }}>
           <div>
-            <h1 style={{ margin: 0, fontSize: 28, fontWeight: 800, color: colors.textPrimary, letterSpacing: '-0.02em' }}>Inventory</h1>
-            <p style={{ margin: "6px 0 0", fontSize: 14, color: colors.textSecondary }}>
+            <h1 style={{ margin: 0, fontSize: 22, fontWeight: 800, color: colors.textPrimary }}>Inventory</h1>
+            <p style={{ margin: "2px 0 0", fontSize: 12, color: colors.textLight }}>
               {loading ? "Loading..." : `${totalItems} ${labelPlural}${labelSuffix}`}
             </p>
           </div>
@@ -479,6 +478,8 @@ export default function InventoryPage() {
             <HelpCircle size={16} color={colors.textLight} />
           </button>
         </div>
+
+      <div style={{ flex: 1, overflowY: "auto", padding: "16px 24px 40px" }}>
 
         <div className="tour-project-context" style={{
           display: "flex", alignItems: "center", gap: 10,
@@ -625,9 +626,9 @@ export default function InventoryPage() {
 
         {paymentSummary.totalBill > 0 && (
           <div style={{
-            background: `linear-gradient(135deg, ${colors.primaryBlue}, ${colors.primaryPurple || "#B137FF"})`,
+            background: `linear-gradient(135deg, ${colors.primaryBlue}, ${colors.primaryPurple || "#F97316"})`,
             borderRadius: radius.lg, padding: "16px 20px", marginBottom: 16,
-            color: "#FFF", boxShadow: "0 4px 16px rgba(23,62,234,0.25)",
+            color: "#FFF", boxShadow: "0 4px 16px rgba(249,115,22,0.25)",
           }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
               <div>
@@ -945,7 +946,7 @@ export default function InventoryPage() {
                                           <div key={tx._id || idx} style={{
                                             display: "flex", alignItems: "center", justifyContent: "space-between",
                                             background: colors.bgBase4, borderRadius: radius.sm,
-                                            padding: "10px 12px", border: "1px solid #ECEBFF", fontSize: 12.5,
+                                            padding: "10px 12px", border: "1px solid #FFF5F0", fontSize: 12.5,
                                           }}>
                                             <div style={{ flex: 1.2 }}>
                                               <div style={{ fontWeight: 700, color: colors.textPrimary }}>
@@ -971,7 +972,7 @@ export default function InventoryPage() {
                                                 </span>
                                               </div>
                                               <button onClick={() => navigate("/manualentry", { state: { transaction: tx } })}
-                                                style={{ background: "#FFF", border: "1px solid #ECEBFF", borderRadius: 6, width: 28, height: 28, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", color: colors.primaryBlue }} title="Edit Transaction">
+                                                style={{ background: "#FFF", border: "1px solid #FFF5F0", borderRadius: 6, width: 28, height: 28, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", color: colors.primaryBlue }} title="Edit Transaction">
                                                 <Pencil size={12} />
                                               </button>
                                             </div>

@@ -40,7 +40,7 @@ export default function AssignTaskPage() {
   useEffect(() => {
     Promise.all([
       projectAPI.getAll().catch(() => ({ data: { projects: [] } })),
-      taskAPI.getUsers().catch(() => ({ data: [] }))
+      authAPI.getUsers().catch(() => ({ data: [] }))
     ]).then(([projRes, userRes]) => {
       setProjects(projRes.data?.projects || projRes.data || []);
       setUsers(userRes.data?.users || userRes.data || []);

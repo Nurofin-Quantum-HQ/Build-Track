@@ -3,7 +3,8 @@ import { Outlet, useNavigate } from "react-router-dom";
 import Sidebar from "../components/Sidebar";
 import AppTour from "../components/AppTour";
 import { Bell, Settings } from "lucide-react";
-import { colors } from "../styles/designTokens";
+import { colors, typography } from "../styles/designTokens";
+import nurofinLogo from "../assets/nurofin-black.svg";
 
 export default function DashboardLayout() {
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
@@ -73,7 +74,37 @@ export default function DashboardLayout() {
             </button>
           )}
           <div style={{ flex: 1 }} />
-          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 16 }} className="header-right-group">
+            <div
+              onClick={() => navigate("/")}
+              className="header-brand-card"
+              title="BuildTrack - Powered by Nurofin"
+            >
+              <div className="header-brand-primary">
+                <img
+                  src="/buildtrack-logo.png"
+                  alt="BuildTrack"
+                  className="header-brand-logo"
+                />
+                <span className="header-brand-name">
+                  BuildTrack
+                </span>
+              </div>
+
+              <div className="header-brand-divider" />
+
+              <div className="header-powered-by">
+                <span className="header-powered-text">
+                  Powered by
+                </span>
+                <img
+                  src={nurofinLogo}
+                  alt="Nurofin"
+                  className="header-nurofin-svg"
+                />
+              </div>
+            </div>
+
             <button
               onClick={() => navigate("/notifications")}
               className="premium-topbar-btn"

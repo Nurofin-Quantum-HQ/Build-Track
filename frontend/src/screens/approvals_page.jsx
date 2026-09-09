@@ -18,10 +18,10 @@ function formatDate(dateStr) {
 }
 
 const typeStyles = {
-  Materials: { bg: '#ECEBFF', color: '#6C63FF' },
+  Materials: { bg: '#FFF5F0', color: '#F97316' },
   Wages: { bg: '#E8F5E9', color: '#2E7D32' },
   Expense: { bg: '#FFF3E0', color: '#E65100' },
-  Income: { bg: '#F3E8FF', color: '#7C3AED' },
+  Income: { bg: '#FFF7F0', color: '#EA580C' },
 };
 
 export default function ApprovalsPage() {
@@ -189,7 +189,7 @@ export default function ApprovalsPage() {
                       <span>{formatDate(entry.date || entry.createdAt)}</span>
                       <span>{entry.projectName || entry.project || '—'}</span>
                       {hasPhotos && (
-                        <span onClick={(e) => { e.stopPropagation(); setLightbox({ photos, index: 0 }); }} style={{ color: '#5B5CEB', display: 'flex', alignItems: 'center', gap: 4, cursor: 'pointer', fontWeight: 600 }}>
+                        <span onClick={(e) => { e.stopPropagation(); setLightbox({ photos, index: 0 }); }} style={{ color: '#F97316', display: 'flex', alignItems: 'center', gap: 4, cursor: 'pointer', fontWeight: 600 }}>
                           <ImageIcon size={14} /> View Proof
                         </span>
                       )}
@@ -244,7 +244,7 @@ export default function ApprovalsPage() {
           {lightbox.photos.length > 1 && (
             <div style={{ display: 'flex', gap: 12, marginTop: 16 }} onClick={e => e.stopPropagation()}>
               {lightbox.photos.map((p, i) => (
-                <div key={i} onClick={() => setLightbox({ ...lightbox, index: i })} style={{ width: 60, height: 60, borderRadius: 8, border: lightbox.index === i ? '2px solid #5B5CEB' : '2px solid transparent', cursor: 'pointer', backgroundImage: `url(${p})`, backgroundSize: 'cover', backgroundPosition: 'center' }} />
+                <div key={i} onClick={() => setLightbox({ ...lightbox, index: i })} style={{ width: 60, height: 60, borderRadius: 8, border: lightbox.index === i ? '2px solid #F97316' : '2px solid transparent', cursor: 'pointer', backgroundImage: `url(${p})`, backgroundSize: 'cover', backgroundPosition: 'center' }} />
               ))}
             </div>
           )}

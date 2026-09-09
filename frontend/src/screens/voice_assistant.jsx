@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { transactionAPI, voiceAPI } from '../api';
 import useProjectStore from '../stores/projectStore';
@@ -30,9 +30,9 @@ const STATUS = {
 };
 
 const ENTRY_TYPES = [
-  { id: 'material', label: 'Material', icon: 'material', color: '#173EEA' },
-  { id: 'labor', label: 'Labor', icon: 'labor', color: '#B137FF' },
-  { id: 'equipment', label: 'Equipment', icon: 'equipment', color: '#67C8FF' },
+  { id: 'material', label: 'Material', icon: 'material', color: '#F97316' },
+  { id: 'labor', label: 'Labor', icon: 'labor', color: '#EA580C' },
+  { id: 'equipment', label: 'Equipment', icon: 'equipment', color: '#FB923C' },
 ];
 
 const typeIcons = {
@@ -47,43 +47,10 @@ const ENTRY_EXAMPLES = {
   equipment: 'Say: "JCB excavator worked 6 hours at 1200 per hour, diesel 500"',
 };
 
-class ErrorBoundary extends React.Component {
-  constructor(props) {
-    super(props);
-    this.state = { hasError: false, error: null };
-  }
-  static getDerivedStateFromError(error) {
-    return { hasError: true, error };
-  }
-  componentDidCatch(error, errorInfo) {
-    console.error("VoiceAssistant Error:", error, errorInfo);
-  }
-  render() {
-    if (this.state.hasError) {
-      return (
-        <div style={{ padding: 40, color: 'red', background: 'white', height: '100vh', overflow: 'auto' }}>
-          <h2>Something went wrong in Voice Assistant.</h2>
-          <pre style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-all' }}>{this.state.error?.toString()}</pre>
-          <pre style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-all', marginTop: 20 }}>{this.state.error?.stack}</pre>
-        </div>
-      );
-    }
-    return this.props.children;
-  }
-}
-
-export default function VoiceAssistantPage(props) {
-  return (
-    <ErrorBoundary>
-      <VoiceAssistant {...props} />
-    </ErrorBoundary>
-  );
-}
-
-function VoiceAssistant({ preselectedProject: propProject }) {
+export default function VoiceAssistantPage() {
   const navigate = useNavigate();
   const location = useLocation();
-  const preselectedProject = propProject || location.state?.project || null;
+  const preselectedProject = location.state?.project || null;
   const { can, isAdmin } = useAuth();
   
   const allowedTypes = useMemo(() => {
@@ -95,16 +62,6 @@ function VoiceAssistant({ preselectedProject: propProject }) {
   }, [can, isAdmin]);
 
   const [status, setStatus] = useState(preselectedProject ? STATUS.idle : STATUS.context);
-  const isListening = status === STATUS.listening;
-  const isIdle = status === STATUS.idle;
-  const isProcessing = status === STATUS.processing;
-  const isExtracting = status === STATUS.extracting;
-  const isSummary = status === STATUS.summary;
-  const isSaving = status === STATUS.saving;
-  const isCompleted = status === STATUS.completed;
-  const isError = status === STATUS.error;
-  const isContext = status === STATUS.context;
-
   const [entryType, setEntryType] = useState(() => allowedTypes.length > 0 ? allowedTypes[0] : 'material');
   
   useEffect(() => {
@@ -137,13 +94,12 @@ function VoiceAssistant({ preselectedProject: propProject }) {
   const [runTour, setRunTour] = useState(false);
 
 
-  const hasContext = !!(executionContext.project || executionContext.floor || executionContext.activity);
-  
   const tourSteps = [
-    ...(isIdle || isListening ? [{ target: '.tour-entry-types', content: 'Select the type of entry before speaking.', disableBeacon: true }] : []),
-    ...(hasContext ? [{ target: '.tour-context', content: 'Set the project, floor, and phase context here.' }] : []),
-    { target: '.tour-mic', content: 'Tap the microphone and describe your entry naturally.', disableBeacon: !(isIdle || isListening) },
-    ...(isIdle || isContext ? [{ target: '.tour-recent', content: 'Recently added entries appear here.' }] : [])
+    { target: '.tour-header', content: 'Use the Voice Assistant to quickly record entries by speaking.', disableBeacon: true },
+    { target: '.tour-entry-types', content: 'Select the type of entry before speaking.' },
+    { target: '.tour-context', content: 'Set the project, floor, and phase context here.' },
+    { target: '.tour-mic', content: 'Tap the microphone and describe your entry naturally.' },
+    { target: '.tour-recent', content: 'Recently added entries appear here.' }
   ];
 
   const {
@@ -169,26 +125,26 @@ function VoiceAssistant({ preselectedProject: propProject }) {
     perfLogger.logMount('VoiceAssistant');
   }, []);
 
-  const fetchRecentEntries = useCallback(() => {
-    if (!executionContext.project) {
-      setRecentEntries([]);
-      setRecentLoading(false);
-      return;
-    }
-    setRecentLoading(true);
-    const typeMap = { material: 'Materials', labor: 'Wages', equipment: 'Expense' };
-    const currentType = typeMap[entryType];
-    const projectId = typeof executionContext.project === 'object' ? (executionContext.project._id || executionContext.project.id) : executionContext.project;
-    
-    transactionAPI.getAll({ project: projectId, type: currentType, limit: 5 })
-      .then(({ data }) => setRecentEntries(data.transactions || []))
-      .catch(() => setRecentEntries([]))
-      .finally(() => setRecentLoading(false));
-  }, [entryType, executionContext.project]);
-
   useEffect(() => {
-    fetchRecentEntries();
-  }, [fetchRecentEntries]);
+    useProjectStore.getState().fetchContext().then(list => setProjects(list || [])).catch(() => {});
+    storeFetchTx().then(list => {
+      const all = list || txStore || [];
+      const typeMap = { material: 'Materials', labor: 'Wages', equipment: 'Expense' };
+      const currentType = typeMap[entryType];
+      const filtered = all.filter(t => {
+        if (t.type === 'Income' || t.type === 'Revenue') return false;
+        if (currentType && t.type !== currentType) return false;
+          if (executionContext.project) {
+             const getProjName = (p) => typeof p === 'object' && p ? (p.projectName || p.name || '') : (p || '');
+             const projName = getProjName(executionContext.project);
+             const tProj = getProjName(t.project) || t.projectName || '';
+             if (projName && tProj && tProj !== projName) return false;
+          }
+        return true;
+      });
+      setRecentEntries(filtered.slice(0, 5));
+    }).catch(() => setRecentEntries([])).finally(() => setRecentLoading(false));
+  }, [txStore, storeFetchTx, entryType, executionContext.project]);
 
   useEffect(() => {
     return () => {
@@ -307,22 +263,29 @@ function VoiceAssistant({ preselectedProject: propProject }) {
     setStatus(STATUS.idle);
   }, [resetSpeech]);
 
-  useEffect(() => {
-    useProjectStore.getState().fetchContext().then(list => setProjects(list || [])).catch(() => {});
-  }, []);
-
-  useEffect(() => {
-    return () => {
-      if (processTimerRef.current) clearInterval(processTimerRef.current);
-      if (autoResetTimerRef.current) clearTimeout(autoResetTimerRef.current);
-    };
-  }, []);
-
-  useEffect(() => {
-    if (!isListening && !speechProcessing && status === STATUS.listening) {
-      setStatus(STATUS.idle);
-    }
-  }, [isListening, speechProcessing, status]);
+  const fetchRecentEntries = useCallback(() => {
+    setRecentLoading(true);
+    transactionAPI.getAll()
+      .then(({ data }) => {
+        const all = data.transactions || [];
+        const typeMap = { material: 'Materials', labor: 'Wages', equipment: 'Expense' };
+        const currentType = typeMap[entryType];
+        const filtered = all.filter(t => {
+          if (t.type === 'Income' || t.type === 'Revenue') return false;
+          if (currentType && t.type !== currentType) return false;
+          if (executionContext.project) {
+         const getProjName = (p) => typeof p === 'object' && p ? (p.projectName || p.name || '') : (p || '');
+         const projName = getProjName(executionContext.project);
+         const tProj = getProjName(t.project) || t.projectName || '';
+         if (projName && tProj && tProj !== projName) return false;
+          }
+          return true;
+        });
+        setRecentEntries(filtered.slice(0, 5));
+      })
+      .catch(() => setRecentEntries([]))
+      .finally(() => setRecentLoading(false));
+  }, [entryType, executionContext.project]);
 
   const handleReviewSave = useCallback(async (reviewData) => {
     setShowReview(false);
@@ -410,7 +373,17 @@ function VoiceAssistant({ preselectedProject: propProject }) {
     navigate(`/transaction?${p.toString()}`);
   }, [navigate, executionContext, entryType]);
 
-    const formatTime = (secs) => {
+  const isListening = status === STATUS.listening;
+  const isIdle = status === STATUS.idle;
+  const isProcessing = status === STATUS.processing;
+  const isExtracting = status === STATUS.extracting;
+  const isSummary = status === STATUS.summary;
+  const isSaving = status === STATUS.saving;
+  const isCompleted = status === STATUS.completed;
+  const isError = status === STATUS.error;
+  const isContext = status === STATUS.context;
+
+  const formatTime = (secs) => {
     const m = String(Math.floor(secs / 60)).padStart(2, '0');
     const s = String(secs % 60).padStart(2, '0');
     return `${m}:${s}`;
@@ -440,8 +413,8 @@ function VoiceAssistant({ preselectedProject: propProject }) {
           to { transform: rotate(360deg); }
         }
         @keyframes orbPulse {
-          0%, 100% { box-shadow: 0 0 0 0px rgba(23, 62, 234, 0.2), 0 0 0 0px rgba(23, 62, 234, 0.1); }
-          50% { box-shadow: 0 0 0 10px rgba(23, 62, 234, 0.15), 0 0 0 20px rgba(23, 62, 234, 0.08); }
+          0%, 100% { box-shadow: 0 0 0 0px rgba(249, 115, 22, 0.2), 0 0 0 0px rgba(249, 115, 22, 0.1); }
+          50% { box-shadow: 0 0 0 10px rgba(249, 115, 22, 0.15), 0 0 0 20px rgba(249, 115, 22, 0.08); }
         }
         .voice-card { animation: slideUp 0.35s cubic-bezier(0.16, 1, 0.3, 1); }
         .fade-in { animation: fadeIn 0.3s ease; }
@@ -597,7 +570,7 @@ function VoiceAssistant({ preselectedProject: propProject }) {
                   </div>
 
                   <div style={{
-                    background: 'rgba(23, 62, 234, 0.03)',
+                    background: 'rgba(249, 115, 22, 0.03)',
                     borderRadius: '12px', border: `1px solid ${colors.border}`,
                     padding: '18px', fontSize: 15, color: colors.textPrimary, fontWeight: 500,
                     lineHeight: 1.6, minHeight: 64, textAlign: 'left',
@@ -624,7 +597,7 @@ function VoiceAssistant({ preselectedProject: propProject }) {
                       background: gradients.primaryGradient,
                       display: 'flex', alignItems: 'center', justifyContent: 'center',
                       cursor: 'pointer',
-                      boxShadow: '0 10px 24px rgba(23, 62, 234, 0.25)',
+                      boxShadow: '0 10px 24px rgba(249, 115, 22, 0.25)',
                       transition: 'all 200ms cubic-bezier(0.16, 1, 0.3, 1)',
                     }}
                     className="hover-scale"
@@ -780,7 +753,7 @@ function VoiceAssistant({ preselectedProject: propProject }) {
               width: 64, height: 64, borderRadius: '50%', margin: '0 auto 20px',
               background: gradients.primaryGradient,
               display: 'flex', alignItems: 'center', justifyContent: 'center',
-              boxShadow: '0 8px 20px rgba(23, 62, 234, 0.25)',
+              boxShadow: '0 8px 20px rgba(249, 115, 22, 0.25)',
             }}>
               <CheckCircle2 size={32} color="white" />
             </div>
@@ -921,7 +894,7 @@ function VoiceAssistant({ preselectedProject: propProject }) {
               cursor: 'pointer',
               boxShadow: isListening
                 ? '0 6px 20px rgba(239,68,68,0.4)'
-                : '0 8px 30px rgba(23, 62, 234, 0.3)',
+                : '0 8px 30px rgba(249, 115, 22, 0.3)',
               transition: 'all 200ms cubic-bezier(0.16, 1, 0.3, 1)',
             }}
             className="hover-scale"

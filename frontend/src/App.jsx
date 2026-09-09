@@ -68,7 +68,7 @@ function PageLoader() {
       color: '#6B7280', fontSize: 13, fontWeight: 500,
     }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-        <div style={{ width: 16, height: 16, border: '2px solid #5B5CEB', borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin 0.6s linear infinite' }} />
+        <div style={{ width: 16, height: 16, border: '2px solid #F97316', borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin 0.6s linear infinite' }} />
         <span>Loading...</span>
       </div>
     </div>

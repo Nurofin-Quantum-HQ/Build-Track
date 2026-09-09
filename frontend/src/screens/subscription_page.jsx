@@ -128,7 +128,7 @@ export default function SubscriptionPage() {
   const [runTour, setRunTour] = useState(false);
 
   const tourSteps = [
-    ...(subStatus ? [{ target: '.tour-current-plan', content: 'Here is your current active subscription and its status.', disableBeacon: true }] : []),
+    { target: '.tour-current-plan', content: 'Here is your current active subscription and its status.', disableBeacon: true },
     { target: '.tour-plans', content: 'Explore our available plans. Upgrade to unlock more projects and users.' },
     { target: '.tour-restore-purchases', content: 'If you have upgraded on another device, use this to sync your purchases.' }
   ];
