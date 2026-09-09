@@ -4,7 +4,7 @@ const Subscription = require('../models/Subscription');
 const { protect } = require('../middleware/auth');
 const { buildPaymentPayload, verifyAndDecryptCallbackData } = require('../utils/airpayservice');
 const PLAN_PRICES = {
-  starter:    498,
+  starter:    1,
   growth:     999,
   pro:       1499,
   business:  2499,
