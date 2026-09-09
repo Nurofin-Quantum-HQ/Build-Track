@@ -79,6 +79,7 @@ const ALLOWED_ORIGINS = [
   "https://buildtrack-api.nurofin.com",
   "https://build-track.onrender.com",
   "https://build-track-web.onrender.com",
+  "https://secure.airpay.co.in",
   ...(process.env.NGROK_URL ? [process.env.NGROK_URL] : []),
 ]
   .filter(Boolean)
