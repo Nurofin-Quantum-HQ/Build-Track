@@ -192,15 +192,20 @@ function verifyAndDecryptCallbackData(reqBody) {
 
   const cfg = getConfig();
 
-  if (reqBody.response) {
-    // Encrypted payload mode
+  // If unencrypted fields are already present (like in a browser redirect), use them directly
+  if (reqBody.TRANSACTIONSTATUS || reqBody.transaction_status || reqBody.ap_SecureHash || reqBody.ap_securehash || reqBody.AP_SECUREHASH) {
+    // Unencrypted JSON/Form data mode
+    dataObj = reqBody;
+    rawResult = reqBody;
+  } else if (reqBody.response) {
+    // Encrypted payload mode (pure IPN)
     const encryptionKey = generateEncryptionKeyFromCreds(cfg.username, cfg.password);
     const cleanResponse = reqBody.response.replace(/ /g, '+');
     const decrypted = decryptCallbackResponse(cleanResponse, encryptionKey);
     rawResult = JSON.parse(decrypted);
     dataObj = rawResult.data || rawResult;
   } else {
-    // Unencrypted JSON/Form data mode
+    // Fallback if somehow it didn't match
     dataObj = reqBody;
     rawResult = reqBody;
   }
