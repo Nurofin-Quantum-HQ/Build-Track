@@ -1,4 +1,4 @@
-const express    = require('express');
+﻿const express    = require('express');
 const router     = express.Router();
 const Subscription = require('../models/Subscription');
 const { protect } = require('../middleware/auth');
@@ -107,6 +107,33 @@ router.post('/callback', async (req, res) => {
   } catch (err) {
     console.error('Callback error:', err.message);
     res.redirect('buildtrack://payment/failure?reason=server_error');
+  }
+});
+router.post('/cancel', protect, async (req, res) => {
+  try {
+    const isAdmin = (req.user.role || '').toLowerCase() === 'admin';
+    const billingUserId = isAdmin
+      ? req.user._id
+      : (req.user.createdBy || req.user._id);
+    const sub = await Subscription.findOne({
+      userId: billingUserId,
+      status: 'active',
+      endDate: { $gt: new Date() },
+    }).sort({ createdAt: -1 });
+    if (!sub) {
+      return res.status(404).json({ success: false, message: 'No active subscription found to cancel' });
+    }
+    await Subscription.findByIdAndUpdate(sub._id, {
+      status: 'cancelled',
+    });
+    res.json({
+      success: true,
+      message: 'Subscription has been cancelled successfully.',
+      endDate: sub.endDate,
+    });
+  } catch (err) {
+    console.error('Cancel error:', err.message);
+    res.status(500).json({ success: false, message: 'Failed to cancel subscription' });
   }
 });
 router.get('/status', protect, async (req, res) => {
