@@ -179,25 +179,14 @@ router.post('/callback', async (req, res) => {
   }
 
   try {
-    // ── 0. Handle Browser Redirect ─────────────────────────────────────────
-    // If the request doesn't have an encrypted `response` field, it's likely 
-    // Airpay redirecting the user's browser back via form POST.
-    if (!req.body || !req.body.response) {
-      console.log('[AirPay IPN] No encrypted response found. Treating as browser redirect.');
-      const status = (req.body?.TRANSACTIONSTATUS || req.body?.transaction_status || '').toString().toUpperCase();
-      const isSuccess = status === 'SUCCESS' || status === '200';
-      const frontendUrl = process.env.CLIENT_URL || 'https://buildtrack.nurofin.com';
-      return res.redirect(`${frontendUrl}/subscription?status=${isSuccess ? 'success' : 'failed'}`);
-    }
-
     // ── 1. Decrypt and verify IPN ──────────────────────────────────────────
     const { data: txnData } = verifyAndDecryptCallbackData(req.body);
 
-    const orderId       = txnData.orderid       || txnData.order_id;
-    const airpayTxnId   = txnData.ap_transactionid || txnData.transactionid;
-    const paymentStatus = (txnData.transaction_status || '').toString().trim().toUpperCase();
-    const receivedMid   = String(txnData.merchant_id || '').trim();
-    const receivedAmt   = Number(txnData.amount || 0);
+    const orderId       = txnData.orderid       || txnData.TRANSACTIONID || txnData.order_id;
+    const airpayTxnId   = txnData.ap_transactionid || txnData.APTRANSACTIONID || txnData.transactionid;
+    const paymentStatus = (txnData.transaction_status || txnData.TRANSACTIONSTATUS || '').toString().trim().toUpperCase();
+    const receivedMid   = String(txnData.merchant_id || txnData.MERCHANT_ID || '').trim();
+    const receivedAmt   = Number(txnData.amount || txnData.AMOUNT || 0);
 
     console.log(`[AirPay IPN] orderId=${orderId} txnId=${airpayTxnId} status=${paymentStatus}`);
 
@@ -218,6 +207,17 @@ router.post('/callback', async (req, res) => {
     // ── 4. Idempotency — if already processed, acknowledge and stop ────────
     if (payment.callbackProcessed) {
       console.log(`[AirPay IPN] Duplicate callback ignored for orderId=${orderId}`);
+      
+      const userAgent = req.headers['user-agent'] || '';
+      const isBrowser = userAgent.includes('Mozilla') || userAgent.includes('AppleWebKit') || 
+                        req.headers['sec-fetch-dest'] === 'document' || 
+                        (req.headers.accept && req.headers.accept.includes('text/html'));
+                        
+      if (isBrowser) {
+        const isSuccess = payment.status === 'PAID';
+        const frontendUrl = process.env.CLIENT_URL || 'https://buildtrack.nurofin.com';
+        return res.redirect(`${frontendUrl}/subscription?status=${isSuccess ? 'success' : 'failed'}`);
+      }
       return res.status(200).send('ALREADY_PROCESSED');
     }
 
@@ -295,12 +295,36 @@ router.post('/callback', async (req, res) => {
       console.log(`[AirPay IPN] ❌ FAILED — status=${paymentStatus} orderId=${orderId}`);
     }
 
+    // Check if this is a browser redirecting to the callback
+    const userAgent = req.headers['user-agent'] || '';
+    const isBrowser = userAgent.includes('Mozilla') || userAgent.includes('AppleWebKit') || 
+                      req.headers['sec-fetch-dest'] === 'document' || 
+                      (req.headers.accept && req.headers.accept.includes('text/html'));
+                      
+    if (isBrowser) {
+      const frontendUrl = process.env.CLIENT_URL || 'https://buildtrack.nurofin.com';
+      return res.redirect(`${frontendUrl}/subscription?status=${isSuccess ? 'success' : 'failed'}`);
+    }
+
     // Airpay requires HTTP 200 to stop retrying
     return res.status(200).send(isSuccess ? 'SUCCESS' : 'FAILED');
 
   } catch (err) {
-    // On ANY error: return HTTP 200 so Airpay stops retrying, but log for investigation
+    // On ANY error: log for investigation
     console.error('[AirPay IPN] Processing error:', err.message);
+    
+    // Check if this is a browser redirecting to the callback
+    const userAgent = req.headers['user-agent'] || '';
+    const isBrowser = userAgent.includes('Mozilla') || userAgent.includes('AppleWebKit') || 
+                      req.headers['sec-fetch-dest'] === 'document' || 
+                      (req.headers.accept && req.headers.accept.includes('text/html'));
+                      
+    if (isBrowser) {
+      console.log('[AirPay IPN] Redirecting browser to frontend after error.');
+      const frontendUrl = process.env.CLIENT_URL || 'https://buildtrack.nurofin.com';
+      return res.redirect(`${frontendUrl}/subscription?status=failed`);
+    }
+
     // Do NOT redirect to buildtrack:// — this is a server-to-server endpoint
     return res.status(200).send('SERVER_ERROR');
   }

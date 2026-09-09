@@ -183,19 +183,27 @@ async function buildPaymentPayload({
  * @throws if response is missing, decryption fails, or checksum is invalid
  */
 function verifyAndDecryptCallbackData(reqBody) {
-  if (!reqBody || !reqBody.response) {
-    throw new Error('Missing encrypted response payload in callback body');
+  let dataObj = null;
+  let rawResult = null;
+  
+  if (!reqBody || !(reqBody.response || reqBody.ap_transactionid || reqBody.TRANSACTIONID || reqBody.orderid)) {
+    throw new Error('Missing valid payload in callback body');
   }
 
-  const cfg           = getConfig();
-  const encryptionKey = generateEncryptionKeyFromCreds(cfg.username, cfg.password);
+  const cfg = getConfig();
 
-  // Decrypt using Airpay's SHA-256 IV derivation
-  const decrypted = decryptCallbackResponse(reqBody.response, encryptionKey);
-  const rawResult = JSON.parse(decrypted);
-
-  // Airpay wraps transaction fields in a `data` sub-object
-  const dataObj = rawResult.data || rawResult;
+  if (reqBody.response) {
+    // Encrypted payload mode
+    const encryptionKey = generateEncryptionKeyFromCreds(cfg.username, cfg.password);
+    const cleanResponse = reqBody.response.replace(/ /g, '+');
+    const decrypted = decryptCallbackResponse(cleanResponse, encryptionKey);
+    rawResult = JSON.parse(decrypted);
+    dataObj = rawResult.data || rawResult;
+  } else {
+    // Unencrypted JSON/Form data mode
+    dataObj = reqBody;
+    rawResult = reqBody;
+  }
 
   // Verify Airpay secure hash (CRC32)
   if (dataObj.ap_securehash) {
@@ -206,29 +214,29 @@ function verifyAndDecryptCallbackData(reqBody) {
       // UPI mode includes CUSTOMERVPA
       const customerVpa = reqBody.CUSTOMERVPA || dataObj.custom_var || '';
       hashInput = [
-        dataObj.orderid,
-        dataObj.ap_transactionid,
-        dataObj.amount,
-        dataObj.transaction_status,
-        dataObj.message,
+        dataObj.orderid || dataObj.TRANSACTIONID,
+        dataObj.ap_transactionid || dataObj.APTRANSACTIONID,
+        dataObj.amount || dataObj.AMOUNT,
+        dataObj.transaction_status || dataObj.TRANSACTIONSTATUS,
+        dataObj.message || dataObj.MESSAGE,
         cfg.merchantId,
         cfg.username,
         customerVpa,
       ].join(':');
     } else {
       hashInput = [
-        dataObj.orderid,
-        dataObj.ap_transactionid,
-        dataObj.amount,
-        dataObj.transaction_status,
-        dataObj.message,
+        dataObj.orderid || dataObj.TRANSACTIONID,
+        dataObj.ap_transactionid || dataObj.APTRANSACTIONID,
+        dataObj.amount || dataObj.AMOUNT,
+        dataObj.transaction_status || dataObj.TRANSACTIONSTATUS,
+        dataObj.message || dataObj.MESSAGE,
         cfg.merchantId,
         cfg.username,
       ].join(':');
     }
 
     const computedHash = (CRC32.str(hashInput) >>> 0).toString();
-    const receivedHash = String(dataObj.ap_securehash);
+    const receivedHash = String(dataObj.ap_securehash || dataObj.ap_SecureHash || dataObj.AP_SECUREHASH || '');
 
     if (computedHash !== receivedHash) {
       throw new Error(

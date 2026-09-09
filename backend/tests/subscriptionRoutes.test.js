@@ -90,11 +90,11 @@ describe('verifyAndDecryptCallbackData', () => {
   const { verifyAndDecryptCallbackData } = require('../utils/airpayservice');
 
   it('should throw when req.body is missing', () => {
-    expect(() => verifyAndDecryptCallbackData(null)).toThrow('Missing encrypted response payload');
+    expect(() => verifyAndDecryptCallbackData(null)).toThrow('Missing valid payload');
   });
 
   it('should throw when response field is missing', () => {
-    expect(() => verifyAndDecryptCallbackData({})).toThrow('Missing encrypted response payload');
+    expect(() => verifyAndDecryptCallbackData({})).toThrow('Missing valid payload');
   });
 
   it('should throw when response field is empty string', () => {
