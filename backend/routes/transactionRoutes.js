@@ -322,7 +322,10 @@ router.get("/", async (req, res) => {
     const limitParam = req.query.limit ? parseInt(req.query.limit, 10) : 10000;
     const filterByViewAccess = req.query.filterByViewAccess;
     if (filterByViewAccess === 'true') {
-      if (req.user.role !== "Admin") {
+      const hasFullAccess = req.user.role === "Admin" || 
+                            (req.user.permissions && (req.user.permissions.includes("view_reports") || req.user.permissions.includes("manage_expenses") || req.user.permissions.includes("view_assigned_project")));
+      
+      if (!hasFullAccess) {
         const supervisorDoc = await User.findById(req.user._id).select("createdBy overseesRoles");
         const overseesRoles = supervisorDoc?.overseesRoles || [];
         let viewableUserIds = [req.user._id];
