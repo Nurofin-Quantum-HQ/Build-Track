@@ -138,7 +138,7 @@ export const taskAPI = {
 
 export const subscriptionAPI = {
   getStatus:  ()      => api.get("/subscriptions/status"),
-  initiate:   (data)  => api.post("/subscriptions/initiate", data),
+  initiate:   (data)  => api.post("/subscriptions/initiate", data),  // data: { plan, phone?, savePhone? }
   getUserSub: ()      => api.get("/users/subscription"),
   updateUserSub: (d)  => api.put("/users/subscription", d),
 };

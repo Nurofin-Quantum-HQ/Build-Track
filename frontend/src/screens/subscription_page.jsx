@@ -1,6 +1,6 @@
-import { useState, useEffect } from "react";
-import { subscriptionAPI } from "../api";
-import { Bell, Star, ClipboardList, AlertTriangle, Lock, Building2, CreditCard, HelpCircle } from "lucide-react";
+import { useState, useEffect, useRef } from "react";
+import { subscriptionAPI, userAPI } from "../api";
+import { Bell, Star, ClipboardList, AlertTriangle, Lock, Building2, CreditCard, HelpCircle, Phone, X } from "lucide-react";
 import ModuleTour from "../components/ModuleTour";
 
 const PLANS = [
@@ -24,7 +24,7 @@ const PLANS = [
   {
     id: "starter",
     title: "Starter",
-    price: 498,
+    price: 1,
     period: "/mo",
     tagline: "For small teams just getting started.",
     users: "5 users",
@@ -118,21 +118,146 @@ const CHECKMARK = (
 
 const TOPBAR_H = 65;
 
+/** Phone number modal — shown when Airpay requires buyer_phone */
+function PhoneModal({ planTitle, onSubmit, onCancel, loading }) {
+  const [phone, setPhone] = useState("");
+  const [savePhone, setSavePhone] = useState(true);
+  const [phoneError, setPhoneError] = useState("");
+  const inputRef = useRef(null);
+
+  useEffect(() => {
+    setTimeout(() => inputRef.current?.focus(), 100);
+  }, []);
+
+  function validate(val) {
+    const digits = val.replace(/\D/g, "");
+    if (!digits) return "Phone number is required.";
+    if (digits.length < 8 || digits.length > 15) return "Enter a valid phone number (8–15 digits).";
+    return "";
+  }
+
+  function handleSubmit(e) {
+    e.preventDefault();
+    const err = validate(phone);
+    if (err) { setPhoneError(err); return; }
+    onSubmit({ phone: phone.replace(/\D/g, ""), savePhone });
+  }
+
+  return (
+    <div style={{
+      position: "fixed", inset: 0, zIndex: 9000,
+      background: "rgba(0,0,0,0.5)", display: "flex",
+      alignItems: "center", justifyContent: "center", padding: 16,
+    }}>
+      <div style={{
+        background: "#fff", borderRadius: 18, padding: "32px 28px",
+        maxWidth: 420, width: "100%", boxShadow: "0 20px 60px rgba(0,0,0,0.2)",
+        position: "relative",
+      }}>
+        <button
+          onClick={onCancel}
+          style={{
+            position: "absolute", top: 14, right: 16, background: "none",
+            border: "none", cursor: "pointer", color: "#888", padding: 4,
+          }}
+        >
+          <X size={18} />
+        </button>
+
+        <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 16 }}>
+          <div style={{
+            width: 44, height: 44, borderRadius: 12, background: "#fff5f0",
+            display: "flex", alignItems: "center", justifyContent: "center",
+          }}>
+            <Phone size={20} color="#ea580c" />
+          </div>
+          <div>
+            <div style={{ fontWeight: 700, fontSize: 16, color: "#1a1a1a" }}>
+              Mobile Number Required
+            </div>
+            <div style={{ fontSize: 12, color: "#888", marginTop: 2 }}>
+              For {planTitle} plan payment
+            </div>
+          </div>
+        </div>
+
+        <p style={{ fontSize: 13, color: "#555", lineHeight: 1.6, marginBottom: 20 }}>
+          Airpay requires your mobile number to process the payment securely.
+          This will be used only for payment verification.
+        </p>
+
+        <form onSubmit={handleSubmit}>
+          <label style={{ fontSize: 13, fontWeight: 600, color: "#374151", display: "block", marginBottom: 6 }}>
+            Mobile Number <span style={{ color: "#ea580c" }}>*</span>
+          </label>
+          <input
+            ref={inputRef}
+            type="tel"
+            placeholder="e.g. 9876543210"
+            value={phone}
+            onChange={e => { setPhone(e.target.value); setPhoneError(""); }}
+            style={{
+              width: "100%", boxSizing: "border-box",
+              padding: "10px 14px", fontSize: 15, borderRadius: 10,
+              border: phoneError ? "1.5px solid #f87171" : "1.5px solid #e5e7eb",
+              outline: "none", marginBottom: phoneError ? 4 : 16,
+            }}
+          />
+          {phoneError && (
+            <p style={{ fontSize: 12, color: "#dc2626", margin: "0 0 14px" }}>{phoneError}</p>
+          )}
+
+          <label style={{
+            display: "flex", alignItems: "center", gap: 8,
+            fontSize: 13, color: "#555", cursor: "pointer", marginBottom: 20,
+          }}>
+            <input
+              type="checkbox"
+              checked={savePhone}
+              onChange={e => setSavePhone(e.target.checked)}
+              style={{ accentColor: "#ea580c", width: 15, height: 15 }}
+            />
+            Save this number to my profile for future payments
+          </label>
+
+          <button
+            type="submit"
+            disabled={loading}
+            style={{
+              width: "100%", padding: "12px 0", borderRadius: 12,
+              background: loading ? "#f5f5f5" : "#ea580c",
+              color: loading ? "#999" : "#fff",
+              border: "none", fontWeight: 700, fontSize: 15,
+              cursor: loading ? "not-allowed" : "pointer",
+              boxShadow: loading ? "none" : "0 4px 14px rgba(234,88,12,0.35)",
+            }}
+          >
+            {loading ? "Processing…" : "Continue to Payment"}
+          </button>
+        </form>
+      </div>
+    </div>
+  );
+}
+
 export default function SubscriptionPage() {
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading]         = useState(true);
   const [currentPlan, setCurrentPlan] = useState(null);
-  const [subStatus, setSubStatus] = useState(null);
-  const [processing, setProcessing] = useState(null);
-  const [error, setError] = useState("");
-  const [isNarrow, setIsNarrow] = useState(window.innerWidth < 768);
-  const [runTour, setRunTour] = useState(false);
+  const [subStatus, setSubStatus]     = useState(null);
+  const [processing, setProcessing]   = useState(null);
+  const [error, setError]             = useState("");
+  const [isNarrow, setIsNarrow]       = useState(window.innerWidth < 768);
+  const [runTour, setRunTour]         = useState(false);
+
+  // Phone modal state
+  const [phonePlan, setPhonePlan]     = useState(null); // which plan triggered modal
+  const [phoneLoading, setPhoneLoading] = useState(false);
 
   const tourSteps = [
     { target: '.tour-current-plan', content: 'Here is your current active subscription and its status.', disableBeacon: true },
     { target: '.tour-plans', content: 'Explore our available plans. Upgrade to unlock more projects and users.' },
     { target: '.tour-restore-purchases', content: 'If you have upgraded on another device, use this to sync your purchases.' }
   ];
-
 
   useEffect(() => {
     const onResize = () => setIsNarrow(window.innerWidth < 768);
@@ -141,8 +266,24 @@ export default function SubscriptionPage() {
   }, []);
 
   useEffect(() => {
-    let isMounted = true;
+    // Check for payment return status in URL
+    const params = new URLSearchParams(window.location.search);
+    const status = params.get("status");
+    if (status === "success") {
+      setError("");
+      // Clear query params
+      window.history.replaceState({}, "", window.location.pathname);
+    } else if (status === "failed") {
+      setError("Payment was not completed. Please try again.");
+      window.history.replaceState({}, "", window.location.pathname);
+    } else if (status === "pending") {
+      setError("Payment is being confirmed. Please wait a moment and refresh.");
+      window.history.replaceState({}, "", window.location.pathname);
+    }
+  }, []);
 
+  useEffect(() => {
+    let isMounted = true;
     subscriptionAPI
       .getStatus()
       .then(({ data }) => {
@@ -162,11 +303,35 @@ export default function SubscriptionPage() {
         setSubStatus({ hasSubscription: false, plan: "free" });
         setLoading(false);
       });
-
     return () => { isMounted = false; };
   }, []);
 
-  const handleSubscribe = async (planId) => {
+  /**
+   * Submits Airpay payment form.
+   * paymentParams contains: airpayUrl + form fields.
+   */
+  function submitAirpayForm(paymentParams) {
+    const { airpayUrl, ...formFields } = paymentParams;
+    const form = document.createElement("form");
+    form.method = "POST";
+    form.action = airpayUrl;
+    Object.entries(formFields).forEach(([key, value]) => {
+      const input = document.createElement("input");
+      input.type  = "hidden";
+      input.name  = key;
+      input.value = value;
+      form.appendChild(input);
+    });
+    document.body.appendChild(form);
+    form.submit();
+    document.body.removeChild(form);
+  }
+
+  /**
+   * Initiates payment — handles phone-required 422 response
+   * by showing the PhoneModal.
+   */
+  const handleSubscribe = async (planId, phoneData = null) => {
     if (planId === currentPlan) return;
     if (planId === "free") return;
 
@@ -174,30 +339,54 @@ export default function SubscriptionPage() {
       setProcessing(planId);
       setError("");
 
-      const { data } = await subscriptionAPI.initiate({ plan: planId });
+      const payload = { plan: planId };
+      if (phoneData) {
+        payload.phone     = phoneData.phone;
+        payload.savePhone = phoneData.savePhone;
+      }
+
+      const { data } = await subscriptionAPI.initiate(payload);
 
       if (data.success && data.paymentParams) {
-        const { airpayUrl, ...formFields } = data.paymentParams;
-
-        const form = document.createElement("form");
-        form.method = "POST";
-        form.action = airpayUrl;
-
-        Object.entries(formFields).forEach(([key, value]) => {
-          const input = document.createElement("input");
-          input.type = "hidden";
-          input.name = key;
-          input.value = value;
-          form.appendChild(input);
-        });
-
-        document.body.appendChild(form);
-        form.submit();
-        document.body.removeChild(form);
+        submitAirpayForm(data.paymentParams);
       }
     } catch (err) {
-      setError(err.response?.data?.message || "Failed to initiate payment. Please try again.");
+      const status = err.response?.status;
+      const body   = err.response?.data;
+
+      if (status === 422 && body?.requiresPhone) {
+        // Show phone modal — keep processing state so button shows "Processing…"
+        setProcessing(null);
+        setPhonePlan(planId);
+        return;
+      }
+
+      setError(body?.message || "Failed to initiate payment. Please try again.");
     } finally {
+      if (!phonePlan) setProcessing(null);
+    }
+  };
+
+  /** Called when user submits phone number from modal */
+  const handlePhoneSubmit = async ({ phone, savePhone }) => {
+    setPhoneLoading(true);
+    try {
+      const { data } = await subscriptionAPI.initiate({
+        plan: phonePlan,
+        phone,
+        savePhone,
+      });
+
+      if (data.success && data.paymentParams) {
+        setPhonePlan(null);
+        submitAirpayForm(data.paymentParams);
+      }
+    } catch (err) {
+      const body = err.response?.data;
+      setError(body?.message || "Payment initiation failed. Please try again.");
+      setPhonePlan(null);
+    } finally {
+      setPhoneLoading(false);
       setProcessing(null);
     }
   };
@@ -221,7 +410,7 @@ export default function SubscriptionPage() {
           display: "flex", alignItems: "center", justifyContent: "center",
           flex: 1, color: "#888", fontSize: 15,
         }}>
-          Loading subscription plans...
+          Loading subscription plans…
         </div>
       </div>
     );
@@ -237,6 +426,17 @@ export default function SubscriptionPage() {
     }}>
       <ModuleTour steps={tourSteps} run={runTour} setRun={setRunTour} moduleName="Subscription" />
 
+      {/* Phone capture modal */}
+      {phonePlan && (
+        <PhoneModal
+          planTitle={PLANS.find(p => p.id === phonePlan)?.title || phonePlan}
+          loading={phoneLoading}
+          onSubmit={handlePhoneSubmit}
+          onCancel={() => { setPhonePlan(null); setProcessing(null); }}
+        />
+      )}
+
+      {/* Top bar */}
       <div style={{
         height: TOPBAR_H, flexShrink: 0,
         background: "#fff", borderBottom: "1px solid #ebebeb",
@@ -256,6 +456,7 @@ export default function SubscriptionPage() {
         </div>
       </div>
 
+      {/* Body */}
       <div style={{
         flex: 1,
         minHeight: 0,
@@ -265,6 +466,7 @@ export default function SubscriptionPage() {
         boxSizing: "border-box",
       }}>
 
+        {/* Hero banner */}
         <div style={{
           background: "linear-gradient(135deg, #ea580c 0%, #f97316 50%, #fb923c 100%)",
           borderRadius: "clamp(16px,2vw,20px)",
@@ -273,17 +475,8 @@ export default function SubscriptionPage() {
           position: "relative",
           overflow: "hidden",
         }}>
-          <div style={{
-            position: "absolute", top: -60, right: -40,
-            width: 220, height: 220, borderRadius: "50%",
-            background: "rgba(255,255,255,0.08)",
-          }} />
-          <div style={{
-            position: "absolute", bottom: -80, left: "40%",
-            width: 280, height: 280, borderRadius: "50%",
-            background: "rgba(255,255,255,0.05)",
-          }} />
-
+          <div style={{ position: "absolute", top: -60, right: -40, width: 220, height: 220, borderRadius: "50%", background: "rgba(255,255,255,0.08)" }} />
+          <div style={{ position: "absolute", bottom: -80, left: "40%", width: 280, height: 280, borderRadius: "50%", background: "rgba(255,255,255,0.05)" }} />
           <div style={{ position: "relative", zIndex: 1, maxWidth: 640 }}>
             <div style={{
               display: "inline-flex", alignItems: "center", gap: 6,
@@ -299,35 +492,25 @@ export default function SubscriptionPage() {
             }}>
               Choose the Right Plan for Your Business
             </h2>
-            <p style={{
-              margin: 0, fontSize: "clamp(13px,1.4vw,16px)", lineHeight: 1.6,
-              opacity: 0.9,
-            }}>
+            <p style={{ margin: 0, fontSize: "clamp(13px,1.4vw,16px)", lineHeight: 1.6, opacity: 0.9 }}>
               Scale your construction management with powerful tools designed for teams of all sizes.
               No hidden fees, cancel anytime.
             </p>
           </div>
         </div>
 
+        {/* Current plan badge */}
         {subStatus && (
           <div className="tour-current-plan" style={{
-            background: "#fff",
-            borderRadius: 14,
-            border: "1px solid #ebebeb",
-            padding: "14px 20px",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-            flexWrap: "wrap",
-            gap: 12,
+            background: "#fff", borderRadius: 14, border: "1px solid #ebebeb",
+            padding: "14px 20px", display: "flex", alignItems: "center",
+            justifyContent: "space-between", flexWrap: "wrap", gap: 12,
             boxShadow: "0 1px 4px rgba(0,0,0,0.04)",
           }}>
             <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-              <div style={{
-                width: 36, height: 36, borderRadius: 10,
-                background: "#fff5f0", display: "flex",
-                alignItems: "center", justifyContent: "center",
-              }}><ClipboardList size={16} /></div>
+              <div style={{ width: 36, height: 36, borderRadius: 10, background: "#fff5f0", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                <ClipboardList size={16} />
+              </div>
               <div>
                 <div style={{ fontSize: 13, fontWeight: 700, color: "#1a1a1a" }}>
                   Current Plan: <span style={{ color: "#ea580c" }}>{PLANS.find(p => p.id === currentPlan)?.title || "Free"}</span>
@@ -353,6 +536,7 @@ export default function SubscriptionPage() {
           </div>
         )}
 
+        {/* Error banner */}
         {error && (
           <div style={{
             padding: "12px 16px", background: "#fee2e2",
@@ -366,60 +550,47 @@ export default function SubscriptionPage() {
           </div>
         )}
 
+        {/* Plans grid */}
         <div className="tour-plans" style={{
           display: "grid",
-          gridTemplateColumns: isNarrow
-            ? "1fr"
-            : "repeat(3, 1fr)",
+          gridTemplateColumns: isNarrow ? "1fr" : "repeat(3, 1fr)",
           gap: "clamp(12px,1.5vw,18px)",
         }}>
           {PLANS.map((plan) => {
-            const isCurrent = plan.id === currentPlan;
+            const isCurrent    = plan.id === currentPlan;
             const isProcessing = processing === plan.id;
 
             return (
               <div
                 key={plan.id}
                 style={{
-                  background: plan.highlighted
-                    ? "linear-gradient(180deg, #fff5f0 0%, #fff 40%)"
-                    : "#fff",
+                  background: plan.highlighted ? "linear-gradient(180deg, #fff5f0 0%, #fff 40%)" : "#fff",
                   borderRadius: "clamp(14px,1.5vw,18px)",
-                  border: plan.highlighted
-                    ? "2px solid #ea580c"
-                    : "1px solid #ebebeb",
+                  border: plan.highlighted ? "2px solid #ea580c" : "1px solid #ebebeb",
                   padding: "clamp(20px,2.5vw,28px)",
-                  display: "flex",
-                  flexDirection: "column",
+                  display: "flex", flexDirection: "column",
                   position: "relative",
-                  boxShadow: plan.highlighted
-                    ? "0 8px 32px rgba(234,88,12,0.12)"
-                    : "0 1px 8px rgba(0,0,0,0.04)",
+                  boxShadow: plan.highlighted ? "0 8px 32px rgba(234,88,12,0.12)" : "0 1px 8px rgba(0,0,0,0.04)",
                   transition: "transform 0.2s, box-shadow 0.2s",
                 }}
                 onMouseEnter={e => {
                   e.currentTarget.style.transform = "translateY(-3px)";
                   e.currentTarget.style.boxShadow = plan.highlighted
-                    ? "0 12px 40px rgba(234,88,12,0.18)"
-                    : "0 8px 24px rgba(0,0,0,0.08)";
+                    ? "0 12px 40px rgba(234,88,12,0.18)" : "0 8px 24px rgba(0,0,0,0.08)";
                 }}
                 onMouseLeave={e => {
                   e.currentTarget.style.transform = "translateY(0)";
                   e.currentTarget.style.boxShadow = plan.highlighted
-                    ? "0 8px 32px rgba(234,88,12,0.12)"
-                    : "0 1px 8px rgba(0,0,0,0.04)";
-                }}>
-
+                    ? "0 8px 32px rgba(234,88,12,0.12)" : "0 1px 8px rgba(0,0,0,0.04)";
+                }}
+              >
                 <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 14 }}>
                   {plan.highlighted && (
                     <span style={{
                       fontSize: 10, fontWeight: 800, color: "#fff",
                       background: "#ea580c", padding: "3px 10px",
-                      borderRadius: 20, letterSpacing: "0.05em",
-                      textTransform: "uppercase",
-                    }}>
-                      Most Popular
-                    </span>
+                      borderRadius: 20, letterSpacing: "0.05em", textTransform: "uppercase",
+                    }}>Most Popular</span>
                   )}
                   {isCurrent && (
                     <span style={{
@@ -427,73 +598,45 @@ export default function SubscriptionPage() {
                       background: "#f0fdf4", border: "1px solid #bbf7d0",
                       padding: "3px 10px", borderRadius: 20,
                       letterSpacing: "0.05em", textTransform: "uppercase",
-                    }}>
-                      Current Plan
-                    </span>
+                    }}>Current Plan</span>
                   )}
                 </div>
 
-                <div style={{
-                  fontSize: "clamp(16px,1.6vw,20px)", fontWeight: 800,
-                  color: "#1a1a1a", marginBottom: 4,
-                }}>
+                <div style={{ fontSize: "clamp(16px,1.6vw,20px)", fontWeight: 800, color: "#1a1a1a", marginBottom: 4 }}>
                   {plan.title}
                 </div>
-
-                <div style={{
-                  fontSize: "clamp(11px,1.1vw,13px)", color: "#888",
-                  marginBottom: 16, lineHeight: 1.4,
-                }}>
+                <div style={{ fontSize: "clamp(11px,1.1vw,13px)", color: "#888", marginBottom: 16, lineHeight: 1.4 }}>
                   {plan.tagline}
                 </div>
 
                 <div style={{ marginBottom: 20 }}>
                   <span style={{
                     fontSize: "clamp(28px,3vw,36px)", fontWeight: 800,
-                    color: plan.highlighted ? "#ea580c" : "#1a1a1a",
-                    letterSpacing: "-1px",
+                    color: plan.highlighted ? "#ea580c" : "#1a1a1a", letterSpacing: "-1px",
                   }}>
                     {plan.price === 0 ? "₹0" : `₹${plan.price.toLocaleString("en-IN")}`}
                   </span>
-                  <span style={{
-                    fontSize: 13, color: "#888", fontWeight: 500,
-                    marginLeft: 4,
-                  }}>
+                  <span style={{ fontSize: 13, color: "#888", fontWeight: 500, marginLeft: 4 }}>
                     {plan.period}
                   </span>
                 </div>
 
-                <div style={{
-                  display: "flex", gap: 12, marginBottom: 18,
-                  paddingBottom: 16, borderBottom: "1px solid #f0f0f0",
-                }}>
-                  <div style={{
-                    flex: 1, background: "#f7f7f8", borderRadius: 8,
-                    padding: "8px 10px", textAlign: "center",
-                  }}>
+                <div style={{ display: "flex", gap: 12, marginBottom: 18, paddingBottom: 16, borderBottom: "1px solid #f0f0f0" }}>
+                  <div style={{ flex: 1, background: "#f7f7f8", borderRadius: 8, padding: "8px 10px", textAlign: "center" }}>
                     <div style={{ fontSize: 11, color: "#888", fontWeight: 600 }}>Users</div>
                     <div style={{ fontSize: 13, fontWeight: 700, color: "#1a1a1a", marginTop: 2 }}>{plan.users}</div>
                   </div>
-                  <div style={{
-                    flex: 1, background: "#f7f7f8", borderRadius: 8,
-                    padding: "8px 10px", textAlign: "center",
-                  }}>
+                  <div style={{ flex: 1, background: "#f7f7f8", borderRadius: 8, padding: "8px 10px", textAlign: "center" }}>
                     <div style={{ fontSize: 11, color: "#888", fontWeight: 600 }}>Projects</div>
                     <div style={{ fontSize: 13, fontWeight: 700, color: "#1a1a1a", marginTop: 2 }}>{plan.projects}</div>
                   </div>
                 </div>
 
-                <div style={{
-                  flex: 1, display: "flex", flexDirection: "column", gap: 10,
-                  marginBottom: 20,
-                }}>
+                <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 10, marginBottom: 20 }}>
                   {plan.features.map((feat, i) => (
                     <div key={i} style={{ display: "flex", alignItems: "flex-start", gap: 10 }}>
                       {CHECKMARK}
-                      <span style={{
-                        fontSize: "clamp(12px,1.1vw,13px)", color: "#555",
-                        lineHeight: 1.5, fontWeight: 500,
-                      }}>
+                      <span style={{ fontSize: "clamp(12px,1.1vw,13px)", color: "#555", lineHeight: 1.5, fontWeight: 500 }}>
                         {feat}
                       </span>
                     </div>
@@ -504,32 +647,13 @@ export default function SubscriptionPage() {
                   onClick={() => handleSubscribe(plan.id)}
                   disabled={isCurrent || isProcessing}
                   style={{
-                    width: "100%",
-                    padding: "12px 0",
-                    borderRadius: 12,
-                    border: isCurrent
-                      ? "1px solid #e5e5e5"
-                      : plan.highlighted
-                        ? "none"
-                        : "2px solid #ea580c",
-                    background: isCurrent
-                      ? "#f5f5f5"
-                      : plan.highlighted
-                        ? "#ea580c"
-                        : "#fff",
-                    color: isCurrent
-                      ? "#999"
-                      : plan.highlighted
-                        ? "#fff"
-                        : "#ea580c",
-                    fontWeight: 700,
-                    fontSize: 14,
+                    width: "100%", padding: "12px 0", borderRadius: 12,
+                    border: isCurrent ? "1px solid #e5e5e5" : plan.highlighted ? "none" : "2px solid #ea580c",
+                    background: isCurrent ? "#f5f5f5" : plan.highlighted ? "#ea580c" : "#fff",
+                    color: isCurrent ? "#999" : plan.highlighted ? "#fff" : "#ea580c",
+                    fontWeight: 700, fontSize: 14,
                     cursor: isCurrent || isProcessing ? "not-allowed" : "pointer",
-                    boxShadow: isCurrent
-                      ? "none"
-                      : plan.highlighted
-                        ? "0 4px 14px rgba(234,88,12,0.35)"
-                        : "none",
+                    boxShadow: isCurrent ? "none" : plan.highlighted ? "0 4px 14px rgba(234,88,12,0.35)" : "none",
                     transition: "all 0.2s ease",
                     opacity: isProcessing ? 0.7 : 1,
                     letterSpacing: "0.02em",
@@ -558,7 +682,7 @@ export default function SubscriptionPage() {
                   {isCurrent
                     ? "✓ Current Plan"
                     : isProcessing
-                      ? "Processing..."
+                      ? "Processing…"
                       : plan.price === 0
                         ? "Get Started"
                         : `Subscribe to ${plan.title}`}
@@ -568,14 +692,8 @@ export default function SubscriptionPage() {
           })}
         </div>
 
-        <div style={{
-          display: "flex",
-          flexDirection: "column",
-          alignItems: "center",
-          gap: 12,
-          marginTop: 8,
-          paddingBottom: 20,
-        }}>
+        {/* Footer */}
+        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 12, marginTop: 8, paddingBottom: 20 }}>
           <span
             style={{
               fontSize: 14, color: "#ea580c", fontWeight: 700,
@@ -596,28 +714,19 @@ export default function SubscriptionPage() {
             Restore Purchases
           </span>
 
-          <p style={{
-            fontSize: 11, color: "#aaa", textAlign: "center",
-            maxWidth: 520, lineHeight: 1.6, margin: 0,
-          }}>
+          <p style={{ fontSize: 11, color: "#aaa", textAlign: "center", maxWidth: 520, lineHeight: 1.6, margin: 0 }}>
             Subscriptions automatically renew at the end of each billing period unless cancelled
             at least 24 hours before the renewal date. You can manage your subscription from your
             account settings. Payment is processed securely through our payment partner.
           </p>
 
-          <div style={{
-            display: "flex", alignItems: "center", gap: 16,
-            marginTop: 4,
-          }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 16, marginTop: 4 }}>
             {[
-              { icon: Lock, label: "Secure Payment" },
+              { icon: Lock,      label: "Secure Payment" },
               { icon: Building2, label: "RBI Compliant" },
               { icon: CreditCard, label: "UPI / Cards" },
             ].map(({ icon: Icon, label }) => (
-              <span key={label} style={{
-                fontSize: 11, color: "#888", fontWeight: 600,
-                display: "flex", alignItems: "center", gap: 4,
-              }}>
+              <span key={label} style={{ fontSize: 11, color: "#888", fontWeight: 600, display: "flex", alignItems: "center", gap: 4 }}>
                 <Icon size={14} />
                 {label}
               </span>
