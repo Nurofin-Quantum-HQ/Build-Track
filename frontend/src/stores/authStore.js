@@ -74,6 +74,7 @@ const useAuthStore = create(
             permissions: Array.isArray(userData.permissions) ? userData.permissions : [],
             profilePhoto: userData.profilePhoto || null,
             company: userData.company || "",
+            phone: userData.phone || null,
           },
           token,
           initialized: true,
@@ -109,6 +110,7 @@ const useAuthStore = create(
               permissions: Array.isArray(u.permissions) ? u.permissions : state.user?.permissions || [],
               profilePhoto: u.profilePhoto || state.user?.profilePhoto,
               company: u.company || state.user?.company,
+              phone: u.phone || state.user?.phone || null,
             },
           }));
         } catch {

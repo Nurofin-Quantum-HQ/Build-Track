@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { subscriptionAPI, userAPI } from "../api";
-import { Bell, Star, ClipboardList, AlertTriangle, Lock, Building2, CreditCard, HelpCircle, Phone, X } from "lucide-react";
+import useAuthStore from "../stores/authStore";
+import { Bell, Star, ClipboardList, AlertTriangle, Lock, Building2, CreditCard, HelpCircle, Phone, X, CheckCircle } from "lucide-react";
 import ModuleTour from "../components/ModuleTour";
 
 const PLANS = [

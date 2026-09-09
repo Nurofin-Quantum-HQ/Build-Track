@@ -86,16 +86,21 @@ router.post('/initiate', protect, async (req, res) => {
     let buyerFirstName = sanitiseName(nameParts[0]);
     let buyerLastName  = sanitiseName(nameParts.slice(1).join(''));
 
+    // If user has only a single name (e.g. "Nisha"), reuse it as last name
+    if (buyerFirstName && !buyerLastName) {
+      buyerLastName = buyerFirstName;
+    }
+
     // Sandbox fallback only
     if (!isProd) {
       if (!buyerFirstName) buyerFirstName = 'Test';
       if (!buyerLastName)  buyerLastName  = 'User';
     }
 
-    // In production, reject if real name parts cannot be derived
-    if (isProd && (!buyerFirstName || !buyerLastName)) {
+    // In production, reject only if there is truly no name at all
+    if (isProd && !buyerFirstName) {
       return res.status(422).json({
-        message: 'Your account name must have a first and last name to proceed with payment. Please update your profile.',
+        message: 'Your account must have a name to proceed with payment. Please update your profile.',
       });
     }
 
