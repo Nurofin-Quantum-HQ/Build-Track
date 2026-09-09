@@ -49,6 +49,7 @@ const userSchema = new mongoose.Schema(
     isActive: { type: Boolean, default: true },
     resetPasswordToken: { type: String, default: null },
     resetPasswordExpires: { type: Date, default: null },
+    phone: { type: String, default: null, trim: true },
     twoFactorEnabled: { type: Boolean, default: false },
     tokenVersion: { type: Number, default: 0 },
     subscription: {

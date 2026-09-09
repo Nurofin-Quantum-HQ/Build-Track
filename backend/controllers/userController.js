@@ -4,6 +4,7 @@ const safeUser = (user) => ({
   _id:              user._id || user.id,
   name:             user.name,
   email:            user.email,
+  phone:            user.phone || null,
   role:             user.role   || "Mason",
   permissions:      Array.isArray(user.permissions) ? user.permissions : [],
   projectIds:       Array.isArray(user.projectIds)  ? user.projectIds.map(String) : [],
@@ -22,7 +23,7 @@ const updateProfile = async (req, res) => {
     const userId = req.user?.id || req.user?._id;
     if (!userId) return res.status(401).json({ message: "Not authenticated" });
 
-    const { name, email, profilePhoto, role } = req.body;
+    const { name, email, profilePhoto, role, phone } = req.body;
     const user = await User.findById(userId).select("-password");
     if (!user) return res.status(404).json({ message: "User not found" });
 
@@ -51,6 +52,18 @@ const updateProfile = async (req, res) => {
 
     if (profilePhoto !== undefined) {
       user.profilePhoto = (profilePhoto === "" || profilePhoto === null) ? null : String(profilePhoto);
+    }
+
+    if (phone !== undefined) {
+      if (phone === null || phone === "") {
+        user.phone = null;
+      } else {
+        const digitsOnly = String(phone).replace(/\D/g, '');
+        if (digitsOnly.length < 8 || digitsOnly.length > 15) {
+          return res.status(400).json({ message: "Phone number must be 8–15 digits" });
+        }
+        user.phone = digitsOnly;
+      }
     }
 
     if (role !== undefined) {
