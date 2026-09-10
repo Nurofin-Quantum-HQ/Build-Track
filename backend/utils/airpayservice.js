@@ -295,35 +295,42 @@ function verifyAndDecryptCallbackData(reqBody) {
     let hashInput;
 
     if (CHMOD === 'upi') {
-      const customerVpa = reqBody.CUSTOMERVPA || dataObj.customer_vpa || dataObj.custom_var || '';
+      const customerVpa = reqBody.CUSTOMERVPA || dataObj.customer_vpa || dataObj.custom_var || reqBody.customervpa || '';
       hashInput = [
-        dataObj.orderid,
-        dataObj.ap_transactionid,
-        dataObj.amount,
-        dataObj.transaction_status,
-        dataObj.message,
-        cfg.merchantId,
-        cfg.username,
-        customerVpa,
+        dataObj.orderid !== undefined ? String(dataObj.orderid) : (dataObj.TRANSACTIONID !== undefined ? String(dataObj.TRANSACTIONID) : ''),
+        dataObj.ap_transactionid !== undefined ? String(dataObj.ap_transactionid) : (dataObj.APTRANSACTIONID !== undefined ? String(dataObj.APTRANSACTIONID) : ''),
+        dataObj.amount !== undefined ? String(dataObj.amount) : (dataObj.AMOUNT !== undefined ? String(dataObj.AMOUNT) : ''),
+        dataObj.transaction_status !== undefined ? String(dataObj.transaction_status) : (dataObj.TRANSACTIONSTATUS !== undefined ? String(dataObj.TRANSACTIONSTATUS) : ''),
+        dataObj.message !== undefined ? String(dataObj.message) : (dataObj.MESSAGE !== undefined ? String(dataObj.MESSAGE) : ''),
+        String(cfg.merchantId),
+        String(cfg.username),
+        String(customerVpa),
       ].join(':');
     } else {
       hashInput = [
-        dataObj.orderid,
-        dataObj.ap_transactionid,
-        dataObj.amount,
-        dataObj.transaction_status,
-        dataObj.message,
-        cfg.merchantId,
-        cfg.username,
+        dataObj.orderid !== undefined ? String(dataObj.orderid) : (dataObj.TRANSACTIONID !== undefined ? String(dataObj.TRANSACTIONID) : ''),
+        dataObj.ap_transactionid !== undefined ? String(dataObj.ap_transactionid) : (dataObj.APTRANSACTIONID !== undefined ? String(dataObj.APTRANSACTIONID) : ''),
+        dataObj.amount !== undefined ? String(dataObj.amount) : (dataObj.AMOUNT !== undefined ? String(dataObj.AMOUNT) : ''),
+        dataObj.transaction_status !== undefined ? String(dataObj.transaction_status) : (dataObj.TRANSACTIONSTATUS !== undefined ? String(dataObj.TRANSACTIONSTATUS) : ''),
+        dataObj.message !== undefined ? String(dataObj.message) : (dataObj.MESSAGE !== undefined ? String(dataObj.MESSAGE) : ''),
+        String(cfg.merchantId),
+        String(cfg.username),
       ].join(':');
     }
 
     const computedHash = (CRC32.str(hashInput) >>> 0).toString();
     const receivedHash = String(secureHash);
 
-    // Diagnostic log (no sensitive data — only hash values and field presence)
-    console.log(`[AirPay IPN] Hash verification: chmod=${CHMOD}, computed=${computedHash}, received=${receivedHash}`);
-    console.log(`[AirPay IPN] Hash input fields present: orderid=${!!dataObj.orderid}, ap_txnid=${!!dataObj.ap_transactionid}, amount=${!!dataObj.amount}, status=${!!dataObj.transaction_status}, message=${!!dataObj.message}`);
+    // Diagnostic log (safely logging the exact values fed to hash)
+    console.log(`[AirPay IPN] Hash Diagnostic: CHMOD=${CHMOD}`);
+    console.log(`[AirPay IPN] Hash fields: orderid='${dataObj.orderid !== undefined ? dataObj.orderid : dataObj.TRANSACTIONID}', ` +
+                `ap_txnid='${dataObj.ap_transactionid !== undefined ? dataObj.ap_transactionid : dataObj.APTRANSACTIONID}', ` +
+                `amount='${dataObj.amount !== undefined ? dataObj.amount : dataObj.AMOUNT}', ` +
+                `status='${dataObj.transaction_status !== undefined ? dataObj.transaction_status : dataObj.TRANSACTIONSTATUS}', ` +
+                `message='${dataObj.message !== undefined ? dataObj.message : dataObj.MESSAGE}', ` +
+                `mid='${cfg.merchantId}', username='***'`);
+    console.log(`[AirPay IPN] Hash string structure: ${hashInput.replace(cfg.username, '***')}`);
+    console.log(`[AirPay IPN] Hash verification: computed=${computedHash}, received=${receivedHash}`);
 
     if (computedHash !== receivedHash) {
       throw new Error(
