@@ -171,6 +171,9 @@ router.post('/initiate', protect, async (req, res) => {
 // Airpay IPN — server-to-server. MUST return HTTP 200 to stop retries.
 
 router.post('/callback', async (req, res) => {
+  // Temporary deployment version log
+  console.log('[AirPay IPN] --- CALLBACK ROUTE TRIGGERED (DEPLOYMENT v10.4) ---');
+  
   // Safe logging — never log keys, full payloads, or sensitive fields
   console.log('[AirPay IPN] Callback received — body keys:', Object.keys(req.body || {}));
   console.log('[AirPay IPN] Has "response" field:', !!req.body?.response);

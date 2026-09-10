@@ -192,22 +192,53 @@ function verifyAndDecryptCallbackData(reqBody) {
 
   const cfg = getConfig();
 
-  // If unencrypted fields are already present (like in a browser redirect), use them directly
+  // 1. PRIORITIZE PLAIN TEXT FIELDS (Browser Redirect usually has these)
   if (reqBody.TRANSACTIONSTATUS || reqBody.transaction_status || reqBody.ap_SecureHash || reqBody.ap_securehash || reqBody.AP_SECUREHASH) {
-    // Unencrypted JSON/Form data mode
+    console.log('[AirPay IPN] Using unencrypted plain text fields from payload.');
     dataObj = reqBody;
     rawResult = reqBody;
-  } else if (reqBody.response) {
-    // Encrypted payload mode (pure IPN)
+  } 
+  // 2. ENCRYPTED PAYLOAD MODE
+  else if (reqBody.response) {
+    console.log('[AirPay IPN] Attempting to decrypt response field...');
     const encryptionKey = generateEncryptionKeyFromCreds(cfg.username, cfg.password);
     const cleanResponse = reqBody.response.replace(/ /g, '+');
-    const decrypted = decryptCallbackResponse(cleanResponse, encryptionKey);
-    rawResult = JSON.parse(decrypted);
+    let decrypted = decryptCallbackResponse(cleanResponse, encryptionKey);
+    
+    // Airpay IV flaw causes the first 16 bytes to often decrypt to garbage.
+    // We must robustly extract the JSON payload.
+    
+    let jsonString = decrypted;
+    
+    // First find the boundaries of the valid JSON object
+    const firstBrace = decrypted.indexOf('{');
+    const lastBrace = decrypted.lastIndexOf('}');
+    
+    if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
+       jsonString = decrypted.substring(firstBrace, lastBrace + 1);
+    }
+
+    try {
+      rawResult = JSON.parse(jsonString);
+    } catch (e) {
+      console.log('[AirPay IPN] Standard JSON extraction failed, attempting fallback regex...');
+      // Fallback: extract just the data object if possible
+      const match = decrypted.match(/"data"\s*:\s*\{([^}]*)\}/);
+      if (match) {
+        try {
+          rawResult = JSON.parse('{"data": {' + match[1] + '}}');
+        } catch (regexErr) {
+          throw new Error('JSON parse failed on regex extracted data: ' + regexErr.message);
+        }
+      } else {
+         throw new Error(`JSON extraction failed: ${e.message}. Payload prefix: ${decrypted.substring(0, 30)}...`);
+      }
+    }
+    
     dataObj = rawResult.data || rawResult;
-  } else {
-    // Fallback if somehow it didn't match
-    dataObj = reqBody;
-    rawResult = reqBody;
+  } 
+  else {
+    throw new Error('Payload format not recognized.');
   }
 
   // Verify Airpay secure hash (CRC32)
