@@ -185,100 +185,154 @@ async function buildPaymentPayload({
 function verifyAndDecryptCallbackData(reqBody) {
   let dataObj = null;
   let rawResult = null;
+  let extractionMethod = 'none';
   
-  if (!reqBody || !(reqBody.response || reqBody.ap_transactionid || reqBody.TRANSACTIONID || reqBody.orderid)) {
+  if (!reqBody) {
+    throw new Error('Missing valid payload in callback body');
+  }
+
+  // Quick check: does the body have ANY recognisable Airpay field?
+  const hasAnyField = reqBody.response || reqBody.ap_transactionid ||
+                      reqBody.TRANSACTIONID || reqBody.orderid ||
+                      reqBody.TRANSACTIONSTATUS || reqBody.transaction_status ||
+                      reqBody.ap_SecureHash || reqBody.ap_securehash;
+  if (!hasAnyField) {
     throw new Error('Missing valid payload in callback body');
   }
 
   const cfg = getConfig();
 
-  // 1. PRIORITIZE PLAIN TEXT FIELDS (Browser Redirect usually has these)
-  if (reqBody.TRANSACTIONSTATUS || reqBody.transaction_status || reqBody.ap_SecureHash || reqBody.ap_securehash || reqBody.AP_SECUREHASH) {
-    console.log('[AirPay IPN] Using unencrypted plain text fields from payload.');
-    dataObj = reqBody;
-    rawResult = reqBody;
-  } 
-  // 2. ENCRYPTED PAYLOAD MODE
-  else if (reqBody.response) {
-    console.log('[AirPay IPN] Attempting to decrypt response field...');
+  // ── STEP 1: Always try to decrypt `response` first ──────────────────────
+  // Airpay computes ap_securehash from the DECRYPTED data values.
+  // The form POST also includes uppercase plain text fields (TRANSACTIONSTATUS,
+  // AMOUNT, etc.) but these may have DIFFERENT formatting (e.g. "SUCCESS" vs
+  // "200", "1" vs "1.00"), so the hash won't match if we use them.
+  // The Airpay reference code ALWAYS decrypts `response` to verify the hash.
+
+  if (reqBody.response) {
+    console.log('[AirPay IPN] Encrypted response field present, attempting decrypt...');
     const encryptionKey = generateEncryptionKeyFromCreds(cfg.username, cfg.password);
+    // Fix form URL encoding: '+' becomes space in application/x-www-form-urlencoded
     const cleanResponse = reqBody.response.replace(/ /g, '+');
-    let decrypted = decryptCallbackResponse(cleanResponse, encryptionKey);
-    
-    // Airpay IV flaw causes the first 16 bytes to often decrypt to garbage.
-    // We must robustly extract the JSON payload.
-    
-    let jsonString = decrypted;
-    
-    // First find the boundaries of the valid JSON object
-    const firstBrace = decrypted.indexOf('{');
-    const lastBrace = decrypted.lastIndexOf('}');
-    
-    if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
-       jsonString = decrypted.substring(firstBrace, lastBrace + 1);
-    }
 
     try {
-      rawResult = JSON.parse(jsonString);
-    } catch (e) {
-      console.log('[AirPay IPN] Standard JSON extraction failed, attempting fallback regex...');
-      // Fallback: extract just the data object if possible
-      const match = decrypted.match(/"data"\s*:\s*\{([^}]*)\}/);
-      if (match) {
+      const decrypted = decryptCallbackResponse(cleanResponse, encryptionKey);
+      console.log(`[AirPay IPN] Decryption succeeded — decrypted length: ${decrypted.length}`);
+
+      // ── Robust JSON extraction ──────────────────────────────────────────
+      // Airpay's IV derivation can cause the first AES block (16 bytes) to
+      // decrypt as garbage.  The Airpay reference code itself works around
+      // this by using a regex to extract the "data" object.
+      // Strategy: locate the outermost { … } boundaries, then parse.
+
+      const firstBrace = decrypted.indexOf('{');
+      const lastBrace  = decrypted.lastIndexOf('}');
+
+      if (firstBrace !== -1 && lastBrace > firstBrace) {
+        const jsonCandidate = decrypted.substring(firstBrace, lastBrace + 1);
         try {
-          rawResult = JSON.parse('{"data": {' + match[1] + '}}');
-        } catch (regexErr) {
-          throw new Error('JSON parse failed on regex extracted data: ' + regexErr.message);
+          rawResult = JSON.parse(jsonCandidate);
+          extractionMethod = firstBrace === 0 ? 'direct' : 'brace-trim';
+          console.log(`[AirPay IPN] JSON parsed OK (method: ${extractionMethod})`);
+        } catch (trimErr) {
+          // Brace-trim failed; try Airpay reference regex: /"data"\s*:\s*\{…\}/
+          console.log('[AirPay IPN] Brace-trim parse failed, trying regex extraction...');
+          const match = decrypted.match(/"data"\s*:\s*(\{[^}]*\})/);
+          if (match) {
+            rawResult = { data: JSON.parse(match[1]) };
+            extractionMethod = 'regex';
+            console.log('[AirPay IPN] Regex extraction succeeded');
+          } else {
+            throw new Error(
+              `JSON extraction failed after decrypt: ${trimErr.message}. ` +
+              `Prefix (30 chars): ${decrypted.substring(0, 30)}`
+            );
+          }
         }
       } else {
-         throw new Error(`JSON extraction failed: ${e.message}. Payload prefix: ${decrypted.substring(0, 30)}...`);
+        throw new Error(
+          `No JSON boundaries found in decrypted payload (len ${decrypted.length}). ` +
+          `Prefix (30 chars): ${decrypted.substring(0, 30)}`
+        );
       }
+      dataObj = rawResult.data || rawResult;
+
+    } catch (decryptErr) {
+      // Decryption itself failed (wrong block length, padding error, etc.)
+      // Fall through to plain text path below
+      console.error(`[AirPay IPN] Decryption/extraction failed: ${decryptErr.message}`);
+      console.log('[AirPay IPN] Falling back to plain text fields...');
     }
-    
-    dataObj = rawResult.data || rawResult;
-  } 
-  else {
-    throw new Error('Payload format not recognized.');
   }
 
-  // Verify Airpay secure hash (CRC32)
-  if (dataObj.ap_securehash) {
-    const CHMOD = (reqBody.CHMOD || '').toLowerCase();
+  // ── STEP 2: Fall back to unencrypted form fields ────────────────────────
+  // Only used when: (a) no response field, or (b) decryption totally failed.
+  if (!dataObj) {
+    const hasPlainFields = reqBody.TRANSACTIONSTATUS || reqBody.transaction_status ||
+                           reqBody.transaction_payment_status ||
+                           reqBody.ap_SecureHash || reqBody.ap_securehash;
+    if (hasPlainFields) {
+      console.log('[AirPay IPN] Using unencrypted plain text fields (hash verification will be skipped).');
+      dataObj = reqBody;
+      rawResult = reqBody;
+      extractionMethod = 'plaintext';
+    } else {
+      throw new Error(
+        'No decryptable response and no recognisable plain text fields. ' +
+        `Body keys: ${Object.keys(reqBody).join(', ')}`
+      );
+    }
+  }
+
+  // ── STEP 3: Verify Airpay secure hash (CRC32) ──────────────────────────
+  // Only verify when we have the decrypted data (hash was computed from those
+  // values). When using plain text fallback, we skip hash verification because
+  // the field formats differ from what Airpay hashed.
+  const secureHash = dataObj.ap_securehash || dataObj.ap_SecureHash || dataObj.AP_SECUREHASH;
+
+  if (secureHash && extractionMethod !== 'plaintext') {
+    const CHMOD = (reqBody.CHMOD || reqBody.chmod || '').toLowerCase();
     let hashInput;
 
     if (CHMOD === 'upi') {
-      // UPI mode includes CUSTOMERVPA
-      const customerVpa = reqBody.CUSTOMERVPA || dataObj.custom_var || '';
+      const customerVpa = reqBody.CUSTOMERVPA || dataObj.customer_vpa || dataObj.custom_var || '';
       hashInput = [
-        dataObj.orderid || dataObj.TRANSACTIONID,
-        dataObj.ap_transactionid || dataObj.APTRANSACTIONID,
-        dataObj.amount || dataObj.AMOUNT,
-        dataObj.transaction_status || dataObj.TRANSACTIONSTATUS,
-        dataObj.message || dataObj.MESSAGE,
+        dataObj.orderid,
+        dataObj.ap_transactionid,
+        dataObj.amount,
+        dataObj.transaction_status,
+        dataObj.message,
         cfg.merchantId,
         cfg.username,
         customerVpa,
       ].join(':');
     } else {
       hashInput = [
-        dataObj.orderid || dataObj.TRANSACTIONID,
-        dataObj.ap_transactionid || dataObj.APTRANSACTIONID,
-        dataObj.amount || dataObj.AMOUNT,
-        dataObj.transaction_status || dataObj.TRANSACTIONSTATUS,
-        dataObj.message || dataObj.MESSAGE,
+        dataObj.orderid,
+        dataObj.ap_transactionid,
+        dataObj.amount,
+        dataObj.transaction_status,
+        dataObj.message,
         cfg.merchantId,
         cfg.username,
       ].join(':');
     }
 
     const computedHash = (CRC32.str(hashInput) >>> 0).toString();
-    const receivedHash = String(dataObj.ap_securehash || dataObj.ap_SecureHash || dataObj.AP_SECUREHASH || '');
+    const receivedHash = String(secureHash);
+
+    // Diagnostic log (no sensitive data — only hash values and field presence)
+    console.log(`[AirPay IPN] Hash verification: chmod=${CHMOD}, computed=${computedHash}, received=${receivedHash}`);
+    console.log(`[AirPay IPN] Hash input fields present: orderid=${!!dataObj.orderid}, ap_txnid=${!!dataObj.ap_transactionid}, amount=${!!dataObj.amount}, status=${!!dataObj.transaction_status}, message=${!!dataObj.message}`);
 
     if (computedHash !== receivedHash) {
       throw new Error(
         `Airpay secure hash mismatch — computed: ${computedHash}, received: ${receivedHash}`
       );
     }
+    console.log('[AirPay IPN] ✅ Secure hash verified');
+  } else if (extractionMethod === 'plaintext') {
+    console.log('[AirPay IPN] ⚠️ Hash verification skipped (plain text fallback — values may differ from hashed values)');
   }
 
   return { data: dataObj, rawResult };

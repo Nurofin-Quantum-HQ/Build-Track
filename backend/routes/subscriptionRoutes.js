@@ -172,7 +172,7 @@ router.post('/initiate', protect, async (req, res) => {
 
 router.post('/callback', async (req, res) => {
   // Temporary deployment version log
-  console.log('[AirPay IPN] --- CALLBACK ROUTE TRIGGERED (DEPLOYMENT v10.4) ---');
+  console.log('[AirPay IPN] --- CALLBACK ROUTE TRIGGERED (DEPLOYMENT v10.5) ---');
   
   // Safe logging — never log keys, full payloads, or sensitive fields
   console.log('[AirPay IPN] Callback received — body keys:', Object.keys(req.body || {}));
@@ -274,6 +274,21 @@ router.post('/callback', async (req, res) => {
       );
 
       console.log(`[AirPay IPN] ✅ SUCCESS — subscription activated for orderId=${orderId} plan=${payment.plan}`);
+
+      try {
+        const NotificationService = require("../services/NotificationService");
+        await NotificationService.send(payment.userId, {
+          title: "Payment Received",
+          message: `Your ${payment.plan} plan payment of Rs. ${payment.amount} was successful. Subscription activated.`,
+          type: "payment",
+          priority: "high",
+          relatedId: payment._id,
+          relatedModel: "Payment",
+          data: { plan: payment.plan, amount: payment.amount }
+        });
+      } catch (e) {
+        console.error("[AirPay IPN] Failed to send success notification:", e);
+      }
     } else {
       // Payment failed or unknown status
       await Payment.findByIdAndUpdate(payment._id, {
@@ -296,6 +311,21 @@ router.post('/callback', async (req, res) => {
       );
 
       console.log(`[AirPay IPN] ❌ FAILED — status=${paymentStatus} orderId=${orderId}`);
+
+      try {
+        const NotificationService = require("../services/NotificationService");
+        await NotificationService.send(payment.userId, {
+          title: "Payment Failed",
+          message: `Your ${payment.plan} plan payment of Rs. ${payment.amount} could not be completed. Please try again.`,
+          type: "payment",
+          priority: "high",
+          relatedId: payment._id,
+          relatedModel: "Payment",
+          data: { plan: payment.plan, amount: payment.amount, status: paymentStatus }
+        });
+      } catch (e) {
+        console.error("[AirPay IPN] Failed to send failure notification:", e);
+      }
     }
 
     // Check if this is a browser redirecting to the callback
