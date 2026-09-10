@@ -2,10 +2,11 @@
  * subscriptionRoutes.js
  *
  * Endpoints:
- *   POST /api/subscriptions/initiate       — authenticated, creates PENDING payment + subscription
- *   POST /api/subscriptions/callback       — Airpay IPN server-to-server, returns HTTP 200
- *   GET  /api/subscriptions/browser-return — browser redirect after payment (checks status)
- *   GET  /api/subscriptions/status         — authenticated, returns current subscription status
+ *   POST /api/subscriptions/initiate       - authenticated, creates PENDING payment + subscription
+ *   POST /api/subscriptions/callback       - unauthenticated IPN webhook from Airpay
+ *   GET  /api/subscriptions/browser-return - browser redirect after payment (checks status)
+ *   POST /api/subscriptions/cancel         - authenticated, cancels active subscription
+ *   GET  /api/subscriptions/status         - authenticated, returns current subscription status
  */
 const express      = require('express');
 const router       = express.Router();
@@ -365,6 +366,7 @@ router.post('/callback', async (req, res) => {
   }
 });
 
+
 // ─── GET /api/subscriptions/browser-return ────────────────────────────────────
 // This is the URL the USER's BROWSER is redirected to after payment on Airpay.
 // Look up real payment status and redirect accordingly.
@@ -405,6 +407,36 @@ router.get('/browser-return', async (req, res) => {
 });
 
 // ─── GET /api/subscriptions/status ────────────────────────────────────────────
+
+
+
+router.post('/cancel', protect, async (req, res) => {
+  try {
+    const isAdmin = (req.user.role || '').toLowerCase() === 'admin';
+    const billingUserId = isAdmin
+      ? req.user._id
+      : (req.user.createdBy || req.user._id);
+    const sub = await Subscription.findOne({
+      userId: billingUserId,
+      status: 'active',
+      endDate: { $gt: new Date() },
+    }).sort({ createdAt: -1 });
+    if (!sub) {
+      return res.status(404).json({ success: false, message: 'No active subscription found to cancel' });
+    }
+    await Subscription.findByIdAndUpdate(sub._id, {
+      status: 'cancelled',
+    });
+    res.json({
+      success: true,
+      message: 'Subscription has been cancelled successfully.',
+      endDate: sub.endDate,
+    });
+  } catch (err) {
+    console.error('Cancel error:', err.message);
+    res.status(500).json({ success: false, message: 'Failed to cancel subscription' });
+  }
+});
 
 router.get('/status', protect, async (req, res) => {
   try {

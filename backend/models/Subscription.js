@@ -1,4 +1,4 @@
-const mongoose = require('mongoose');
+﻿const mongoose = require('mongoose');
 
 const subscriptionSchema = new mongoose.Schema({
   userId: {
@@ -8,12 +8,12 @@ const subscriptionSchema = new mongoose.Schema({
   },
   plan: {
     type: String,
-    enum: ['starter', 'growth', 'pro', 'business', 'enterprise'],
+    enum: ['free', 'pro', 'enterprise', 'starter', 'custom'],
     required: true,
   },
   status: {
     type: String,
-    enum: ['pending', 'active', 'failed', 'expired'],
+    enum: ['pending', 'active', 'failed', 'expired', 'cancelled'],
     default: 'pending',
   },
   amount:   { type: Number, required: true },
