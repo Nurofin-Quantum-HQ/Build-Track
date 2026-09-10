@@ -172,7 +172,7 @@ router.post('/initiate', protect, async (req, res) => {
 
 router.post('/callback', async (req, res) => {
   // Temporary deployment version log
-  console.log('[AirPay IPN] --- CALLBACK ROUTE TRIGGERED (DEPLOYMENT v10.6) ---');
+  console.log('[AirPay IPN] --- CALLBACK ROUTE TRIGGERED (DEPLOYMENT v10.7) ---');
   
   // Safe logging — never log keys, full payloads, or sensitive fields
   console.log('[AirPay IPN] Callback received — body keys:', Object.keys(req.body || {}));
