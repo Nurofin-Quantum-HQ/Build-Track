@@ -3,7 +3,7 @@ import { useNavigate, useLocation } from "react-router-dom";
 import { projectAPI, transactionAPI } from "../api";
 import perfLogger from "../utils/performanceLogger";
 import { resolveImageUrl } from "../utils/imageUrl";
-import { calcProgress, getPhaseProgress, toggleActivity } from "../utils/constructionPhases";
+import { calcProgress, getPhaseProgress, toggleActivity, isActivityCompleted } from "../utils/constructionPhases";
 import { Toast, ConfirmDialog } from "../components/Toast";
 import { Card, Badge, Button } from "../components/ui";
 import CsvImportExportCard from "../components/CsvImportExportCard";
@@ -163,12 +163,12 @@ export default function ManageSitePage() {
   const phases = p.selectedPhases || [];
   const hasNewTracker = phases.length > 0;
   const trackerTotal = phases.reduce((s, ph) => s + (ph.activities?.length || 0), 0);
-  const trackerDone = phases.reduce((s, ph) => s + (ph.activities?.filter(a => a.completed || a.isCompleted).length || 0), 0);
+  const trackerDone = phases.reduce((s, ph) => s + (ph.activities?.filter(a => isActivityCompleted(a, ph, p)).length || 0), 0);
 
   const projectName = p.projectName || "Untitled Project";
   const projectLoc = p.location || "\u2014";
   const progFallback = p.progress || 0;
-  const progress = hasNewTracker ? calcProgress(phases) : (progFallback > 1 ? progFallback : progFallback * 100);
+  const progress = hasNewTracker ? calcProgress(phases, p) : (progFallback > 1 ? progFallback : progFallback * 100);
   const status = p.status || "Active";
   const hasPhoto = Boolean(p.photo && String(p.photo).trim());
   const imgSrc = hasPhoto ? resolveImageUrl(p.photo) : "";
@@ -197,13 +197,14 @@ export default function ManageSitePage() {
   const addlAll = [...addl, ...unknown];
 
   const handleToggleActivity = async (phaseId, activityId) => {
-    const updatedPhases = toggleActivity(phases, phaseId, activityId);
-    const newProgress = calcProgress(updatedPhases);
-    setLocalProject(prev => ({ ...prev, selectedPhases: updatedPhases, progress: newProgress }));
+    const updatedPhases = toggleActivity(phases, phaseId, activityId, p);
+    const newProgress = calcProgress(updatedPhases, p);
+    const completedKeys = updatedPhases.flatMap(ph => ph.activities?.filter(a => isActivityCompleted(a, ph, p)).map(a => a.id) || []);
+    setLocalProject(prev => ({ ...prev, selectedPhases: updatedPhases, completedActivityKeys: completedKeys, progress: newProgress }));
     try {
-      await projectAPI.update(projectId, { selectedPhases: updatedPhases, progress: newProgress });
+      await projectAPI.update(projectId, { selectedPhases: updatedPhases, completedActivityKeys: completedKeys, progress: newProgress });
     } catch {
-      setLocalProject(prev => ({ ...prev, selectedPhases: phases, progress: calcProgress(phases) }));
+      setLocalProject(prev => ({ ...prev, selectedPhases: phases, progress: calcProgress(phases, p) }));
       setToast({ msg: "Failed to update activity.", type: "error" });
     }
   };
@@ -454,7 +455,7 @@ export default function ManageSitePage() {
     </CollapsibleCard>
   );
 
-  const _isC = (act) => act.completed || act.isCompleted;
+  const _isC = (act, phase = null) => isActivityCompleted(act, phase, p);
   const _completedDateLabel = (act) => {
     if (!act.completedAt) return null;
     const d = new Date(act.completedAt);
@@ -511,7 +512,7 @@ export default function ManageSitePage() {
       <CollapsibleCard title={SECTIONS.tracker} icon={<ClipboardCheck size={16} />} subtitle={`${trackerDone}/${trackerTotal} done`} defaultOpen>
         <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
           {phases.map(phase => {
-            const pDone = phase.activities?.filter(a => a.completed || a.isCompleted).length || 0;
+            const pDone = phase.activities?.filter(a => isActivityCompleted(a, phase, p)).length || 0;
             const pTotal = phase.activities?.length || 0;
             const pPct = pTotal > 0 ? pDone / pTotal : 0;
             const isExpanded = expandedPhase === phase.id;
@@ -828,7 +829,7 @@ export default function ManageSitePage() {
               <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 10 }}>
                 <Badge variant={status === "Completed" ? "success" : status === "In Progress" ? "info" : status === "On Hold" ? "warning" : "info"} size="sm">{status}</Badge>
                 {phases.length > 0 && (() => {
-                  const completedKeys = new Set(phases.flatMap(ph => ph.activities?.filter(a => a.completed || a.isCompleted).map(a => a.id) || []));
+                  const completedKeys = new Set(phases.flatMap(ph => ph.activities?.filter(a => isActivityCompleted(a, ph, p)).map(a => a.id) || []));
                   let activePhase = null;
                   for (const ph of phases) {
                     if (ph.activities?.some(a => !completedKeys.has(a.id))) {

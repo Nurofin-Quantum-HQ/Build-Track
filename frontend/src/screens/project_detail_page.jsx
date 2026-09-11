@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { projectAPI, transactionAPI, inventoryAPI } from "../api";
-import { calcProgress } from "../utils/constructionPhases";
+import { calcProgress, isActivityCompleted } from "../utils/constructionPhases";
 import { Toast, ConfirmDialog } from "../components/Toast";
 import { Card, Badge, Button } from "../components/ui";
 import ProjectMemberModal from "../components/ProjectMemberModal";
@@ -119,7 +119,7 @@ export default function ProjectDetailPage() {
 
   const p = project;
   const phases = p.selectedPhases || [];
-  const progress = calcProgress(phases) || (p.progress > 1 ? p.progress : (p.progress || 0) * 100);
+  const progress = calcProgress(phases, p) || (p.progress > 1 ? Math.round(p.progress) : Math.round((p.progress || 0) * 100));
   const status = p.status || "Active";
   const income = transactions.filter(t => t.type === "Income").reduce((s, t) => s + (t.amount || 0), 0);
   const spent = Number(p.spentAmount || 0);
@@ -353,7 +353,7 @@ export default function ProjectDetailPage() {
         ) : (
           <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
             {phases.map((phase) => {
-              const pDone = phase.activities?.filter(a => a.completed || a.isCompleted).length || 0;
+              const pDone = phase.activities?.filter(a => isActivityCompleted(a, phase, p)).length || 0;
               const pTotal = phase.activities?.length || 0;
               const pPct = pTotal > 0 ? pDone / pTotal : 0;
               const isExpanded = expandedPhase === phase.id;
@@ -371,7 +371,7 @@ export default function ProjectDetailPage() {
                     </div>
                   </div>
                   {isExpanded && phase.activities?.map((act) => {
-                    const done = act.completed || act.isCompleted;
+                    const done = isActivityCompleted(act, phase, p);
                     return (
                       <div key={act.id} style={{ padding: "6px 14px 6px 18px", borderTop: "1px solid #F1F5F9", display: "flex", alignItems: "center", gap: 8 }}>
                         <div style={{ width: 16, height: 16, borderRadius: 4, border: `1.5px solid ${done ? "#22C55E" : "#CBD5E1"}`, background: done ? "#22C55E" : "transparent", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
