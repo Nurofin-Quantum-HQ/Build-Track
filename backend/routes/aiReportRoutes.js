@@ -28,10 +28,17 @@ async function getProjectIds(req) {
   return projects.map((p) => p._id);
 }
 async function baseTxQuery(req) {
-  const isAdmin = req.user.role === "Admin";
-  if (isAdmin) return { createdBy: req.user._id };
   const ids = await getProjectIds(req);
-  return { project: { $in: ids } };
+  if (req.user.role === "Admin") {
+    return { $or: [{ createdBy: req.user._id }, { project: { $in: ids } }] };
+  }
+  const adminId = await getAdminId(req.user);
+  return {
+    $or: [
+      { project: { $in: ids } },
+      { project: null, createdBy: { $in: [req.user._id, adminId].filter(Boolean) } }
+    ]
+  };
 }
 function detectIntent(q) {
   const lower = q.toLowerCase();

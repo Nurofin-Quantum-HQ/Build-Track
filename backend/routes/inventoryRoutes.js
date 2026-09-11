@@ -4,7 +4,20 @@ const Inventory = require("../models/Inventory");
 const Project = require("../models/Project");
 const { protect, requirePermission, getAdminId, canAccessProjectFilter } = require("../middleware/auth");
 router.use(protect);
-router.use(requirePermission(["manage_material_master", "manage_expenses"]));
+router.use((req, res, next) => {
+  if (req.user && (req.user.role === "Admin" || req.user.role === "Supervisor")) {
+    return next();
+  }
+  return requirePermission([
+    "manage_material_master",
+    "manage_expenses",
+    "view_inventory",
+    "manage_inventory",
+    "view_projects",
+    "add_entries",
+    "add_entry"
+  ])(req, res, next);
+});
 router.get("/", async (req, res) => {
   try {
     const { project } = req.query;

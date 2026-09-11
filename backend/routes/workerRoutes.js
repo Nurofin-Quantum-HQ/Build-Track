@@ -5,7 +5,18 @@ const { protect, requirePermission, getAdminId } = require("../middleware/auth")
 const upload      = require("../config/multer");
 const { getFileUrl, deleteFile } = require("../config/fileHelpers");
 router.use(protect);
-router.use(requirePermission(["manage_labour_master", "manage_team"]));
+router.use((req, res, next) => {
+  if (req.user && (req.user.role === "Admin" || req.user.role === "Supervisor")) {
+    return next();
+  }
+  return requirePermission([
+    "manage_labour_master",
+    "manage_team",
+    "view_team",
+    "add_entries",
+    "view_projects"
+  ])(req, res, next);
+});
 router.get("/", async (req, res) => {
   try {
     const { status, search } = req.query;
