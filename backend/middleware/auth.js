@@ -80,14 +80,31 @@ const canAccessProjectFilter = (req, projectId = null) => {
   const objectIds = assignedIds
     .filter((id) => mongoose.Types.ObjectId.isValid(id))
     .map((id) => new mongoose.Types.ObjectId(id));
+  const adminId = user.createdBy;
+
   if (projectId) {
     const pidStr = projectId.toString();
-    if (!assignedIds.includes(pidStr)) {
-      return { _id: new mongoose.Types.ObjectId(), __never: true };
+    const isAssigned = assignedIds.includes(pidStr);
+    if (isAssigned) {
+      return { _id: projectId };
     }
-    return { _id: projectId };
+    if (adminId) {
+      return { _id: projectId, createdBy: adminId };
+    }
+    return { _id: new mongoose.Types.ObjectId(), __never: true };
   }
-  return { _id: { $in: objectIds } };
+
+  const conditions = [];
+  if (objectIds.length > 0) {
+    conditions.push({ _id: { $in: objectIds } });
+  }
+  if (adminId) {
+    conditions.push({ createdBy: adminId });
+  }
+  if (conditions.length === 1) return conditions[0];
+  if (conditions.length > 1) return { $or: conditions };
+
+  return { _id: { $in: [] } };
 };
 const canManageProjectFilter = (req, projectId = null) => {
   const user = req.user;

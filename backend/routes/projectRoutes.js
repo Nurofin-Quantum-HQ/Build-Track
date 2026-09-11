@@ -584,7 +584,13 @@ router.put("/:id", protect, async (req, res) => {
     const existing = await Project.findById(req.params.id);
     if (!existing) return res.status(404).json({ message: "Project not found" });
     const userPerms = Array.isArray(req.user.permissions) ? req.user.permissions : [];
-    const hasEdit = req.user.role === 'Admin' || userPerms.includes("edit_project") || userPerms.includes("manage_team") || userPerms.includes("add_entry");
+    const hasEdit =
+      req.user.role === 'Admin' ||
+      req.user.role === 'Supervisor' ||
+      userPerms.includes("edit_project") ||
+      userPerms.includes("manage_team") ||
+      userPerms.includes("add_entry") ||
+      userPerms.includes("submit_daily_update");
     if (!hasEdit) {
       const Task = require("../models/Task");
       const hasTask = await Task.exists({ project: existing._id, assignedTo: req.user._id });
@@ -700,6 +706,13 @@ router.put("/:id", protect, async (req, res) => {
           .map((p) => p?.phaseName)
           .filter((n) => n);
       }
+      if (body.progress === undefined && Array.isArray(parsedPhases) && parsedPhases.length > 0) {
+        const totalCount = parsedPhases.reduce((sum, ph) => sum + (ph.activities?.length || 0), 0);
+        const doneCount = parsedPhases.reduce((sum, ph) => sum + (ph.activities?.filter(a => a.completed || a.isCompleted)?.length || 0), 0);
+        if (totalCount > 0) {
+          updateData.progress = Number((doneCount / totalCount).toFixed(4));
+        }
+      }
     }
     const photoFile = req.files?.find((f) => f.fieldname === "photo");
     if (photoFile) {
@@ -709,8 +722,8 @@ router.put("/:id", protect, async (req, res) => {
       if (existing?.photo) await deleteFile(existing.photo);
       updateData.photo = null;
     }
-    const project = await Project.findOneAndUpdate(
-      canManageProjectFilter(req, req.params.id),
+    const project = await Project.findByIdAndUpdate(
+      existing._id,
       { $set: updateData },
       { new: true, runValidators: true }
     );
