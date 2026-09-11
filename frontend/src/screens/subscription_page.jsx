@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { subscriptionAPI, userAPI } from "../api";
+import { useAuth } from "../contexts/AuthContext";
 import useAuthStore from "../stores/authStore";
 import { Bell, Star, ClipboardList, AlertTriangle, Lock, Building2, CreditCard, HelpCircle, Phone, X, CheckCircle } from "lucide-react";
 import ModuleTour from "../components/ModuleTour";
@@ -242,6 +243,9 @@ function PhoneModal({ planTitle, onSubmit, onCancel, loading }) {
 }
 
 export default function SubscriptionPage() {
+  const { user } = useAuth();
+  const isAdmin = user?.role?.toLowerCase() === "admin";
+
   const [loading, setLoading]         = useState(true);
   const [currentPlan, setCurrentPlan] = useState(null);
   const [subStatus, setSubStatus]     = useState(null);
@@ -556,6 +560,19 @@ export default function SubscriptionPage() {
           </div>
         )}
 
+        {/* Managed by admin banner */}
+        {!isAdmin && !loading && (
+          <div style={{
+            padding: "12px 16px", background: "#e0f2fe",
+            border: "1px solid #bae6fd", borderRadius: 10,
+            color: "#0369a1", fontSize: 13, display: "flex",
+            alignItems: "center", gap: 8,
+          }}>
+            <span><AlertTriangle size={14} /></span>
+            <span>Your subscription is managed by your administrator.</span>
+          </div>
+        )}
+
         {/* Plans grid */}
         <div className="tour-plans" style={{
           display: "grid",
@@ -649,50 +666,52 @@ export default function SubscriptionPage() {
                   ))}
                 </div>
 
-                <button
-                  onClick={() => handleSubscribe(plan.id)}
-                  disabled={isCurrent || isProcessing}
-                  style={{
-                    width: "100%", padding: "12px 0", borderRadius: 12,
-                    border: isCurrent ? "1px solid #e5e5e5" : plan.highlighted ? "none" : "2px solid #ea580c",
-                    background: isCurrent ? "#f5f5f5" : plan.highlighted ? "#ea580c" : "#fff",
-                    color: isCurrent ? "#999" : plan.highlighted ? "#fff" : "#ea580c",
-                    fontWeight: 700, fontSize: 14,
-                    cursor: isCurrent || isProcessing ? "not-allowed" : "pointer",
-                    boxShadow: isCurrent ? "none" : plan.highlighted ? "0 4px 14px rgba(234,88,12,0.35)" : "none",
-                    transition: "all 0.2s ease",
-                    opacity: isProcessing ? 0.7 : 1,
-                    letterSpacing: "0.02em",
-                  }}
-                  onMouseEnter={e => {
-                    if (isCurrent || isProcessing) return;
-                    if (plan.highlighted) {
-                      e.currentTarget.style.background = "#c2410c";
-                      e.currentTarget.style.transform = "translateY(-1px)";
-                      e.currentTarget.style.boxShadow = "0 6px 20px rgba(234,88,12,0.4)";
-                    } else {
-                      e.currentTarget.style.background = "#fff5f0";
-                    }
-                  }}
-                  onMouseLeave={e => {
-                    if (isCurrent || isProcessing) return;
-                    if (plan.highlighted) {
-                      e.currentTarget.style.background = "#ea580c";
-                      e.currentTarget.style.transform = "translateY(0)";
-                      e.currentTarget.style.boxShadow = "0 4px 14px rgba(234,88,12,0.35)";
-                    } else {
-                      e.currentTarget.style.background = "#fff";
-                    }
-                  }}
-                >
-                  {isCurrent
-                    ? "✓ Current Plan"
-                    : isProcessing
-                      ? "Processing…"
-                      : plan.price === 0
-                        ? "Get Started"
-                        : `Subscribe to ${plan.title}`}
-                </button>
+                {isAdmin && (
+                  <button
+                    onClick={() => handleSubscribe(plan.id)}
+                    disabled={isCurrent || isProcessing}
+                    style={{
+                      width: "100%", padding: "12px 0", borderRadius: 12,
+                      border: isCurrent ? "1px solid #e5e5e5" : plan.highlighted ? "none" : "2px solid #ea580c",
+                      background: isCurrent ? "#f5f5f5" : plan.highlighted ? "#ea580c" : "#fff",
+                      color: isCurrent ? "#999" : plan.highlighted ? "#fff" : "#ea580c",
+                      fontWeight: 700, fontSize: 14,
+                      cursor: isCurrent || isProcessing ? "not-allowed" : "pointer",
+                      boxShadow: isCurrent ? "none" : plan.highlighted ? "0 4px 14px rgba(234,88,12,0.35)" : "none",
+                      transition: "all 0.2s ease",
+                      opacity: isProcessing ? 0.7 : 1,
+                      letterSpacing: "0.02em",
+                    }}
+                    onMouseEnter={e => {
+                      if (isCurrent || isProcessing) return;
+                      if (plan.highlighted) {
+                        e.currentTarget.style.background = "#c2410c";
+                        e.currentTarget.style.transform = "translateY(-1px)";
+                        e.currentTarget.style.boxShadow = "0 6px 20px rgba(234,88,12,0.4)";
+                      } else {
+                        e.currentTarget.style.background = "#fff5f0";
+                      }
+                    }}
+                    onMouseLeave={e => {
+                      if (isCurrent || isProcessing) return;
+                      if (plan.highlighted) {
+                        e.currentTarget.style.background = "#ea580c";
+                        e.currentTarget.style.transform = "translateY(0)";
+                        e.currentTarget.style.boxShadow = "0 4px 14px rgba(234,88,12,0.35)";
+                      } else {
+                        e.currentTarget.style.background = "#fff";
+                      }
+                    }}
+                  >
+                    {isCurrent
+                      ? "✓ Current Plan"
+                      : isProcessing
+                        ? "Processing…"
+                        : plan.price === 0
+                          ? "Get Started"
+                          : `Subscribe to ${plan.title}`}
+                  </button>
+                )}
               </div>
             );
           })}
