@@ -16,8 +16,13 @@ const notificationSchema = new mongoose.Schema({
   },
   type: {
     type: String,
-    enum: ["approval", "payment", "inventory", "project", "worker", "system"],
+    enum: ["approval", "payment", "inventory", "project", "worker", "task", "system"],
     default: "system"
+  },
+  priority: {
+    type: String,
+    enum: ["low", "medium", "high"],
+    default: "low"
   },
   read: {
     type: Boolean,
@@ -30,7 +35,18 @@ const notificationSchema = new mongoose.Schema({
   relatedModel: {
     type: String,
     default: null
+  },
+  data: {
+    type: mongoose.Schema.Types.Mixed,
+    default: {}
+  },
+  channel: {
+    type: String,
+    enum: ["in_app", "email", "push", "browser"],
+    default: "in_app"
   }
 }, { timestamps: true });
+
+notificationSchema.index({ user: 1, read: 1, createdAt: -1 });
 
 module.exports = mongoose.model("Notification", notificationSchema);
