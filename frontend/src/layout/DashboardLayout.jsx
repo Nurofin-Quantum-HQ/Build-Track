@@ -1,15 +1,18 @@
 import { useState, useEffect } from "react";
-import { Outlet, useNavigate } from "react-router-dom";
+import { Outlet, useNavigate, useLocation } from "react-router-dom";
 import Sidebar from "../components/Sidebar";
 import AppTour from "../components/AppTour";
 import { Bell, Settings } from "lucide-react";
 import { colors, typography } from "../styles/designTokens";
 import nurofinLogo from "../assets/nurofin-black.svg";
+import { notificationAPI } from "../api";
 
 export default function DashboardLayout() {
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [unreadCount, setUnreadCount] = useState(0);
   const navigate = useNavigate();
+  const location = useLocation();
 
   useEffect(() => {
     const onResize = () => {
@@ -20,6 +23,23 @@ export default function DashboardLayout() {
     window.addEventListener("resize", onResize);
     return () => window.removeEventListener("resize", onResize);
   }, []);
+
+  useEffect(() => {
+    let active = true;
+    const fetchUnread = () => {
+      notificationAPI.getUnreadCount()
+        .then(res => {
+          if (active) setUnreadCount(res.data?.unreadCount || 0);
+        })
+        .catch(() => {});
+    };
+    fetchUnread();
+    const interval = setInterval(fetchUnread, 60000);
+    return () => {
+      active = false;
+      clearInterval(interval);
+    };
+  }, [location.pathname]);
 
   return (
     <div style={{ display: "flex", height: "100vh", overflow: "hidden", background: colors.bg }}>
@@ -109,8 +129,30 @@ export default function DashboardLayout() {
               onClick={() => navigate("/notifications")}
               className="premium-topbar-btn"
               aria-label="Notifications"
+              style={{ position: "relative" }}
             >
               <Bell size={20} />
+              {unreadCount > 0 && (
+                <span
+                  style={{
+                    position: "absolute",
+                    top: -6,
+                    right: -6,
+                    background: "#EF4444",
+                    color: "#FFF",
+                    fontSize: 10,
+                    fontWeight: 700,
+                    lineHeight: 1,
+                    padding: "3px 5px",
+                    borderRadius: 10,
+                    minWidth: 16,
+                    textAlign: "center",
+                    pointerEvents: "none",
+                  }}
+                >
+                  {unreadCount > 99 ? "99+" : unreadCount}
+                </span>
+              )}
             </button>
             <button
               onClick={() => navigate("/settings")}

@@ -7,7 +7,7 @@ import perfLogger from "../utils/performanceLogger";
 import { Toast, ConfirmDialog } from "../components/Toast";
 import { resolveImageUrl } from "../utils/imageUrl";
 import { Card, Badge, Button, SkeletonLine } from "../components/ui";
-import { Search, Plus, Building2, ArrowRight, Edit3, Trash2, RefreshCw, FolderOpen, HelpCircle } from "lucide-react";
+import { Search, Plus, Building2, ArrowRight, Edit3, RefreshCw, FolderOpen, HelpCircle } from "lucide-react";
 import ModuleTour from "../components/ModuleTour";
 
 const STATUS_STYLE = {
@@ -50,7 +50,6 @@ export default function ProjectsPage() {
   const isAdmin = user?.role?.toLowerCase() === "admin";
   const canCreate = isAdmin || can("create_project") || can("manage_team");
   const canEdit = isAdmin || can("edit_project") || can("manage_team");
-  const canDelete = isAdmin || can("delete_project") || can("manage_team");
 
   const tourSteps = [
     { target: '.tour-header', content: 'Here you can view and manage all your projects.', disableBeacon: true },
@@ -88,25 +87,6 @@ export default function ProjectsPage() {
   }, [allProjects.length, storeFetchProjects]);
 
   useEffect(() => { fetchProjects(); }, [fetchProjects]);
-
-  const handleDelete = (e, projectId, projectName) => {
-    e.stopPropagation();
-    setConfirmDlg({
-      message: `Delete "${projectName}"? This action cannot be undone.`,
-      danger: true,
-      confirmLabel: "Delete Project",
-      onConfirm: async () => {
-        setConfirmDlg(null);
-        try {
-          await projectAPI.delete(projectId);
-          setAllProjects(prev => prev.filter(p => p._id !== projectId));
-          setToast({ msg: `"${projectName}" deleted successfully.`, type: "success" });
-        } catch (err) {
-          setToast({ msg: err.response?.data?.message || "Failed to delete project.", type: "error" });
-        }
-      },
-    });
-  };
 
   const filtered = allProjects.filter(p => {
     const q = search.toLowerCase();
@@ -260,11 +240,6 @@ export default function ProjectsPage() {
                         {canEdit && (
                           <button onClick={() => navigate("/newproject", { state: { project: p } })} title="Edit project" style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 4, color: '#64748B', display: 'flex', alignItems: 'center' }}>
                             <Edit3 size={15} />
-                          </button>
-                        )}
-                        {canDelete && (
-                          <button onClick={(e) => handleDelete(e, p._id, p.projectName)} title="Delete project" style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 4, color: '#DC2626', display: 'flex', alignItems: 'center' }}>
-                            <Trash2 size={15} />
                           </button>
                         )}
                       </div>

@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
-import { userAPI, authAPI, subscriptionAPI } from "../api";
+import { userAPI, authAPI, subscriptionAPI, notificationAPI } from "../api";
 import { Toast, ConfirmDialog } from "../components/Toast";
 import { Badge, Button, Card } from "../components/ui";
 import { resolveImageUrl } from "../utils/imageUrl";
@@ -102,6 +102,16 @@ export default function SettingsPage() {
   useEffect(() => {
     subscriptionAPI.getStatus()
       .then(({ data }) => setSubscription(data?.hasSubscription ? data : null))
+      .catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    notificationAPI.getPreferences()
+      .then(({ data }) => {
+        const p = data?.preferences || {};
+        if (typeof p.email === "boolean") setEmailNotif(p.email);
+        if (typeof p.push === "boolean") setPushNotif(p.push);
+      })
       .catch(() => {});
   }, []);
 
@@ -219,7 +229,7 @@ export default function SettingsPage() {
 
   const handleDeleteAccount = () => {
     setConfirmDlg({
-      message: "Are you sure you want to permanently delete your account? This action cannot be undone.",
+      message: "This will permanently delete your admin account and ALL data associated with it — projects, team members, transactions, and more. This cannot be undone.",
       danger: true, confirmLabel: "Delete My Account",
       onConfirm: async () => {
         setConfirmDlg(null);
@@ -304,8 +314,19 @@ export default function SettingsPage() {
           </SectionCard>
 
           <SectionCard title="Notifications" className="tour-notifications">
-            <SettingsRow icon={<Bell size={14} />} title="Notifications" subtitle="Receive project updates and alerts" border={false}
-              action={<Toggle on={emailNotif} onToggle={() => setEmailNotif(v => !v)} />} />
+            <SettingsRow icon={<Bell size={14} />} title="Email Notifications" subtitle="Receive project updates and alerts by email" border={false}
+              action={<Toggle on={emailNotif} onToggle={() => {
+                const next = !emailNotif;
+                setEmailNotif(next);
+                notificationAPI.updatePreferences({ email: next }).catch(() => setEmailNotif(!next));
+              }} />} />
+
+            <SettingsRow icon={<Bell size={14} />} title="Push Notifications" subtitle="Get instant alerts on the mobile app" border={false}
+              action={<Toggle on={pushNotif} onToggle={() => {
+                const next = !pushNotif;
+                setPushNotif(next);
+                notificationAPI.updatePreferences({ push: next }).catch(() => setPushNotif(!next));
+              }} />} />
           </SectionCard>
 
           <SectionCard title="Security" className="tour-security">
@@ -371,6 +392,22 @@ export default function SettingsPage() {
               <LogOut size={16} /> Log Out
             </Button>
           </SectionCard>
+
+          {isAdmin && (
+            <SectionCard title="Danger Zone" style={{ border: "1px solid #FECACA" }}>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
+                <div>
+                  <div style={{ fontSize: 14, fontWeight: 600, color: "#111827" }}>Delete My Account</div>
+                  <div style={{ fontSize: 12, color: "#64748B", marginTop: 4 }}>
+                    Permanently delete your admin account and all related data.
+                  </div>
+                </div>
+                <Button variant="danger" size="sm" onClick={handleDeleteAccount}>
+                  Delete Account
+                </Button>
+              </div>
+            </SectionCard>
+          )}
 
           <div style={{ textAlign: "center", padding: "8px 0 16px" }}>
             <span style={{ fontSize: 12, color: "#94A3B8" }}>BuildTrack Version 2.4.0 (2024)</span>

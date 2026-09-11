@@ -249,6 +249,22 @@ process.on("uncaughtException", (err) => {
 });
 (async () => {
   try {
+    // Try to initialize firebase-admin if FIREBASE_SERVICE_ACCOUNT is available
+    if (process.env.FIREBASE_SERVICE_ACCOUNT) {
+      try {
+        const admin = require("firebase-admin");
+        const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
+        admin.initializeApp({
+          credential: admin.credential.cert(serviceAccount)
+        });
+        console.log("✅ Firebase Admin initialized successfully.");
+      } catch (fcmErr) {
+        console.error("❌ Failed to initialize Firebase Admin:", fcmErr.message);
+      }
+    } else {
+      console.log("⚠️ FIREBASE_SERVICE_ACCOUNT not set. Push notifications will not be sent.");
+    }
+
     await connectWithRetry(process.env.MONGO_URI);
   } catch (err) {
     console.error('[Startup] MongoDB connection failed after all retries.');

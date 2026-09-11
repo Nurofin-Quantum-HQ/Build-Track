@@ -134,6 +134,20 @@ router.post("/", async (req, res) => {
       time: time || "Today",
     });
     const populatedTask = await Task.findById(newTask._id).populate("assignedTo", "name role profilePhoto");
+
+    if (newTask.assignedTo) {
+      const NotificationService = require("../services/NotificationService");
+      await NotificationService.send(newTask.assignedTo, {
+        title: "New Task Assigned",
+        message: `You have been assigned the task "${newTask.title}".`,
+        type: "task",
+        priority: "medium",
+        relatedId: newTask._id,
+        relatedModel: "Task",
+        data: { project: newTask.project, status: newTask.status }
+      });
+    }
+
     res.status(201).json({ message: "Task created successfully", task: populatedTask });
   } catch (err) {
     console.error("Create task error:", err);
@@ -158,6 +172,21 @@ router.put("/:id/status", async (req, res) => {
     }
     task.status = status;
     await task.save();
+
+    const NotificationService = require("../services/NotificationService");
+    const isStatusChanger = req.user._id;
+    if (status === "Completed" && task.createdBy && task.createdBy.toString() !== isStatusChanger.toString()) {
+      await NotificationService.send(task.createdBy, {
+        title: "Task Completed",
+        message: `Task "${task.title}" has been marked as completed.`,
+        type: "task",
+        priority: "low",
+        relatedId: task._id,
+        relatedModel: "Task",
+        data: { project: task.project, status }
+      });
+    }
+
     res.json({ message: "Task status updated", task });
   } catch (err) {
     console.error("Update task status error:", err);
@@ -206,6 +235,20 @@ router.put("/:id", async (req, res) => {
     }
     await task.save();
     const populatedTask = await Task.findById(task._id).populate("assignedTo", "name role profilePhoto");
+
+    const NotificationService = require("../services/NotificationService");
+    if (task.assignedTo && req.body.assignedTo !== undefined && task.assignedTo.toString() !== req.user._id.toString()) {
+      await NotificationService.send(task.assignedTo, {
+        title: "New Task Assigned",
+        message: `You have been assigned the task "${task.title}".`,
+        type: "task",
+        priority: "medium",
+        relatedId: task._id,
+        relatedModel: "Task",
+        data: { project: task.project, status: task.status }
+      });
+    }
+
     res.json({ message: "Task updated successfully", task: populatedTask });
   } catch (err) {
     console.error("Update task error:", err);
