@@ -729,9 +729,12 @@ router.put("/:id", requirePermission(["manage_expenses", "add_entries"]), async 
   } catch (uploadErr) {
     return res.status(400).json({ message: uploadErr.message || "File upload error" });
   }
+  const reqId = req.headers['x-request-id'] || 'no-req-id';
   if (process.env.NODE_ENV !== "production") {
-    console.log('=== UPDATE TRANSACTION REQUEST ===');
-    console.log('ID:', req.params.id);
+    console.log(`=== UPDATE TRANSACTION REQUEST [${reqId}] ===`);
+    console.log(`ID: ${req.params.id} | User: ${req.user._id}`);
+  } else {
+    console.log(`[PAYMENT] Update request [${reqId}] started for TX: ${req.params.id} by User: ${req.user._id}`);
   }
   const { paymentStatus, paidAmount } = req.body;
   const session = await mongoose.startSession();
@@ -1045,10 +1048,13 @@ router.put("/:id", requirePermission(["manage_expenses", "add_entries"]), async 
     tx.amount = finalAmount;
     await tx.save({ session });
     await session.commitTransaction();
+    const reqId = req.headers['x-request-id'] || 'no-req-id';
+    console.log(`[PAYMENT] Update request [${reqId}] completed successfully for TX: ${tx._id}`);
     res.json({ message: "Transaction updated successfully", transaction: tx });
   } catch (err) {
     await session.abortTransaction();
-    console.error("Update transaction error:", err);
+    const reqId = req.headers['x-request-id'] || 'no-req-id';
+    console.error(`[PAYMENT] Update request [${reqId}] error:`, err);
     let status = err.status || 500;
     if (err.name === "ValidationError") status = 400;
     else if (err.name === "VersionError") status = 409;
