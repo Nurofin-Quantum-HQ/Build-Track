@@ -17,6 +17,9 @@ const userSchema = new mongoose.Schema(
     },
     providerId: { type: String, default: null },
     profilePhoto: { type: String, default: null },
+    companyName: { type: String, trim: true, default: "" },
+    companyFontStyle: { type: String, trim: true, default: "Inter" },
+    companyLogo: { type: String, default: null },
     role: {
       type: String,
       default: "Mason",

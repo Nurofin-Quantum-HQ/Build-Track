@@ -9,10 +9,10 @@ import {
   User, Mail, Shield, Bell, Globe, ChevronDown, Camera, Pencil, Lock,
   LogOut, Trash2, Users, FileText, KeyRound, Eye, EyeOff, ArrowLeft,
   CreditCard, Palette, Moon, Monitor, Smartphone, Download, AlertTriangle, HelpCircle,
-  Save, Check
+  Save, Check, Building, Upload, X, Type, Image as ImageIcon
 } from "lucide-react";
 import ModuleTour from "../components/ModuleTour";
-
+import { COMPANY_FONT_OPTIONS } from "../pages/signup_page";
 import perfLogger from "../utils/performanceLogger";
 
 function Toggle({ on, onToggle }) {
@@ -50,6 +50,7 @@ function SettingsRow({ icon, title, subtitle, action, border }) {
 
 export default function SettingsPage() {
   const profileInputRef = useRef(null);
+  const companyLogoInputRef = useRef(null);
   const navigate = useNavigate();
   const { user, updateUser, logout } = useAuth();
   const isAdmin = user?.role === "admin" || user?.role === "Admin";
@@ -64,6 +65,13 @@ export default function SettingsPage() {
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
   const [role, setRole] = useState("Site Supervisor");
+
+  const [companyName, setCompanyName] = useState("");
+  const [companyFontStyle, setCompanyFontStyle] = useState("Inter");
+  const [companyLogo, setCompanyLogo] = useState(null);
+  const [companySaving, setCompanySaving] = useState(false);
+  const [companySaved, setCompanySaved] = useState(false);
+
   const [language, setLanguage] = useState("English");
   const currency = "Indian Rupee (INR)";
   const [emailNotif, setEmailNotif] = useState(true);
@@ -88,6 +96,14 @@ export default function SettingsPage() {
       fullName !== (user.name || "") ||
       email !== (user.email || "") ||
       role !== (user.role || "Site Supervisor")
+    )
+  );
+
+  const isCompanyDirty = Boolean(
+    user && (
+      companyName !== (user.companyName || "") ||
+      companyFontStyle !== (user.companyFontStyle || "Inter") ||
+      companyLogo !== (user.companyLogo || null)
     )
   );
 
@@ -120,6 +136,9 @@ export default function SettingsPage() {
       setFullName(user.name || "");
       setEmail(user.email || "");
       setRole(user.role || "Site Supervisor");
+      setCompanyName(user.companyName || "");
+      setCompanyFontStyle(user.companyFontStyle || "Inter");
+      setCompanyLogo(user.companyLogo || null);
       if (user.twoFactorEnabled !== undefined) setTwoFA(user.twoFactorEnabled);
       if (user.profilePhoto) setProfileImage(resolveImageUrl(user.profilePhoto));
       else setProfileImage(null);
@@ -131,6 +150,59 @@ export default function SettingsPage() {
     window.addEventListener("resize", onResize);
     return () => window.removeEventListener("resize", onResize);
   }, []);
+
+  const handleCompanyLogoUpload = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 5 * 1024 * 1024) {
+      setToast({ msg: "Logo must be smaller than 5MB.", type: "error" });
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      setCompanyLogo(ev.target.result);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleRemoveCompanyLogo = () => {
+    setCompanyLogo(null);
+    if (companyLogoInputRef.current) companyLogoInputRef.current.value = "";
+  };
+
+  const handleSaveCompany = async () => {
+    if (companySaving) return;
+    if (!companyName.trim()) {
+      setToast({ msg: "Company name cannot be empty.", type: "error" });
+      return;
+    }
+    setCompanySaving(true);
+    try {
+      const { data } = await userAPI.updateProfile({
+        companyName: companyName.trim(),
+        companyFontStyle: companyFontStyle || "Inter",
+        companyLogo: companyLogo || "",
+      });
+      const updatedUser = data.user || {
+        ...user,
+        companyName: companyName.trim(),
+        companyFontStyle: companyFontStyle || "Inter",
+        companyLogo: companyLogo || null,
+      };
+      updateUser(updatedUser);
+      setCompanyName(updatedUser.companyName || "");
+      setCompanyFontStyle(updatedUser.companyFontStyle || "Inter");
+      setCompanyLogo(updatedUser.companyLogo || null);
+      window.dispatchEvent(new Event("userUpdated"));
+      setToast({ msg: "Company branding updated successfully!", type: "success" });
+      setCompanySaved(true);
+      setTimeout(() => setCompanySaved(false), 2500);
+    } catch (err) {
+      setToast({ msg: err.response?.data?.message || "Failed to update company branding.", type: "error" });
+    } finally {
+      setCompanySaving(false);
+    }
+  };
 
   const handleImageUpload = async (e) => {
     const file = e.target.files[0];
@@ -306,6 +378,213 @@ export default function SettingsPage() {
                   ) : (
                     <>
                       <Save size={16} /> Save Changes
+                    </>
+                  )}
+                </Button>
+              </div>
+            </div>
+          </SectionCard>
+
+          <SectionCard title="Company Branding & Sidebar">
+            <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+              <div>
+                <label style={{ fontSize: 12, fontWeight: 600, color: "#64748B", display: "block", marginBottom: 6 }}>
+                  COMPANY NAME *
+                </label>
+                <input
+                  value={companyName}
+                  onChange={(e) => setCompanyName(e.target.value)}
+                  placeholder="Enter your company name"
+                  style={baseInput}
+                />
+              </div>
+
+              <div>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
+                  <label style={{ fontSize: 12, fontWeight: 600, color: "#64748B", display: "flex", alignItems: "center", gap: 6 }}>
+                    <Type size={14} color="#F97316" />
+                    COMPANY NAME FONT STYLE
+                  </label>
+                  <span style={{ fontSize: "11px", color: "#F97316", fontWeight: "600" }}>Live Typeface Preview</span>
+                </div>
+
+                <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: 8 }}>
+                  {COMPANY_FONT_OPTIONS.map((f) => {
+                    const isSelected = companyFontStyle === f.id;
+                    return (
+                      <button
+                        key={f.id}
+                        type="button"
+                        onClick={() => setCompanyFontStyle(f.id)}
+                        style={{
+                          padding: "10px 12px",
+                          borderRadius: 10,
+                          border: isSelected ? "2px solid #F97316" : "1.5px solid #E2E8F0",
+                          background: isSelected ? "#FFF7ED" : "#FFFFFF",
+                          cursor: "pointer",
+                          textAlign: "left",
+                          display: "flex",
+                          flexDirection: "column",
+                          gap: 2,
+                          transition: "all 0.15s ease",
+                          boxShadow: isSelected ? "0 2px 8px rgba(249, 115, 22, 0.15)" : "none",
+                        }}
+                      >
+                        <span style={{ fontSize: "11px", color: isSelected ? "#EA580C" : "#64748B", fontWeight: 700 }}>
+                          {f.name}
+                        </span>
+                        <span
+                          style={{
+                            fontFamily: f.font,
+                            fontSize: "15px",
+                            fontWeight: 800,
+                            color: isSelected ? "#0F172A" : "#334155",
+                            whiteSpace: "nowrap",
+                            overflow: "hidden",
+                            textOverflow: "ellipsis",
+                          }}
+                        >
+                          {companyName.trim() || "Preview"}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              <div>
+                <label style={{ fontSize: 12, fontWeight: 600, color: "#64748B", display: "flex", alignItems: "center", gap: 6, marginBottom: 8 }}>
+                  <ImageIcon size={14} color="#F97316" />
+                  COMPANY LOGO <span style={{ fontWeight: 400, color: "#94A3B8" }}>(Optional — if omitted, only company name appears)</span>
+                </label>
+
+                <input
+                  ref={companyLogoInputRef}
+                  type="file"
+                  accept="image/*"
+                  style={{ display: "none" }}
+                  onChange={handleCompanyLogoUpload}
+                />
+
+                {companyLogo ? (
+                  <div style={{
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    padding: "12px 16px",
+                    borderRadius: 12,
+                    background: "#F8FAFC",
+                    border: "1.5px solid #E2E8F0"
+                  }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+                      <img
+                        src={resolveImageUrl(companyLogo)}
+                        alt="Company Logo"
+                        style={{ width: 44, height: 44, objectFit: "contain", borderRadius: 8, background: "#FFF", border: "1px solid #E2E8F0" }}
+                      />
+                      <div>
+                        <div style={{ fontSize: "13px", fontWeight: "700", color: "#0F172A" }}>Company Logo Uploaded</div>
+                        <button
+                          type="button"
+                          onClick={() => companyLogoInputRef.current?.click()}
+                          style={{ background: "none", border: "none", color: "#F97316", fontSize: "12px", fontWeight: "700", padding: 0, cursor: "pointer", marginTop: 2 }}
+                        >
+                          Replace logo
+                        </button>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={handleRemoveCompanyLogo}
+                      style={{ background: "#FEE2E2", border: "none", borderRadius: 8, padding: 8, cursor: "pointer", color: "#EF4444", display: "flex" }}
+                      title="Remove logo"
+                    >
+                      <X size={16} />
+                    </button>
+                  </div>
+                ) : (
+                  <div
+                    onClick={() => companyLogoInputRef.current?.click()}
+                    style={{
+                      border: "1.5px dashed #CBD5E1",
+                      borderRadius: 12,
+                      padding: "16px 20px",
+                      background: "#F8FAFC",
+                      cursor: "pointer",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      gap: 10,
+                      transition: "all 0.15s ease",
+                    }}
+                    onMouseEnter={(e) => { e.currentTarget.style.borderColor = "#F97316"; e.currentTarget.style.background = "#FFF7ED"; }}
+                    onMouseLeave={(e) => { e.currentTarget.style.borderColor = "#CBD5E1"; e.currentTarget.style.background = "#F8FAFC"; }}
+                  >
+                    <Upload size={18} color="#F97316" />
+                    <span style={{ fontSize: "13px", fontWeight: "600", color: "#475569" }}>
+                      Upload Company Logo (PNG, JPG, SVG)
+                    </span>
+                  </div>
+                )}
+              </div>
+
+              {/* Sidebar Preview Box */}
+              <div style={{ padding: "14px 18px", borderRadius: 12, background: "rgba(249, 115, 22, 0.05)", border: "1px solid rgba(249, 115, 22, 0.15)" }}>
+                <div style={{ fontSize: "11px", fontWeight: 700, color: "#EA580C", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 8 }}>
+                  Sidebar Top Preview
+                </div>
+                <div style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 12,
+                  padding: "12px 16px",
+                  borderRadius: 12,
+                  background: "rgba(255, 255, 255, 0.9)",
+                  border: "1px solid rgba(0, 0, 0, 0.06)",
+                  boxShadow: "0 2px 8px rgba(0,0,0,0.04)"
+                }}>
+                  {companyLogo && (
+                    <img
+                      src={resolveImageUrl(companyLogo)}
+                      alt="Logo"
+                      style={{ width: 36, height: 36, borderRadius: 8, objectFit: "contain", flexShrink: 0 }}
+                    />
+                  )}
+                  <span
+                    style={{
+                      fontSize: 18,
+                      fontWeight: 800,
+                      color: "#111827",
+                      fontFamily: COMPANY_FONT_OPTIONS.find(f => f.id === companyFontStyle)?.font || "'Inter', sans-serif",
+                      whiteSpace: "nowrap",
+                      overflow: "hidden",
+                      textOverflow: "ellipsis"
+                    }}
+                  >
+                    {companyName.trim() || "Your Company"}
+                  </span>
+                </div>
+              </div>
+
+              <div>
+                <Button
+                  variant="primary"
+                  size="md"
+                  onClick={handleSaveCompany}
+                  disabled={companySaving || (!isCompanyDirty && !companySaved)}
+                  style={companySaved ? { background: "#10B981", color: "#fff", boxShadow: "0 4px 10px rgba(16, 185, 129, 0.25)" } : undefined}
+                >
+                  {companySaving ? (
+                    <>
+                      <Save size={16} /> Saving…
+                    </>
+                  ) : companySaved ? (
+                    <>
+                      <Check size={16} /> ✓ Branding Saved!
+                    </>
+                  ) : (
+                    <>
+                      <Save size={16} /> Save Branding
                     </>
                   )}
                 </Button>

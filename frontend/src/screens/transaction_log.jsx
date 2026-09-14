@@ -13,7 +13,7 @@ import {
   RefreshCw,
   ArrowUpRight,
   ArrowDownRight,
-  DollarSign,
+  IndianRupee,
   Trash2,
   Filter,
   Calendar,
@@ -168,7 +168,7 @@ export default function TransactionLog() {
         {[
           { label: 'Total Income', value: income, color: colors.success, bg: colors.successLight, icon: ArrowUpRight },
           { label: 'Total Expenses', value: expenses, color: colors.danger, bg: colors.dangerLight, icon: ArrowDownRight },
-          { label: 'Net Balance', value: income - expenses, color: income - expenses >= 0 ? colors.primary : colors.danger, bg: income - expenses >= 0 ? colors.primaryLight : colors.dangerLight, icon: DollarSign },
+          { label: 'Net Balance', value: income - expenses, color: income - expenses >= 0 ? colors.primary : colors.danger, bg: income - expenses >= 0 ? colors.primaryLight : colors.dangerLight, icon: IndianRupee },
         ].map((item, idx) => {
           const Icon = item.icon;
           return (
@@ -244,7 +244,7 @@ export default function TransactionLog() {
         </div>
       ) : paginated.length === 0 ? (
         <EmptyState
-          icon={<DollarSign size={24} />}
+          icon={<IndianRupee size={24} />}
           title={transactions.length === 0 ? "No transactions found" : "No matches found"}
           description={transactions.length === 0 ? 'Create your first manual or voice transaction to populate this list.' : 'Try adjusting your search terms or filters.'}
           actionLabel={transactions.length === 0 ? "Add Transaction" : undefined}
@@ -257,7 +257,7 @@ export default function TransactionLog() {
               const st = TYPE_STYLES[t.type] || TYPE_STYLES.Expense;
               const pName = resolveProjectName(t.project) || "";
               const isPositive = t.type === "Income";
-              const TypeIcon = st.icon || DollarSign;
+              const TypeIcon = st.icon || IndianRupee;
 
               return (
                 <div key={t._id || i} className="tx-row" style={{
