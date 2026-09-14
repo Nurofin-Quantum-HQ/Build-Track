@@ -21,6 +21,17 @@ const linkStyle = {
   marginBottom: 4,
 };
 
+const FONT_FAMILY_MAP = {
+  "Inter": "'Inter', sans-serif",
+  "Outfit": "'Outfit', sans-serif",
+  "Poppins": "'Poppins', sans-serif",
+  "Montserrat": "'Montserrat', sans-serif",
+  "Roboto": "'Roboto', sans-serif",
+  "Playfair Display": "'Playfair Display', serif",
+  "Cinzel": "'Cinzel', serif",
+  "Caveat": "'Caveat', cursive",
+};
+
 export default function Sidebar() {
   const location = useLocation();
   const { user: authUser, logout } = useAuth();
@@ -74,22 +85,57 @@ export default function Sidebar() {
         boxShadow: "var(--shadow-lg)",
       }}
     >
-      <div style={{ display: "flex", alignItems: "center", gap: 12, padding: "24px 20px 20px" }}>
-        <img
-          src="/buildtrack-logo.png"
-          alt="BuildTrack"
-          style={{
-            width: 36,
-            height: 36,
-            borderRadius: "10px",
-            objectFit: "contain",
-            flexShrink: 0,
-          }}
-        />
-        <span style={{ fontSize: 19, fontWeight: 800, color: colors.textPrimary, letterSpacing: "-0.03em", fontFamily: typography.fontFamily }}>
-          BuildTrack
-        </span>
-      </div>
+      {user?.companyLogo ? (
+        <div style={{ display: "flex", alignItems: "center", gap: 12, padding: "24px 20px 20px", minWidth: 0 }}>
+          <img
+            src={resolveImageUrl(user.companyLogo)}
+            alt={user?.companyName || "Company Logo"}
+            style={{
+              width: 38,
+              height: 38,
+              borderRadius: "10px",
+              objectFit: "contain",
+              flexShrink: 0,
+              background: "rgba(255, 255, 255, 0.8)",
+              border: "1px solid rgba(0, 0, 0, 0.06)",
+              boxShadow: "0 2px 8px rgba(0,0,0,0.04)",
+            }}
+          />
+          <span
+            style={{
+              fontSize: 19,
+              fontWeight: 800,
+              color: colors.textPrimary,
+              letterSpacing: "-0.02em",
+              fontFamily: FONT_FAMILY_MAP[user?.companyFontStyle] || user?.companyFontStyle || typography.fontFamily,
+              whiteSpace: "nowrap",
+              overflow: "hidden",
+              textOverflow: "ellipsis",
+            }}
+            title={user?.companyName}
+          >
+            {user?.companyName || "BuildTrack"}
+          </span>
+        </div>
+      ) : (
+        <div style={{ display: "flex", alignItems: "center", padding: "24px 20px 20px", minWidth: 0 }}>
+          <span
+            style={{
+              fontSize: 20,
+              fontWeight: 800,
+              color: colors.textPrimary,
+              letterSpacing: "-0.02em",
+              fontFamily: FONT_FAMILY_MAP[user?.companyFontStyle] || user?.companyFontStyle || typography.fontFamily,
+              whiteSpace: "nowrap",
+              overflow: "hidden",
+              textOverflow: "ellipsis",
+            }}
+            title={user?.companyName}
+          >
+            {user?.companyName || "BuildTrack"}
+          </span>
+        </div>
+      )}
 
       <nav style={{ flex: 1, overflowY: "auto", padding: "0 16px", display: "flex", flexDirection: "column", gap: 2 }}>
         <div style={{ fontSize: 11, fontWeight: 700, color: colors.textTertiary, letterSpacing: "0.08em", padding: "12px 8px 6px", textTransform: "uppercase" }}>
