@@ -79,6 +79,7 @@ const ALLOWED_ORIGINS = [
   "https://buildtrack-api.nurofin.com",
   "https://build-track.onrender.com",
   "https://build-track-web.onrender.com",
+  "https://secure.airpay.co.in",
   ...(process.env.NGROK_URL ? [process.env.NGROK_URL] : []),
 ]
   .filter(Boolean)
@@ -87,7 +88,13 @@ app.use(
   cors({
     origin: (incomingOrigin, callback) => {
       if (!incomingOrigin) return callback(null, true);
-      if (ALLOWED_ORIGINS.includes(incomingOrigin) || incomingOrigin.startsWith("http://localhost:")) {
+      if (
+        ALLOWED_ORIGINS.includes(incomingOrigin) || 
+        incomingOrigin.startsWith("http://localhost:") || 
+        incomingOrigin.startsWith("http://127.0.0.1:") ||
+        incomingOrigin.startsWith("capacitor://") ||
+        incomingOrigin.startsWith("buildtrack://")
+      ) {
         return callback(null, true);
       }
       console.warn(`[CORS] Rejected request from unlisted origin: ${incomingOrigin}`);
@@ -95,8 +102,8 @@ app.use(
     },
     methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
     allowedHeaders: isProd
-      ? ["Content-Type", "Authorization"]
-      : ["Content-Type", "Authorization", "ngrok-skip-browser-warning"],
+      ? ["Content-Type", "Authorization", "X-Request-ID"]
+      : ["Content-Type", "Authorization", "X-Request-ID", "ngrok-skip-browser-warning"],
     credentials: false,
   })
 );
@@ -248,6 +255,22 @@ process.on("uncaughtException", (err) => {
 });
 (async () => {
   try {
+    // Try to initialize firebase-admin if FIREBASE_SERVICE_ACCOUNT is available
+    if (process.env.FIREBASE_SERVICE_ACCOUNT) {
+      try {
+        const admin = require("firebase-admin");
+        const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
+        admin.initializeApp({
+          credential: admin.credential.cert(serviceAccount)
+        });
+        console.log("✅ Firebase Admin initialized successfully.");
+      } catch (fcmErr) {
+        console.error("❌ Failed to initialize Firebase Admin:", fcmErr.message);
+      }
+    } else {
+      console.log("⚠️ FIREBASE_SERVICE_ACCOUNT not set. Push notifications will not be sent.");
+    }
+
     await connectWithRetry(process.env.MONGO_URI);
   } catch (err) {
     console.error('[Startup] MongoDB connection failed after all retries.');

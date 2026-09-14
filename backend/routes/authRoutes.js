@@ -12,6 +12,16 @@ const { updateProfile, safeUser: controllerSafeUser } = require("../controllers/
 const upload = require("../config/multer");
 const { getFileUrl } = require("../config/fileHelpers");
 const Subscription = require("../models/Subscription");
+const Project = require("../models/Project");
+const ProjectConfig = require("../models/ProjectConfig");
+const Transaction = require("../models/Transaction");
+const ExpenseEntry = require("../models/ExpenseEntry");
+const Task = require("../models/Task");
+const Inventory = require("../models/Inventory");
+const ProjectUpdate = require("../models/ProjectUpdate");
+const Worker = require("../models/Worker");
+const EsignRequest = require("../models/EsignRequest");
+const Notification = require("../models/Notification");
 const bcrypt = require("bcryptjs");
 const loginFailures = new Map();
 const registrationOTPs = new Map();
@@ -102,6 +112,53 @@ const normalizeRole = (role, fallback = "Mason") => {
   return clean.length > 0 ? clean : fallback;
 };
 const getUserId = (req) => req.user?._id || req.user?.id;
+
+async function adminDeleteAccount(adminId) {
+  try {
+    console.log(`[DeleteAccount] Starting cascade delete for admin ${adminId}`);
+    const childUsers = await User.find({ createdBy: adminId }).select("_id");
+    const userIds = [adminId, ...childUsers.map((u) => u._id)];
+
+    const projects = await Project.find({ createdBy: adminId }).select("_id");
+    const projectIds = projects.map((p) => p._id);
+
+    const txs = await Transaction.find({ createdBy: adminId }, "_id eSignToken");
+    const txIds = txs.map((t) => t._id);
+    const signTokens = txs.map((t) => t.eSignToken).filter(Boolean);
+
+    await EsignRequest.deleteMany({
+      $or: [
+        { token: { $in: signTokens } },
+        { "meta.transactionId": { $in: txIds } },
+      ],
+    });
+    await Notification.deleteMany({ user: { $in: userIds } });
+    await Subscription.deleteMany({ userId: { $in: userIds } });
+    await Transaction.deleteMany({
+      $or: [{ createdBy: { $in: userIds } }, { project: { $in: projectIds } }],
+    });
+    await ExpenseEntry.deleteMany({
+      $or: [{ createdBy: { $in: userIds } }, { project: { $in: projectIds } }],
+    });
+    await Task.deleteMany({
+      $or: [{ createdBy: { $in: userIds } }, { project: { $in: projectIds } }],
+    });
+    await Inventory.deleteMany({
+      $or: [{ createdBy: { $in: userIds } }, { project: { $in: projectIds } }],
+    });
+    await ProjectUpdate.deleteMany({
+      $or: [{ createdBy: { $in: userIds } }, { project: { $in: projectIds } }],
+    });
+    await Worker.deleteMany({ createdBy: { $in: userIds } });
+    await ProjectConfig.deleteMany({ project: { $in: projectIds } });
+    await Project.deleteMany({ createdBy: adminId });
+    await User.deleteMany({ _id: { $in: userIds } });
+    console.log(`[DeleteAccount] Successfully cascade deleted admin ${adminId} and all child data.`);
+  } catch (err) {
+    console.error(`[DeleteAccount] Cascade delete failed for admin ${adminId}:`, err);
+    throw err;
+  }
+}
 const ADMIN_PERMISSIONS = [
   "create_project",
   "edit_project",
@@ -627,10 +684,16 @@ router.delete("/account", protect, async (req, res) => {
   try {
     const user = await User.findById(getUserId(req));
     if (!user) return res.status(404).json({ message: "User not found" });
-    user.isActive = false;
-    await user.save();
-    return res.json({ message: "Account has been deactivated permanently." });
+    if ((user.role || "").toLowerCase() !== "admin") {
+      return res.status(403).json({ message: "Only administrators can delete accounts." });
+    }
+    
+    await adminDeleteAccount(user._id);
+    return res.json({
+      message: "Account and all associated data have been permanently deleted.",
+    });
   } catch (err) {
+    console.error("Delete account error:", err);
     return res.status(500).json({ message: "Failed to delete account" });
   }
 });

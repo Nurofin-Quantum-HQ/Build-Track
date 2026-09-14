@@ -1,6 +1,6 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { colors } from '../styles/designTokens';
+import { colors, radius } from '../styles/designTokens';
 import { Card, Badge, Button, EmptyState } from '../components/ui';
 import {
   Bell, CheckCheck, Trash2, ArrowLeft, CheckCircle, IndianRupee,
@@ -8,6 +8,7 @@ import {
   ClipboardList, ArrowRight, Clock
 } from 'lucide-react';
 import useNotificationStore from '../stores/notificationStore';
+import { notificationAPI } from '../api';
 
 function formatTimeAgo(dateStr) {
   if (!dateStr) return 'Just now';
@@ -30,6 +31,7 @@ const typeIcons = {
   inventory: <Package size={18} />,
   project: <Building2 size={18} />,
   worker: <User size={18} />,
+  task: <Shield size={18} />,
   system: <Bell size={18} />,
 };
 
@@ -39,13 +41,38 @@ const typeColors = {
   inventory: { bg: '#FFF7ED', color: '#F97316' },
   project: { bg: '#FFF7F0', color: '#EA580C' },
   worker: { bg: '#FFF5F0', color: '#FB923C' },
+  task: { bg: '#EEF2FF', color: '#4F46E5' },
   system: { bg: '#F1F5F9', color: '#64748B' },
 };
+
+function targetRouteFor(n) {
+  switch (n.relatedModel) {
+    case "Transaction": return "/transaction";
+    case "Inventory": return "/inventory";
+    case "Task": return "/assign-task";
+    case "Project": return "/projects";
+    case "Payment": return "/subscription";
+    default: return null;
+  }
+}
+
+function SkeletonRow() {
+  return (
+    <Card padding="16px 20px" style={{ opacity: 0.7 }}>
+      <div style={{ display: 'flex', gap: 14, alignItems: 'flex-start' }}>
+        <div style={{ width: 38, height: 38, borderRadius: 10, background: '#F1F5F9', flexShrink: 0 }} />
+        <div style={{ flex: 1 }}>
+          <div style={{ width: '45%', height: 14, background: '#E5E7EB', borderRadius: 6, marginBottom: 8 }} />
+          <div style={{ width: '80%', height: 12, background: '#F1F5F9', borderRadius: 6 }} />
+        </div>
+      </div>
+    </Card>
+  );
+}
 
 export default function NotificationsPage() {
   const navigate = useNavigate();
   const [filter, setFilter] = useState('all');
-
   const {
     systemNotifications,
     inventoryAlerts,
@@ -533,7 +560,9 @@ export default function NotificationsPage() {
                     key={nId}
                     onClick={() => {
                       if (!n.read) markAsRead(nId);
-                      if (n.type === 'approval') navigate('/approvals');
+                      const target = targetRouteFor(n);
+                      if (target) navigate(target);
+                      else if (n.type === 'approval') navigate('/approvals');
                       else if (n.type === 'inventory') navigate('/inventory');
                       else if (n.type === 'payment') navigate('/transaction');
                     }}

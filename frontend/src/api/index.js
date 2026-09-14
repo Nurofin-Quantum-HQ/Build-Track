@@ -111,7 +111,10 @@ export const dashboardAPI = {
 };
 
 export const notificationAPI = {
-  getAll: () => api.get("/notifications"),
+  getAll: (params) => api.get("/notifications", { params }),
+  getUnreadCount: () => api.get("/notifications/unread-count"),
+  getPreferences: () => api.get("/notifications/preferences"),
+  updatePreferences: (preferences) => api.put("/notifications/preferences", { preferences }),
   markAsRead: (id) => api.put(`/notifications/${id}/read`),
   markAllAsRead: () => api.put("/notifications/read-all"),
   clearAll: () => api.delete("/notifications/all"),
@@ -138,7 +141,7 @@ export const taskAPI = {
 
 export const subscriptionAPI = {
   getStatus:  ()      => api.get("/subscriptions/status"),
-  initiate:   (data)  => api.post("/subscriptions/initiate", data),
+  initiate:   (data)  => api.post("/subscriptions/initiate", data),  // data: { plan, phone?, savePhone? }
   getUserSub: ()      => api.get("/users/subscription"),
   updateUserSub: (d)  => api.put("/users/subscription", d),
 };

@@ -1,21 +1,24 @@
 import { useState, useEffect } from "react";
-import { Outlet, useNavigate } from "react-router-dom";
+import { Outlet, useNavigate, useLocation } from "react-router-dom";
 import Sidebar from "../components/Sidebar";
 import AppTour from "../components/AppTour";
 import { Bell, Settings } from "lucide-react";
 import { colors, typography } from "../styles/designTokens";
 import nurofinLogo from "../assets/nurofin-black.svg";
 import useNotificationStore from "../stores/notificationStore";
+import { notificationAPI } from "../api";
 
 export default function DashboardLayout() {
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [unreadCount, setUnreadCount] = useState(0);
   const navigate = useNavigate();
+  const location = useLocation();
   const { fetchAll, totalAlertCount } = useNotificationStore();
 
   useEffect(() => {
     fetchAll();
-  }, [fetchAll]);
+  }, [fetchAll, location.pathname]);
 
   useEffect(() => {
     const onResize = () => {
@@ -26,6 +29,23 @@ export default function DashboardLayout() {
     window.addEventListener("resize", onResize);
     return () => window.removeEventListener("resize", onResize);
   }, []);
+
+  useEffect(() => {
+    let active = true;
+    const fetchUnread = () => {
+      notificationAPI.getUnreadCount()
+        .then(res => {
+          if (active) setUnreadCount(res.data?.unreadCount || 0);
+        })
+        .catch(() => {});
+    };
+    fetchUnread();
+    const interval = setInterval(fetchUnread, 60000);
+    return () => {
+      active = false;
+      clearInterval(interval);
+    };
+  }, [location.pathname]);
 
   return (
     <div style={{ display: "flex", height: "100vh", overflow: "hidden", background: colors.bg }}>
@@ -118,7 +138,7 @@ export default function DashboardLayout() {
               style={{ position: "relative" }}
             >
               <Bell size={20} />
-              {totalAlertCount > 0 && (
+              {Math.max(totalAlertCount || 0, unreadCount || 0) > 0 && (
                 <span
                   style={{
                     position: "absolute",
@@ -140,7 +160,7 @@ export default function DashboardLayout() {
                     pointerEvents: "none",
                   }}
                 >
-                  {totalAlertCount > 99 ? "99+" : totalAlertCount}
+                  {Math.max(totalAlertCount || 0, unreadCount || 0) > 99 ? "99+" : Math.max(totalAlertCount || 0, unreadCount || 0)}
                 </span>
               )}
             </button>

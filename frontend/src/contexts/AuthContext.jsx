@@ -39,6 +39,14 @@ export function AuthProvider({ children }) {
 
           setUser(userData);
           localStorage.setItem('bt_user', JSON.stringify(userData));
+
+          // Try to request Firebase token after successful login
+          try {
+            const { requestFirebaseToken } = await import('../api/firebaseConfig');
+            await requestFirebaseToken();
+          } catch (e) {
+            console.warn("Could not load/request firebase token", e);
+          }
         })
         .catch(() => {
           localStorage.removeItem('bt_token');
@@ -83,6 +91,15 @@ export function AuthProvider({ children }) {
     setUser(u);
     setLoading(false);
     window.dispatchEvent(new Event('userUpdated'));
+
+    // Try to request Firebase token after successful login
+    try {
+      const { requestFirebaseToken } = await import('../api/firebaseConfig');
+      await requestFirebaseToken();
+    } catch (e) {
+      console.warn("Could not load/request firebase token", e);
+    }
+
     return u;
   }, []);
 
@@ -98,6 +115,15 @@ export function AuthProvider({ children }) {
     setUser(u);
     setLoading(false);
     window.dispatchEvent(new Event('userUpdated'));
+
+    // Try to request Firebase token after successful register
+    try {
+      const { requestFirebaseToken } = await import('../api/firebaseConfig');
+      await requestFirebaseToken();
+    } catch (e) {
+      console.warn("Could not load/request firebase token", e);
+    }
+
     return u;
   }, []);
 
