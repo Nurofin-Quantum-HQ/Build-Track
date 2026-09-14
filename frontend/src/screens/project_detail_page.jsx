@@ -10,7 +10,7 @@ import CsvImportExportCard from "../components/CsvImportExportCard";
 import ModuleTour from "../components/ModuleTour";
 import {
   ChevronDown, ArrowLeft, Building2, MapPin, Calendar, User, Phone,
-  DollarSign, Target, ClipboardCheck, Package, TrendingUp, PieChart,
+  IndianRupee, Target, ClipboardCheck, Package, TrendingUp, PieChart,
   Check, X, Plus, Settings, BarChart3, CreditCard, Hash, Layers, Users, FileText, HelpCircle
 } from "lucide-react";
 
@@ -266,9 +266,9 @@ export default function ProjectDetailPage() {
           <h3 style={{ fontSize: 14, fontWeight: 700, color: "#111827", margin: "0 0 14px" }}>Financial Summary</h3>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
             {[
-              { icon: <DollarSign size={14} />, label: "Total Budget", val: fmtINR(budget), color: "#F97316" },
+              { icon: <IndianRupee size={14} />, label: "Total Budget", val: fmtINR(budget), color: "#F97316" },
               { icon: <TrendingUp size={14} />, label: "Spent", val: fmtINR(spent), color: spent > budget ? "#EF4444" : "#111827" },
-              { icon: <DollarSign size={14} />, label: "Income", val: fmtINR(income), color: "#22C55E" },
+              { icon: <IndianRupee size={14} />, label: "Income", val: fmtINR(income), color: "#22C55E" },
               { icon: <Target size={14} />, label: "Remaining", val: fmtINR(Math.max(budget - spent, 0)), color: budget - spent >= 0 ? "#22C55E" : "#EF4444" },
             ].map((item, i) => (
               <div key={i} style={{ background: "#F8FAFC", borderRadius: 8, padding: "12px 14px", display: "flex", alignItems: "center", gap: 10 }}>
@@ -314,7 +314,7 @@ export default function ProjectDetailPage() {
               return (
                 <div key={t._id || i} style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 0", borderBottom: "1px solid #F8FAFC" }}>
                   <div style={{ width: 28, height: 28, borderRadius: 6, background: ts.bg, display: "flex", alignItems: "center", justifyContent: "center", color: ts.color, flexShrink: 0 }}>
-                    <DollarSign size={12} />
+                    <IndianRupee size={12} />
                   </div>
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ fontSize: 13, fontWeight: 600, color: "#111827" }}>{t.title || t.type}</div>
@@ -435,9 +435,32 @@ export default function ProjectDetailPage() {
       <ProjectMemberModal isOpen={isMemberModalOpen} onClose={() => setIsMemberModalOpen(false)} project={project} onUpdateMembers={handleUpdateMembers} />
 
       <div className="tour-project-header" style={{ background: "#fff", borderBottom: "1px solid #E5E7EB", padding: "14px 24px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexShrink: 0 }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          <button onClick={() => navigate(-1)} style={{ border: "none", background: "#F1F5F9", cursor: "pointer", width: 32, height: 32, borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", color: "#475569" }}>
-            <ArrowLeft size={14} />
+        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+          <button
+            onClick={() => navigate("/projects")}
+            title="Back to Projects"
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: 6,
+              padding: "7px 14px",
+              background: "#F8FAFC",
+              border: "1px solid #E2E8F0",
+              borderRadius: 8,
+              fontSize: 13,
+              fontWeight: 600,
+              color: "#334155",
+              cursor: "pointer",
+              transition: "all 0.15s ease",
+              fontFamily: "inherit",
+              flexShrink: 0,
+              boxShadow: "0 1px 2px rgba(0,0,0,0.04)"
+            }}
+            onMouseEnter={e => { e.currentTarget.style.background = "#F1F5F9"; e.currentTarget.style.color = "#0F172A"; }}
+            onMouseLeave={e => { e.currentTarget.style.background = "#F8FAFC"; e.currentTarget.style.color = "#334155"; }}
+          >
+            <ArrowLeft size={16} />
+            <span>Back</span>
           </button>
           <div>
             <h1 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: "#111827", letterSpacing: "-0.03em" }}>{p.projectName || "Project"}</h1>
@@ -480,7 +503,7 @@ export default function ProjectDetailPage() {
 function CatRow({ label, amount, color }) {
   return (
     <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-      <DollarSign size={12} color={color} />
+      <IndianRupee size={12} color={color} />
       <span style={{ flex: 1, fontSize: 13, color: "#475569" }}>{label}</span>
       <span style={{ fontSize: 13, fontWeight: 700, color }}>{fmtINR(amount)}</span>
     </div>

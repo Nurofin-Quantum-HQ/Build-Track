@@ -6,7 +6,7 @@ import { MetricCard, CategoryBudgetBar } from "../components/MetricCards";
 import { Badge, Button, Card } from "../components/ui";
 import {
   Search, Download, FileText, ChevronDown, Calendar, Filter, RefreshCw,
-  BarChart3, Layers, DollarSign, Users, TrendingUp, Sparkles, HelpCircle
+  BarChart3, Layers, Wrench, Users, TrendingUp, Sparkles, HelpCircle
 } from "lucide-react";
 import ModuleTour from "../components/ModuleTour";
 
@@ -261,7 +261,7 @@ export default function ReportsPage() {
           <MetricCard icon={<BarChart3 size={16} />} label="Total Cost" value={stats.total} budget={projects.find(p => (p._id || p.id) === selectedProject)?.budget?.["total"] || projects.find(p => (p._id || p.id) === selectedProject)?.totalBudget || 0} color="#F97316" />
           <MetricCard icon={<Layers size={16} />} label="Material" value={stats.material} budget={projects.find(p => (p._id || p.id) === selectedProject)?.budgetMaterial || 0} color="#F97316" />
           <MetricCard icon={<Users size={16} />} label="Labour" value={stats.labour} budget={projects.find(p => (p._id || p.id) === selectedProject)?.budgetLabour || 0} color="#EA580C" />
-          <MetricCard icon={<DollarSign size={16} />} label="Equipment" value={stats.equipment} budget={projects.find(p => (p._id || p.id) === selectedProject)?.budgetEquipment || 0} color="#06B6D4" />
+          <MetricCard icon={<Wrench size={16} />} label="Equipment" value={stats.equipment} budget={projects.find(p => (p._id || p.id) === selectedProject)?.budgetEquipment || 0} color="#06B6D4" />
         </div>
 
         <div className="tour-charts" style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1.5fr 1fr", gap: 14, marginBottom: 16 }}>

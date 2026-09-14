@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { NavLink } from "react-router-dom";
+import { NavLink, useLocation } from "react-router-dom";
 import { navItems, adminNavItems } from "../navItems";
 import { resolveImageUrl } from "../utils/imageUrl";
 import { LogOut, HelpCircle } from "lucide-react";
@@ -7,6 +7,7 @@ import { colors, gradients, radius, typography } from "../styles/designTokens";
 import { useAuth } from "../contexts/AuthContext";
 import { preloadRoute } from "../App";
 import perfLogger from "../utils/performanceLogger";
+import useNotificationStore from "../stores/notificationStore";
 
 const linkStyle = {
   display: "flex",
@@ -21,8 +22,10 @@ const linkStyle = {
 };
 
 export default function Sidebar() {
+  const location = useLocation();
   const { user: authUser, logout } = useAuth();
   const [user, setUser] = useState(authUser);
+  const totalAlertCount = useNotificationStore((state) => state.totalAlertCount);
 
   useEffect(() => {
     setUser(authUser);
@@ -113,20 +116,55 @@ export default function Sidebar() {
             onMouseEnter={() => preloadRoute(item.path)}
             onPointerDown={() => preloadRoute(item.path)}
             onClick={() => perfLogger.startRoute(item.path)}
-            style={({ isActive }) => ({
-              ...linkStyle,
-              color: isActive ? "#FFFFFF" : colors.textSecondary,
-              background: isActive ? gradients.primaryGradient : "transparent",
-              boxShadow: isActive ? "0 8px 16px -4px rgba(249, 115, 22, 0.4)" : "none",
-              fontWeight: isActive ? 600 : 500,
-            })}
+            style={({ isActive }) => {
+              const active = isActive || (item.path === "/projects" && (
+                location.pathname.startsWith("/projects") ||
+                location.pathname === "/managesite" ||
+                location.pathname === "/newproject" ||
+                location.pathname.startsWith("/project-detail") ||
+                location.pathname.startsWith("/project-report")
+              ));
+              return {
+                ...linkStyle,
+                color: active ? "#FFFFFF" : colors.textSecondary,
+                background: active ? gradients.primaryGradient : "transparent",
+                boxShadow: active ? "0 8px 16px -4px rgba(249, 115, 22, 0.4)" : "none",
+                fontWeight: active ? 600 : 500,
+              };
+            }}
           >
-            {({ isActive }) => (
-              <>
-                <item.icon size={18} color={isActive ? "#FFFFFF" : colors.textSecondary} />
-                <span>{item.label}</span>
-              </>
-            )}
+            {({ isActive }) => {
+              const active = isActive || (item.path === "/projects" && (
+                location.pathname.startsWith("/projects") ||
+                location.pathname === "/managesite" ||
+                location.pathname === "/newproject" ||
+                location.pathname.startsWith("/project-detail") ||
+                location.pathname.startsWith("/project-report")
+              ));
+              return (
+                <>
+                  <item.icon size={18} color={active ? "#FFFFFF" : colors.textSecondary} />
+                  <span>{item.label}</span>
+                  {item.label === "Notifications" && totalAlertCount > 0 && (
+                    <span
+                      style={{
+                        marginLeft: "auto",
+                        background: active ? "rgba(255, 255, 255, 0.3)" : "#EF4444",
+                        color: "#FFFFFF",
+                        fontSize: 10,
+                        fontWeight: 700,
+                        padding: "1px 6px",
+                        borderRadius: 10,
+                        minWidth: 16,
+                        textAlign: "center",
+                      }}
+                    >
+                      {totalAlertCount > 99 ? "99+" : totalAlertCount}
+                    </span>
+                  )}
+                </>
+              );
+            }}
           </NavLink>
         )})}
 

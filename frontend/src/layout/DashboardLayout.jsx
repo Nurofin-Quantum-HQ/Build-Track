@@ -5,11 +5,17 @@ import AppTour from "../components/AppTour";
 import { Bell, Settings } from "lucide-react";
 import { colors, typography } from "../styles/designTokens";
 import nurofinLogo from "../assets/nurofin-black.svg";
+import useNotificationStore from "../stores/notificationStore";
 
 export default function DashboardLayout() {
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const navigate = useNavigate();
+  const { fetchAll, totalAlertCount } = useNotificationStore();
+
+  useEffect(() => {
+    fetchAll();
+  }, [fetchAll]);
 
   useEffect(() => {
     const onResize = () => {
@@ -109,8 +115,34 @@ export default function DashboardLayout() {
               onClick={() => navigate("/notifications")}
               className="premium-topbar-btn"
               aria-label="Notifications"
+              style={{ position: "relative" }}
             >
               <Bell size={20} />
+              {totalAlertCount > 0 && (
+                <span
+                  style={{
+                    position: "absolute",
+                    top: -3,
+                    right: -3,
+                    minWidth: 17,
+                    height: 17,
+                    borderRadius: 9,
+                    background: "#EF4444",
+                    color: "#FFFFFF",
+                    fontSize: 10,
+                    fontWeight: 700,
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    padding: "0 3px",
+                    border: "2px solid #FFFFFF",
+                    boxShadow: "0 2px 4px rgba(239, 68, 68, 0.4)",
+                    pointerEvents: "none",
+                  }}
+                >
+                  {totalAlertCount > 99 ? "99+" : totalAlertCount}
+                </span>
+              )}
             </button>
             <button
               onClick={() => navigate("/settings")}
