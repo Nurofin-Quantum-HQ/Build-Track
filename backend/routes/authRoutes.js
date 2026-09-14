@@ -282,12 +282,12 @@ router.post("/verify-registration-otp", (req, res) => {
 
 router.post("/register", async (req, res) => {
   try {
-    const { name, email, password, projectId } = req.body;
+    const { name, email, password, projectId, phone } = req.body;
     console.log(`[Auth] Register request received for email: ${email}`);
-    if (!name || !email || !password) {
+    if (!name || !email || !password || !phone) {
       return res
         .status(400)
-        .json({ success: false, message: "All fields required" });
+        .json({ success: false, message: "All fields including phone number are required" });
     }
     if (String(password).length < 8) {
       return res.status(400).json({
@@ -315,6 +315,7 @@ router.post("/register", async (req, res) => {
       name: cleanName,
       email: cleanEmail,
       password,
+      phone: String(phone).trim(),
       role: serverAssignedRole,
       permissions: serverAssignedPermissions,
       projectIds,
