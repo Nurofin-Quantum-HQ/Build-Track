@@ -15,7 +15,8 @@ import {
   Upload,
   X,
   Type,
-  Image as ImageIcon
+  Image as ImageIcon,
+  Phone
 } from "lucide-react";
 import LightPremiumInput from "../components/ui/LightPremiumInput";
 import nurofinLogo from "../assets/nurofin-black.svg";
@@ -48,6 +49,7 @@ export default function SignUpPage() {
   const [companyFontStyle, setCompanyFontStyle] = useState("Inter");
   const [companyLogo, setCompanyLogo] = useState(null);
   const [logoPreview, setLogoPreview] = useState(null);
+  const [phone, setPhone] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
@@ -143,6 +145,7 @@ export default function SignUpPage() {
   const validate = () => {
     const e = {};
     if (!fullName.trim())                           e.name = "Full name is required.";
+    if (!phone.trim())                              e.phone = "Phone number is required.";
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) e.email = "Enter a valid company email.";
     if (!companyName.trim())                        e.companyName = "Company name is required.";
     if (password.length < 6)                        e.password = "Min 6 characters required.";
@@ -174,6 +177,7 @@ export default function SignUpPage() {
         companyFontStyle: companyFontStyle || "Inter",
         companyLogo: companyLogo || null,
         password,
+        phone: phone.trim(),
       });
       localStorage.setItem("bt_token", data.token);
       localStorage.setItem("bt_user", JSON.stringify(data.user));
@@ -403,6 +407,20 @@ export default function SignUpPage() {
                 }}
                 error={errors.name}
                 autoComplete="name"
+              />
+
+              <LightPremiumInput
+                type="tel"
+                label="Phone Number"
+                icon={Phone}
+                value={phone}
+                onChange={e => {
+                  setPhone(e.target.value);
+                  setErrors(p => ({...p, phone: ""}));
+                  setServerErr("");
+                }}
+                error={errors.phone}
+                autoComplete="tel"
               />
 
               <div style={{ display: "flex", alignItems: "flex-start", gap: 12 }}>
