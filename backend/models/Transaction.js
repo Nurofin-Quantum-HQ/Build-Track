@@ -184,6 +184,7 @@ const transactionSchema = new mongoose.Schema(
         "Bank Transfer",
         "UPI",
         "Cheque",
+        "Card",
         "",
       ],
       default: "Cash",
