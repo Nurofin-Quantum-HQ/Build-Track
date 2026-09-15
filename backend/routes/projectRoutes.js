@@ -724,8 +724,6 @@ router.put("/:id", protect, async (req, res) => {
       if (existing?.photo) await deleteFile(existing.photo);
       updateData.photo = null;
     }
-<<<<<<< HEAD
-    
     let currentDocs = existing.documents || [];
     if (body.retainedDocuments !== undefined) {
       currentDocs = safeParse(body.retainedDocuments) || [];
@@ -737,10 +735,6 @@ router.put("/:id", protect, async (req, res) => {
     }
     const project = await Project.findOneAndUpdate(
       canManageProjectFilter(req, req.params.id),
-=======
-    const project = await Project.findByIdAndUpdate(
-      existing._id,
->>>>>>> a95f4d8c5ddf7abb28103f28e43c8a4d10f474d1
       { $set: updateData },
       { new: true, runValidators: true }
     );
