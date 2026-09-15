@@ -458,6 +458,15 @@ export default function ManualEntryPage() {
       setErrMsg("Amount must be greater than 0.");
       return false;
     }
+    const qtyVal = parseFloat(values.quantity);
+    if (isNaN(qtyVal) || qtyVal <= 0) {
+      setErrMsg("Quantity must be greater than 0.");
+      return false;
+    }
+    if (qtyVal > 10000000) {
+      setErrMsg("Quantity is too large. Please enter a realistic quantity (max 10,000,000).");
+      return false;
+    }
     if (paymentResult && paymentResult.requestEsign && !paymentResult.clientEmail) {
       setErrMsg("Please enter the client email for E-Signature.");
       return false;

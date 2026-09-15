@@ -12,6 +12,7 @@ import {
   X,
 } from "lucide-react";
 import { transactionAPI, esignAPI } from "../api";
+import useTransactionStore from "../stores/transactionStore";
 
 const primaryBlue = "#F97316";
 
@@ -145,8 +146,16 @@ export default function RecordPaymentSheet({ open, entry, projects, onClose, onS
       setEsignReqId(rId);
       setEsignStatusText("Waiting for client to sign...");
 
+      let pollCount = 0;
+      const MAX_POLLS = 60; // 3 minutes timeout (60 * 3s)
       const poll = async () => {
         if (!esignPollingRef.current) return;
+        pollCount++;
+        if (pollCount > MAX_POLLS) {
+          setEsignPolling(false);
+          setEsignStatusText("Signing timed out. You can retry or complete payment manually.");
+          return;
+        }
         try {
           const statusRes = await esignAPI.checkStatus(rId);
           if (statusRes.data?.status === 'signed') {
@@ -302,6 +311,11 @@ export default function RecordPaymentSheet({ open, entry, projects, onClose, onS
       }
 
       await transactionAPI.update(entryId, payload);
+      try {
+        useTransactionStore.getState().fetchTransactions({}, true);
+      } catch (e) {
+        console.error("Failed to auto-refresh transactions store:", e);
+      }
 
       const toastMsg =
         amt > 0
