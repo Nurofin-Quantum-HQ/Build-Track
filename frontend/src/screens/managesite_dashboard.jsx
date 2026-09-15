@@ -9,10 +9,10 @@ import { Card, Badge, Button } from "../components/ui";
 import CsvImportExportCard from "../components/CsvImportExportCard";
 import useTransactionStore from "../stores/transactionStore";
 import {
-  ChevronDown, ChevronRight, Plus, FileDown, FileUp, Pencil, X, Check, ArrowRight,
+  ChevronDown, ChevronRight, Plus, FileDown, FileUp, Pencil, X, Check, ArrowRight, ArrowLeft,
   Building2, MapPin, Calendar, User, Hash, Phone, Code, Wrench,
   Home, Layers, Bed, Bath, Settings, Zap, Flame, ChefHat, Sun,
-  Clock, DollarSign, CreditCard, PiggyBank, Target, ClipboardCheck,
+  Clock, IndianRupee, CreditCard, PiggyBank, Target, ClipboardCheck,
   List, Camera, FileText, Send, Trash2, Info, AlertCircle, Sparkles,
 } from "lucide-react";
 
@@ -416,7 +416,7 @@ export default function ManageSitePage() {
   };
 
   const renderFinancial = () => (
-    <CollapsibleCard title={SECTIONS.financial} icon={<DollarSign size={16} />} defaultOpen>
+    <CollapsibleCard title={SECTIONS.financial} icon={<IndianRupee size={16} />} defaultOpen>
       <div style={{ background: "#F8FAFC", borderRadius: 8, border: "1px solid #E5E7EB", padding: "12px 14px", marginBottom: 12 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
           <div style={{ width: 36, height: 36, borderRadius: 8, background: "#FFF5F0", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
@@ -716,7 +716,7 @@ export default function ManageSitePage() {
                       flexShrink: 0,
                     }}
                   >
-                    <DollarSign size={18} color={tc.color} />
+                    <IndianRupee size={18} color={tc.color} />
                   </div>
 
                   <div style={{ flex: 1, minWidth: 0 }}>
@@ -801,10 +801,37 @@ export default function ManageSitePage() {
       {confirmDlg && <ConfirmDialog message={confirmDlg.message} danger={confirmDlg.danger} confirmLabel={confirmDlg.confirmLabel} onConfirm={confirmDlg.onConfirm} onCancel={() => setConfirmDlg(null)} />}
 
       <div style={{ background: "#fff", borderBottom: "1px solid #E5E7EB", padding: "14px 24px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexShrink: 0 }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 14 }}>
-          <span onClick={() => navigate("/projects")} style={{ color: "#F97316", cursor: "pointer", fontWeight: 500, fontSize: 13 }}>Projects</span>
-          <ArrowRight size={12} color="#94A3B8" />
-          <span style={{ color: "#111827", fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: 300, fontSize: 13 }}>{projectName}</span>
+        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+          <button
+            onClick={() => navigate("/projects")}
+            title="Back to Projects"
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: 6,
+              padding: "7px 14px",
+              background: "#F8FAFC",
+              border: "1px solid #E2E8F0",
+              borderRadius: 8,
+              fontSize: 13,
+              fontWeight: 600,
+              color: "#334155",
+              cursor: "pointer",
+              transition: "all 0.15s ease",
+              fontFamily: "inherit",
+              boxShadow: "0 1px 2px rgba(0,0,0,0.04)"
+            }}
+            onMouseEnter={e => { e.currentTarget.style.background = "#F1F5F9"; e.currentTarget.style.color = "#0F172A"; }}
+            onMouseLeave={e => { e.currentTarget.style.background = "#F8FAFC"; e.currentTarget.style.color = "#334155"; }}
+          >
+            <ArrowLeft size={16} />
+            <span>Back</span>
+          </button>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 14 }}>
+            <span onClick={() => navigate("/projects")} style={{ color: "#F97316", cursor: "pointer", fontWeight: 500, fontSize: 13 }}>Projects</span>
+            <ArrowRight size={12} color="#94A3B8" />
+            <span style={{ color: "#111827", fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: 300, fontSize: 13 }}>{projectName}</span>
+          </div>
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
           <button onClick={handleExportCSV} style={{ padding: "6px 12px", background: "#fff", border: "1px solid #E5E7EB", borderRadius: 8, fontSize: 12, fontWeight: 600, color: "#475569", cursor: "pointer", display: "flex", alignItems: "center", gap: 6, fontFamily: 'inherit' }}>
@@ -892,7 +919,7 @@ export default function ManageSitePage() {
           <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr 1fr" : "repeat(4, 1fr)", gap: 10 }}>
             <ActionBtn icon={<FileText size={18} />} label="Add Entry" onClick={() => navigate("/add-entry", { state: { project: p } })} borderColor="#EA580C" />
             <ActionBtn icon={<MicIcon />} label="Voice Entry" onClick={() => navigate("/voice", { state: { project: p } })} borderColor="#EA580C" />
-            <ActionBtn icon={<BarChartIcon />} label="View Reports" onClick={() => navigate("/reports/:id", { state: { project: p } })} borderColor="#FB923C" />
+            <ActionBtn icon={<BarChartIcon />} label="View Reports" onClick={() => navigate("/project-report/" + projectId, { state: { project: p } })} borderColor="#FB923C" />
             <ActionBtn icon={<Building2 size={18} />} label="Full Details" onClick={() => navigate("/project-detail/" + projectId, { state: { project: p } })} borderColor="#22C55E" />
           </div>
         </CollapsibleCard>
@@ -928,7 +955,7 @@ function CatRow({ label, amount, color }) {
   return (
     <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
       <div style={{ width: 28, height: 28, borderRadius: 6, background: `${color}14`, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-        <DollarSign size={12} color={color} />
+        <IndianRupee size={12} color={color} />
       </div>
       <span style={{ flex: 1, fontSize: 13, color: "#475569" }}>{label}</span>
       <span style={{ fontSize: 13, fontWeight: 700, color }}>{fmtINR(amount)}</span>

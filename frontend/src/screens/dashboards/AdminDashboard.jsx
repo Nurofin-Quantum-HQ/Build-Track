@@ -7,7 +7,7 @@ import perfLogger from '../../utils/performanceLogger';
 import {
   Clock,
   TrendingUp,
-  DollarSign,
+  IndianRupee,
   Wallet,
   PlusCircle,
   Mic,
@@ -365,7 +365,7 @@ export default function AdminDashboard() {
       <div className="tour-kpis" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 24 }}>
         {[
           { label: 'Total Cost', value: formatCurrency(totalCost), subtitle: budget > 0 ? `${((totalCost / budget) * 100).toFixed(0)}% Used` : '—', icon: Wallet, color: '#F97316', alert: budget > 0 && totalCost > budget * 0.9 },
-          { label: 'Budget', value: formatCurrency(budget), subtitle: `Remaining: ${formatCurrency(Math.max(budget - totalCost, 0))}`, icon: DollarSign, color: '#EA580C' },
+          { label: 'Budget', value: formatCurrency(budget), subtitle: `Remaining: ${formatCurrency(Math.max(budget - totalCost, 0))}`, icon: IndianRupee, color: '#EA580C' },
           { label: lang === 'kn' ? 'Ottu Aadaaya' : lang === 'ta' ? 'Motha Varuvai' : 'Total Revenue', value: formatCurrency(totalRevenue), subtitle: lang === 'kn' ? 'Nagadu O?aharivu' : lang === 'ta' ? 'Pana Varavu' : 'Cash Inflow', icon: ArrowUpRight, color: '#22C55E' },
           { label: 'Net Cash Flow', value: formatCurrency(Math.abs(netCashflow)), subtitle: netCashflow >= 0 ? 'Net Profit' : 'Net Loss', icon: ArrowDownRight, color: netCashflow >= 0 ? '#22C55E' : '#EF4444', alert: netCashflow < 0 },
         ].map((kpi) => {
@@ -521,7 +521,7 @@ export default function AdminDashboard() {
                   background: type.bg, display: 'flex',
                   alignItems: 'center', justifyContent: 'center', flexShrink: 0,
                 }}>
-                  <DollarSign size={18} color={type.color} />
+                  <IndianRupee size={18} color={type.color} />
                 </div>
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ fontSize: 14, fontWeight: 600, color: colors.textPrimary, marginBottom: 4 }}>

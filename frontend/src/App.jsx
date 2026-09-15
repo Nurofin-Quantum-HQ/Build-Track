@@ -29,6 +29,8 @@ const ManualEntryPage  = lazy(() => import("./screens/manual_entry"));
 const InventoryPage    = lazy(() => import("./screens/inventory_page"));
 const SubscriptionPage = lazy(() => import("./screens/subscription_page"));
 const AuditLogsPage     = lazy(() => import("./screens/audit_logs_page"));
+const ProjectDetail    = lazy(() => import("./screens/project_detail_page"));
+const ProjectReport    = lazy(() => import("./screens/project_report_page"));
 
 export const routePreloaders = {
   "/": () => import("./screens/dashboard_page"),
@@ -51,6 +53,8 @@ export const routePreloaders = {
   "/notifications": () => import("./screens/notifications_page"),
   "/subscription": () => import("./screens/subscription_page"),
   "/audit-logs": () => import("./screens/audit_logs_page"),
+  "/project-detail": () => import("./screens/project_detail_page"),
+  "/project-report": () => import("./screens/project_report_page"),
 };
 
 export function preloadRoute(path) {
@@ -135,6 +139,9 @@ function AppRoutes() {
 
           <Route path="/settings"    element={<Settings />} />
           <Route path="/managesite"  element={<ManageSite />} />
+          <Route path="/project-detail/:id" element={<ProjectDetail />} />
+          <Route path="/project-report/:id" element={<ProjectReport />} />
+          <Route path="/reports/:id" element={<ProjectReport />} />
 
           <Route path="/approvals"  element={
             <RequireRole permission="approve_payments" route="/approvals">

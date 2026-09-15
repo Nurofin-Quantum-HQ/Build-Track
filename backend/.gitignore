@@ -1,0 +1,50 @@
+﻿# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# Dependencies
+node_modules/
+dist/
+dist-ssr/
+*.local
+
+# Environment variables
+.env
+.env.*
+!.env.example
+
+# Uploads (keep placeholder)
+uploads/*
+!uploads/.gitkeep
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Editor directories
+.vscode/*
+!.vscode/extensions.json
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# Scratch / debug scripts
+graphify-out/
+query_db_temp.js
+scratch_generate_api_list.js
+test_*.js
+test_*.html
+decrypt_payment_response.js
+generate_postman_values.js
+identify_gemini_key.js
+scripts/measure_context_size.js
+scripts/profile_main_endpoint.js
+scripts/profile_projects.js

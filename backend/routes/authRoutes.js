@@ -76,6 +76,9 @@ const safeUser = (user) => {
     id: user._id || user.id,
     name: user.name,
     email: user.email,
+    companyName: user.companyName || (user.createdBy && typeof user.createdBy === 'object' ? user.createdBy.companyName : '') || '',
+    companyFontStyle: user.companyFontStyle || (user.createdBy && typeof user.createdBy === 'object' ? user.createdBy.companyFontStyle : 'Inter') || 'Inter',
+    companyLogo: user.companyLogo || (user.createdBy && typeof user.createdBy === 'object' ? user.createdBy.companyLogo : null) || null,
     role: user.role || "Mason",
     permissions: Array.isArray(user.permissions) ? user.permissions : [],
     projectIds,
@@ -282,24 +285,26 @@ router.post("/verify-registration-otp", (req, res) => {
 
 router.post("/register", async (req, res) => {
   try {
-    const { name, email, password, projectId, phone } = req.body;
+    const { name, email, password, projectId, phone, companyName, companyFontStyle, companyLogo, client } = req.body;
     console.log(`[Auth] Register request received for email: ${email}`);
     if (!name || !email || !password || !phone) {
       return res
         .status(400)
-        .json({ success: false, message: "All fields including phone number are required" });
+        .json({ success: false, message: "Name, email, password, and phone number are required" });
     }
-    if (String(password).length < 8) {
+    if (String(password).length < 6) {
       return res.status(400).json({
         success: false,
-        message: "Password must be at least 8 characters",
+        message: "Password must be at least 6 characters",
       });
     }
     const cleanEmail = String(email).toLowerCase().trim();
-    if (!verifiedEmails.has(cleanEmail)) {
+    if (client !== 'mobile' && !verifiedEmails.has(cleanEmail)) {
       return res.status(400).json({ success: false, message: "Email not verified. Please verify your email first." });
     }
     const cleanName = String(name).trim();
+    const cleanCompanyName = String(companyName).trim();
+    const cleanFontStyle = companyFontStyle ? String(companyFontStyle).trim() : "Inter";
     const exists = await User.findOne({ email: cleanEmail });
     if (exists) {
       return res.status(409).json({
@@ -313,6 +318,9 @@ router.post("/register", async (req, res) => {
     const serverAssignedPermissions = ADMIN_PERMISSIONS;
     const user = await User.create({
       name: cleanName,
+      companyName: cleanCompanyName,
+      companyFontStyle: cleanFontStyle,
+      companyLogo: companyLogo || null,
       email: cleanEmail,
       password,
       phone: String(phone).trim(),
@@ -322,7 +330,7 @@ router.post("/register", async (req, res) => {
       projectId: legacyProjectId,
     });
     console.log(
-      `[Auth] Account owner registered: ${user._id} | server-assigned role=${serverAssignedRole}`
+      `[Auth] Account owner registered: ${user._id} | company="${cleanCompanyName}" | server-assigned role=${serverAssignedRole}`
     );
     
     verifiedEmails.delete(cleanEmail);
@@ -407,6 +415,9 @@ router.post("/provision", protect, authorize("Admin"), async (req, res) => {
     const user = await User.create({
       name: cleanName,
       email: cleanEmail,
+      companyName: req.user.companyName || "",
+      companyFontStyle: req.user.companyFontStyle || "Inter",
+      companyLogo: req.user.companyLogo || null,
       password: finalPassword,
       role: cleanRole,
       permissions: normalizePermissions(permissions),
@@ -522,6 +533,28 @@ router.put("/photo", protect, upload.single("photo"), async (req, res) => {
   } catch (err) {
     console.error("Photo upload error:", err);
     return res.status(500).json({ message: "Failed to upload photo" });
+  }
+});
+router.put("/company-logo", protect, upload.single("logo"), async (req, res) => {
+  try {
+    const user = await User.findById(getUserId(req));
+    if (!user) return res.status(404).json({ message: "User not found" });
+    if (req.file) {
+      user.companyLogo = getFileUrl(req.file);
+    } else if (req.body.companyLogo !== undefined) {
+      user.companyLogo = req.body.companyLogo === "delete" || req.body.companyLogo === "" || req.body.companyLogo === null ? null : String(req.body.companyLogo);
+    } else {
+      return res.status(400).json({ message: "No logo provided" });
+    }
+    await user.save();
+    return res.json({
+      message: "Company logo updated",
+      companyLogo: user.companyLogo,
+      user: safeUser(user),
+    });
+  } catch (err) {
+    console.error("Company logo upload error:", err);
+    return res.status(500).json({ message: "Failed to upload company logo" });
   }
 });
 router.get("/google", (req, res, next) => {
