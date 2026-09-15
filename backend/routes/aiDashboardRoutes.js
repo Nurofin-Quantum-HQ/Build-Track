@@ -60,15 +60,23 @@ function formatDynamicRows(rows, requestedColumns, tableType) {
 }
 router.post("/query", async (req, res) => {
   const reqId = Math.random().toString(16).slice(2, 7).toUpperCase();
-  try {
+  let timeoutTimer;
+  const timeoutPromise = new Promise((_, reject) => {
+    timeoutTimer = setTimeout(() => {
+      const err = new Error("AI taking too long");
+      err.isTimeout = true;
+      err.statusCode = 504;
+      reject(err);
+    }, 15000);
+    if (timeoutTimer.unref) timeoutTimer.unref();
+  });
+
+  const queryLogic = async () => {
     const { query } = req.body;
     if (!query || !query.trim()) {
-      return res.status(400).json({
-        success: false,
-        error: "Query is required",
-        message: "Please provide a search query.",
-        statusCode: 400
-      });
+      const err = new Error("Please provide a search query.");
+      err.statusCode = 400;
+      throw err;
     }
     const baseScope = await buildBaseScope(req);
     const projectsList = baseScope.projects.map(p => ({
@@ -86,22 +94,15 @@ router.post("/query", async (req, res) => {
     } catch (aiError) {
       if (aiError instanceof GroqAuthError || aiError.name === "GroqAuthError") {
         console.error(`[${reqId}] GroqAuthError: ${aiError.message}`);
-        return res.status(500).json({
-          success: false,
-          error: "AI Service Authentication Failed",
-          message: aiError.message,
-          developer_details: `Caught ${aiError.statusCode || 401} from Groq`,
-          statusCode: 500
-        });
+        const err = new Error(aiError.message);
+        err.statusCode = 500;
+        err.authError = true;
+        throw err;
       }
       console.error(`[${reqId}] AI Query Generation Error:`, aiError.message);
-      return res.status(500).json({
-        success: false,
-        error: "AI Query Generation Failed",
-        message: aiError.message || "The AI service returned an unexpected response. Please try again.",
-        developer_details: aiError.message,
-        statusCode: 500
-      });
+      const err = new Error(aiError.message || "The AI service returned an unexpected response. Please try again.");
+      err.statusCode = 500;
+      throw err;
     }
     const analyticsData = await executeAiQuery(
       queryPlan,
@@ -150,7 +151,7 @@ router.post("/query", async (req, res) => {
         alerts = [...alerts, ...lowAlerts];
       }
     } catch(e) {}
-    return res.json({
+    return {
       success: true,
       data: {
         summary,
@@ -171,10 +172,25 @@ router.post("/query", async (req, res) => {
         alerts,
         actions: followUps
       }
-    });
+    };
+  };
+
+  try {
+    const payload = await Promise.race([queryLogic(), timeoutPromise]);
+    clearTimeout(timeoutTimer);
+    return res.json(payload);
   } catch (error) {
+    clearTimeout(timeoutTimer);
     console.error(`[${reqId}] AI Dashboard Error:`, error.message);
-    if (error instanceof GroqAuthError || error.name === "GroqAuthError") {
+    if (error.isTimeout || error.statusCode === 504 || error.message === "AI taking too long") {
+      return res.status(504).json({
+        success: false,
+        error: "AI taking too long",
+        message: "AI taking too long",
+        statusCode: 504
+      });
+    }
+    if (error.authError || error instanceof GroqAuthError || error.name === "GroqAuthError") {
       return res.status(500).json({
         success: false,
         error: "AI Service Authentication Failed",
@@ -183,12 +199,13 @@ router.post("/query", async (req, res) => {
         statusCode: 500
       });
     }
-    return res.status(500).json({
+    const status = error.statusCode || 500;
+    return res.status(status).json({
       success: false,
-      error: "Internal Server Error",
+      error: error.message || "Internal Server Error",
       message: error.message || "An unexpected error occurred. Please try again.",
       developer_details: error.message,
-      statusCode: 500
+      statusCode: status
     });
   }
 });

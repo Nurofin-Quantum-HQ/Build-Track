@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { aiDashboardAPI } from '../api';
+import { aiDashboardAPI, aiChatAPI } from '../api';
 import { colors, radius, shadows, gradients } from '../styles/designTokens';
 import { Card, Spinner } from '../components/ui';
 import { Toast } from '../components/Toast';
@@ -88,13 +88,53 @@ export default function AiChatReportPage() {
     setResult(null);
 
     try {
-      const res = await aiDashboardAPI.query({
-        query: trimmed,
-        projectId: projectId
-      });
+      let res;
+      try {
+        res = await aiChatAPI.ask({
+          question: trimmed,
+          projectId: projectId
+        });
+      } catch (chatErr) {
+        if (
+          chatErr.response?.status === 504 ||
+          chatErr.code === 'ECONNABORTED' ||
+          chatErr.response?.data?.message === 'AI taking too long' ||
+          chatErr.response?.data?.error === 'AI taking too long'
+        ) {
+          throw chatErr;
+        }
+        res = await aiDashboardAPI.query({
+          query: trimmed,
+          projectId: projectId
+        });
+      }
 
-      const responseData = res.data?.data || {};
-      const table = responseData.table || {};
+      let responseData = res.data?.data;
+      let table = responseData?.table;
+
+      // Handle direct result from aiReportRoutes.js
+      if (!responseData && res.data?.result) {
+        const r = res.data.result;
+        table = {
+          type: r.table_type || 'entries',
+          rows: (r.rows || []).map((row, idx) => ({ number: idx + 1, ...row })),
+          columns: r.columns || (r.rows?.length ? Object.keys(r.rows[0]) : []),
+          total: r.total_amount,
+          totalAmount: r.total_amount,
+          rowCount: r.rowCount || r.rows?.length || 0
+        };
+        responseData = {
+          summary: r.text || r.summary || '',
+          metrics: { totalSpent: r.total_amount },
+          table,
+          charts: null,
+          alerts: [],
+          actions: ['Export to CSV', 'Filter by project']
+        };
+      }
+
+      table = table || {};
+      responseData = responseData || {};
 
       const mappedResult = {
         summary: responseData.summary || '',
@@ -115,7 +155,19 @@ export default function AiChatReportPage() {
       setState('results');
     } catch (err) {
       console.error(err);
-      setErrorMsg(err.response?.data?.message || err.friendlyMessage || err.message || 'An unknown error occurred.');
+      const isTimeout =
+        err.code === 'ECONNABORTED' ||
+        err.response?.status === 504 ||
+        err.response?.data?.message === 'AI taking too long' ||
+        err.response?.data?.error === 'AI taking too long' ||
+        err.message?.includes('timeout') ||
+        err.message?.includes('taking too long');
+
+      const message = isTimeout
+        ? 'AI taking too long'
+        : (err.response?.data?.message || err.friendlyMessage || err.message || 'An unknown error occurred.');
+
+      setErrorMsg(message);
       setState('error');
     }
   };

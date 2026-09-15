@@ -115,6 +115,14 @@ const COLUMN_MAPPINGS = {
     "Title": "title",
     "name": "title",
     "title": "title",
+    "Material Name": "title",
+    "Material": "title",
+    "Material / Item": "title",
+    "Item Name": "title",
+    "Worker Name": "title",
+    "Labour Type": "title",
+    "Equipment Name": "title",
+    "Description": "title",
     "Unit": "unit",
     "unit": "unit",
     "Quantity": "quantity",
@@ -528,10 +536,8 @@ export default function CsvImport({ onComplete }) {
   const doImport = async () => {
     if (!preview || !resolvedRows.length) return;
 
-    const unresolved = resolvedRows.filter(r => !r.payload._resolvedProject);
-    if (unresolved.length > 0) {
-      const names = [...new Set(unresolved.map(r => r.raw["Project"] || "Unknown"))];
-      setError(`Could not resolve project(s): ${names.join(", ")}. Make sure the project names match your existing projects.`);
+    if (rowValidationErrors.length > 0) {
+      setError(`Row ${rowValidationErrors[0].row}: ${rowValidationErrors[0].message}`);
       return;
     }
 
@@ -544,7 +550,7 @@ export default function CsvImport({ onComplete }) {
       const qty = payload.quantity || 0;
       const rt = payload.rate || 0;
       return {
-        title: payload.title || "Untitled",
+        title: payload.title || "Item",
         type: payload.type || "Expense",
         project: payload.project,
         date: payload.date ? new Date(payload.date).toISOString() : new Date().toISOString(),
@@ -620,13 +626,61 @@ export default function CsvImport({ onComplete }) {
     URL.revokeObjectURL(url);
   };
 
-  const getRowStatus = (resolved) => {
-    if (!resolved?.payload?._resolvedProject) return "unresolved";
+  const getRowError = (resolved, index) => {
+    const rowNum = index + 1;
+    if (!resolved?.payload) return `Invalid row data on row ${rowNum}`;
+    const p = resolved.payload;
+    const raw = resolved.raw || {};
+
+    if (!p._resolvedProject) {
+      return `Could not resolve project "${raw["Project"] || "Unknown"}" on row ${rowNum}`;
+    }
+
+    const type = p.type || "Materials";
+    if (type === "Materials" || selectedTemplate === "material") {
+      const matName = (p.title || raw["Material Name"] || raw["Material"] || raw["Item Name"] || raw["Material / Item"] || raw["Name"] || raw["Description"] || "").trim();
+      if (!matName || matName.toLowerCase() === "untitled") {
+        return `Missing material name on row ${rowNum}`;
+      }
+    } else if (type === "Wages" || selectedTemplate === "labour") {
+      const worker = (p.title || raw["Worker Name"] || raw["Worker"] || raw["Labour Type"] || raw["Labour"] || raw["Name"] || raw["Description"] || "").trim();
+      if (!worker || worker.toLowerCase() === "untitled") {
+        return `Missing worker type on row ${rowNum}`;
+      }
+    } else if (type === "Expense" || selectedTemplate === "equipment") {
+      const equip = (p.title || raw["Equipment Name"] || raw["Equipment"] || raw["Machine"] || raw["Name"] || raw["Description"] || "").trim();
+      if (!equip || equip.toLowerCase() === "untitled") {
+        return `Missing equipment name on row ${rowNum}`;
+      }
+    } else {
+      const name = (p.title || raw["Name"] || raw["Title"] || raw["Description"] || "").trim();
+      if (!name || name.toLowerCase() === "untitled") {
+        return `Missing item description on row ${rowNum}`;
+      }
+    }
+
+    return null;
+  };
+
+  const rowValidationErrors = useMemo(() => {
+    if (!resolvedRows.length) return [];
+    const errors = [];
+    resolvedRows.forEach((r, idx) => {
+      const err = getRowError(r, idx);
+      if (err) errors.push({ row: idx + 1, message: err });
+    });
+    return errors;
+  }, [resolvedRows, selectedTemplate]);
+
+  const getRowStatus = (resolved, index) => {
+    const err = getRowError(resolved, index);
+    if (err) return "error";
     return "ok";
   };
 
-  const unresolvedCount = resolvedRows.filter(r => getRowStatus(r) === "unresolved").length;
-  const allResolved = resolvedRows.length > 0 && unresolvedCount === 0;
+  const canProceedWithImport = resolvedRows.length > 0 && rowValidationErrors.length === 0;
+  const allResolved = canProceedWithImport;
+  const unresolvedCount = rowValidationErrors.length;
 
   return (
     <div style={{ background: "#fff", borderRadius: 18, border: "1px solid #e5e5e5", padding: 20, boxShadow: "0 2px 10px rgba(20,20,50,0.05)" }}>
@@ -758,13 +812,13 @@ export default function CsvImport({ onComplete }) {
                 </span>
               )}
             </div>
-            <button onClick={doImport} disabled={importing || !allResolved}
+            <button onClick={doImport} disabled={importing || !canProceedWithImport}
               style={{
                 padding: "8px 20px",
-                background: importing ? "#FB923C" : !allResolved ? "#ccc" : gradients.primaryButton,
+                background: importing ? "#FB923C" : !canProceedWithImport ? "#ccc" : gradients.primaryButton,
                 color: "#fff",
                 border: "none", borderRadius: 8, fontWeight: 600, fontSize: 13,
-                cursor: importing || !allResolved ? "not-allowed" : "pointer",
+                cursor: importing || !canProceedWithImport ? "not-allowed" : "pointer",
               }}>
               {importing ? `Importing ${importProgress.current}/${importProgress.total}…` : `Import ${preview.total} Entries`}
             </button>
@@ -772,22 +826,36 @@ export default function CsvImport({ onComplete }) {
 
           {resolvedRows.length > 0 && (
             <div style={{
-              marginBottom: 12, padding: "10px 14px", borderRadius: 10,
-              background: allResolved ? "#dcfce7" : "#fef3c7",
-              border: `1px solid ${allResolved ? "#86efac" : "#fde68a"}`,
-              fontSize: 12,
+              marginBottom: 12, padding: "12px 14px", borderRadius: 10,
+              background: canProceedWithImport ? "#dcfce7" : "#fee2e2",
+              border: `1px solid ${canProceedWithImport ? "#86efac" : "#fca5a5"}`,
+              fontSize: 12.5,
             }}>
-              {allResolved ? (
-                <span style={{ color: "#166534" }}>
-                  ✅ All {resolvedRows.length} rows matched to projects successfully. Ready to import!
+              {canProceedWithImport ? (
+                <span style={{ color: "#166534", fontWeight: 600 }}>
+                  ✅ All {resolvedRows.length} rows matched and validated successfully. Ready to import!
                 </span>
               ) : (
-                <span style={{ color: "#92400e" }}>
-                  ⚠️ {unresolvedCount} of {resolvedRows.length} rows could not be matched to a project. Fix the project names in your CSV.<br />
-                  <span style={{ fontSize: 11.5, marginTop: 4, display: "inline-block", opacity: 0.85 }}>
-                    <strong>Loaded projects in this account:</strong> {projects.length ? projects.map(p => `"${p.projectName}"`).join(", ") : "None (check your logged-in account)"}
-                  </span>
-                </span>
+                <div style={{ color: "#991b1b" }}>
+                  <div style={{ fontWeight: 700, marginBottom: 4 }}>
+                    ⚠️ Found {rowValidationErrors.length} validation error{rowValidationErrors.length > 1 ? "s" : ""} in CSV file:
+                  </div>
+                  <ul style={{ margin: "4px 0 0", paddingLeft: 18 }}>
+                    {rowValidationErrors.slice(0, 5).map(e => (
+                      <li key={e.row} style={{ marginBottom: 2 }}>
+                        <strong>Row {e.row}:</strong> {e.message}
+                      </li>
+                    ))}
+                  </ul>
+                  {rowValidationErrors.length > 5 && (
+                    <div style={{ marginTop: 4, fontStyle: "italic", fontSize: 11.5 }}>
+                      + {rowValidationErrors.length - 5} more row error(s). Please fix these in your CSV file before importing.
+                    </div>
+                  )}
+                  <div style={{ fontSize: 11, marginTop: 6, opacity: 0.85 }}>
+                    <strong>Loaded projects:</strong> {projects.length ? projects.map(p => `"${p.projectName}"`).join(", ") : "None"}
+                  </div>
+                </div>
               )}
             </div>
           )}
@@ -811,7 +879,7 @@ export default function CsvImport({ onComplete }) {
             <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
               <thead>
                 <tr style={{ background: "#fafafa" }}>
-                  <th style={{ padding: "8px 6px", textAlign: "center", fontWeight: 600, color: "#555", borderBottom: "1px solid #eee", width: 30 }}>✓</th>
+                  <th style={{ padding: "8px 6px", textAlign: "center", fontWeight: 600, color: "#555", borderBottom: "1px solid #eee", width: 30 }}>Status</th>
                   {preview.headers.slice(0, 8).map(h => (
                     <th key={h} style={{ padding: "8px 10px", textAlign: "left", fontWeight: 600, color: "#555", borderBottom: "1px solid #eee" }}>{h}</th>
                   ))}
@@ -820,14 +888,15 @@ export default function CsvImport({ onComplete }) {
               <tbody>
                 {preview.rows.slice(0, 5).map((row, i) => {
                   const resolved = resolvedRows[i];
-                  const status = resolved ? getRowStatus(resolved) : "pending";
+                  const rowErr = resolved ? getRowError(resolved, i) : null;
+                  const status = resolved ? getRowStatus(resolved, i) : "pending";
                   return (
-                    <tr key={i} style={{ borderBottom: "1px solid #f5f5f5" }}>
-                      <td style={{ padding: "8px 6px", textAlign: "center" }}>
+                    <tr key={i} style={{ borderBottom: "1px solid #f5f5f5", background: status === "error" ? "#fff5f5" : "transparent" }}>
+                      <td style={{ padding: "8px 6px", textAlign: "center" }} title={rowErr || "Valid row"}>
                         {status === "ok" ? (
                           <span style={{ color: "#22c55e", fontSize: 14 }}>✓</span>
-                        ) : status === "unresolved" ? (
-                          <span style={{ color: "#ef4444", fontSize: 14 }}>✗</span>
+                        ) : status === "error" ? (
+                          <span style={{ color: "#ef4444", fontSize: 14, fontWeight: "bold" }}>✗</span>
                         ) : (
                           <span style={{ color: "#aaa", fontSize: 14 }}>…</span>
                         )}
