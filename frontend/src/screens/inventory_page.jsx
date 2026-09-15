@@ -861,15 +861,21 @@ export default function InventoryPage() {
                       background: `${colors.primaryPurple}08`, borderRadius: radius.sm, padding: "10px 12px",
                     }}>
                       <div>
-                        <div style={{ fontSize: 9.5, fontWeight: 700, color: colors.textLight, letterSpacing: "0.05em", marginBottom: 2 }}>{typeLabel.toUpperCase()}</div>
+                        <div style={{ fontSize: 9.5, fontWeight: 700, color: colors.textLight, letterSpacing: "0.05em", marginBottom: 2 }}>
+                          {item.category === "labour" ? "TOTAL DAYS" : item.category === "equipment" ? "TOTAL HRS" : "BALANCE"}
+                        </div>
                         <div style={{ fontSize: 13.5, fontWeight: 700, color: colors.textPrimary }}>{balance.toLocaleString("en-IN")}</div>
                       </div>
                       <div>
-                        <div style={{ fontSize: 9.5, fontWeight: 700, color: colors.textLight, letterSpacing: "0.05em", marginBottom: 2 }}>PURCHASED</div>
+                        <div style={{ fontSize: 9.5, fontWeight: 700, color: colors.textLight, letterSpacing: "0.05em", marginBottom: 2 }}>
+                          {item.category === "labour" || item.category === "equipment" ? "LOGGED" : "PURCHASED"}
+                        </div>
                         <div style={{ fontSize: 13.5, fontWeight: 700, color: colors.primaryBlue }}>{(item.purchased || 0).toLocaleString("en-IN")}</div>
                       </div>
                       <div>
-                        <div style={{ fontSize: 9.5, fontWeight: 700, color: colors.textLight, letterSpacing: "0.05em", marginBottom: 2 }}>USED</div>
+                        <div style={{ fontSize: 9.5, fontWeight: 700, color: colors.textLight, letterSpacing: "0.05em", marginBottom: 2 }}>
+                          {item.category === "labour" || item.category === "equipment" ? "CONSUMED" : "USED"}
+                        </div>
                         <div style={{ fontSize: 13.5, fontWeight: 700, color: "#EF4444" }}>{(item.used || 0).toLocaleString("en-IN")}</div>
                       </div>
                     </div>

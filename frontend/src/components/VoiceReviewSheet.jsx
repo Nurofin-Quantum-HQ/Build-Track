@@ -768,7 +768,7 @@ function renderStep({ step, data, updateField, goNext, customInput, setCustomInp
           </div>
           <div style={{ fontSize: 14, color: colors.textSecondary, marginBottom: 16 }}>Enter the material quantity</div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 20 }}>
-            <input type="number" value={data.quantity} onChange={e => updateField('quantity', e.target.value)}
+            <input type="number" step="any" value={data.quantity} onChange={e => updateField('quantity', e.target.value)}
               placeholder="0" autoFocus
               style={{
                 flex: 1, height: 64, padding: '0 16px', borderRadius: 12,
@@ -844,7 +844,7 @@ function renderStep({ step, data, updateField, goNext, customInput, setCustomInp
             {data.entryType === 'equipment' ? 'Enter rate per hour' : `Rate per ${data.unit || 'unit'}`}
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 20 }}>
-            <input type="number" value={data.rate} onChange={e => updateField('rate', e.target.value)}
+            <input type="number" step="any" value={data.rate} onChange={e => updateField('rate', e.target.value)}
               placeholder="0" autoFocus
               style={{
                 flex: 1, height: 64, padding: '0 16px', borderRadius: 12,

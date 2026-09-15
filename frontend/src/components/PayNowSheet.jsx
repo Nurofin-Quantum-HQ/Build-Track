@@ -167,8 +167,8 @@ export default function PayNowSheet({
         : parseAmount(amount.trim()) ?? 0.0;
 
     let apiPaymentMode = selectedMethod;
-    if (apiPaymentMode === "Bank Transfer" || apiPaymentMode === "Card") {
-      apiPaymentMode = "Bank";
+    if (apiPaymentMode === "Bank Transfer") {
+      apiPaymentMode = "Bank Transfer";
     }
 
     const statusStr =
