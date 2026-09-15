@@ -237,37 +237,68 @@ export function addActivityToPhase(phases, phaseId, activityName) {
   });
 }
 
-export function toggleActivity(phases, phaseId, activityId) {
+export function isActivityCompleted(act, phase = null, project = null) {
+  if (!act) return false;
+  if (act.completed === true || act.completed === "true" || act.completed === 1) return true;
+  if (act.isCompleted === true || act.isCompleted === "true" || act.isCompleted === 1) return true;
+  const statusStr = String(act.status || "").toLowerCase().trim();
+  if (statusStr === "completed" || statusStr === "done") return true;
+  if (project) {
+    const keys = project.completedActivityKeys || project.completedActivities || project.completed_activity_keys || [];
+    if (Array.isArray(keys)) {
+      if (keys.includes(act.id) || keys.includes(act.name)) return true;
+      if (phase && (keys.includes(`${phase.phaseName}_${act.name}`) || keys.includes(`${phase.id}_${act.id}`))) return true;
+    }
+  }
+  return false;
+}
+
+export function toggleActivity(phases, phaseId, activityId, project = null) {
   return phases.map(p => {
     if (p.id !== phaseId) return p;
     return {
       ...p,
-      activities: (p.activities || []).map(a =>
-        a.id === activityId
-          ? { ...a, completed: !(a.completed || a.isCompleted), isCompleted: false, completedAt: !(a.completed || a.isCompleted) ? new Date().toISOString() : null }
-          : a
-      ),
+      activities: (p.activities || []).map(a => {
+        if (a.id === activityId) {
+          const currentlyDone = isActivityCompleted(a, p, project);
+          const nextDone = !currentlyDone;
+          return {
+            ...a,
+            completed: nextDone,
+            isCompleted: nextDone,
+            status: nextDone ? "Completed" : "Pending",
+            completedAt: nextDone ? (a.completedAt || new Date().toISOString()) : null,
+          };
+        }
+        return a;
+      }),
     };
   });
 }
 
-export function calcProgress(phases) {
+export function calcProgress(phases, project = null) {
   let total = 0;
   let completed = 0;
-  phases.forEach(p => {
+  (phases || []).forEach(p => {
     (p.activities || []).forEach(a => {
       total++;
-      if (a.completed || a.isCompleted) completed++;
+      if (isActivityCompleted(a, p, project)) completed++;
     });
   });
-  return total === 0 ? 0 : Math.round((completed / total) * 100);
+  if (total === 0) {
+    if (project && project.progress !== undefined && project.progress !== null) {
+      return project.progress > 1 ? Math.round(project.progress) : Math.round(project.progress * 100);
+    }
+    return 0;
+  }
+  return Math.round((completed / total) * 100);
 }
 
-export function getPhaseProgress(phase) {
-  const acts = phase.activities || [];
+export function getPhaseProgress(phase, project = null) {
+  const acts = phase?.activities || [];
   const total = acts.length;
   if (total === 0) return 0;
-  const completed = acts.filter(a => a.completed || a.isCompleted).length;
+  const completed = acts.filter(a => isActivityCompleted(a, phase, project)).length;
   return Math.round((completed / total) * 100);
 }
 
