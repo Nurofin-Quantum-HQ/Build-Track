@@ -116,7 +116,6 @@ router.get("/financial", async (req, res) => {
         utilization,
       };
     });
-    const adminId = await getAdminId(req.user);
     const workersRecords = await Worker.find({ createdBy: adminId }).lean();
     const wageTransactions = transactions.filter((t) => t.type === "Wages");
     const workerStats = {};
