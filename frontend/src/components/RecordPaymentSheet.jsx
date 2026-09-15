@@ -284,8 +284,8 @@ export default function RecordPaymentSheet({ open, entry, projects, onClose, onS
           : "Pending";
 
       let apiPaymentMode = selectedMethod;
-      if (apiPaymentMode === "Bank Transfer" || apiPaymentMode === "Card") {
-        apiPaymentMode = "Bank";
+      if (apiPaymentMode === "Bank Transfer") {
+        apiPaymentMode = "Bank Transfer";
       }
 
       const payload = {

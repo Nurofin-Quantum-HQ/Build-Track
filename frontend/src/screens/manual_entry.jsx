@@ -23,7 +23,7 @@ const UNIT_OPTIONS = {
 
 const GST_PERCENTAGES = [0, 5, 12, 18, 28];
 
-const PAYMENT_METHODS = ["Cash", "UPI", "Bank Transfer", "Cheque", "Credit"];
+const PAYMENT_METHODS = ["Cash", "UPI", "Bank Transfer", "Card", "Cheque", "Credit"];
 
 const FIELDS = {
   material: [
@@ -809,6 +809,7 @@ export default function ManualEntryPage() {
                     onBlur={() => setTimeout(() => setShowAutocomplete(false), 200)}
                     placeholder={f.placeholder}
                     min={f.min}
+                    step={f.type === "number" ? "any" : undefined}
                     style={{ flex: 1, padding: "12px 0", border: "none", background: "transparent", outline: "none", fontSize: 14, color: colors.textPrimary }}
                   />
                 </div>
