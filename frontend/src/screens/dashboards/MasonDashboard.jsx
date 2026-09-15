@@ -35,6 +35,21 @@ export default function MasonDashboard() {
     loadData();
   }, []);
 
+  const handleTaskStatusChange = async (taskId, newStatus) => {
+    try {
+      await taskAPI.updateStatus(taskId, newStatus);
+      setTasks(prev => prev.map(t => t._id === taskId ? { ...t, status: newStatus } : t));
+    } catch (e) {
+      alert('Failed to update task status');
+    }
+  };
+
+  const getStatusColor = (status) => {
+    if (status === 'Completed') return '#10B981'; // success
+    if (status === 'In Progress') return '#3B82F6'; // info
+    return '#F59E0B'; // warning
+  };
+
   if (loading) {
     return (
       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '60vh', color: colors.textSecondary }}>
@@ -71,7 +86,7 @@ export default function MasonDashboard() {
           size="lg"
           icon={<PlusCircle size={20} />}
           style={{ width: '100%', height: 60, fontSize: 16 }}
-          onClick={() => navigate('/add-entry')}
+          onClick={() => navigate('/update-progress')}
         >
           Add Daily Update
         </Button>
@@ -80,7 +95,7 @@ export default function MasonDashboard() {
           size="lg"
           icon={<Package size={20} />}
           style={{ width: '100%', height: 60, fontSize: 16 }}
-          onClick={() => navigate('/add-entry')} // Material entry
+          onClick={() => navigate('/manualentry?type=material')}
         >
           Add Material Entry
         </Button>
@@ -106,9 +121,27 @@ export default function MasonDashboard() {
                     <div style={{ fontWeight: 600, fontSize: 15, color: colors.textPrimary }}>{t.title}</div>
                     {t.description && <div style={{ fontSize: 13, color: colors.textSecondary, marginTop: 4 }}>{t.description}</div>}
                   </div>
-                  <Badge variant={t.status === 'Completed' ? 'success' : 'warning'}>
-                    {t.status || 'Pending'}
-                  </Badge>
+                  <select
+                    value={t.status || 'Pending'}
+                    onChange={(e) => handleTaskStatusChange(t._id, e.target.value)}
+                    style={{
+                      padding: '6px 12px',
+                      borderRadius: '20px',
+                      border: `1px solid ${getStatusColor(t.status || 'Pending')}`,
+                      backgroundColor: `${getStatusColor(t.status || 'Pending')}15`,
+                      color: getStatusColor(t.status || 'Pending'),
+                      fontWeight: 600,
+                      fontSize: 13,
+                      cursor: 'pointer',
+                      outline: 'none',
+                      appearance: 'none',
+                      textAlign: 'center'
+                    }}
+                  >
+                    <option value="Pending">Pending</option>
+                    <option value="In Progress">In Progress</option>
+                    <option value="Completed">Completed</option>
+                  </select>
                 </div>
               ))}
             </div>

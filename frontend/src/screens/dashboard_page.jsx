@@ -20,12 +20,10 @@ export default function DashboardPage() {
 
   if (role === 'admin') {
     return <AdminDashboard />;
-  } else if (role === 'supervisor' || role === 'manager' || role === 'engineer') {
+  } else if (role === 'supervisor') {
     return <SupervisorDashboard />;
-  } else if (role === 'mason' || role === 'labour' || role === 'contractor') {
-    return <MasonDashboard />;
   } else {
-
-    return <AdminDashboard />;
+    // SECURITY FIX: Default unknown/custom roles to the most restricted dashboard (Mason)
+    return <MasonDashboard />;
   }
 }

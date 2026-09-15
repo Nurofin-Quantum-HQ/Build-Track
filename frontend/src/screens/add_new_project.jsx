@@ -105,7 +105,7 @@ function Stepper({ label, value, onChange, min = 0, max = 99 }) {
       <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
         <button onClick={() => onChange(Math.max(min, value - 1))}
           style={{ width: 28, height: 28, borderRadius: 6, border: "1px solid #E5E7EB", background: "#fff", cursor: "pointer", fontSize: 14, fontWeight: 700, color: "#64748B", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: 'inherit' }}>
-          \u2212
+          -
         </button>
         <span style={{ width: 24, textAlign: "center", fontSize: 14, fontWeight: 700, color: "#111827" }}>{value}</span>
         <button onClick={() => onChange(Math.min(max, value + 1))}
@@ -1156,7 +1156,7 @@ export default function NewProjectPage() {
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginTop: 12 }}>
             <button className="tour-save-btn" onClick={handleSubmit} disabled={saving}
               style={{ minHeight: 46, padding: "12px 0", background: "#F97316", color: "#fff", border: "none", borderRadius: 8, fontWeight: 700, fontSize: 14, cursor: saving ? "not-allowed" : "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 8, opacity: saving ? 0.6 : 1, transition: "background 0.2s", fontFamily: 'inherit' }}>
-              {saving ? <><SpinnerIcon /> Saving\u2026</> : isEditMode ? <><Check size={16} /> Update Project</> : <><Plus size={16} /> Create Project</>}
+              {saving ? <><SpinnerIcon /> Saving...</> : isEditMode ? <><Check size={16} /> Update Project</> : <><Plus size={16} /> Create Project</>}
             </button>
             <button onClick={() => navigate("/projects")} disabled={saving}
               style={{ minHeight: 46, padding: "12px 0", background: "#fff", color: "#475569", border: "1px solid #E5E7EB", borderRadius: 8, fontWeight: 600, fontSize: 14, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: 'inherit' }}>

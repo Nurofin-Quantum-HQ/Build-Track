@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
+import { useAuth } from "../contexts/AuthContext";
 import { projectAPI, transactionAPI } from "../api";
 import perfLogger from "../utils/performanceLogger";
 import { resolveImageUrl } from "../utils/imageUrl";
@@ -81,6 +82,7 @@ export default function ManageSitePage() {
   const location = useLocation();
   const project = location.state?.project || null;
   const projectId = project?._id || project?.id;
+  const { isAdmin } = useAuth();
 
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
   const [toast, setToast] = useState({ msg: "", type: "info" });
@@ -575,11 +577,13 @@ export default function ManageSitePage() {
                               VIEW
                             </div>
                           )}
-                          <div onClick={() => setExpandedActivityBudgets(prev => ({ ...prev, [act.id]: !prev[act.id] }))} style={{ cursor: "pointer", display: "flex", color: "#94A3B8" }}>
-                            <ChevronDown size={14} style={{ transform: isBudgetExpanded ? "rotate(180deg)" : "none", transition: "transform 0.18s" }} />
-                          </div>
+                          {isAdmin && (
+                            <div onClick={() => setExpandedActivityBudgets(prev => ({ ...prev, [act.id]: !prev[act.id] }))} style={{ cursor: "pointer", display: "flex", color: "#94A3B8" }}>
+                              <ChevronDown size={14} style={{ transform: isBudgetExpanded ? "rotate(180deg)" : "none", transition: "transform 0.18s" }} />
+                            </div>
+                          )}
                         </div>
-                        {isBudgetExpanded && (
+                        {isAdmin && isBudgetExpanded && (
                           <div style={{ margin: "8px 0 4px", padding: 12, background: "#F8FAFC", borderRadius: 8, border: "1px solid #E5E7EB" }}>
                             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
                               <span style={{ fontSize: 12, fontWeight: 600, color: "#111827" }}>Activity Budget Allocation</span>
@@ -881,8 +885,44 @@ export default function ManageSitePage() {
         {renderFeatureGroup("Kitchen Requirements", <ChefHat size={16} />, kitchen)}
         {renderFeatureGroup("Electrical & Plumbing", <Zap size={16} />, electrical)}
         {renderFeatureGroup("Terrace & Interior", <Sun size={16} />, terrace)}
+        
+        {hasPhoto && (
+          <CollapsibleCard title="Site Photo" icon={<Camera size={16} />} defaultOpen>
+            <img src={imgSrc} alt="Site" style={{ width: "100%", maxHeight: 300, objectFit: "cover", borderRadius: 8, border: "1px solid #E5E7EB" }} />
+          </CollapsibleCard>
+        )}
+        
+        {p.scope && (
+          <CollapsibleCard title="Project Scope" icon={<ClipboardCheck size={16} />} defaultOpen>
+            <div style={{ fontSize: 13, color: "#475569", lineHeight: 1.6, whiteSpace: "pre-wrap" }}>{p.scope}</div>
+          </CollapsibleCard>
+        )}
+        
+        {p.documents && p.documents.length > 0 && (
+          <CollapsibleCard title="Documents & Blueprints" icon={<FileText size={16} />} defaultOpen count={p.documents.length}>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))", gap: 12 }}>
+              {p.documents.map((doc, idx) => {
+                const fileUrl = resolveImageUrl(doc);
+                const fileName = doc.split("/").pop() || `Document ${idx + 1}`;
+                const isImage = /\.(jpg|jpeg|png|gif|webp)$/i.test(fileName);
+                return (
+                  <div key={idx} style={{ border: "1px solid #E5E7EB", borderRadius: 10, overflow: "hidden", background: "#F8FAFC", display: "flex", flexDirection: "column" }}>
+                    <div style={{ height: 110, background: "#FFF5F0", display: "flex", alignItems: "center", justifyContent: "center", position: "relative", overflow: "hidden" }}>
+                      {isImage ? <img src={fileUrl} alt={fileName} style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : <FileText size={36} color="#F97316" />}
+                      <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", gap: 8, background: "rgba(0,0,0,0.4)" }}>
+                        <a href={fileUrl} target="_blank" rel="noreferrer" style={{ padding: "6px 12px", borderRadius: 6, background: "#fff", fontSize: 12, fontWeight: 600, color: "#111827", textDecoration: "none" }}>View</a>
+                      </div>
+                    </div>
+                    <div style={{ padding: "10px 12px", fontSize: 12, fontWeight: 600, color: "#334155", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={fileName}>{fileName}</div>
+                  </div>
+                );
+              })}
+            </div>
+          </CollapsibleCard>
+        )}
+
         {renderTimeline()}
-        {renderFinancial()}
+        {isAdmin && renderFinancial()}
         <CsvImportExportCard project={p} onProjectUpdated={setLocalProject} setToast={setToast} />
         {renderTracker()}
         {renderRecentEntries()}

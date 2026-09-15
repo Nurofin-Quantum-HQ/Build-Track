@@ -40,7 +40,8 @@ export default function Sidebar() {
   }, []);
 
   const photoUrl = user?.profilePhoto ? resolveImageUrl(user.profilePhoto) : null;
-  const isAdminOrSupervisor = user?.role === "admin" || user?.role === "supervisor";
+  const r = (user?.role || "").toLowerCase();
+  const isAdminOrSupervisor = r === "admin" || r === "supervisor";
 
   const handleLogout = () => {
     if (logout) logout();
@@ -92,7 +93,18 @@ export default function Sidebar() {
         <div style={{ fontSize: 11, fontWeight: 700, color: colors.textTertiary, letterSpacing: "0.08em", padding: "12px 8px 6px", textTransform: "uppercase" }}>
           Main
         </div>
-        {navItems.map((item) => {
+        {navItems.filter((item) => {
+          if (item.label === "Dashboard") return true;
+          if (item.label === "Projects") return isAdminOrSupervisor || user?.permissions?.includes('create_project') || user?.permissions?.includes('view_assigned_project') || user?.permissions?.includes('view_projects');
+          if (item.label === "Add Entry" || item.label === "Voice") return isAdminOrSupervisor || user?.permissions?.includes('add_entries');
+          if (item.label === "Log") return true;
+          if (item.label === "Inventory") return isAdminOrSupervisor || user?.permissions?.includes('manage_inventory');
+          if (item.label === "Assign Task") return isAdminOrSupervisor || user?.permissions?.includes('assign_tasks');
+          if (item.label === "Notifications") return true;
+          if (item.label === "Reports") return isAdminOrSupervisor || user?.permissions?.includes('view_reports');
+          if (item.label === "Subscription" || item.label === "Settings") return isAdminOrSupervisor;
+          return true;
+        }).map((item) => {
           const tourClassMap = {
             'Dashboard': 'tour-dashboard',
             'Projects': 'tour-create-project',

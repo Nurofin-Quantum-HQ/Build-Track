@@ -269,7 +269,7 @@ export default function AdminDashboard() {
               Active Project
             </div>
             {projects.length === 0 && (
-              <Button size="sm" variant="outline" className="tour-new-project" icon={<PlusCircle size={14} />} onClick={() => navigate('/projects/new')}>
+              <Button size="sm" variant="outline" className="tour-new-project" icon={<PlusCircle size={14} />} onClick={() => navigate('/newproject')}>
                 New Project
               </Button>
             )}

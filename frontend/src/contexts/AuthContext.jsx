@@ -145,6 +145,12 @@ export function AuthProvider({ children }) {
   const can = useCallback((permission) => {
     const r = user?.role?.toLowerCase();
     if (r === 'admin' || r === 'supervisor') return true;
+    
+    if (r === 'mason' || r === 'site engineer' || r === 'contractor') {
+      const defaultPerms = ['add_entries', 'view_assigned_project', 'submit_daily_update', 'upload_photos'];
+      if (defaultPerms.includes(permission)) return true;
+    }
+    
     const perms = user?.permissions || [];
     return perms.includes(permission);
   }, [user]);

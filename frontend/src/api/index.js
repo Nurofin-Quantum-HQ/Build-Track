@@ -137,8 +137,9 @@ export const aiDashboardAPI = {
 export const taskAPI = {
   getDaily: () => api.get("/tasks/daily"),
   createTask: (data) => api.post("/tasks", data),
+  updateStatus: (id, status) => api.put(`/tasks/${id}/status`, { status }),
+  updateTask: (id, data) => api.put(`/tasks/${id}`, data),
 };
-
 export const subscriptionAPI = {
   getStatus:  ()      => api.get("/subscriptions/status"),
   initiate:   (data)  => api.post("/subscriptions/initiate", data),  // data: { plan, phone?, savePhone? }

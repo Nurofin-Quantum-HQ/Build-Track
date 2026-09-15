@@ -26,6 +26,7 @@ const AssignTask       = lazy(() => import("./screens/assign_task_page"));
 const Notifications    = lazy(() => import("./screens/notifications_page"));
 const ManageSite       = lazy(() => import("./screens/managesite_dashboard"));
 const ManualEntryPage  = lazy(() => import("./screens/manual_entry"));
+const UpdateProgressPage = lazy(() => import("./screens/update_progress_page"));
 const InventoryPage    = lazy(() => import("./screens/inventory_page"));
 const SubscriptionPage = lazy(() => import("./screens/subscription_page"));
 const AuditLogsPage     = lazy(() => import("./screens/audit_logs_page"));
@@ -33,6 +34,7 @@ const AuditLogsPage     = lazy(() => import("./screens/audit_logs_page"));
 export const routePreloaders = {
   "/": () => import("./screens/dashboard_page"),
   "/add-entry": () => import("./screens/add_entry_page"),
+  "/update-progress": () => import("./screens/update_progress_page"),
   "/manualentry": () => import("./screens/manual_entry"),
   "/entry-detail": () => import("./screens/entry_detail_page"),
   "/voice": () => import("./screens/voice_assistant"),
@@ -105,6 +107,11 @@ function AppRoutes() {
           <Route path="/add-entry" element={
             <RequireRole permission="add_entries" route="/add-entry">
               <AddEntry />
+            </RequireRole>
+          } />
+          <Route path="/update-progress" element={
+            <RequireRole permission="add_entries" route="/update-progress">
+              <UpdateProgressPage />
             </RequireRole>
           } />
           <Route path="/manualentry" element={

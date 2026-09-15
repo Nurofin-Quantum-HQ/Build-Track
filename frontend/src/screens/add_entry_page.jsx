@@ -22,7 +22,7 @@ export default function AddEntryPage() {
 
   const entryTypes = useMemo(() => {
     const types = [];
-    if (isAdmin || can('manage_expenses')) {
+    if (isAdmin || can('manage_expenses') || can('add_entries')) {
       types.push({
         id: 'material',
         title: 'Material',

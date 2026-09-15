@@ -30,7 +30,7 @@ export default function RequireRole({ permission, route, children }) {
     return <AccessDenied />;
   }
 
-  if (route) {
+  if (!permission && route) {
     const r = user?.role?.toLowerCase();
     const isAdminOrSupervisor = r === "admin" || r === "supervisor";
     if (!isAdminOrSupervisor) {

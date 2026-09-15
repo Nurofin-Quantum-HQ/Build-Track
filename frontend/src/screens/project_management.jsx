@@ -223,9 +223,11 @@ export default function ProjectsPage() {
                       </div>
                     )}
 
-                    <div style={{ fontSize: 13, fontWeight: 600, color: '#F97316', marginBottom: 14 }}>
-                      ₹{spent.toLocaleString("en-IN")} of ₹{budget.toLocaleString("en-IN")}
-                    </div>
+                    {isAdmin && (
+                      <div style={{ fontSize: 13, fontWeight: 600, color: '#F97316', marginBottom: 14 }}>
+                        ₹{spent.toLocaleString("en-IN")} of ₹{budget.toLocaleString("en-IN")}
+                      </div>
+                    )}
 
                     <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
                       <span style={{ fontSize: 12, fontWeight: 600, color: '#64748B' }}>Overall Progress</span>

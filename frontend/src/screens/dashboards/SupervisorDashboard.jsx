@@ -89,6 +89,21 @@ export default function SupervisorDashboard() {
     { name: 'Rejected', count: rejected.length, icon: XCircle, color: colors.danger }
   ];
 
+  const handleTaskStatusChange = async (taskId, newStatus) => {
+    try {
+      await taskAPI.updateStatus(taskId, newStatus);
+      setTasks(prev => prev.map(t => t._id === taskId ? { ...t, status: newStatus } : t));
+    } catch (e) {
+      alert('Failed to update task status');
+    }
+  };
+
+  const getStatusColor = (status) => {
+    if (status === 'Completed') return '#10B981'; // success
+    if (status === 'In Progress') return '#3B82F6'; // info
+    return '#F59E0B'; // warning
+  };
+
   if (loading) {
     return (
       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '60vh', color: colors.textSecondary }}>
@@ -271,14 +286,32 @@ export default function SupervisorDashboard() {
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
               {tasks.map(t => (
-                <div key={t._id} style={{ padding: 12, border: `1px solid ${colors.border}`, borderRadius: 8 }}>
-                  <div style={{ fontWeight: 600, fontSize: 14, color: colors.textPrimary }}>{t.title}</div>
-                  <div style={{ fontSize: 12, color: colors.textSecondary, marginTop: 4 }}>
-                    Assigned to: {t.assignee?.name || 'Unassigned'}
+                <div key={t._id} style={{ padding: 12, border: `1px solid ${colors.border}`, borderRadius: 8, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <div>
+                    <div style={{ fontWeight: 600, fontSize: 15, color: colors.textPrimary }}>{t.title}</div>
+                    <div style={{ fontSize: 13, color: colors.textSecondary }}>Assigned to: {t.assigneeModel === 'Worker' ? t.workerDetails?.name : t.assignedToDetails?.name}</div>
                   </div>
-                  <Badge variant={t.status === 'Completed' ? 'success' : 'warning'} style={{ marginTop: 8 }}>
-                    {t.status || 'Pending'}
-                  </Badge>
+                  <select
+                    value={t.status || 'Pending'}
+                    onChange={(e) => handleTaskStatusChange(t._id, e.target.value)}
+                    style={{
+                      padding: '6px 12px',
+                      borderRadius: '20px',
+                      border: `1px solid ${getStatusColor(t.status || 'Pending')}`,
+                      backgroundColor: `${getStatusColor(t.status || 'Pending')}15`,
+                      color: getStatusColor(t.status || 'Pending'),
+                      fontWeight: 600,
+                      fontSize: 13,
+                      cursor: 'pointer',
+                      outline: 'none',
+                      appearance: 'none',
+                      textAlign: 'center'
+                    }}
+                  >
+                    <option value="Pending">Pending</option>
+                    <option value="In Progress">In Progress</option>
+                    <option value="Completed">Completed</option>
+                  </select>
                 </div>
               ))}
             </div>
