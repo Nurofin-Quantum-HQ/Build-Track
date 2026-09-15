@@ -307,9 +307,10 @@ router.get("/", async (req, res) => {
       const projectFilter = canAccessProjectFilter(req);
       const projects = await Project.find(projectFilter).select("_id");
       const projectIds = projects.map((p) => p._id);
+      const adminId = await getAdminId(req.user);
       query.$or = [
         { project: { $in: projectIds } },
-        { project: null, createdBy: req.user._id }
+        { project: null, createdBy: { $in: [req.user._id, adminId].filter(Boolean) } }
       ];
     } else {
       const adminProjects = await Project.find({ createdBy: req.user._id }).select("_id");
@@ -329,6 +330,9 @@ router.get("/", async (req, res) => {
         const supervisorDoc = await User.findById(req.user._id).select("createdBy overseesRoles");
         const overseesRoles = supervisorDoc?.overseesRoles || [];
         let viewableUserIds = [req.user._id];
+        if (supervisorDoc?.createdBy) {
+          viewableUserIds.push(supervisorDoc.createdBy);
+        }
         if (overseesRoles.length > 0 && supervisorDoc?.createdBy) {
           const allOrgUsers = await User.find({ createdBy: supervisorDoc.createdBy }).select("_id role");
           const overseesRolesLower = overseesRoles.map(r => r.toLowerCase().trim());
@@ -407,15 +411,17 @@ router.get("/:id", async (req, res) => {
       .populate("project", "projectName status progress createdBy");
     if (!tx) return res.status(404).json({ message: "Transaction not found" });
     if (req.user.role !== "Admin") {
-      const assignedIds = Array.isArray(req.user.projectIds)
-        ? req.user.projectIds.filter(Boolean).map((id) => id.toString())
-        : [];
-      const legacyId = req.user.projectId ? req.user.projectId.toString() : null;
-      const allAssigned = legacyId && !assignedIds.includes(legacyId)
-        ? [...assignedIds, legacyId]
-        : assignedIds;
-      if (!tx.project || !allAssigned.includes(tx.project._id.toString())) {
-        return res.status(403).json({ message: "Access denied to this transaction" });
+      const adminId = await getAdminId(req.user);
+      if (tx.project) {
+        const pDoc = await Project.findOne(canAccessProjectFilter(req, tx.project._id || tx.project));
+        if (!pDoc) {
+          return res.status(403).json({ message: "Access denied to this transaction" });
+        }
+      } else {
+        const isOwnOrAdmin = tx.createdBy?.toString() === req.user._id.toString() || (adminId && tx.createdBy?.toString() === adminId.toString());
+        if (!isOwnOrAdmin) {
+          return res.status(403).json({ message: "Access denied to this transaction" });
+        }
       }
     } else {
       if (tx.project && tx.project.createdBy.toString() !== req.user._id.toString()) {
@@ -746,15 +752,17 @@ router.put("/:id", requirePermission(["manage_expenses", "add_entries"]), async 
     const tx = await Transaction.findById(req.params.id).session(session);
     if (!tx) return res.status(404).json({ message: "Transaction not found" });
     if (req.user.role !== "Admin") {
-      const assignedIds = Array.isArray(req.user.projectIds)
-        ? req.user.projectIds.filter(Boolean).map((id) => id.toString())
-        : [];
-      const legacyId = req.user.projectId ? req.user.projectId.toString() : null;
-      const allAssigned = legacyId && !assignedIds.includes(legacyId)
-        ? [...assignedIds, legacyId]
-        : assignedIds;
-      if (!tx.project || !allAssigned.includes(tx.project.toString())) {
-        return res.status(403).json({ message: "Access denied to this transaction" });
+      const adminId = await getAdminId(req.user);
+      if (tx.project) {
+        const pDoc = await Project.findOne(canAccessProjectFilter(req, tx.project)).session(session);
+        if (!pDoc) {
+          return res.status(403).json({ message: "Access denied to this transaction" });
+        }
+      } else {
+        const isOwnOrAdmin = tx.createdBy?.toString() === req.user._id.toString() || (adminId && tx.createdBy?.toString() === adminId.toString());
+        if (!isOwnOrAdmin) {
+          return res.status(403).json({ message: "Access denied to this transaction" });
+        }
       }
     } else {
       if (tx.project) {
@@ -1073,15 +1081,17 @@ router.delete("/:id", async (req, res) => {
     const tx = await Transaction.findById(req.params.id).session(session);
     if (!tx) return res.status(404).json({ message: "Transaction not found" });
     if (req.user.role !== "Admin") {
-      const assignedIds = Array.isArray(req.user.projectIds)
-        ? req.user.projectIds.filter(Boolean).map((id) => id.toString())
-        : [];
-      const legacyId = req.user.projectId ? req.user.projectId.toString() : null;
-      const allAssigned = legacyId && !assignedIds.includes(legacyId)
-        ? [...assignedIds, legacyId]
-        : assignedIds;
-      if (!tx.project || !allAssigned.includes(tx.project.toString())) {
-        return res.status(403).json({ message: "Access denied to this transaction" });
+      const adminId = await getAdminId(req.user);
+      if (tx.project) {
+        const pDoc = await Project.findOne(canAccessProjectFilter(req, tx.project)).session(session);
+        if (!pDoc) {
+          return res.status(403).json({ message: "Access denied to this transaction" });
+        }
+      } else {
+        const isOwnOrAdmin = tx.createdBy?.toString() === req.user._id.toString() || (adminId && tx.createdBy?.toString() === adminId.toString());
+        if (!isOwnOrAdmin) {
+          return res.status(403).json({ message: "Access denied to this transaction" });
+        }
       }
     } else {
       if (tx.project) {

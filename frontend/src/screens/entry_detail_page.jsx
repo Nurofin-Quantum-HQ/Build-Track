@@ -5,7 +5,7 @@ import { transactionAPI, approvalAPI } from '../api';
 import RecordPaymentSheet from '../components/RecordPaymentSheet';
 import { useAuth } from '../contexts/AuthContext';
 import {
-  Package, User, Wrench, DollarSign, ArrowLeft, Trash2, Calendar,
+  Package, User, Wrench, IndianRupee, ArrowLeft, Trash2, Calendar,
   CreditCard, Building2, Hash, FileText, AlertTriangle, CheckCircle,
   XCircle, Clock, MapPin, Phone, UserCheck, FileCheck, ExternalLink,
   Receipt, PlusCircle
@@ -15,7 +15,7 @@ const typeConfig = {
   Materials: { label: 'Material', bg: '#FFF5F0', color: '#F97316', icon: <Package size={18} /> },
   Wages: { label: 'Labour', bg: '#F0FDF4', color: '#22C55E', icon: <User size={18} /> },
   Expense: { label: 'Equipment', bg: '#FFF7ED', color: '#F97316', icon: <Wrench size={18} /> },
-  Income: { label: 'Income', bg: '#FFF7F0', color: '#EA580C', icon: <DollarSign size={18} /> },
+  Income: { label: 'Income', bg: '#FFF7F0', color: '#EA580C', icon: <IndianRupee size={18} /> },
 };
 
 function formatCurrency(amount) {
@@ -97,7 +97,7 @@ export default function EntryDetailPage() {
     { icon: <FileText size={14} />, label: 'Category', value: entry.category || entry.materialType || entry.workType || '\u2014' },
     { icon: <Package size={14} />, label: 'Quantity', value: entry.quantity ? `${entry.quantity} ${entry.unit || ''}` : '\u2014' },
     { icon: <CreditCard size={14} />, label: 'Rate', value: entry.rate ? formatCurrency(entry.rate) : '\u2014' },
-    { icon: <DollarSign size={14} />, label: 'Total Amount', value: formatCurrency(entry.amount), highlight: true },
+    { icon: <IndianRupee size={14} />, label: 'Total Amount', value: formatCurrency(entry.amount), highlight: true },
     { icon: <CheckCircle size={14} />, label: 'Payment Status', value: entry.paymentStatus || '\u2014' },
   ];
 

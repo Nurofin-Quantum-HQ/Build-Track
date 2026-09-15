@@ -60,10 +60,14 @@ router.get("/financial", async (req, res) => {
     const query = {
       date: { $gte: startDate, $lte: endDate },
     };
+    const adminId = await getAdminId(req.user);
     if (isAdmin) {
-      query.createdBy = userId;
+      query.$or = [{ createdBy: userId }, { project: { $in: projectIds } }];
     } else {
-      query.project = { $in: projectIds };
+      query.$or = [
+        { project: { $in: projectIds } },
+        { project: null, createdBy: { $in: [userId, adminId].filter(Boolean) } }
+      ];
     }
     if (type && type !== "All") query.type = type;
     if (category) query.category = category;
@@ -73,6 +77,7 @@ router.get("/financial", async (req, res) => {
         return res.status(403).json({ message: "Access denied to this project" });
       }
       query.project = project;
+      delete query.$or;
     }
     const transactions = await Transaction.find(query)
       .populate("project", "projectName status budget progress")
@@ -111,7 +116,6 @@ router.get("/financial", async (req, res) => {
         utilization,
       };
     });
-    const adminId = await getAdminId(req.user);
     const workersRecords = await Worker.find({ createdBy: adminId }).lean();
     const wageTransactions = transactions.filter((t) => t.type === "Wages");
     const workerStats = {};
@@ -227,10 +231,14 @@ router.get("/financial/export-csv", async (req, res) => {
       type: "Wages",
       date: { $gte: startDate, $lte: endDate },
     };
+    const adminId = await getAdminId(req.user);
     if (isAdmin) {
-      txQuery.createdBy = req.user._id;
+      txQuery.$or = [{ createdBy: req.user._id }, { project: { $in: projectIds } }];
     } else {
-      txQuery.project = { $in: projectIds };
+      txQuery.$or = [
+        { project: { $in: projectIds } },
+        { project: null, createdBy: { $in: [req.user._id, adminId].filter(Boolean) } }
+      ];
     }
     const wageTransactions = await Transaction.find(txQuery)
       .populate("worker", "name trade dailyWage")
@@ -269,10 +277,14 @@ router.get("/financial/export-pdf", async (req, res) => {
     const txQuery = {
       date: { $gte: startDate, $lte: endDate },
     };
+    const adminId = await getAdminId(req.user);
     if (isAdmin) {
-      txQuery.createdBy = req.user._id;
+      txQuery.$or = [{ createdBy: req.user._id }, { project: { $in: projectIds } }];
     } else {
-      txQuery.project = { $in: projectIds };
+      txQuery.$or = [
+        { project: { $in: projectIds } },
+        { project: null, createdBy: { $in: [req.user._id, adminId].filter(Boolean) } }
+      ];
     }
     const transactions = await Transaction.find(txQuery).populate("project", "projectName");
     const income = transactions

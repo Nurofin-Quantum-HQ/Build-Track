@@ -4,6 +4,9 @@ const safeUser = (user) => ({
   _id:              user._id || user.id,
   name:             user.name,
   email:            user.email,
+  companyName:      user.companyName || (user.createdBy && typeof user.createdBy === 'object' ? user.createdBy.companyName : '') || '',
+  companyFontStyle: user.companyFontStyle || (user.createdBy && typeof user.createdBy === 'object' ? user.createdBy.companyFontStyle : 'Inter') || 'Inter',
+  companyLogo:      user.companyLogo || (user.createdBy && typeof user.createdBy === 'object' ? user.createdBy.companyLogo : null) || null,
   phone:            user.phone || null,
   role:             user.role   || "Mason",
   permissions:      Array.isArray(user.permissions) ? user.permissions : [],
@@ -23,9 +26,25 @@ const updateProfile = async (req, res) => {
     const userId = req.user?.id || req.user?._id;
     if (!userId) return res.status(401).json({ message: "Not authenticated" });
 
-    const { name, email, profilePhoto, role, phone } = req.body;
+    const { name, email, profilePhoto, role, phone, companyName, companyFontStyle, companyLogo } = req.body;
     const user = await User.findById(userId).select("-password");
     if (!user) return res.status(404).json({ message: "User not found" });
+
+    if (companyName !== undefined) {
+      const trimmedCompany = String(companyName).trim();
+      if (!trimmedCompany) {
+        return res.status(400).json({ message: "Company name cannot be empty" });
+      }
+      user.companyName = trimmedCompany;
+    }
+
+    if (companyFontStyle !== undefined) {
+      user.companyFontStyle = String(companyFontStyle).trim() || "Inter";
+    }
+
+    if (companyLogo !== undefined) {
+      user.companyLogo = (companyLogo === "" || companyLogo === null || companyLogo === "delete") ? null : String(companyLogo);
+    }
 
     if (name !== undefined) {
       const trimmedName = String(name).trim();

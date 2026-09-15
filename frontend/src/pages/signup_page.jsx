@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { authAPI } from "../api";
 import {
@@ -12,10 +12,25 @@ import {
   Building,
   CheckCircle,
   AlertTriangle,
+  Upload,
+  X,
+  Type,
+  Image as ImageIcon,
   Phone
 } from "lucide-react";
 import LightPremiumInput from "../components/ui/LightPremiumInput";
 import nurofinLogo from "../assets/nurofin-black.svg";
+
+export const COMPANY_FONT_OPTIONS = [
+  { id: "Inter", name: "Inter (Modern)", font: "'Inter', sans-serif" },
+  { id: "Outfit", name: "Outfit (Bold)", font: "'Outfit', sans-serif" },
+  { id: "Poppins", name: "Poppins (Clean)", font: "'Poppins', sans-serif" },
+  { id: "Montserrat", name: "Montserrat (Architectural)", font: "'Montserrat', sans-serif" },
+  { id: "Roboto", name: "Roboto (Technical)", font: "'Roboto', sans-serif" },
+  { id: "Playfair Display", name: "Playfair Display (Serif)", font: "'Playfair Display', serif" },
+  { id: "Cinzel", name: "Cinzel (Classic)", font: "'Cinzel', serif" },
+  { id: "Caveat", name: "Caveat (Script)", font: "'Caveat', cursive" },
+];
 
 const features = [
   { title: "Real-time dashboards",  desc: "Track every project metric live."  },
@@ -27,8 +42,13 @@ const features = [
 export default function SignUpPage() {
   const navigate = useNavigate();
   const [vw, setVw] = useState(window.innerWidth);
+  const logoInputRef = useRef(null);
 
   const [fullName, setFullName] = useState("");
+  const [companyName, setCompanyName] = useState("");
+  const [companyFontStyle, setCompanyFontStyle] = useState("Inter");
+  const [companyLogo, setCompanyLogo] = useState(null);
+  const [logoPreview, setLogoPreview] = useState(null);
   const [phone, setPhone] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -100,11 +120,34 @@ export default function SignUpPage() {
     }
   };
 
+  const handleLogoChange = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 5 * 1024 * 1024) {
+      setErrors((p) => ({ ...p, logo: "Logo must be smaller than 5MB." }));
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      setCompanyLogo(ev.target.result);
+      setLogoPreview(ev.target.result);
+      setErrors((p) => ({ ...p, logo: "" }));
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleRemoveLogo = () => {
+    setCompanyLogo(null);
+    setLogoPreview(null);
+    if (logoInputRef.current) logoInputRef.current.value = "";
+  };
+
   const validate = () => {
     const e = {};
     if (!fullName.trim())                           e.name = "Full name is required.";
     if (!phone.trim())                              e.phone = "Phone number is required.";
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) e.email = "Enter a valid company email.";
+    if (!companyName.trim())                        e.companyName = "Company name is required.";
     if (password.length < 6)                        e.password = "Min 6 characters required.";
     if (confirm !== password)                       e.confirm = "Passwords do not match.";
     if (!agreed)                                    e.agreed = "Please accept the terms.";
@@ -130,11 +173,15 @@ export default function SignUpPage() {
       const { data } = await authAPI.register({
         name: fullName.trim(),
         email: email.trim(),
+        companyName: companyName.trim(),
+        companyFontStyle: companyFontStyle || "Inter",
+        companyLogo: companyLogo || null,
         password,
         phone: phone.trim(),
       });
       localStorage.setItem("bt_token", data.token);
       localStorage.setItem("bt_user", JSON.stringify(data.user));
+      window.dispatchEvent(new Event("userUpdated"));
       navigate("/", { replace: true });
     } catch (err) {
       const msg =
@@ -477,6 +524,156 @@ export default function SignUpPage() {
 
               {isEmailVerified && (
                 <>
+                  <LightPremiumInput
+                    type="text"
+                    label="Company Name *"
+                    icon={Building}
+                    value={companyName}
+                    onChange={e => {
+                      setCompanyName(e.target.value);
+                      setErrors(p => ({...p, companyName: ""}));
+                      setServerErr("");
+                    }}
+                    error={errors.companyName}
+                    placeholder="e.g. Apex Construction"
+                    autoComplete="organization"
+                  />
+
+                  <div style={{ marginBottom: 18 }}>
+                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
+                      <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: "12px", fontWeight: "700", color: "#334155" }}>
+                        <Type size={14} color="#F97316" />
+                        <span>Company Name Font Style</span>
+                      </label>
+                      <span style={{ fontSize: "11px", color: "#F97316", fontWeight: "600" }}>Live Preview</span>
+                    </div>
+
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, maxHeight: "150px", overflowY: "auto", padding: "2px" }}>
+                      {COMPANY_FONT_OPTIONS.map((f) => {
+                        const isSelected = companyFontStyle === f.id;
+                        return (
+                          <button
+                            key={f.id}
+                            type="button"
+                            onClick={() => setCompanyFontStyle(f.id)}
+                            style={{
+                              padding: "8px 10px",
+                              borderRadius: 10,
+                              border: isSelected ? "2px solid #F97316" : "1.5px solid #E2E8F0",
+                              background: isSelected ? "#FFF7ED" : "#FFFFFF",
+                              cursor: "pointer",
+                              textAlign: "left",
+                              display: "flex",
+                              flexDirection: "column",
+                              gap: 2,
+                              transition: "all 0.15s ease",
+                              boxShadow: isSelected ? "0 2px 8px rgba(249, 115, 22, 0.15)" : "none",
+                            }}
+                          >
+                            <span style={{ fontSize: "10.5px", color: isSelected ? "#EA580C" : "#64748B", fontWeight: 700 }}>
+                              {f.name}
+                            </span>
+                            <span
+                              style={{
+                                fontFamily: f.font,
+                                fontSize: "13.5px",
+                                fontWeight: 800,
+                                color: isSelected ? "#0F172A" : "#334155",
+                                whiteSpace: "nowrap",
+                                overflow: "hidden",
+                                textOverflow: "ellipsis",
+                              }}
+                            >
+                              {companyName.trim() || "Preview"}
+                            </span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  <div style={{ marginBottom: 18 }}>
+                    <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: "12px", fontWeight: "700", color: "#334155", marginBottom: 6 }}>
+                      <ImageIcon size={14} color="#F97316" />
+                      <span>Company Logo <span style={{ fontWeight: 500, color: "#94A3B8" }}>(Optional)</span></span>
+                    </label>
+
+                    <input
+                      ref={logoInputRef}
+                      type="file"
+                      accept="image/*"
+                      style={{ display: "none" }}
+                      onChange={handleLogoChange}
+                    />
+
+                    {logoPreview ? (
+                      <div style={{
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "space-between",
+                        padding: "10px 14px",
+                        borderRadius: 12,
+                        background: "#F8FAFC",
+                        border: "1.5px solid #E2E8F0"
+                      }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                          <img
+                            src={logoPreview}
+                            alt="Logo Preview"
+                            style={{ width: 40, height: 40, objectFit: "contain", borderRadius: 8, background: "#FFF", border: "1px solid #E2E8F0" }}
+                          />
+                          <div>
+                            <div style={{ fontSize: "12px", fontWeight: "700", color: "#0F172A" }}>Logo Uploaded</div>
+                            <button
+                              type="button"
+                              onClick={() => logoInputRef.current?.click()}
+                              style={{ background: "none", border: "none", color: "#F97316", fontSize: "11px", fontWeight: "700", padding: 0, cursor: "pointer" }}
+                            >
+                              Change logo
+                            </button>
+                          </div>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={handleRemoveLogo}
+                          style={{ background: "#FEE2E2", border: "none", borderRadius: 8, padding: 6, cursor: "pointer", color: "#EF4444", display: "flex" }}
+                          title="Remove logo"
+                        >
+                          <X size={15} />
+                        </button>
+                      </div>
+                    ) : (
+                      <div
+                        onClick={() => logoInputRef.current?.click()}
+                        style={{
+                          border: "1.5px dashed #CBD5E1",
+                          borderRadius: 12,
+                          padding: "12px 14px",
+                          background: "#F8FAFC",
+                          cursor: "pointer",
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          gap: 10,
+                          transition: "all 0.15s ease",
+                        }}
+                        onMouseEnter={(e) => { e.currentTarget.style.borderColor = "#F97316"; e.currentTarget.style.background = "#FFF7ED"; }}
+                        onMouseLeave={(e) => { e.currentTarget.style.borderColor = "#CBD5E1"; e.currentTarget.style.background = "#F8FAFC"; }}
+                      >
+                        <Upload size={16} color="#F97316" />
+                        <span style={{ fontSize: "12px", fontWeight: "600", color: "#475569" }}>
+                          Upload Logo (Optional)
+                        </span>
+                      </div>
+                    )}
+                    {errors.logo && (
+                      <div style={{ display: "flex", alignItems: "center", gap: 5, marginTop: 5, color: "#dc2626", fontSize: "11px", fontWeight: "700" }}>
+                        <AlertTriangle size={11} />
+                        <span>{errors.logo}</span>
+                      </div>
+                    )}
+                  </div>
+
                   <LightPremiumInput
                     type={showPass ? "text" : "password"}
                     label="Password"

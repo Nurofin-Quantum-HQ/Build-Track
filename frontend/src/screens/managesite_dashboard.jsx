@@ -4,16 +4,16 @@ import { useAuth } from "../contexts/AuthContext";
 import { projectAPI, transactionAPI } from "../api";
 import perfLogger from "../utils/performanceLogger";
 import { resolveImageUrl } from "../utils/imageUrl";
-import { calcProgress, getPhaseProgress, toggleActivity } from "../utils/constructionPhases";
+import { calcProgress, getPhaseProgress, toggleActivity, isActivityCompleted } from "../utils/constructionPhases";
 import { Toast, ConfirmDialog } from "../components/Toast";
 import { Card, Badge, Button } from "../components/ui";
 import CsvImportExportCard from "../components/CsvImportExportCard";
 import useTransactionStore from "../stores/transactionStore";
 import {
-  ChevronDown, ChevronRight, Plus, FileDown, FileUp, Pencil, X, Check, ArrowRight,
+  ChevronDown, ChevronRight, Plus, FileDown, FileUp, Pencil, X, Check, ArrowRight, ArrowLeft,
   Building2, MapPin, Calendar, User, Hash, Phone, Code, Wrench,
   Home, Layers, Bed, Bath, Settings, Zap, Flame, ChefHat, Sun,
-  Clock, DollarSign, CreditCard, PiggyBank, Target, ClipboardCheck,
+  Clock, IndianRupee, CreditCard, PiggyBank, Target, ClipboardCheck,
   List, Camera, FileText, Send, Trash2, Info, AlertCircle, Sparkles,
 } from "lucide-react";
 
@@ -165,12 +165,12 @@ export default function ManageSitePage() {
   const phases = p.selectedPhases || [];
   const hasNewTracker = phases.length > 0;
   const trackerTotal = phases.reduce((s, ph) => s + (ph.activities?.length || 0), 0);
-  const trackerDone = phases.reduce((s, ph) => s + (ph.activities?.filter(a => a.completed || a.isCompleted).length || 0), 0);
+  const trackerDone = phases.reduce((s, ph) => s + (ph.activities?.filter(a => isActivityCompleted(a, ph, p)).length || 0), 0);
 
   const projectName = p.projectName || "Untitled Project";
   const projectLoc = p.location || "\u2014";
   const progFallback = p.progress || 0;
-  const progress = hasNewTracker ? calcProgress(phases) : (progFallback > 1 ? progFallback : progFallback * 100);
+  const progress = hasNewTracker ? calcProgress(phases, p) : (progFallback > 1 ? progFallback : progFallback * 100);
   const status = p.status || "Active";
   const hasPhoto = Boolean(p.photo && String(p.photo).trim());
   const imgSrc = hasPhoto ? resolveImageUrl(p.photo) : "";
@@ -199,13 +199,14 @@ export default function ManageSitePage() {
   const addlAll = [...addl, ...unknown];
 
   const handleToggleActivity = async (phaseId, activityId) => {
-    const updatedPhases = toggleActivity(phases, phaseId, activityId);
-    const newProgress = calcProgress(updatedPhases);
-    setLocalProject(prev => ({ ...prev, selectedPhases: updatedPhases, progress: newProgress }));
+    const updatedPhases = toggleActivity(phases, phaseId, activityId, p);
+    const newProgress = calcProgress(updatedPhases, p);
+    const completedKeys = updatedPhases.flatMap(ph => ph.activities?.filter(a => isActivityCompleted(a, ph, p)).map(a => a.id) || []);
+    setLocalProject(prev => ({ ...prev, selectedPhases: updatedPhases, completedActivityKeys: completedKeys, progress: newProgress }));
     try {
-      await projectAPI.update(projectId, { selectedPhases: updatedPhases, progress: newProgress });
+      await projectAPI.update(projectId, { selectedPhases: updatedPhases, completedActivityKeys: completedKeys, progress: newProgress });
     } catch {
-      setLocalProject(prev => ({ ...prev, selectedPhases: phases, progress: calcProgress(phases) }));
+      setLocalProject(prev => ({ ...prev, selectedPhases: phases, progress: calcProgress(phases, p) }));
       setToast({ msg: "Failed to update activity.", type: "error" });
     }
   };
@@ -417,7 +418,7 @@ export default function ManageSitePage() {
   };
 
   const renderFinancial = () => (
-    <CollapsibleCard title={SECTIONS.financial} icon={<DollarSign size={16} />} defaultOpen>
+    <CollapsibleCard title={SECTIONS.financial} icon={<IndianRupee size={16} />} defaultOpen>
       <div style={{ background: "#F8FAFC", borderRadius: 8, border: "1px solid #E5E7EB", padding: "12px 14px", marginBottom: 12 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
           <div style={{ width: 36, height: 36, borderRadius: 8, background: "#FFF5F0", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
@@ -456,7 +457,7 @@ export default function ManageSitePage() {
     </CollapsibleCard>
   );
 
-  const _isC = (act) => act.completed || act.isCompleted;
+  const _isC = (act, phase = null) => isActivityCompleted(act, phase, p);
   const _completedDateLabel = (act) => {
     if (!act.completedAt) return null;
     const d = new Date(act.completedAt);
@@ -513,7 +514,7 @@ export default function ManageSitePage() {
       <CollapsibleCard title={SECTIONS.tracker} icon={<ClipboardCheck size={16} />} subtitle={`${trackerDone}/${trackerTotal} done`} defaultOpen>
         <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
           {phases.map(phase => {
-            const pDone = phase.activities?.filter(a => a.completed || a.isCompleted).length || 0;
+            const pDone = phase.activities?.filter(a => isActivityCompleted(a, phase, p)).length || 0;
             const pTotal = phase.activities?.length || 0;
             const pPct = pTotal > 0 ? pDone / pTotal : 0;
             const isExpanded = expandedPhase === phase.id;
@@ -719,7 +720,7 @@ export default function ManageSitePage() {
                       flexShrink: 0,
                     }}
                   >
-                    <DollarSign size={18} color={tc.color} />
+                    <IndianRupee size={18} color={tc.color} />
                   </div>
 
                   <div style={{ flex: 1, minWidth: 0 }}>
@@ -804,10 +805,37 @@ export default function ManageSitePage() {
       {confirmDlg && <ConfirmDialog message={confirmDlg.message} danger={confirmDlg.danger} confirmLabel={confirmDlg.confirmLabel} onConfirm={confirmDlg.onConfirm} onCancel={() => setConfirmDlg(null)} />}
 
       <div style={{ background: "#fff", borderBottom: "1px solid #E5E7EB", padding: "14px 24px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexShrink: 0 }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 14 }}>
-          <span onClick={() => navigate("/projects")} style={{ color: "#F97316", cursor: "pointer", fontWeight: 500, fontSize: 13 }}>Projects</span>
-          <ArrowRight size={12} color="#94A3B8" />
-          <span style={{ color: "#111827", fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: 300, fontSize: 13 }}>{projectName}</span>
+        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+          <button
+            onClick={() => navigate("/projects")}
+            title="Back to Projects"
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: 6,
+              padding: "7px 14px",
+              background: "#F8FAFC",
+              border: "1px solid #E2E8F0",
+              borderRadius: 8,
+              fontSize: 13,
+              fontWeight: 600,
+              color: "#334155",
+              cursor: "pointer",
+              transition: "all 0.15s ease",
+              fontFamily: "inherit",
+              boxShadow: "0 1px 2px rgba(0,0,0,0.04)"
+            }}
+            onMouseEnter={e => { e.currentTarget.style.background = "#F1F5F9"; e.currentTarget.style.color = "#0F172A"; }}
+            onMouseLeave={e => { e.currentTarget.style.background = "#F8FAFC"; e.currentTarget.style.color = "#334155"; }}
+          >
+            <ArrowLeft size={16} />
+            <span>Back</span>
+          </button>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 14 }}>
+            <span onClick={() => navigate("/projects")} style={{ color: "#F97316", cursor: "pointer", fontWeight: 500, fontSize: 13 }}>Projects</span>
+            <ArrowRight size={12} color="#94A3B8" />
+            <span style={{ color: "#111827", fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: 300, fontSize: 13 }}>{projectName}</span>
+          </div>
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
           <button onClick={handleExportCSV} style={{ padding: "6px 12px", background: "#fff", border: "1px solid #E5E7EB", borderRadius: 8, fontSize: 12, fontWeight: 600, color: "#475569", cursor: "pointer", display: "flex", alignItems: "center", gap: 6, fontFamily: 'inherit' }}>
@@ -832,7 +860,7 @@ export default function ManageSitePage() {
               <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 10 }}>
                 <Badge variant={status === "Completed" ? "success" : status === "In Progress" ? "info" : status === "On Hold" ? "warning" : "info"} size="sm">{status}</Badge>
                 {phases.length > 0 && (() => {
-                  const completedKeys = new Set(phases.flatMap(ph => ph.activities?.filter(a => a.completed || a.isCompleted).map(a => a.id) || []));
+                  const completedKeys = new Set(phases.flatMap(ph => ph.activities?.filter(a => isActivityCompleted(a, ph, p)).map(a => a.id) || []));
                   let activePhase = null;
                   for (const ph of phases) {
                     if (ph.activities?.some(a => !completedKeys.has(a.id))) {
@@ -931,7 +959,7 @@ export default function ManageSitePage() {
           <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr 1fr" : "repeat(4, 1fr)", gap: 10 }}>
             <ActionBtn icon={<FileText size={18} />} label="Add Entry" onClick={() => navigate("/add-entry", { state: { project: p } })} borderColor="#EA580C" />
             <ActionBtn icon={<MicIcon />} label="Voice Entry" onClick={() => navigate("/voice", { state: { project: p } })} borderColor="#EA580C" />
-            <ActionBtn icon={<BarChartIcon />} label="View Reports" onClick={() => navigate("/reports/:id", { state: { project: p } })} borderColor="#FB923C" />
+            <ActionBtn icon={<BarChartIcon />} label="View Reports" onClick={() => navigate("/project-report/" + projectId, { state: { project: p } })} borderColor="#FB923C" />
             <ActionBtn icon={<Building2 size={18} />} label="Full Details" onClick={() => navigate("/project-detail/" + projectId, { state: { project: p } })} borderColor="#22C55E" />
           </div>
         </CollapsibleCard>
@@ -967,7 +995,7 @@ function CatRow({ label, amount, color }) {
   return (
     <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
       <div style={{ width: 28, height: 28, borderRadius: 6, background: `${color}14`, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-        <DollarSign size={12} color={color} />
+        <IndianRupee size={12} color={color} />
       </div>
       <span style={{ flex: 1, fontSize: 13, color: "#475569" }}>{label}</span>
       <span style={{ fontSize: 13, fontWeight: 700, color }}>{fmtINR(amount)}</span>

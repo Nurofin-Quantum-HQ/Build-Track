@@ -7,9 +7,9 @@ import { buildDefaultPhases, addCustomPhase, addActivityToPhase, mergePhasesWith
 import { Badge, Button } from "../components/ui";
 import ModuleTour from "../components/ModuleTour";
 import {
-  ChevronDown, Plus, X, Check, Camera, MapPin, Calendar, User, Phone,
+  ChevronDown, Plus, Minus, X, Check, Camera, MapPin, Calendar, User, Phone,
   Building2, Home, Layers, Bed, Bath, Settings, Zap, Flame, ChefHat, Sun,
-  CalendarDays, DollarSign, HardHat, FileText, Hash, ArrowLeft, Upload,
+  CalendarDays, IndianRupee, HardHat, FileText, Hash, ArrowLeft, Upload,
   ClipboardList, Users, Wrench, HelpCircle
 } from "lucide-react";
 
@@ -108,9 +108,26 @@ function Stepper({ label, value, onChange, min = 0, max = 99 }) {
           -
         </button>
         <span style={{ width: 24, textAlign: "center", fontSize: 14, fontWeight: 700, color: "#111827" }}>{value}</span>
-        <button onClick={() => onChange(Math.min(max, value + 1))}
-          style={{ width: 28, height: 28, borderRadius: 6, border: "1px solid #E5E7EB", background: "#fff", cursor: "pointer", fontSize: 14, fontWeight: 700, color: "#64748B", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: 'inherit' }}>
-          +
+        <button
+          type="button"
+          onClick={() => onChange(Math.min(max, value + 1))}
+          aria-label={`Increase ${label}`}
+          disabled={value >= max}
+          style={{
+            width: 28,
+            height: 28,
+            borderRadius: 6,
+            border: "1px solid #E5E7EB",
+            background: value >= max ? "#F8FAFC" : "#fff",
+            cursor: value >= max ? "not-allowed" : "pointer",
+            color: value >= max ? "#CBD5E1" : "#64748B",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            fontFamily: "inherit",
+            transition: "all 0.15s"
+          }}>
+          <Plus size={13} strokeWidth={2.5} />
         </button>
       </div>
     </div>
@@ -740,9 +757,37 @@ export default function NewProjectPage() {
 
       <div style={{ height: TOPBAR_H, flexShrink: 0, background: "#fff", borderBottom: "1px solid #E5E7EB", padding: "0 24px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
         <ModuleTour steps={tourSteps} run={runTour} setRun={setRunTour} moduleName="AddNewProject" />
-        <div style={{ minWidth: 0 }}>
-          <h1 style={{ margin: 0, fontSize: 20, fontWeight: 700, color: "#111827", letterSpacing: "-0.03em" }}>{isEditMode ? "Edit Project" : "New Project"}</h1>
-          <p style={{ margin: "2px 0 0", fontSize: 12, color: "#64748B" }}>{isEditMode ? "Edit project configuration" : "Create a new construction project"}</p>
+        <div style={{ display: "flex", alignItems: "center", gap: 12, minWidth: 0 }}>
+          <button
+            onClick={() => navigate("/projects")}
+            title="Back to Projects"
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: 6,
+              padding: "7px 14px",
+              background: "#F8FAFC",
+              border: "1px solid #E2E8F0",
+              borderRadius: 8,
+              fontSize: 13,
+              fontWeight: 600,
+              color: "#334155",
+              cursor: "pointer",
+              transition: "all 0.15s ease",
+              fontFamily: "inherit",
+              flexShrink: 0,
+              boxShadow: "0 1px 2px rgba(0,0,0,0.04)"
+            }}
+            onMouseEnter={e => { e.currentTarget.style.background = "#F1F5F9"; e.currentTarget.style.color = "#0F172A"; }}
+            onMouseLeave={e => { e.currentTarget.style.background = "#F8FAFC"; e.currentTarget.style.color = "#334155"; }}
+          >
+            <ArrowLeft size={16} />
+            <span>Back</span>
+          </button>
+          <div style={{ minWidth: 0 }}>
+            <h1 style={{ margin: 0, fontSize: 20, fontWeight: 700, color: "#111827", letterSpacing: "-0.03em" }}>{isEditMode ? "Edit Project" : "New Project"}</h1>
+            <p style={{ margin: "2px 0 0", fontSize: 12, color: "#64748B" }}>{isEditMode ? "Edit project configuration" : "Create a new construction project"}</p>
+          </div>
         </div>
         <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
           <button onClick={() => setRunTour(true)} title="Help" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 36, height: 36, background: '#fff', border: '1px solid #E5E7EB', borderRadius: 8, cursor: 'pointer', flexShrink: 0 }}>
@@ -982,28 +1027,28 @@ export default function NewProjectPage() {
                 <div>
                   <label style={labelStyle}>Materials</label>
                   <div style={{ display: "flex", alignItems: "center", gap: 6, background: "#fff", border: "1px solid #E5E7EB", borderRadius: 8, padding: "10px 12px" }}>
-                    <DollarSign size={14} color="#F97316" />
+                    <IndianRupee size={14} color="#F97316" />
                     <input value={budgetMaterial} onChange={e => setBudgetMaterial(e.target.value)} placeholder="0" type="number" style={{ flex: 1, border: "none", background: "transparent", outline: "none", fontSize: 14, color: "#111827", fontFamily: "inherit" }} />
                   </div>
                 </div>
                 <div>
                   <label style={labelStyle}>Labour</label>
                   <div style={{ display: "flex", alignItems: "center", gap: 6, background: "#fff", border: "1px solid #E5E7EB", borderRadius: 8, padding: "10px 12px" }}>
-                    <DollarSign size={14} color="#0EA5E9" />
+                    <IndianRupee size={14} color="#0EA5E9" />
                     <input value={budgetLabour} onChange={e => setBudgetLabour(e.target.value)} placeholder="0" type="number" style={{ flex: 1, border: "none", background: "transparent", outline: "none", fontSize: 14, color: "#111827", fontFamily: "inherit" }} />
                   </div>
                 </div>
                 <div>
                   <label style={labelStyle}>Equipment</label>
                   <div style={{ display: "flex", alignItems: "center", gap: 6, background: "#fff", border: "1px solid #E5E7EB", borderRadius: 8, padding: "10px 12px" }}>
-                    <DollarSign size={14} color="#EA580C" />
+                    <IndianRupee size={14} color="#EA580C" />
                     <input value={budgetEquipment} onChange={e => setBudgetEquipment(e.target.value)} placeholder="0" type="number" style={{ flex: 1, border: "none", background: "transparent", outline: "none", fontSize: 14, color: "#111827", fontFamily: "inherit" }} />
                   </div>
                 </div>
                 <div>
                   <label style={labelStyle}>Miscellaneous</label>
                   <div style={{ display: "flex", alignItems: "center", gap: 6, background: "#fff", border: "1px solid #E5E7EB", borderRadius: 8, padding: "10px 12px" }}>
-                    <DollarSign size={14} color="#F59E0B" />
+                    <IndianRupee size={14} color="#F59E0B" />
                     <input value={budgetMisc} onChange={e => setBudgetMisc(e.target.value)} placeholder="0" type="number" style={{ flex: 1, border: "none", background: "transparent", outline: "none", fontSize: 14, color: "#111827", fontFamily: "inherit" }} />
                   </div>
                 </div>

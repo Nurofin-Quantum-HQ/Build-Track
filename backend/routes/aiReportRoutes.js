@@ -4,6 +4,7 @@ const Transaction = require("../models/Transaction");
 const Inventory = require("../models/Inventory");
 const Project = require("../models/Project");
 const { protect, getAdminId, canAccessProjectFilter } = require("../middleware/auth");
+const aiProvider = require("../services/ai/groqProvider");
 router.use(protect);
 function fmtDate(d) {
   if (!d) return "-";
@@ -28,10 +29,17 @@ async function getProjectIds(req) {
   return projects.map((p) => p._id);
 }
 async function baseTxQuery(req) {
-  const isAdmin = req.user.role === "Admin";
-  if (isAdmin) return { createdBy: req.user._id };
   const ids = await getProjectIds(req);
-  return { project: { $in: ids } };
+  if (req.user.role === "Admin") {
+    return { $or: [{ createdBy: req.user._id }, { project: { $in: ids } }] };
+  }
+  const adminId = await getAdminId(req.user);
+  return {
+    $or: [
+      { project: { $in: ids } },
+      { project: null, createdBy: { $in: [req.user._id, adminId].filter(Boolean) } }
+    ]
+  };
 }
 function detectIntent(q) {
   const lower = q.toLowerCase();
@@ -43,7 +51,8 @@ function detectIntent(q) {
   const monthMatch = monthNames.find((m) => lower.includes(m));
   const isToday    = /\btoday\b/.test(lower);
   const isYesterday= /\byesterday\b/.test(lower);
-  const isThisWeek = /this week|last 7 days/.test(lower);
+  const isLastWeek = /\blast week\b|previous week|past week/i.test(lower);
+  const isThisWeek = !isLastWeek && /this week|last 7 days/.test(lower);
   const isThisMonth= /this month|current month/.test(lower);
   const isLastMonth= /last month/.test(lower);
   const isMaterial  = /material|cement|sand|steel|brick|paint|stone|purchase|aggregate|gravel|concrete/i.test(q);
@@ -61,7 +70,7 @@ function detectIntent(q) {
   const specificMaterial = materialNames.find((m) => lower.includes(m));
   return {
     dateRangeMatch, monthMatch,
-    isToday, isYesterday, isThisWeek, isThisMonth, isLastMonth,
+    isToday, isYesterday, isThisWeek, isLastWeek, isThisMonth, isLastMonth,
     isMaterial, isLabour, isEquipment, isExpense,
     isInventory, isBudget, isTotal, isPending, isProgress, isEntries,
     specificMaterial,
@@ -81,16 +90,17 @@ function mergeWithHistory(intent, question, history) {
     const prevIntent = detectIntent(prevQ);
     const currentHasDateSignal =
       intent.dateRangeMatch || intent.monthMatch || intent.isToday ||
-      intent.isYesterday || intent.isThisWeek || intent.isThisMonth || intent.isLastMonth;
+      intent.isYesterday || intent.isThisWeek || intent.isLastWeek || intent.isThisMonth || intent.isLastMonth;
     const prevHasDateSignal =
       prevIntent.dateRangeMatch || prevIntent.monthMatch || prevIntent.isToday ||
-      prevIntent.isYesterday || prevIntent.isThisWeek || prevIntent.isThisMonth || prevIntent.isLastMonth;
+      prevIntent.isYesterday || prevIntent.isThisWeek || prevIntent.isLastWeek || prevIntent.isThisMonth || prevIntent.isLastMonth;
     if (!currentHasDateSignal && prevHasDateSignal && looksLikeFollowUp) {
       intent.dateRangeMatch = prevIntent.dateRangeMatch;
       intent.monthMatch     = prevIntent.monthMatch;
       intent.isToday        = prevIntent.isToday;
       intent.isYesterday    = prevIntent.isYesterday;
       intent.isThisWeek     = prevIntent.isThisWeek;
+      intent.isLastWeek     = prevIntent.isLastWeek;
       intent.isThisMonth    = prevIntent.isThisMonth;
       intent.isLastMonth    = prevIntent.isLastMonth;
     }
@@ -143,6 +153,18 @@ function resolveDateWindow(intent) {
     const start = new Date(d); start.setHours(0,0,0,0);
     const end   = new Date(d); end.setHours(23,59,59,999);
     return { start, end, label: "Yesterday" };
+  }
+  if (intent.isLastWeek) {
+    const d = new Date();
+    const day = d.getDay();
+    const diffToPrevMonday = (day === 0 ? 6 : day - 1) + 7;
+    const start = new Date(d);
+    start.setDate(d.getDate() - diffToPrevMonday);
+    start.setHours(0, 0, 0, 0);
+    const end = new Date(start);
+    end.setDate(start.getDate() + 6);
+    end.setHours(23, 59, 59, 999);
+    return { start, end, label: `last week (${fmtDate(start)}–${fmtDate(end)})` };
   }
   if (intent.isThisWeek) {
     const start = new Date(); start.setDate(now.getDate() - 6); start.setHours(0,0,0,0);
@@ -329,16 +351,16 @@ router.post("/ai-chat", async (req, res) => {
       });
     }
     if (intent.isPending) {
-      const pendingTx = await Transaction.find({ ...scope, paymentStatus: "Pending" })
-        .populate("project", "projectName")
-        .sort({ date: -1 })
-        .lean();
+      const pendingTx = await Transaction.find({
+        ...scope,
+        paymentStatus: { $in: ["Pending", "Partial"] },
+      }).sort({ date: -1 }).lean();
       if (pendingTx.length === 0) {
         return res.json({
           result: {
-            text: "No pending payments found.",
+            text: "All payments are up to date. No pending payments found.",
             table_type: "none", table_title: null,
-            rows: [], inventory_rows: [], total_amount: null,
+            rows: [], inventory_rows: [], total_amount: 0,
           },
         });
       }
@@ -359,27 +381,36 @@ router.post("/ai-chat", async (req, res) => {
         },
       });
     }
+
     let typeFilter = null;
     if (intent.isLabour)         typeFilter = "Wages";
     else if (intent.isEquipment) typeFilter = "Equipment";
     else if (intent.isExpense)   typeFilter = "Expense";
     else if (intent.isMaterial)  typeFilter = "Materials";
+
     const dateWindow = resolveDateWindow(intent);
+
     if (dateWindow) {
       const txQuery = {
         ...scope,
         date: { $gte: dateWindow.start, $lte: dateWindow.end },
       };
       if (typeFilter) txQuery.type = typeFilter;
-      const txs   = await Transaction.find(txQuery)
+      if (intent.specificMaterial) {
+        txQuery.type = "Materials";
+        txQuery.title = { $regex: intent.specificMaterial, $options: "i" };
+      }
+      const txs = await Transaction.find(txQuery)
         .populate("project", "projectName")
         .sort({ date: -1 })
         .lean();
+
       const paid    = txs.filter((t) => t.paymentStatus === "Paid");
       const partial = txs.filter((t) => t.paymentStatus === "Partial");
       const pending = txs.filter((t) => t.paymentStatus === "Pending");
       const total   = txs.reduce((s, t) => s + Number(t.amount || 0), 0);
       const paidAmt = paid.reduce((s, t) => s + Number(t.amount || 0), 0);
+
       const rows = txs.map((t) => ({
         date: fmtDate(t.date),
         item: t.title || t.category || "-",
@@ -387,19 +418,75 @@ router.post("/ai-chat", async (req, res) => {
         unit: t.unit || "-",
         amount: Number(t.amount || 0),
       }));
-      const typeLabel = typeFilter ? typeFilter.toLowerCase() : "entry";
-      const summaryText = txs.length > 0
-        ? `Found ${txs.length} ${typeLabel} record${txs.length > 1 ? "s" : ""} in ${dateWindow.label} — total ${fmtINR(total)} (${fmtINR(paidAmt)} paid, ${pending.length} pending).`
+
+      const matLabel = intent.specificMaterial
+        ? intent.specificMaterial.charAt(0).toUpperCase() + intent.specificMaterial.slice(1)
+        : null;
+      const typeLabel = matLabel || (typeFilter ? typeFilter.toLowerCase() : "entry");
+
+      let fallbackText = txs.length > 0
+        ? (matLabel
+            ? `We spent ${fmtINR(total)} on ${matLabel.toLowerCase()} ${dateWindow.label} across ${txs.length} record${txs.length > 1 ? "s" : ""}.`
+            : `Found ${txs.length} ${typeLabel} record${txs.length > 1 ? "s" : ""} in ${dateWindow.label} — total ${fmtINR(total)} (${fmtINR(paidAmt)} paid, ${pending.length} pending).`)
         : `No ${typeLabel} entries found for ${dateWindow.label}.`;
+
+      // Context Window Protection: Send bounded sample (top 50) + summary metrics to Groq LLM
+      const boundedContext = {
+        question,
+        filter: matLabel || typeFilter || "All",
+        dateRange: dateWindow.label,
+        totalCount: txs.length,
+        totalSpendINR: total,
+        totalPaidINR: paidAmt,
+        pendingCount: pending.length,
+        entriesSample: txs.slice(0, 50).map(t => ({
+          date: fmtDate(t.date),
+          title: t.title,
+          amount: t.amount,
+          unit: t.unit,
+          quantity: t.quantity,
+          status: t.paymentStatus
+        }))
+      };
+
+      const summaryText = await askGroqWithTimeout(boundedContext, question, reqId, fallbackText);
+      const tableTitle = matLabel
+        ? `${matLabel} entries · ${dateWindow.label}`
+        : `${typeFilter || "All"} entries · ${dateWindow.label}`;
+
       return res.json({
+        success: true,
         result: {
           text: summaryText,
+          summary: summaryText,
           table_type: txs.length > 0 ? "entries" : "none",
-          table_title: `${typeFilter || "All"} entries · ${dateWindow.label}`,
+          table_title: tableTitle,
           rows, inventory_rows: [], total_amount: total,
+          columns: ["date", "item", "quantity", "unit", "amount"],
+          rowCount: txs.length
         },
+        data: {
+          summary: summaryText,
+          table: {
+            type: txs.length > 0 ? "entries" : "none",
+            columns: ["Purchased Date", "Description", "Qty", "Amount (INR)"],
+            rows: rows.map((r, i) => ({
+              number: i + 1,
+              "Purchased Date": r.date,
+              "Description": r.item,
+              "Qty": `${r.quantity} ${r.unit}`,
+              "Amount (INR)": r.amount
+            })),
+            total,
+            totalAmount: total,
+            rowCount: txs.length
+          },
+          metrics: { totalSpent: total, count: txs.length },
+          actions: ["Export to CSV", "Filter by project"]
+        }
       });
     }
+
     if (intent.specificMaterial) {
       const mat = intent.specificMaterial;
       const txs = await Transaction.find({
@@ -426,15 +513,61 @@ router.post("/ai-chat", async (req, res) => {
         unit: t.unit || "-",
         amount: Number(t.amount || 0),
       }));
+
+      const matCap = mat.charAt(0).toUpperCase() + mat.slice(1);
+      const fallbackText = `${matCap} total ${fmtINR(total)} across ${txs.length} entr${txs.length > 1 ? "ies" : "y"}. Largest: ${fmtINR(largest.amount)} on ${fmtDate(largest.date)}.`;
+
+      // Context Window Protection: Bounded context to Groq
+      const boundedContext = {
+        question,
+        material: matCap,
+        totalRecords: txs.length,
+        totalSpentINR: total,
+        largestEntryAmount: largest.amount,
+        entriesSample: txs.slice(0, 50).map(t => ({
+          date: fmtDate(t.date),
+          title: t.title,
+          amount: t.amount,
+          unit: t.unit,
+          quantity: t.quantity
+        }))
+      };
+
+      const summaryText = await askGroqWithTimeout(boundedContext, question, reqId, fallbackText);
+
       return res.json({
+        success: true,
         result: {
-          text: `${mat.charAt(0).toUpperCase() + mat.slice(1)} total ${fmtINR(total)} across ${txs.length} entr${txs.length > 1 ? "ies" : "y"}. Largest: ${fmtINR(largest.amount)} on ${fmtDate(largest.date)}.`,
+          text: summaryText,
+          summary: summaryText,
           table_type: "entries",
-          table_title: `${mat.charAt(0).toUpperCase() + mat.slice(1)} entries`,
+          table_title: `${matCap} entries`,
           rows, inventory_rows: [], total_amount: total,
+          columns: ["date", "item", "quantity", "unit", "amount"],
+          rowCount: txs.length
         },
+        data: {
+          summary: summaryText,
+          table: {
+            type: "entries",
+            columns: ["Purchased Date", "Description", "Qty", "Amount (INR)"],
+            rows: rows.map((r, i) => ({
+              number: i + 1,
+              "Purchased Date": r.date,
+              "Description": r.item,
+              "Qty": `${r.quantity} ${r.unit}`,
+              "Amount (INR)": r.amount
+            })),
+            total,
+            totalAmount: total,
+            rowCount: txs.length
+          },
+          metrics: { totalSpent: total, count: txs.length },
+          actions: ["Export to CSV", "Filter by project"]
+        }
       });
     }
+
     if (typeFilter) {
       const txs = await Transaction.find({ ...scope, type: typeFilter })
         .sort({ date: -1 })
@@ -448,15 +581,48 @@ router.post("/ai-chat", async (req, res) => {
         unit: t.unit || "-",
         amount: Number(t.amount || 0),
       }));
+      const fallbackText = `Found ${txs.length} ${typeFilter.toLowerCase()} entr${txs.length > 1 ? "ies" : "y"} totalling ${fmtINR(total)}.`;
+      const summaryText = await askGroqWithTimeout({
+        question,
+        type: typeFilter,
+        count: txs.length,
+        totalINR: total,
+        entriesSample: txs
+      }, question, reqId, fallbackText);
+
       return res.json({
+        success: true,
         result: {
-          text: `Found ${txs.length} ${typeFilter.toLowerCase()} entr${txs.length > 1 ? "ies" : "y"} totalling ${fmtINR(total)}.`,
+          text: summaryText,
+          summary: summaryText,
           table_type: txs.length > 0 ? "entries" : "none",
           table_title: `${typeFilter} entries`,
           rows, inventory_rows: [], total_amount: total,
+          columns: ["date", "item", "quantity", "unit", "amount"],
+          rowCount: txs.length
         },
+        data: {
+          summary: summaryText,
+          table: {
+            type: txs.length > 0 ? "entries" : "none",
+            columns: ["Purchased Date", "Description", "Qty", "Amount (INR)"],
+            rows: rows.map((r, i) => ({
+              number: i + 1,
+              "Purchased Date": r.date,
+              "Description": r.item,
+              "Qty": `${r.quantity} ${r.unit}`,
+              "Amount (INR)": r.amount
+            })),
+            total,
+            totalAmount: total,
+            rowCount: txs.length
+          },
+          metrics: { totalSpent: total, count: txs.length },
+          actions: ["Export to CSV", "Filter by project"]
+        }
       });
     }
+
     if (intent.isTotal || intent.isEntries) {
       const txs       = await Transaction.find(scope).sort({ date: -1 }).limit(50).lean();
       const total     = txs.reduce((s, t) => s + Number(t.amount || 0), 0);
@@ -470,25 +636,68 @@ router.post("/ai-chat", async (req, res) => {
         unit: t.unit || "-",
         amount: Number(t.amount || 0),
       }));
+      const fallbackText = `Latest ${txs.length} entries — total ${fmtINR(total)}. Materials: ${fmtINR(material)}, Labour: ${fmtINR(labour)}, Equipment: ${fmtINR(equipment)}.`;
+      const summaryText = await askGroqWithTimeout({
+        question,
+        count: txs.length,
+        totalINR: total,
+        materialINR: material,
+        labourINR: labour,
+        equipmentINR: equipment,
+        entriesSample: txs
+      }, question, reqId, fallbackText);
+
       return res.json({
+        success: true,
         result: {
-          text: `Latest ${txs.length} entries — total ${fmtINR(total)}. Materials: ${fmtINR(material)}, Labour: ${fmtINR(labour)}, Equipment: ${fmtINR(equipment)}.`,
+          text: summaryText,
+          summary: summaryText,
           table_type: rows.length > 0 ? "entries" : "none",
           table_title: "Recent entries",
           rows, inventory_rows: [], total_amount: total,
+          columns: ["date", "item", "quantity", "unit", "amount"],
+          rowCount: txs.length
         },
+        data: {
+          summary: summaryText,
+          table: {
+            type: rows.length > 0 ? "entries" : "none",
+            columns: ["Purchased Date", "Description", "Qty", "Amount (INR)"],
+            rows: rows.map((r, i) => ({
+              number: i + 1,
+              "Purchased Date": r.date,
+              "Description": r.item,
+              "Qty": `${r.quantity} ${r.unit}`,
+              "Amount (INR)": r.amount
+            })),
+            total,
+            totalAmount: total,
+            rowCount: txs.length
+          },
+          metrics: { totalSpent: total, count: txs.length },
+          actions: ["Export to CSV", "Filter by project"]
+        }
       });
     }
+
     return res.json({
       result: {
-        text: "Try asking:\n• 'Entries in June'\n• 'Cement spend'\n• 'Labour entries this week'\n• 'Inventory status'\n• 'Budget health'\n• 'Project progress'\n• 'Pending payments'",
+        text: "Try asking:\n• 'How much did we spend on cement last week?'\n• 'Entries in June'\n• 'Cement spend'\n• 'Labour entries this week'\n• 'Inventory status'\n• 'Budget health'\n• 'Project progress'\n• 'Pending payments'",
         table_type: "none", table_title: null,
         rows: [], inventory_rows: [], total_amount: null,
       },
     });
   } catch (err) {
-    console.error("AI chat error:", err);
-    res.status(500).json({ error: "Failed to process question" });
+    console.error(`[${reqId}] AI chat error:`, err);
+    if (err.isTimeout || err.statusCode === 504 || err.message === "AI taking too long") {
+      return res.status(504).json({
+        success: false,
+        error: "AI taking too long",
+        message: "AI taking too long",
+        statusCode: 504
+      });
+    }
+    res.status(500).json({ error: "Failed to process question", message: err.message || "Failed to process question" });
   }
 });
 module.exports = router;
