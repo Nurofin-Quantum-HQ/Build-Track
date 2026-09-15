@@ -129,6 +129,7 @@ const projectSchema = new mongoose.Schema(
       type: String,
       trim: true,
     },
+    documents: [{ type: String }],
     selectedPhaseNames: [{ type: String }],
     trackedActivityKeys: [{ type: String }],
     completedActivityKeys: [{ type: String }],

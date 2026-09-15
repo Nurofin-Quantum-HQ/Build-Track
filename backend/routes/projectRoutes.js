@@ -547,6 +547,7 @@ router.post("/", requirePermission(["create_project", "manage_team"]), async (re
       projectStatus: uiProjectStatus,
       progress: Number(body.progress || 0),
       photo: getFileUrl(req.files?.find((f) => f.fieldname === "photo")) || null,
+      documents: (req.files?.filter((f) => f.fieldname === "documents") || []).map(getFileUrl).filter(Boolean),
       selectedPhaseNames: safeParse(body.selectedPhaseNames) || [],
       trackedActivityKeys: safeParse(body.trackedActivityKeys) || [],
       completedActivityKeys: safeParse(body.completedActivityKeys) || [],
@@ -713,6 +714,16 @@ router.put("/:id", protect, async (req, res) => {
     } else if (body.removePhoto === "true" || body.removePhoto === true) {
       if (existing?.photo) await deleteFile(existing.photo);
       updateData.photo = null;
+    }
+    
+    let currentDocs = existing.documents || [];
+    if (body.retainedDocuments !== undefined) {
+      currentDocs = safeParse(body.retainedDocuments) || [];
+    }
+    const newDocFiles = req.files?.filter((f) => f.fieldname === "documents") || [];
+    const newDocUrls = newDocFiles.map(getFileUrl).filter(Boolean);
+    if (body.retainedDocuments !== undefined || newDocUrls.length > 0) {
+      updateData.documents = [...currentDocs, ...newDocUrls];
     }
     const project = await Project.findOneAndUpdate(
       canManageProjectFilter(req, req.params.id),
