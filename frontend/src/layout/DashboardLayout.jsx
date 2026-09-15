@@ -5,6 +5,7 @@ import AppTour from "../components/AppTour";
 import { Bell, Settings } from "lucide-react";
 import { colors, typography } from "../styles/designTokens";
 import nurofinLogo from "../assets/nurofin-black.svg";
+import useNotificationStore from "../stores/notificationStore";
 import { notificationAPI } from "../api";
 
 export default function DashboardLayout() {
@@ -13,6 +14,11 @@ export default function DashboardLayout() {
   const [unreadCount, setUnreadCount] = useState(0);
   const navigate = useNavigate();
   const location = useLocation();
+  const { fetchAll, totalAlertCount } = useNotificationStore();
+
+  useEffect(() => {
+    fetchAll();
+  }, [fetchAll, location.pathname]);
 
   useEffect(() => {
     const onResize = () => {
@@ -132,25 +138,29 @@ export default function DashboardLayout() {
               style={{ position: "relative" }}
             >
               <Bell size={20} />
-              {unreadCount > 0 && (
+              {Math.max(totalAlertCount || 0, unreadCount || 0) > 0 && (
                 <span
                   style={{
                     position: "absolute",
-                    top: -6,
-                    right: -6,
+                    top: -3,
+                    right: -3,
+                    minWidth: 17,
+                    height: 17,
+                    borderRadius: 9,
                     background: "#EF4444",
-                    color: "#FFF",
+                    color: "#FFFFFF",
                     fontSize: 10,
                     fontWeight: 700,
-                    lineHeight: 1,
-                    padding: "3px 5px",
-                    borderRadius: 10,
-                    minWidth: 16,
-                    textAlign: "center",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    padding: "0 3px",
+                    border: "2px solid #FFFFFF",
+                    boxShadow: "0 2px 4px rgba(239, 68, 68, 0.4)",
                     pointerEvents: "none",
                   }}
                 >
-                  {unreadCount > 99 ? "99+" : unreadCount}
+                  {Math.max(totalAlertCount || 0, unreadCount || 0) > 99 ? "99+" : Math.max(totalAlertCount || 0, unreadCount || 0)}
                 </span>
               )}
             </button>

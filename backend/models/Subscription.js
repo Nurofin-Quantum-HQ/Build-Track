@@ -1,4 +1,4 @@
-﻿const mongoose = require('mongoose');
+const mongoose = require('mongoose');
 
 const subscriptionSchema = new mongoose.Schema({
   userId: {
@@ -8,7 +8,7 @@ const subscriptionSchema = new mongoose.Schema({
   },
   plan: {
     type: String,
-    enum: ['free', 'pro', 'enterprise', 'starter', 'custom'],
+    enum: ['free', 'starter', 'growth', 'pro', 'business', 'enterprise', 'custom'],
     required: true,
   },
   status: {

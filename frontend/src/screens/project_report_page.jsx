@@ -5,6 +5,7 @@ import { SpendVsBudgetChart } from "../components/Charts";
 import { CategoryBudgetBar } from "../components/MetricCards";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
+import { ArrowLeft } from "lucide-react";
 
 const TYPE_DOT = {
   Materials: "#F97316",
@@ -71,7 +72,7 @@ export default function ProjectReportPage() {
     return (
       <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", minHeight: "100vh", background: "#f7f7f8" }}>
         <div style={{ background: "#fee2e2", border: "1px solid #fca5a5", borderRadius: 10, padding: "12px 16px", color: "#991b1b", fontSize: 13, marginBottom: 16 }}>⚠️ {error}</div>
-        <button onClick={() => navigate("/reports")} style={{ padding: "10px 20px", background: "#ea580c", color: "#fff", border: "none", borderRadius: 10, fontWeight: 600, cursor: "pointer" }}>Back to Reports</button>
+        <button onClick={() => navigate("/projects")} style={{ padding: "10px 20px", background: "#ea580c", color: "#fff", border: "none", borderRadius: 10, fontWeight: 600, cursor: "pointer" }}>Back to Projects</button>
       </div>
     );
   }
@@ -136,7 +137,32 @@ export default function ProjectReportPage() {
     <div style={{ display: "flex", flexDirection: "column", width: "100%", minHeight: "100vh", fontFamily: "'Segoe UI', sans-serif", background: "#f7f7f8" }}>
       <div style={{ background: "#fff", borderBottom: "1px solid #ebebeb", padding: "16px 24px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexShrink: 0 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-          <button onClick={() => navigate("/reports")} style={{ padding: "8px 14px", background: "#f3f4f6", border: "1px solid #e5e5e5", borderRadius: 8, fontSize: 13, fontWeight: 600, color: "#555", cursor: "pointer" }}>← Back</button>
+          <button
+            onClick={() => navigate("/projects")}
+            title="Back to Projects"
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: 6,
+              padding: "7px 14px",
+              background: "#F8FAFC",
+              border: "1px solid #E2E8F0",
+              borderRadius: 8,
+              fontSize: 13,
+              fontWeight: 600,
+              color: "#334155",
+              cursor: "pointer",
+              transition: "all 0.15s ease",
+              fontFamily: "inherit",
+              flexShrink: 0,
+              boxShadow: "0 1px 2px rgba(0,0,0,0.04)"
+            }}
+            onMouseEnter={e => { e.currentTarget.style.background = "#F1F5F9"; e.currentTarget.style.color = "#0F172A"; }}
+            onMouseLeave={e => { e.currentTarget.style.background = "#F8FAFC"; e.currentTarget.style.color = "#334155"; }}
+          >
+            <ArrowLeft size={16} />
+            <span>Back</span>
+          </button>
           <div>
             <h1 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: "#1a1a1a" }}>{project.projectName}</h1>
             <p style={{ margin: "2px 0 0", fontSize: 12, color: "#888" }}>Project Report</p>
