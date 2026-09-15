@@ -88,7 +88,13 @@ app.use(
   cors({
     origin: (incomingOrigin, callback) => {
       if (!incomingOrigin) return callback(null, true);
-      if (ALLOWED_ORIGINS.includes(incomingOrigin) || incomingOrigin.startsWith("http://localhost:")) {
+      if (
+        ALLOWED_ORIGINS.includes(incomingOrigin) || 
+        incomingOrigin.startsWith("http://localhost:") || 
+        incomingOrigin.startsWith("http://127.0.0.1:") ||
+        incomingOrigin.startsWith("capacitor://") ||
+        incomingOrigin.startsWith("buildtrack://")
+      ) {
         return callback(null, true);
       }
       console.warn(`[CORS] Rejected request from unlisted origin: ${incomingOrigin}`);
@@ -96,8 +102,8 @@ app.use(
     },
     methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
     allowedHeaders: isProd
-      ? ["Content-Type", "Authorization"]
-      : ["Content-Type", "Authorization", "ngrok-skip-browser-warning"],
+      ? ["Content-Type", "Authorization", "X-Request-ID"]
+      : ["Content-Type", "Authorization", "X-Request-ID", "ngrok-skip-browser-warning"],
     credentials: false,
   })
 );

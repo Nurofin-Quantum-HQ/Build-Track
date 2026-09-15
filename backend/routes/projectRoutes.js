@@ -590,7 +590,8 @@ router.put("/:id", protect, async (req, res) => {
       userPerms.includes("edit_project") ||
       userPerms.includes("manage_team") ||
       userPerms.includes("add_entry") ||
-      userPerms.includes("submit_daily_update");
+      userPerms.includes("submit_daily_update") ||
+      userPerms.includes("approve_updates");
     if (!hasEdit) {
       const Task = require("../models/Task");
       const hasTask = await Task.exists({ project: existing._id, assignedTo: req.user._id });
