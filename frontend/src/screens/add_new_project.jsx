@@ -162,6 +162,7 @@ export default function NewProjectPage() {
 
   const [isMobile, setIsMobile] = useState(() => window.innerWidth < 768);
   const [projectName, setProjectName] = useState("");
+  const [scope, setScope] = useState("");
   const [city, setCity] = useState("");
   const [mapAddress, setMapAddress] = useState("");
   const [clientName, setClientName] = useState("");
@@ -237,6 +238,7 @@ export default function NewProjectPage() {
   useEffect(() => {
     if (isEditMode && editProject) {
       setProjectName(editProject.projectName || editProject.name || editProject.title || "");
+      setScope(editProject.scope || "");
       setCity(editProject.city || editProject.location || "");
       setMapAddress(editProject.mapAddress || "");
       setClientName(editProject.clientName || "");
@@ -495,6 +497,8 @@ export default function NewProjectPage() {
     fd.append("expectedEndDate", expectedEndDate || "");
     fd.append("status", status);
     fd.append("progress", progress);
+    fd.append("scope", scope);
+    fd.append("retainedDocuments", JSON.stringify(documents));
     if (photoFile) fd.append("photo", photoFile);
 
     documentFiles.forEach(file => {
@@ -1133,7 +1137,7 @@ export default function NewProjectPage() {
           </Accordion>
 
           <Accordion title="Project Scope" icon={<FileText size={16} />}>
-            <textarea value={""} onChange={() => {}}
+            <textarea value={scope} onChange={(e) => setScope(e.target.value)}
               placeholder="Describe the primary objectives and key milestones of the project..."
               rows={4}
               style={{ ...baseInput, resize: "vertical", lineHeight: 1.6, width: "100%", fontFamily: 'inherit' }} />
