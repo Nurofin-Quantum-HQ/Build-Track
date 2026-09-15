@@ -94,8 +94,10 @@ router.post("/use", async (req, res) => {
         title: "Low Stock Alert",
         message: `${item.materialName} is running low. Current stock: ${item.closingStock} ${item.unit}`,
         type: "inventory",
+        priority: "high",
         relatedId: item._id,
-        relatedModel: "Inventory"
+        relatedModel: "Inventory",
+        data: { stock: item.closingStock, unit: item.unit }
       });
     }
 

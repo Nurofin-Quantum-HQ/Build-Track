@@ -74,6 +74,24 @@ const userSchema = new mongoose.Schema(
       hasViewedReports: { type: Boolean, default: false },
       visitedModules: { type: [String], default: [] },
     },
+    notificationPreferences: {
+      email: { type: Boolean, default: true },
+      push: { type: Boolean, default: true },
+      browser: { type: Boolean, default: true },
+      types: {
+        approval: { type: Boolean, default: true },
+        payment: { type: Boolean, default: true },
+        inventory: { type: Boolean, default: true },
+        project: { type: Boolean, default: true },
+        worker: { type: Boolean, default: true },
+        task: { type: Boolean, default: true },
+        system: { type: Boolean, default: true },
+      },
+    },
+    fcmTokens: {
+      type: [String],
+      default: []
+    }
   },
   { timestamps: true }
 );

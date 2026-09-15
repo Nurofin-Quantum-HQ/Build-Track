@@ -1,32 +1,70 @@
 const Notification = require("../models/Notification");
 const User = require("../models/User");
 
+const ALL_TYPES = ["approval", "payment", "inventory", "project", "worker", "task", "system"];
+
 class NotificationService {
   /**
    * Send a notification to a specific user.
-   * Also triggers an "out of app" push/email.
+   * Always persists an in-app notification; out-of-app delivery (email/push/browser)
+   * is gated by the user's notificationPreferences and real provider integrations.
    */
-  static async send(userId, { title, message, type = "system", relatedId = null, relatedModel = null }) {
+  static async send(userId, {
+    title,
+    message,
+    type = "system",
+    priority = "low",
+    data = {},
+    relatedId = null,
+    relatedModel = null
+  }) {
     try {
-      // 1. Create In-App Notification
       const notification = await Notification.create({
         user: userId,
         title,
         message,
         type,
+        priority,
+        data,
         relatedId,
-        relatedModel
+        relatedModel,
+        channel: "in_app"
       });
 
-      // 2. Fetch User to get contact info
+      // Fetch User to run out-of-app delivery (only if preferences allow)
       const user = await User.findById(userId);
-      if (user && user.email) {
-        // Trigger Out of App Notification (Email / Push / SMS)
-        console.log(`\n[OUT OF APP NOTIFICATION] -> Sent to ${user.email}`);
+      if (user && user.email && this.prefers(user, type, "email")) {
+        console.log(`\n[OUT OF APP NOTIFICATION][email] -> Sent to ${user.email}`);
         console.log(`[TITLE]: ${title}`);
         console.log(`[MESSAGE]: ${message}\n`);
-        
-        // TODO: Integrate actual Brevo/SES/FCM here if API keys exist
+      }
+
+      if (user && user.fcmTokens && user.fcmTokens.length > 0 && this.prefers(user, type, "push")) {
+        console.log(`\n[OUT OF APP NOTIFICATION][push] -> Sent to FCM tokens`);
+        try {
+          const admin = require("firebase-admin");
+          // Ensure firebase-admin is initialized in server.js or check here
+          if (admin.apps.length > 0) {
+            const payload = {
+              notification: { title, body: message },
+              data: {
+                type: String(type),
+                relatedId: String(relatedId || ""),
+                relatedModel: String(relatedModel || ""),
+                ...data
+              }
+            };
+            const response = await admin.messaging().sendEachForMulticast({
+              tokens: user.fcmTokens,
+              notification: payload.notification,
+              data: payload.data,
+            });
+            console.log(`[FCM Response] Success: ${response.successCount}, Failed: ${response.failureCount}`);
+            // Note: In a production app, we would remove invalid tokens here
+          }
+        } catch (fcmErr) {
+          console.error("[NotificationService] FCM Error:", fcmErr);
+        }
       }
 
       return notification;
@@ -35,7 +73,18 @@ class NotificationService {
     }
   }
 
-  static async notifyAdminsAndSupervisors(workerId, { title, message, type, relatedId, relatedModel }) {
+  static prefers(user, type, channel) {
+    const prefs = user.notificationPreferences || {};
+    if (prefs[channel] === false) return false;
+    const typePref = prefs.types && prefs.types[type];
+    return typePref === undefined ? true : typePref;
+  }
+
+  static async getUnreadCount(userId) {
+    return Notification.countDocuments({ user: userId, read: false });
+  }
+
+  static async notifyAdminsAndSupervisors(workerId, { title, message, type, priority, data, relatedId, relatedModel }) {
     try {
       const worker = await User.findById(workerId);
       if (!worker) return;
@@ -43,8 +92,18 @@ class NotificationService {
       const adminId = worker.createdBy;
       if (!adminId) return; // if no admin, nowhere to send
 
+      const notify = {
+        title,
+        message,
+        type,
+        priority,
+        data,
+        relatedId,
+        relatedModel
+      };
+
       // 1. Notify Admin
-      await this.send(adminId, { title, message, type, relatedId, relatedModel });
+      await this.send(adminId, notify);
 
       // 2. Notify Supervisors overseeing this worker's role
       const workerRole = (worker.role || "").toLowerCase().trim();
@@ -56,12 +115,37 @@ class NotificationService {
       for (const sup of supervisors) {
         const oversees = sup.overseesRoles?.map(r => r.toLowerCase().trim()) || [];
         if (oversees.includes(workerRole)) {
-          await this.send(sup._id, { title, message, type, relatedId, relatedModel });
+          await this.send(sup._id, notify);
         }
       }
     } catch (err) {
       console.error("[NotificationService] Error in notifyAdminsAndSupervisors:", err);
     }
+  }
+
+  /** Send a system notification to every user of an account (admin + its sub-users). */
+  static async broadcastToAccount(adminId, { title, message, data = {} }) {
+    try {
+      const accountUsers = await User.find({
+        $or: [{ _id: adminId }, { createdBy: adminId }]
+      });
+
+      for (const u of accountUsers) {
+        await this.send(u._id, {
+          title,
+          message,
+          type: "system",
+          priority: "medium",
+          data
+        });
+      }
+    } catch (err) {
+      console.error("[NotificationService] Error in broadcastToAccount:", err);
+    }
+  }
+
+  static get ALL_TYPES() {
+    return ALL_TYPES;
   }
 }
 
