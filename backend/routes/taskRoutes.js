@@ -68,35 +68,7 @@ router.get("/daily", async (req, res) => {
     let tasks = await Task.find({
       $or: queryConditions
     }).populate("assignedTo", "name role profilePhoto");
-    if (tasks.length === 0) {
-      const projects = await Project.find({ createdBy: req.user._id });
-      if (projects.length > 0) {
-        const projectId = projects[0]._id;
-        const defaultTasks = [
-          {
-            createdBy: req.user._id,
-            project: projectId,
-            title: "Foundation Reinforcement checking",
-            assignee: "Mohan Singh",
-            assignedTo: req.user._id,
-            floorName: "Ground Floor",
-            status: "In Progress",
-            time: "09:00 AM",
-            description: "Check the reinforcement bars before pouring concrete."
-          },
-          {
-            createdBy: req.user._id,
-            project: projectId,
-            title: "Brickwork plastering inspections",
-            assignee: "Ravi Teja",
-            floorName: "1st Floor",
-            status: "Not Started",
-            time: "11:30 AM",
-          }
-        ];
-        tasks = await Task.insertMany(defaultTasks);
-      }
-    }
+    
     res.json(tasks);
   } catch (err) {
     console.error("Fetch daily tasks error:", err);
