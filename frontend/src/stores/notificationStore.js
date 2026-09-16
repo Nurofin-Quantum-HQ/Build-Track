@@ -12,7 +12,7 @@ const useNotificationStore = create((set, get) => ({
   get totalAlertCount() {
     const state = get();
     const unreadSystem = state.systemNotifications.filter((n) => !n.read).length;
-    return unreadSystem + state.inventoryAlerts.length;
+    return unreadSystem; // Do not include permanent inventory alerts in the unread badge
   },
 
   async fetchAll(force = false) {

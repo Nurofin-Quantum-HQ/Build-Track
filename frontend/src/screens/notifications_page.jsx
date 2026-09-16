@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../contexts/AuthContext';
 import { colors, radius } from '../styles/designTokens';
 import { Card, Badge, Button, EmptyState } from '../components/ui';
 import {
@@ -45,17 +46,6 @@ const typeColors = {
   system: { bg: '#F1F5F9', color: '#64748B' },
 };
 
-function targetRouteFor(n) {
-  switch (n.relatedModel) {
-    case "Transaction": return "/transaction";
-    case "Inventory": return "/inventory";
-    case "Task": return "/assign-task";
-    case "Project": return "/projects";
-    case "Payment": return "/subscription";
-    default: return null;
-  }
-}
-
 function SkeletonRow() {
   return (
     <Card padding="16px 20px" style={{ opacity: 0.7 }}>
@@ -72,7 +62,33 @@ function SkeletonRow() {
 
 export default function NotificationsPage() {
   const navigate = useNavigate();
+  const { user, can } = useAuth();
   const [filter, setFilter] = useState('all');
+
+  const targetRouteFor = useCallback((n) => {
+    const model = (n.relatedModel || n.type || "").toLowerCase();
+    const isWorker = user?.role?.toLowerCase() === 'mason' || user?.role?.toLowerCase() === 'site engineer';
+    
+    switch (model) {
+      case "transaction":
+      case "payment": 
+        return "/transaction";
+      case "inventory":
+        if (isWorker || !can("manage_inventory")) {
+           return "/add-entry?type=material";
+        }
+        return "/inventory";
+      case "task":
+        if (isWorker || !can("assign_tasks")) {
+           return { pathname: "/update-progress", state: { taskId: n.relatedEntity || n._id || n.id } };
+        }
+        return "/assign-task";
+      case "project": 
+        return "/projects";
+      default: 
+        return null;
+    }
+  }, [can, user]);
   const {
     systemNotifications,
     inventoryAlerts,
@@ -439,7 +455,16 @@ export default function NotificationsPage() {
                   return (
                     <div
                       key={taskId}
-                      onClick={() => navigate('/assign-task')}
+                      onClick={() => {
+                        const target = targetRouteFor({ type: 'task', relatedModel: 'Task', relatedEntity: taskId });
+                        if (target) {
+                          if (typeof target === 'object') {
+                            navigate(target.pathname, { state: target.state });
+                          } else {
+                            navigate(target);
+                          }
+                        }
+                      }}
                       style={{
                         padding: '16px 20px',
                         background: '#FFF',
@@ -561,9 +586,18 @@ export default function NotificationsPage() {
                     onClick={() => {
                       if (!n.read) markAsRead(nId);
                       const target = targetRouteFor(n);
-                      if (target) navigate(target);
+                      if (target) {
+                        if (typeof target === 'object') {
+                          navigate(target.pathname, { state: target.state });
+                        } else {
+                          navigate(target);
+                        }
+                      }
                       else if (n.type === 'approval') navigate('/approvals');
-                      else if (n.type === 'inventory') navigate('/inventory');
+                      else if (n.type === 'inventory') {
+                        if (!can("manage_inventory")) navigate('/add-entry?type=material');
+                        else navigate('/inventory');
+                      }
                       else if (n.type === 'payment') navigate('/transaction');
                     }}
                     style={{
@@ -598,9 +632,33 @@ export default function NotificationsPage() {
                           <h4 style={{ fontSize: 14, fontWeight: n.read ? 500 : 700, color: '#111827', margin: 0 }}>
                             {n.title}
                           </h4>
-                          <span style={{ fontSize: 11, color: '#94A3B8', flexShrink: 0, marginLeft: 8 }}>
-                            {formatTimeAgo(n.createdAt || n.time)}
-                          </span>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0, marginLeft: 8 }}>
+                            <span style={{ fontSize: 11, color: '#94A3B8' }}>
+                              {formatTimeAgo(n.createdAt || n.time)}
+                            </span>
+                            {!n.read && (
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  markAsRead(nId);
+                                }}
+                                title="Mark as read"
+                                style={{
+                                  border: 'none',
+                                  background: 'rgba(59, 130, 246, 0.1)',
+                                  cursor: 'pointer',
+                                  padding: 4,
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  color: '#3B82F6',
+                                  borderRadius: '50%',
+                                }}
+                              >
+                                <CheckCheck size={14} />
+                              </button>
+                            )}
+                          </div>
                         </div>
                         <p style={{ fontSize: 13, color: '#64748B', lineHeight: 1.5, margin: 0 }}>
                           {n.message}

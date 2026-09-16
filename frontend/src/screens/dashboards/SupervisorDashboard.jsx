@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Card, Badge, Button, SkeletonCard } from '../../components/ui';
 import { approvalAPI, taskAPI, projectAPI, transactionAPI } from '../../api';
-import { Clock, CheckCircle, XCircle, AlertCircle, RefreshCw, Briefcase, ChevronRight } from 'lucide-react';
+import { Users, Clock, AlertTriangle, AlertCircle, CheckCircle, RefreshCw, XCircle, Search, Calendar, FileText, Check, ChevronRight, CheckSquare, Settings, Briefcase, PlusCircle, UserCheck, Shield, Edit2 } from 'lucide-react';
 import { colors, typography } from '../../styles/designTokens';
 
 export default function SupervisorDashboard() {
@@ -291,27 +291,41 @@ export default function SupervisorDashboard() {
                     <div style={{ fontWeight: 600, fontSize: 15, color: colors.textPrimary }}>{t.title}</div>
                     <div style={{ fontSize: 13, color: colors.textSecondary }}>Assigned to: {t.assigneeModel === 'Worker' ? t.workerDetails?.name : t.assignedToDetails?.name}</div>
                   </div>
-                  <select
-                    value={t.status || 'Pending'}
-                    onChange={(e) => handleTaskStatusChange(t._id, e.target.value)}
-                    style={{
-                      padding: '6px 12px',
-                      borderRadius: '20px',
-                      border: `1px solid ${getStatusColor(t.status || 'Pending')}`,
-                      backgroundColor: `${getStatusColor(t.status || 'Pending')}15`,
-                      color: getStatusColor(t.status || 'Pending'),
-                      fontWeight: 600,
-                      fontSize: 13,
-                      cursor: 'pointer',
-                      outline: 'none',
-                      appearance: 'none',
-                      textAlign: 'center'
-                    }}
-                  >
-                    <option value="Pending">Pending</option>
-                    <option value="In Progress">In Progress</option>
-                    <option value="Completed">Completed</option>
-                  </select>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <select
+                      value={t.status || 'Pending'}
+                      onChange={(e) => handleTaskStatusChange(t._id, e.target.value)}
+                      style={{
+                        padding: '6px 12px',
+                        borderRadius: '20px',
+                        border: `1px solid ${getStatusColor(t.status || 'Pending')}`,
+                        backgroundColor: `${getStatusColor(t.status || 'Pending')}15`,
+                        color: getStatusColor(t.status || 'Pending'),
+                        fontWeight: 600,
+                        fontSize: 13,
+                        cursor: 'pointer',
+                        outline: 'none',
+                        appearance: 'none',
+                        textAlign: 'center'
+                      }}
+                    >
+                      <option value="Pending">Pending</option>
+                      <option value="In Progress">In Progress</option>
+                      <option value="Completed">Completed</option>
+                    </select>
+                    <button 
+                      onClick={() => navigate('/update-progress', { state: { taskId: t._id, projectId: t.project } })}
+                      style={{
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        width: 32, height: 32, borderRadius: '50%',
+                        background: '#f8fafc', border: '1px solid #e2e8f0', cursor: 'pointer',
+                        color: colors.primary
+                      }}
+                      title="Update Progress"
+                    >
+                      <Edit2 size={14} />
+                    </button>
+                  </div>
                 </div>
               ))}
             </div>

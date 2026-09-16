@@ -30,7 +30,6 @@ const UpdateProgressPage = lazy(() => import("./screens/update_progress_page"));
 const InventoryPage    = lazy(() => import("./screens/inventory_page"));
 const SubscriptionPage = lazy(() => import("./screens/subscription_page"));
 const AuditLogsPage     = lazy(() => import("./screens/audit_logs_page"));
-const ProjectDetail    = lazy(() => import("./screens/project_detail_page"));
 const ProjectReport    = lazy(() => import("./screens/project_report_page"));
 
 export const routePreloaders = {
@@ -55,7 +54,6 @@ export const routePreloaders = {
   "/notifications": () => import("./screens/notifications_page"),
   "/subscription": () => import("./screens/subscription_page"),
   "/audit-logs": () => import("./screens/audit_logs_page"),
-  "/project-detail": () => import("./screens/project_detail_page"),
   "/project-report": () => import("./screens/project_report_page"),
 };
 
@@ -136,7 +134,11 @@ function AppRoutes() {
               <NewProject />
             </RequireRole>
           } />
-          <Route path="/inventory"   element={<InventoryPage />} />
+          <Route path="/inventory"   element={
+            <RequireRole permission="manage_inventory" route="/inventory">
+              <InventoryPage />
+            </RequireRole>
+          } />
 
           <Route path="/reports"     element={
             <RequireRole permission="view_reports" route="/reports">
@@ -146,7 +148,6 @@ function AppRoutes() {
 
           <Route path="/settings"    element={<Settings />} />
           <Route path="/managesite"  element={<ManageSite />} />
-          <Route path="/project-detail/:id" element={<ProjectDetail />} />
           <Route path="/project-report/:id" element={<ProjectReport />} />
           <Route path="/reports/:id" element={<ProjectReport />} />
 
@@ -171,7 +172,7 @@ function AppRoutes() {
           } />
 
           <Route path="/assign-task" element={
-            <RequireRole>
+            <RequireRole permission="assign_tasks" route="/assign-task">
               <AssignTask />
             </RequireRole>
           } />

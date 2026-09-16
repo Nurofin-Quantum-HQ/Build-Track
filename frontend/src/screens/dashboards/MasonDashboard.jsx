@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { Card, Badge, Button, SkeletonCard } from '../../components/ui';
 import { taskAPI, transactionAPI } from '../../api';
-import { Clock, PlusCircle, CheckCircle, Package, Briefcase } from 'lucide-react';
+import { Clock, PlusCircle, CheckCircle, Package, Briefcase, Edit2 } from 'lucide-react';
 import { colors, gradients } from '../../styles/designTokens';
 
 export default function MasonDashboard() {
@@ -121,27 +121,41 @@ export default function MasonDashboard() {
                     <div style={{ fontWeight: 600, fontSize: 15, color: colors.textPrimary }}>{t.title}</div>
                     {t.description && <div style={{ fontSize: 13, color: colors.textSecondary, marginTop: 4 }}>{t.description}</div>}
                   </div>
-                  <select
-                    value={t.status || 'Pending'}
-                    onChange={(e) => handleTaskStatusChange(t._id, e.target.value)}
-                    style={{
-                      padding: '6px 12px',
-                      borderRadius: '20px',
-                      border: `1px solid ${getStatusColor(t.status || 'Pending')}`,
-                      backgroundColor: `${getStatusColor(t.status || 'Pending')}15`,
-                      color: getStatusColor(t.status || 'Pending'),
-                      fontWeight: 600,
-                      fontSize: 13,
-                      cursor: 'pointer',
-                      outline: 'none',
-                      appearance: 'none',
-                      textAlign: 'center'
-                    }}
-                  >
-                    <option value="Pending">Pending</option>
-                    <option value="In Progress">In Progress</option>
-                    <option value="Completed">Completed</option>
-                  </select>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <select
+                      value={t.status || 'Pending'}
+                      onChange={(e) => handleTaskStatusChange(t._id, e.target.value)}
+                      style={{
+                        padding: '6px 12px',
+                        borderRadius: '20px',
+                        border: `1px solid ${getStatusColor(t.status || 'Pending')}`,
+                        backgroundColor: `${getStatusColor(t.status || 'Pending')}15`,
+                        color: getStatusColor(t.status || 'Pending'),
+                        fontWeight: 600,
+                        fontSize: 13,
+                        cursor: 'pointer',
+                        outline: 'none',
+                        appearance: 'none',
+                        textAlign: 'center'
+                      }}
+                    >
+                      <option value="Pending">Pending</option>
+                      <option value="In Progress">In Progress</option>
+                      <option value="Completed">Completed</option>
+                    </select>
+                    <button 
+                      onClick={() => navigate('/update-progress', { state: { taskId: t._id, projectId: t.project } })}
+                      style={{
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        width: 32, height: 32, borderRadius: '50%',
+                        background: '#f8fafc', border: '1px solid #e2e8f0', cursor: 'pointer',
+                        color: colors.primary
+                      }}
+                      title="Update Progress"
+                    >
+                      <Edit2 size={14} />
+                    </button>
+                  </div>
                 </div>
               ))}
             </div>
