@@ -94,6 +94,10 @@ const userSchema = new mongoose.Schema(
     fcmTokens: {
       type: [String],
       default: []
+    },
+    preferences: {
+      type: mongoose.Schema.Types.Mixed,
+      default: {}
     }
   },
   { timestamps: true }
