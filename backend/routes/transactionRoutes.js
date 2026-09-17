@@ -157,10 +157,11 @@ const PAYMENT_MODE_MAP = {
   "bank transfer": "Bank Transfer",
   upi: "UPI",
   cheque: "Cheque", check: "Cheque",
+  card: "Card", "credit card": "Card", "debit card": "Card",
   neft: "Bank Transfer", rtgs: "Bank Transfer",
   online: "UPI",
 };
-const VALID_PAYMENT_MODES = ["Cash", "Bank", "Bank Transfer", "UPI", "Cheque", ""];
+const VALID_PAYMENT_MODES = ["Cash", "Bank", "Bank Transfer", "UPI", "Cheque", "Card", ""];
 const normalizePaymentMode = (raw) => {
   if (!raw) return "Cash";
   const key = String(raw).toLowerCase().trim();
