@@ -213,6 +213,7 @@ app.use("/api/project-updates",   require("./routes/projectUpdateRoutes"));
 app.use("/api/tasks",             require("./routes/taskRoutes"));
 app.use("/api/approvals",         require("./routes/approvalsRoutes"));
 app.use("/api/notifications",     require("./routes/notificationRoutes"));
+app.use("/api/analytics",         require("./routes/analyticsRoutes"));
 app.use("/api/subscriptions",     subscriptionRoutes);
 app.use((_req, res) => res.status(404).json({ success: false, message: "Route not found" }));
 app.use((err, _req, res, _next) => {
