@@ -4,7 +4,7 @@ importScripts('https://www.gstatic.com/firebasejs/9.0.0/firebase-app-compat.js')
 importScripts('https://www.gstatic.com/firebasejs/9.0.0/firebase-messaging-compat.js');
 
 const firebaseConfig = {
-  apiKey: "AIzaSyDdIdFhcwFW0jUWYHoNoc7oBGag4xxSRyY",
+  apiKey: "AIzaSyB6PnOCJfAKxFm6hAvbyDgCX8gXkEi75HY",
   authDomain: "buildtrack-81b09.firebaseapp.com",
   projectId: "buildtrack-81b09",
   storageBucket: "buildtrack-81b09.firebasestorage.app",

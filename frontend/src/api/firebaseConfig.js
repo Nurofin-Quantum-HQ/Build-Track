@@ -5,7 +5,7 @@ import api from "./index";
 
 // Your web app's Firebase configuration
 const firebaseConfig = {
-  apiKey: "AIzaSyDdIdFhcwFW0jUWYHoNoc7oBGag4xxSRyY",
+  apiKey: "AIzaSyB6PnOCJfAKxFm6hAvbyDgCX8gXkEi75HY",
   authDomain: "buildtrack-81b09.firebaseapp.com",
   projectId: "buildtrack-81b09",
   storageBucket: "buildtrack-81b09.firebasestorage.app",
