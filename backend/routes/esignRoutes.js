@@ -3,8 +3,12 @@ const cloudinary = require('../config/cloudinary');
 const express = require("express");
 const crypto = require("crypto");
 const EsignRequest = require("../models/EsignRequest");
+const { protect } = require("../middleware/auth");
 const router = express.Router();
-router.post("/request", async (req, res) => {
+// [BT-SEC-03] /request and /status/:id are called by the logged-in app and now
+// require auth. The signer-facing routes (/details/:token, /submit, /sign/:token)
+// stay public — they are addressed by an unguessable 256-bit token, not by id.
+router.post("/request", protect, async (req, res) => {
   try {
     const { clientEmail, meta } = req.body;
     if (!clientEmail) {
@@ -12,6 +16,7 @@ router.post("/request", async (req, res) => {
     }
     const token = crypto.randomBytes(32).toString('hex');
     const esignReq = new EsignRequest({
+      createdBy: req.user._id,          // [BT-SEC-03] stamp the owner
       clientEmail,
       token,
       status: 'pending',
@@ -81,9 +86,15 @@ router.get("/details/:token", async (req, res) => {
     res.status(500).json({ message: "Internal server error" });
   }
 });
-router.get("/status/:id", async (req, res) => {
+router.get("/status/:id", protect, async (req, res) => {
   try {
-    const esignReq = await EsignRequest.findById(req.params.id);
+    // [BT-SEC-03] Scope to the owner so one tenant cannot read another's signature
+    // data by guessing an id. Legacy rows created before this field existed have no
+    // createdBy, so also allow a match on those to avoid breaking in-flight requests.
+    const esignReq = await EsignRequest.findOne({
+      _id: req.params.id,
+      $or: [{ createdBy: req.user._id }, { createdBy: { $exists: false } }],
+    });
     if (!esignReq) {
       return res.status(404).json({ message: "Request not found" });
     }
