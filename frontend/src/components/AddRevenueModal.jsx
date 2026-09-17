@@ -142,9 +142,6 @@ export default function AddRevenueModal({ open, projects, onClose, onSaved }) {
     
     try {
       let apiPaymentMode = selectedMethod;
-      if (apiPaymentMode === "Card") {
-        apiPaymentMode = "Bank Transfer";
-      }
 
       const payload = {
         title: title,

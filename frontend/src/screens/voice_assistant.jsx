@@ -43,6 +43,7 @@ const typeIcons = {
 
 const ENTRY_EXAMPLES = {
   material: 'Say: "20 bags of UltraTech cement at 420 rupees per bag"',
+  labor: 'Say: "8 masons worked 9 hours at 850 per day"',
   labour: 'Say: "8 masons worked 9 hours at 850 per day"',
   equipment: 'Say: "JCB excavator worked 6 hours at 1200 per hour, diesel 500"',
 };
@@ -188,6 +189,7 @@ export default function VoiceAssistantPage() {
         processTranscript(fullText.trim());
       } else {
         setStatus(STATUS.idle);
+        setSaveError("Couldn't hear or understand any speech. Please tap the mic and try again.");
       }
     }, 300);
   }, [stopRecording, accumulatedTranscript, transcript]);
@@ -618,6 +620,11 @@ export default function VoiceAssistantPage() {
                   {speechError && (
                     <div style={{ fontSize: 13, color: colors.danger, fontWeight: 600, marginTop: 12 }}>
                       {speechError}
+                      {String(speechError).toLowerCase().includes('not-allowed') && (
+                        <div style={{ fontSize: 12, color: colors.textSecondary, marginTop: 4, fontWeight: 500 }}>
+                          To enable: Click the lock or camera icon in your browser address bar and set Microphone to "Allow".
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>
