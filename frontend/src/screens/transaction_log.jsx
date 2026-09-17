@@ -108,6 +108,17 @@ export default function TransactionLog() {
 
   useEffect(() => {
     fetchTransactions();
+    const handleFocus = () => {
+      fetchTransactions(true);
+    };
+    window.addEventListener("focus", handleFocus);
+    const interval = setInterval(() => {
+      fetchTransactions(true);
+    }, 30000);
+    return () => {
+      window.removeEventListener("focus", handleFocus);
+      clearInterval(interval);
+    };
   }, [fetchTransactions]);
 
   const handleDelete = (id) => {
