@@ -126,7 +126,9 @@ router.patch("/:id/threshold", async (req, res) => {
     const val = parseFloat(threshold) ?? 10;
     let item;
     if (/^[0-9a-fA-F]{24}$/.test(req.params.id)) {
-      item = await Inventory.findById(req.params.id);
+      // [BT-SEC-04] Scope by owner so a user cannot edit another tenant's item by id.
+      const adminId = await getAdminId(req.user);
+      item = await Inventory.findOne({ _id: req.params.id, createdBy: adminId });
     }
     if (!item && project && materialName) {
       const adminId = await getAdminId(req.user);

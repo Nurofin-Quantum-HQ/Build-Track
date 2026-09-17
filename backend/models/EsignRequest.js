@@ -1,5 +1,12 @@
 const mongoose = require('mongoose');
 const esignRequestSchema = new mongoose.Schema({
+  // [BT-SEC-03] Owner of the request (the logged-in user who created it), so that
+  // status lookups can be scoped to the tenant instead of read by any id.
+  createdBy: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+    index: true,
+  },
   clientEmail: {
     type: String,
     required: true,

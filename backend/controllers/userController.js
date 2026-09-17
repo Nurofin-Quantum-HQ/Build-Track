@@ -151,29 +151,10 @@ const updateProfilePhoto = async (req, res) => {
     res.status(500).json({ message: "Server error" });
   }
 };
-const updateSubscription = async (req, res) => {
-  try {
-    const userId = req.user.id;
-    const { plan, status, renewalDate, purchaseToken } = req.body;
-    const validPlans = ['free', 'starter', 'growth', 'pro', 'business', 'enterprise'];
-    if (!validPlans.includes(plan)) {
-      return res.status(400).json({ message: "Invalid plan" });
-    }
-    const user = await User.findById(userId);
-    if (!user) return res.status(404).json({ message: "User not found" });
-    user.subscription = {
-      plan:          plan          ?? user.subscription?.plan ?? 'free',
-      status:        status        ?? 'active',
-      renewalDate:   renewalDate   ? new Date(renewalDate) : null,
-      purchaseToken: purchaseToken ?? null,
-    };
-    await user.save();
-    return res.status(200).json({ subscription: user.subscription });
-  } catch (error) {
-    console.error("Update subscription error:", error);
-    return res.status(500).json({ message: "Server error" });
-  }
-};
+// [BT-SEC-01] updateSubscription removed — it let any authenticated user write an
+// arbitrary plan/status onto their own record with no payment verification. It was
+// orphaned Google Play IAP scaffolding (no caller on web or mobile). Subscription
+// entitlement is derived solely from verified payments via /api/subscriptions/*.
 const getSubscription = async (req, res) => {
   try {
     const user = await User.findById(req.user.id).select('subscription');
@@ -249,4 +230,4 @@ const visitModule = async (req, res) => {
   }
 };
 
-module.exports = { safeUser, updateProfile, updateSubscription, getSubscription, getProfile, updateProfilePhoto, assignOversightRoles, skipOnboarding, visitModule };
+module.exports = { safeUser, updateProfile, getSubscription, getProfile, updateProfilePhoto, assignOversightRoles, skipOnboarding, visitModule };

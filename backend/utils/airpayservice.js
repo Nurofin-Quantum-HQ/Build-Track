@@ -265,130 +265,57 @@ function verifyAndDecryptCallbackData(reqBody) {
     }
   }
 
-  // ── STEP 2: Fall back to unencrypted form fields ────────────────────────
-  // Only used when: (a) no response field, or (b) decryption totally failed.
+  // ── STEP 2: Fail closed — NO unauthenticated fallback ───────────────────
+  // [BT-SEC-02] Previously, if the encrypted `response` was absent or could not be
+  // decrypted, the code trusted attacker-supplied plain-text fields and SKIPPED hash
+  // verification — letting anyone forge a "payment success" and activate a plan.
+  // A callback we cannot decrypt carries no proof it came from AirPay, so we reject
+  // it. AirPay's reference integration always sends (and verifies) the encrypted
+  // `response`; there is no legitimate plain-text-only callback to support.
   if (!dataObj) {
-    const hasPlainFields = reqBody.TRANSACTIONSTATUS || reqBody.transaction_status ||
-                           reqBody.transaction_payment_status ||
-                           reqBody.ap_SecureHash || reqBody.ap_securehash;
-    if (hasPlainFields) {
-      console.log('[AirPay IPN] Using unencrypted plain text fields (hash verification will be skipped).');
-      dataObj = reqBody;
-      rawResult = reqBody;
-      extractionMethod = 'plaintext';
-    } else {
-      throw new Error(
-        'No decryptable response and no recognisable plain text fields. ' +
-        `Body keys: ${Object.keys(reqBody).join(', ')}`
-      );
-    }
+    throw new Error(
+      '[BT-SEC-02] Callback rejected: missing or undecryptable `response`. ' +
+      'Plain-text callbacks are not accepted.'
+    );
   }
 
-  // ── STEP 3: Verify Airpay secure hash (CRC32) ──────────────────────────
-  // Only verify when we have the decrypted data (hash was computed from those
-  // values). When using plain text fallback, we skip hash verification because
-  // the field formats differ from what Airpay hashed.
+  // ── STEP 3: Verify AirPay secure hash (CRC32) — MANDATORY, NO SKIP ──────
+  // Per AirPay v4 docs (getting-started-guide/checksum + payments/ipn-callback):
+  //   hash = crc32(orderid : ap_transactionid : amount : transaction_status
+  //                : message : merchant_id : username)   [ + : customervpa for UPI ]
+  // The hash includes our secret USERNAME, which an attacker cannot know — so a
+  // matching hash is the proof the callback is genuine. No hash, or a mismatch,
+  // means we do not trust it and nothing is activated.
   const secureHash = dataObj.ap_securehash || dataObj.ap_SecureHash || dataObj.AP_SECUREHASH;
-
-  if (secureHash && extractionMethod !== 'plaintext') {
-    const CHMOD = (reqBody.CHMOD || reqBody.chmod || dataObj.CHMOD || dataObj.chmod || '').toLowerCase();
-    let hashInput;
-
-    if (CHMOD === 'upi') {
-      const customerVpa = reqBody.CUSTOMERVPA || reqBody.customervpa || dataObj.CUSTOMERVPA || dataObj.customervpa || dataObj.customer_vpa || dataObj.custom_var || '';
-      hashInput = [
-        dataObj.orderid !== undefined ? String(dataObj.orderid) : (dataObj.TRANSACTIONID !== undefined ? String(dataObj.TRANSACTIONID) : ''),
-        dataObj.ap_transactionid !== undefined ? String(dataObj.ap_transactionid) : (dataObj.APTRANSACTIONID !== undefined ? String(dataObj.APTRANSACTIONID) : ''),
-        dataObj.amount !== undefined ? String(dataObj.amount) : (dataObj.AMOUNT !== undefined ? String(dataObj.AMOUNT) : ''),
-        dataObj.transaction_status !== undefined ? String(dataObj.transaction_status) : (dataObj.TRANSACTIONSTATUS !== undefined ? String(dataObj.TRANSACTIONSTATUS) : ''),
-        dataObj.message !== undefined ? String(dataObj.message) : (dataObj.MESSAGE !== undefined ? String(dataObj.MESSAGE) : ''),
-        String(cfg.merchantId),
-        String(cfg.username),
-        String(customerVpa),
-      ].join(':');
-    } else {
-      hashInput = [
-        dataObj.orderid !== undefined ? String(dataObj.orderid) : (dataObj.TRANSACTIONID !== undefined ? String(dataObj.TRANSACTIONID) : ''),
-        dataObj.ap_transactionid !== undefined ? String(dataObj.ap_transactionid) : (dataObj.APTRANSACTIONID !== undefined ? String(dataObj.APTRANSACTIONID) : ''),
-        dataObj.amount !== undefined ? String(dataObj.amount) : (dataObj.AMOUNT !== undefined ? String(dataObj.AMOUNT) : ''),
-        dataObj.transaction_status !== undefined ? String(dataObj.transaction_status) : (dataObj.TRANSACTIONSTATUS !== undefined ? String(dataObj.TRANSACTIONSTATUS) : ''),
-        dataObj.message !== undefined ? String(dataObj.message) : (dataObj.MESSAGE !== undefined ? String(dataObj.MESSAGE) : ''),
-        String(cfg.merchantId),
-        String(cfg.username),
-      ].join(':');
-    }
-
-    const computedHash = (CRC32.str(hashInput) >>> 0).toString();
-    const receivedHash = String(secureHash);
-
-    // Diagnostic log (safely logging the exact values fed to hash)
-    console.log(`[AirPay IPN] Hash Diagnostic: CHMOD=${CHMOD}, dataKeys=${Object.keys(dataObj).join(',')}`);
-    console.log(`[AirPay IPN] Hash fields: orderid='${dataObj.orderid !== undefined ? dataObj.orderid : dataObj.TRANSACTIONID}', ` +
-                `ap_txnid='${dataObj.ap_transactionid !== undefined ? dataObj.ap_transactionid : dataObj.APTRANSACTIONID}', ` +
-                `amount='${dataObj.amount !== undefined ? dataObj.amount : dataObj.AMOUNT}', ` +
-                `status='${dataObj.transaction_status !== undefined ? dataObj.transaction_status : dataObj.TRANSACTIONSTATUS}', ` +
-                `message='${dataObj.message !== undefined ? dataObj.message : dataObj.MESSAGE}', ` +
-                `mid='${cfg.merchantId}', username='***'`);
-    console.log(`[AirPay IPN] Hash string structure: ${hashInput.replace(cfg.username, '***')}`);
-    console.log(`[AirPay IPN] Hash verification: computed=${computedHash}, received=${receivedHash}`);
-
-    if (computedHash !== receivedHash) {
-      console.log('[AirPay IPN] Standard hash mismatch. Attempting secure format variations (case/number formats)...');
-      
-      const safeAmountFormats = [String(dataObj.amount), Number(dataObj.amount).toString(), Number(dataObj.amount).toFixed(2), Number(dataObj.amount).toFixed(3)];
-      const safeStatusFormats = [String(dataObj.transaction_status), 'SUCCESS', 'Success', '200'];
-      const safeMessageFormats = [String(dataObj.message), 'Success', 'Transaction Successful', ''];
-      const safeVpaFormats = [String(customerVpa), ''];
-      const safeUsernames = [String(cfg.username), ''];
-      const safeSeps = [':', '|', ''];
-
-      let foundVariant = false;
-
-      outer: for (const a of safeAmountFormats) {
-        for (const s of safeStatusFormats) {
-          for (const m of safeMessageFormats) {
-            for (const vpa of safeVpaFormats) {
-              for (const u of safeUsernames) {
-                for (const sep of safeSeps) {
-                  let testInput;
-                  if (vpa || CHMOD === 'upi') {
-                    testInput = [String(dataObj.orderid), String(dataObj.ap_transactionid), a, s, m, String(cfg.merchantId), u, vpa].join(sep);
-                  } else {
-                    testInput = [String(dataObj.orderid), String(dataObj.ap_transactionid), a, s, m, String(cfg.merchantId), u].join(sep);
-                  }
-                  
-                  const testHash = (CRC32.str(testInput) >>> 0).toString();
-                  if (testHash === receivedHash) {
-                    console.log(`[AirPay IPN] ✅ MATCH FOUND WITH VARIANT FORMAT! String: ${testInput.replace(cfg.username, '***')}`);
-                    foundVariant = true;
-                    break outer;
-                  }
-
-                  // Try with trailing colon
-                  const testHashTrailing = (CRC32.str(testInput + sep) >>> 0).toString();
-                  if (testHashTrailing === receivedHash) {
-                    console.log(`[AirPay IPN] ✅ MATCH FOUND WITH TRAILING COLON! String: ${testInput.replace(cfg.username, '***') + sep}`);
-                    foundVariant = true;
-                    break outer;
-                  }
-                }
-              }
-            }
-          }
-        }
-      }
-
-      if (!foundVariant) {
-        throw new Error(
-          `Airpay secure hash mismatch — computed: ${computedHash}, received: ${receivedHash}`
-        );
-      }
-    } else {
-      console.log('[AirPay IPN] ✅ Standard secure hash verified');
-    }
-  } else if (extractionMethod === 'plaintext') {
-    console.log('[AirPay IPN] ⚠️ Hash verification skipped (plain text fallback — values may differ from hashed values)');
+  if (!secureHash) {
+    throw new Error('[BT-SEC-02] Callback rejected: ap_securehash missing from verified payload.');
   }
+
+  const pick = (a, b) =>
+    dataObj[a] !== undefined ? String(dataObj[a])
+    : dataObj[b] !== undefined ? String(dataObj[b]) : '';
+  const CHMOD = String(dataObj.chmod || dataObj.CHMOD || reqBody.CHMOD || reqBody.chmod || '').toLowerCase();
+
+  const hashFields = [
+    pick('orderid', 'TRANSACTIONID'),
+    pick('ap_transactionid', 'APTRANSACTIONID'),
+    pick('amount', 'AMOUNT'),
+    pick('transaction_status', 'TRANSACTIONSTATUS'),
+    pick('message', 'MESSAGE'),
+    String(cfg.merchantId),
+    String(cfg.username),
+  ];
+  if (CHMOD === 'upi') {
+    const vpa = pick('customervpa', 'CUSTOMERVPA') || String(dataObj.customer_vpa || '');
+    hashFields.push(vpa);
+  }
+
+  const computedHash = (CRC32.str(hashFields.join(':')) >>> 0).toString();
+  if (computedHash !== String(secureHash)) {
+    // Do not log the raw hash inputs (they include the secret username).
+    throw new Error('[BT-SEC-02] Callback rejected: secure hash mismatch.');
+  }
+  console.log('[AirPay IPN] ✅ Secure hash verified');
 
   return { data: dataObj, rawResult };
 }
