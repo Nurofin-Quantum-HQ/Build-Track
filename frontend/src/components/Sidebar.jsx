@@ -36,7 +36,7 @@ export default function Sidebar() {
   const location = useLocation();
   const { user: authUser, logout } = useAuth();
   const [user, setUser] = useState(authUser);
-  const totalAlertCount = useNotificationStore((state) => state.totalAlertCount);
+  const totalAlertCount = useNotificationStore((state) => state.systemNotifications.filter(n => !n.read).length);
 
   useEffect(() => {
     setUser(authUser);

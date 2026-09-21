@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { aiDashboardAPI, aiChatAPI } from '../api';
-import { colors, radius, shadows, gradients } from '../styles/designTokens';
+import { colors, radius, shadows, gradients, typography } from '../styles/designTokens';
 import { Card, Spinner } from '../components/ui';
 import { Toast } from '../components/Toast';
 import {
@@ -60,8 +60,12 @@ export default function AiChatReportPage() {
   const [tempAllCols, setTempAllCols] = useState([]);
 
   const [recentSearches, setRecentSearches] = useState(() => {
-    const cached = localStorage.getItem('bt_ai_searches_v1');
-    return cached ? JSON.parse(cached) : [];
+    try {
+      const cached = localStorage.getItem('bt_ai_searches_v1');
+      return cached ? JSON.parse(cached) : [];
+    } catch (e) {
+      return [];
+    }
   });
 
   const clearToast = () => setToast({ msg: '', type: 'info' });

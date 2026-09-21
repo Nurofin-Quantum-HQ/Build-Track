@@ -3,7 +3,8 @@ import { useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 import {
   projectAPI,
-  transactionAPI
+  transactionAPI,
+  userAPI
 } from "../api";
 import useProjectStore from "../stores/projectStore";
 import useTransactionStore from "../stores/transactionStore";
@@ -137,6 +138,9 @@ export default function FinancialReportPage() {
 
   const [activeColumns, setActiveColumns] = useState(() => {
     try {
+      if (user?.preferences?.reportColumns) {
+        return user.preferences.reportColumns;
+      }
       const cached = localStorage.getItem("bt_reports_active_cols_v1");
       if (cached) {
         const parsed = JSON.parse(cached);
@@ -206,6 +210,8 @@ export default function FinancialReportPage() {
   const saveActiveColumns = (updated) => {
     setActiveColumns(updated);
     localStorage.setItem("bt_reports_active_cols_v1", JSON.stringify(updated));
+    userAPI.updateProfileAlt({ preferences: { reportColumns: updated } })
+      .catch(err => console.error("Failed to save report columns to profile", err));
   };
 
   useEffect(() => {
@@ -546,7 +552,8 @@ export default function FinancialReportPage() {
   const handleAddMore = (entry) => {
     const activeKey = entry.type === "material" ? "material" : entry.type === "labour" ? "labour" : "equipment";
     const sourceId = entry.id || (entry.rawTx ? (entry.rawTx._id || entry.rawTx.id) : "");
-    navigate(`/manualentry?type=${activeKey}&project=${entry.projectId}&name=${entry.description}&unit=${entry.unit}&brand=${entry.brand || ""}&isDuplicate=true&sourceTransactionId=${sourceId}`);
+    const returnUrl = encodeURIComponent("/reports");
+    navigate(`/manualentry?type=${activeKey}&project=${entry.projectId}&name=${entry.description}&unit=${entry.unit}&brand=${entry.brand || ""}&isDuplicate=true&sourceTransactionId=${sourceId}&returnUrl=${returnUrl}`);
   };
 
   const handleEditEntry = (entry) => {
@@ -566,11 +573,21 @@ export default function FinancialReportPage() {
 
     try {
       const activeCols = (activeColumns && activeColumns[activeTab]) || DEFAULT_COLS[activeTab] || [];
-      const headers = activeCols.map(col => col === "Amount" ? "Amount (INR)" : col);
+      const headers = ['Transaction ID', ...activeCols.map(col => col === "Amount" ? "Amount (INR)" : col)];
+
+      let maxPayments = 0;
+      for (const entry of filteredEntries) {
+        const ph = entry.rawTx?.paymentHistory || [];
+        if (ph.length > maxPayments) maxPayments = ph.length;
+      }
+      for (let i = 1; i <= maxPayments; i++) {
+        headers.push(`Payment ${i} Amount`);
+        headers.push(`Payment ${i} Date`);
+        headers.push(`Payment ${i} Mode`);
+      }
 
       const csvBuffer = [];
-
-      csvBuffer.push(headers.map(h => `"${h.replace(/"/g, '""')}"`).join(","));
+      csvBuffer.push(headers.map(h => `"${String(h).replace(/"/g, '""')}"`).join(","));
 
       for (const entry of filteredEntries) {
         const dateStr = entry.date.toISOString().split("T")[0];
@@ -579,7 +596,7 @@ export default function FinancialReportPage() {
         const statusStr = getPaymentStatusLabel(entry.paymentStatus);
         const payDateStr = entry.paymentDate ? entry.paymentDate.toISOString().split("T")[0] : "—";
 
-        const rowValues = [];
+        const rowValues = [entry.rawTx?._id || ""];
         for (const col of activeCols) {
           if (col === 'Purchased Date') {
             rowValues.push(dateStr);
@@ -618,7 +635,19 @@ export default function FinancialReportPage() {
             rowValues.push(val.toFixed(1));
           }
         }
-        csvBuffer.push(rowValues.map(v => `"${v.replace(/"/g, '""')}"`).join(","));
+        
+        const ph = entry.rawTx?.paymentHistory || [];
+        for (let i = 0; i < maxPayments; i++) {
+           if (i < ph.length) {
+              rowValues.push(ph[i].amount);
+              rowValues.push(ph[i].date ? new Date(ph[i].date).toISOString().split('T')[0] : '');
+              rowValues.push(ph[i].method || '');
+           } else {
+              rowValues.push(''); rowValues.push(''); rowValues.push('');
+           }
+        }
+        
+        csvBuffer.push(rowValues.map(v => `"${String(v).replace(/"/g, '""')}"`).join(","));
       }
 
       const blob = new Blob(["\uFEFF" + csvBuffer.join("\n")], { type: "text/csv;charset=utf-8;" });

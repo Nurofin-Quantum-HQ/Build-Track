@@ -10,9 +10,7 @@ const useNotificationStore = create((set, get) => ({
   lastFetched: 0,
 
   get totalAlertCount() {
-    const state = get();
-    const unreadSystem = state.systemNotifications.filter((n) => !n.read).length;
-    return unreadSystem; // Do not include permanent inventory alerts in the unread badge
+    return this.systemNotifications ? this.systemNotifications.filter(n => !n.read).length : 0;
   },
 
   async fetchAll(force = false) {
@@ -33,7 +31,7 @@ const useNotificationStore = create((set, get) => ({
     let systemNotifications = state.systemNotifications;
     if (notifResult.status === "fulfilled" && notifResult.value?.data) {
       const data = notifResult.value.data;
-      systemNotifications = Array.isArray(data) ? data : data.notifications || [];
+      systemNotifications = Array.isArray(data) ? data : data.notifications || data.items || [];
     }
 
     let inventoryAlerts = state.inventoryAlerts;

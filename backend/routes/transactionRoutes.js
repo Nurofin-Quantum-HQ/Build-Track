@@ -163,11 +163,11 @@ const PAYMENT_MODE_MAP = {
 };
 const VALID_PAYMENT_MODES = ["Cash", "Bank", "Bank Transfer", "UPI", "Cheque", "Card", ""];
 const normalizePaymentMode = (raw) => {
-  if (!raw) return "Cash";
+  if (!raw) return "UPI";
   const key = String(raw).toLowerCase().trim();
   if (PAYMENT_MODE_MAP[key]) return PAYMENT_MODE_MAP[key];
   if (VALID_PAYMENT_MODES.includes(raw)) return raw;
-  return "Cash";
+  return "UPI";
 };
 const runTransactionCreateUpload = (req, res) =>
   new Promise((resolve, reject) => {
@@ -626,13 +626,10 @@ if (req.body.paymentReceipt) {
             attachmentFiles,
           screenshotUrl,
           paymentReceipt: paymentReceiptUrl,
-          paymentHistory: paidAmt > 0 ? [{
+                    paymentHistory: payload.paymentHistory && payload.paymentHistory.length > 0 ? payload.paymentHistory : (paidAmt > 0 ? [{
             date: paymentDate || date || new Date(),
-            method: normalizePaymentMode(paymentMode),
-            amount: paidAmt,
-            note: notes || "Initial payment on creation",
-            receipt: paymentReceiptUrl || undefined,
-          }] : [],
+            method: normalizePaymentMode(paymentMode), amount: paidAmt, note: notes || "Initial payment on bulk creation"
+          }] : []),
           approvalStatus: txApprovalStatus,
           approvedBy: approvedBy,
           approvedAt: approvedAt,
@@ -1322,10 +1319,10 @@ router.post("/bulk", requirePermission(["manage_expenses", "add_entries"]), asyn
         floor, floorId, phase, phaseId, activity, activityId,
         paymentStatus: paymentStatus || "Pending", paymentMode: normalizePaymentMode(paymentMode),
         paymentDate, paidAmount: paidAmt, remarks,
-        paymentHistory: paidAmt > 0 ? [{
-          date: paymentDate || date || new Date(),
-          method: normalizePaymentMode(paymentMode), amount: paidAmt, note: notes || "Initial payment on bulk creation"
-        }] : [],
+                  paymentHistory: payload.paymentHistory && payload.paymentHistory.length > 0 ? payload.paymentHistory : (paidAmt > 0 ? [{
+            date: paymentDate || date || new Date(),
+            method: normalizePaymentMode(paymentMode), amount: paidAmt, note: notes || "Initial payment on bulk creation"
+          }] : []),
         approvalStatus: txApprovalStatus, approvedBy, approvedAt
       });
       await transaction.save({ session });
@@ -1352,7 +1349,7 @@ router.post("/bulk", requirePermission(["manage_expenses", "add_entries"]), asyn
   }
 
   // Update onboarding if they used bulk CSV successfully
-  if (results.successes.length > 0) {
+  if (results.successCount > 0) {
     await User.findByIdAndUpdate(req.user._id, {
       $set: { "onboarding.hasUsedBulkCSV": true }
     });
@@ -1428,4 +1425,57 @@ router.post("/:id/request-esign", async (req, res) => {
     res.status(500).json({ message: "Server error" });
   }
 });
+
+// --- Added backup routes ---
+router.post("/backup-csv", requirePermission(["manage_expenses", "add_entries"]), async (req, res) => {
+  try {
+    const transactions = await Transaction.find({ createdBy: req.user._id }).lean();
+    const fs = require('fs');
+    const path = require('path');
+    const backupPath = path.join(__dirname, '..', 'backups');
+    if (!fs.existsSync(backupPath)) {
+      fs.mkdirSync(backupPath);
+    }
+    const userBackupFile = path.join(backupPath, `backup_${req.user._id}.json`);
+    fs.writeFileSync(userBackupFile, JSON.stringify(transactions));
+    res.json({ message: "Backup successful" });
+  } catch (error) {
+    console.error("Backup error:", error);
+    res.status(500).json({ message: "Backup failed" });
+  }
+});
+
+router.post("/revert-csv", requirePermission(["manage_expenses", "add_entries"]), async (req, res) => {
+  try {
+    const fs = require('fs');
+    const path = require('path');
+    const userBackupFile = path.join(__dirname, '..', 'backups', `backup_${req.user._id}.json`);
+    if (!fs.existsSync(userBackupFile)) {
+      return res.status(404).json({ message: "No backup found to revert" });
+    }
+    const backupData = JSON.parse(fs.readFileSync(userBackupFile, 'utf8'));
+    
+    const session = await mongoose.startSession();
+    session.startTransaction();
+    try {
+      await Transaction.deleteMany({ createdBy: req.user._id }).session(session);
+      if (backupData.length > 0) {
+        await Transaction.insertMany(backupData, { session });
+      }
+      await session.commitTransaction();
+      res.json({ message: "Revert successful" });
+    } catch (e) {
+      await session.abortTransaction();
+      throw e;
+    } finally {
+      session.endSession();
+    }
+  } catch (error) {
+    console.error("Revert error:", error);
+    res.status(500).json({ message: "Revert failed" });
+  }
+});
+// -----------------------------
+
 module.exports = router;
+

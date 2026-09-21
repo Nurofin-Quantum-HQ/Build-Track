@@ -273,6 +273,10 @@ function resolveActivity(activityName, project, phaseId) {
 
 function mapRowToPayload(row, detectedType, columnMapping, projects) {
   const payload = {};
+  
+  if (row["Transaction ID"]) {
+    payload._id = row["Transaction ID"];
+  }
 
   for (const [csvCol, dbField] of Object.entries(columnMapping)) {
     const val = row[csvCol] || "";
@@ -305,6 +309,32 @@ function mapRowToPayload(row, detectedType, columnMapping, projects) {
       default:
         payload[dbField] = val;
     }
+  }
+
+  // Parse dynamic payment columns
+  const paymentHistory = [];
+  let paymentIdx = 1;
+  while (row[`Payment ${paymentIdx} Amount`] !== undefined) {
+    const pAmtStr = row[`Payment ${paymentIdx} Amount`];
+    const pDate = row[`Payment ${paymentIdx} Date`];
+    const pMode = row[`Payment ${paymentIdx} Mode`];
+    
+    if (pAmtStr) {
+      const pAmt = Number(pAmtStr);
+      if (!isNaN(pAmt) && pAmt > 0) {
+        paymentHistory.push({
+          amount: pAmt,
+          date: pDate || new Date(),
+          method: pMode || "Cash",
+          note: "Imported from CSV"
+        });
+      }
+    }
+    paymentIdx++;
+  }
+  
+  if (paymentHistory.length > 0) {
+    payload.paymentHistory = paymentHistory;
   }
 
   if (payload.type) {
@@ -550,6 +580,7 @@ export default function CsvImport({ onComplete }) {
       const qty = payload.quantity || 0;
       const rt = payload.rate || 0;
       return {
+        _id: payload._id,
         title: payload.title || "Item",
         type: payload.type || "Expense",
         project: payload.project,
@@ -570,12 +601,13 @@ export default function CsvImport({ onComplete }) {
         gst: payload.gstPercentage || 0,
         gstPercentage: payload.gstPercentage || 0,
         overtime: payload.overtime || 0,
+        paymentHistory: payload.paymentHistory || [],
         paymentStatus: payload.paymentStatus || "Pending",
         notes: payload.notes || "",
         subType: payload.subtype || "",
         workType: payload.workType || "",
         contractor: payload.contractor || "",
-        model: payload.model || "",
+        model: payload.model || ""
       };
     });
 
@@ -701,8 +733,24 @@ export default function CsvImport({ onComplete }) {
           <div style={{ fontSize: 10.5, fontWeight: 800, color: colors.textLight, letterSpacing: '0.6em', textTransform: 'uppercase' }}>
             BULK ENTRY IMPORT
           </div>
-          <div style={{ fontSize: 15, fontWeight: 800, color: colors.textPrimary, marginTop: 2 }}>
-            CSV Bulk Import
+          <div style={{ fontSize: 15, fontWeight: 800, color: colors.textPrimary, marginTop: 2, display: "flex", justifyContent: "space-between" }}>
+            <span>CSV Bulk Import</span>
+            <button
+              onClick={async () => {
+                if (window.confirm("Are you sure you want to revert your last CSV bulk upload? This will undo all changes made during that specific upload.")) {
+                  try {
+                    await transactionAPI.revertCsv();
+                    if (onComplete) onComplete({ success: true, revert: true });
+                    alert("Reverted successfully.");
+                  } catch (err) {
+                    alert(err.response?.data?.message || "Failed to revert.");
+                  }
+                }
+              }}
+              style={{ padding: "4px 10px", fontSize: 11, fontWeight: 700, borderRadius: 6, border: "1px solid #FCA5A5", background: "#FEF2F2", color: "#EF4444", cursor: "pointer" }}
+            >
+              Revert Last Upload
+            </button>
           </div>
         </div>
       </div>
