@@ -626,9 +626,9 @@ if (req.body.paymentReceipt) {
             attachmentFiles,
           screenshotUrl,
           paymentReceipt: paymentReceiptUrl,
-                    paymentHistory: payload.paymentHistory && payload.paymentHistory.length > 0 ? payload.paymentHistory : (paidAmt > 0 ? [{
+          paymentHistory: req.body.paymentHistory && req.body.paymentHistory.length > 0 ? req.body.paymentHistory : (paidAmt > 0 ? [{
             date: paymentDate || date || new Date(),
-            method: normalizePaymentMode(paymentMode), amount: paidAmt, note: notes || "Initial payment on bulk creation"
+            method: normalizePaymentMode(paymentMode), amount: paidAmt, note: notes || "Initial payment on creation"
           }] : []),
           approvalStatus: txApprovalStatus,
           approvedBy: approvedBy,
