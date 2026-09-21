@@ -410,24 +410,24 @@ router.get("/:id", async (req, res) => {
     const tx = await Transaction.findById(req.params.id)
       .populate("worker", "name trade")
       .populate("project", "projectName status progress createdBy");
-    if (!tx) { await session.abortTransaction(); return res.status(404).json({ message: 'Transaction not found' }); }
+    if (!tx) { return res.status(404).json({ message: 'Transaction not found' }); }
     if (req.user.role !== "Admin") {
       const adminId = await getAdminId(req.user);
       if (tx.project) {
         const pDoc = await Project.findOne(canAccessProjectFilter(req, tx.project._id || tx.project));
         if (!pDoc) {
-          { await session.abortTransaction(); return res.status(403).json({ message: 'Access denied to this transaction' }); }
+          return res.status(403).json({ message: 'Access denied to this transaction' });
         }
       } else {
         const isOwnOrAdmin = tx.createdBy?.toString() === req.user._id.toString() || (adminId && tx.createdBy?.toString() === adminId.toString());
         if (!isOwnOrAdmin) {
-          { await session.abortTransaction(); return res.status(403).json({ message: 'Access denied to this transaction' }); }
+          return res.status(403).json({ message: 'Access denied to this transaction' });
         }
       }
     } else {
       if (tx.project && tx.project.createdBy.toString() !== req.user._id.toString()) {
         if (tx.createdBy.toString() !== req.user._id.toString()) {
-          { await session.abortTransaction(); return res.status(403).json({ message: 'Access denied to this transaction' }); }
+          return res.status(403).json({ message: 'Access denied to this transaction' });
         }
       }
     }
@@ -452,11 +452,13 @@ router.post("/", requirePermission(["manage_expenses", "add_entries"]), async (r
     req.user.role === "Admin" ||
     userPermissions.includes("approve_payments") ||
     userPermissions.includes("mark_paid");
-  if ((paymentStatus === "Paid" || Number(paidAmount) > 0) && !canMarkPaid) {
-    { await session.abortTransaction(); return res.status(403).json({ message: 'Insufficient permissions to record payments or mark as Paid' }); }
-  }
   const session = await mongoose.startSession();
   session.startTransaction();
+  if ((paymentStatus === "Paid" || Number(paidAmount) > 0) && !canMarkPaid) {
+    await session.abortTransaction();
+    session.endSession();
+    return res.status(403).json({ message: 'Insufficient permissions to record payments or mark as Paid' });
+  }
   try {
     const {
       title, type, worker, project, date, notes,
