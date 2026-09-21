@@ -20,6 +20,7 @@ import {
   typography
 } from "../styles/designTokens";
 import RecordPaymentSheet from "../components/RecordPaymentSheet";
+import CsvImport from "../components/CsvImport";
 import {
   Sparkles,
   Building,
@@ -162,6 +163,7 @@ export default function FinancialReportPage() {
 
   const [paymentSheetOpen, setPaymentSheetOpen] = useState(false);
   const [paymentItem, setPaymentItem] = useState(null);
+  const [showImportModal, setShowImportModal] = useState(false);
 
   const clearToast = useCallback(() => setToast({ msg: "", type: "info" }), []);
 
@@ -589,12 +591,20 @@ export default function FinancialReportPage() {
       const csvBuffer = [];
       csvBuffer.push(headers.map(h => `"${String(h).replace(/"/g, '""')}"`).join(","));
 
+      const formatLocal = (dStr) => {
+        if (!dStr) return "—";
+        const d = typeof dStr === 'string' ? new Date(dStr) : dStr;
+        if (isNaN(d.getTime())) return "—";
+        const pad = (n) => n.toString().padStart(2, '0');
+        return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+      };
+
       for (const entry of filteredEntries) {
-        const dateStr = entry.date.toISOString().split("T")[0];
+        const dateStr = formatLocal(entry.date);
         const projectName = getProjectName(entry.projectId);
         const amountStr = entry.amount.toFixed(2);
         const statusStr = getPaymentStatusLabel(entry.paymentStatus);
-        const payDateStr = entry.paymentDate ? entry.paymentDate.toISOString().split("T")[0] : "—";
+        const payDateStr = formatLocal(entry.paymentDate);
 
         const rowValues = [entry.rawTx?._id || ""];
         for (const col of activeCols) {
@@ -640,8 +650,8 @@ export default function FinancialReportPage() {
         for (let i = 0; i < maxPayments; i++) {
            if (i < ph.length) {
               rowValues.push(ph[i].amount);
-              rowValues.push(ph[i].date ? new Date(ph[i].date).toISOString().split('T')[0] : '');
-              rowValues.push(ph[i].method || '');
+              rowValues.push(formatLocal(ph[i].date));
+              rowValues.push(ph[i].method || ph[i].mode || '');
            } else {
               rowValues.push(''); rowValues.push(''); rowValues.push('');
            }
@@ -825,8 +835,28 @@ export default function FinancialReportPage() {
             <SlidersHorizontal size={14} />
             Edit Columns
           </button>
+  
+            <button
+              onClick={() => setShowImportModal(true)}
+              style={{
+                padding: "9px 18px",
+                borderRadius: radius.md,
+                border: "none",
+                background: colors.cardBg,
+                color: colors.textMedium,
+                fontWeight: 700,
+                fontSize: 13,
+                cursor: "pointer",
+                display: "flex",
+                alignItems: "center",
+                gap: 8,
+                boxShadow: shadows.card
+              }}
+            >
+              Import / Revert CSV
+            </button>
 
-          <div style={{ position: "relative" }}>
+            <div style={{ position: "relative" }}>
             <button
               onClick={handleExportCSV}
               disabled={filteredEntries.length === 0}
@@ -1746,6 +1776,20 @@ export default function FinancialReportPage() {
               </button>
             </div>
 
+          </div>
+        </div>
+      )}
+
+      {showImportModal && (
+        <div style={{ position: "fixed", inset: 0, zIndex: 1100, background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }}>
+          <div style={{ background: "#fff", borderRadius: 18, width: "100%", maxWidth: 900, maxHeight: "90vh", overflowY: "auto", position: "relative" }}>
+            <button onClick={() => setShowImportModal(false)} style={{ position: "absolute", top: 16, right: 16, background: "#F1F5F9", border: "none", width: 32, height: 32, borderRadius: 16, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", color: "#64748B", fontWeight: "bold" }}>X</button>
+            <div style={{ padding: "16px 20px 0" }}>
+              <h2 style={{ margin: 0, fontSize: 18, fontWeight: 800 }}>Import or Revert CSV</h2>
+            </div>
+            <div style={{ padding: 20 }}>
+              <CsvImport onComplete={() => window.location.reload()} />
+            </div>
           </div>
         </div>
       )}

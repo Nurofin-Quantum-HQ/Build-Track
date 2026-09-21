@@ -1254,8 +1254,6 @@ router.post("/bulk", requirePermission(["manage_expenses", "add_entries"]), asyn
   const approvedBy = req.user.role === "Admin" ? req.user._id : null;
   const approvedAt = req.user.role === "Admin" ? new Date() : null;
   for (let i = 0; i < transactions.length; i++) {
-    const session = await mongoose.startSession();
-    session.startTransaction();
     try {
       const payload = transactions[i];
       const {
@@ -1307,8 +1305,13 @@ router.post("/bulk", requirePermission(["manage_expenses", "add_entries"]), asyn
         overtime:   ot,
       });
       if (amountErr) throw new Error(`Invalid transaction data: ${amountErr}`);
-      const transaction = new Transaction({
-        createdBy: req.user._id,
+      
+      let transaction;
+      if (payload._id && mongoose.Types.ObjectId.isValid(payload._id)) {
+        transaction = await Transaction.findById(payload._id);
+      }
+      
+      const txData = {
         title: title.trim(),
         type, worker: workerId || null, project: projectId,
         date: date || new Date(), notes, category: resolvedCategory, brand, supplier,
@@ -1317,32 +1320,38 @@ router.post("/bulk", requirePermission(["manage_expenses", "add_entries"]), asyn
         floor, floorId, phase, phaseId, activity, activityId,
         paymentStatus: paymentStatus || "Pending", paymentMode: normalizePaymentMode(paymentMode),
         paymentDate, paidAmount: paidAmt, remarks,
-                  paymentHistory: payload.paymentHistory && payload.paymentHistory.length > 0 ? payload.paymentHistory : (paidAmt > 0 ? [{
-            date: paymentDate || date || new Date(),
-            method: normalizePaymentMode(paymentMode), amount: paidAmt, note: notes || "Initial payment on bulk creation"
-          }] : []),
+        paymentHistory: payload.paymentHistory && payload.paymentHistory.length > 0 ? payload.paymentHistory : (paidAmt > 0 ? [{
+          date: paymentDate || date || new Date(),
+          method: normalizePaymentMode(paymentMode), amount: paidAmt, note: notes || "Initial payment on bulk creation"
+        }] : []),
         approvalStatus: txApprovalStatus, approvedBy, approvedAt
-      });
-      await transaction.save({ session });
+      };
+
+      if (transaction) {
+        transaction.set(txData);
+      } else {
+        transaction = new Transaction({
+          createdBy: req.user._id,
+          ...txData
+        });
+      }
+      
+      await transaction.save();
       if ((type === "Materials" || type === "Wages" || type === "Expense") && qty > 0 && projectId && txApprovalStatus === "Approved") {
         const inventoryDelta = (type === "Materials" && normalizedMaterialType === "usage") ? -qty : qty;
-        await applyInventoryDelta(adminId, projectId, resolvedCategory || title, unit, inventoryDelta, type, session);
+        await applyInventoryDelta(adminId, projectId, resolvedCategory || title, unit, inventoryDelta, type, null);
       }
       if (projectId && phaseId && activityId && txApprovalStatus === "Approved") {
-        await updateProjectPhaseBudget(projectId, phaseId, activityId, type, finalAmount, session);
+        await updateProjectPhaseBudget(projectId, phaseId, activityId, type, finalAmount, null);
       }
-      await session.commitTransaction();
       results.successCount++;
     } catch (err) {
-      await session.abortTransaction();
       results.failedCount++;
       results.failures.push({
         index: i,
         title: transactions[i].title || 'Unknown',
         reason: err.message || "Failed to save transaction"
       });
-    } finally {
-      session.endSession();
     }
   }
 

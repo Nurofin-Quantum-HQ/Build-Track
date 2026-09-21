@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useMemo } from "react";
 import { projectAPI, transactionAPI } from "../api";
 import { colors, radius, gradients } from "../styles/designTokens";
 
@@ -109,6 +109,17 @@ const COLUMN_MAPPINGS = {
     "notes": "notes",
   },
   all: {
+    "Amount": "amount",
+    "Amount (INR)": "amount",
+    "amount (inr)": "amount",
+    "amount": "amount",
+    "Total Amount": "amount",
+    "Paid Amount": "paidAmount",
+    "Paid": "paidAmount",
+    "paid": "paidAmount",
+    "paidAmount": "paidAmount",
+    "Payment Mode": "paymentMode",
+    "paymentMode": "paymentMode",
     "Type": "type",
     "type": "type",
     "Name": "title",
@@ -154,9 +165,13 @@ const COLUMN_MAPPINGS = {
     "gstpercentage": "gstPercentage",
     "Payment Status": "paymentStatus",
     "paymentStatus": "paymentStatus",
+    "Status": "paymentStatus",
+    "status": "paymentStatus",
     "paymentstatus": "paymentStatus",
     "Date": "date",
     "date": "date",
+    "Purchased Date": "date",
+    "Payment Date": "paymentDate",
     "Project": "project",
     "Floor": "floor",
     "floor": "floor",
@@ -283,6 +298,8 @@ function mapRowToPayload(row, detectedType, columnMapping, projects) {
     if (!val) continue;
 
     switch (dbField) {
+      case "amount":
+      case "paidAmount":
       case "quantity":
       case "rate":
       case "overtime":
@@ -587,7 +604,7 @@ export default function CsvImport({ onComplete }) {
         date: payload.date ? new Date(payload.date).toISOString() : new Date().toISOString(),
         quantity: qty,
         rate: rt,
-        amount: qty * rt,
+        amount: payload.amount !== undefined ? payload.amount : (qty * rt),
         unit: payload.unit || "",
         brand: payload.brand || "",
         category: payload.category || "",
@@ -603,6 +620,8 @@ export default function CsvImport({ onComplete }) {
         overtime: payload.overtime || 0,
         paymentHistory: payload.paymentHistory || [],
         paymentStatus: payload.paymentStatus || "Pending",
+        paidAmount: payload.paidAmount,
+        paymentMode: payload.paymentMode,
         notes: payload.notes || "",
         subType: payload.subtype || "",
         workType: payload.workType || "",
