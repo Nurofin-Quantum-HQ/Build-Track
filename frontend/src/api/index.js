@@ -90,6 +90,7 @@ export const transactionAPI = {
   delete:     (id)     => api.delete(`/transactions/${id}`),
   approve:    (id)     => api.put(`/transactions/${id}/approve`, {}),
   reject:     (id, d)  => api.put(`/transactions/${id}/reject`, d),
+  revertCsv:  ()       => api.post("/transactions/revert-csv"),
 };
 
 export const projectUpdateAPI = {

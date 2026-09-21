@@ -6,6 +6,18 @@ const Project = require("../models/Project");
 const { protect, getAdminId, canAccessProjectFilter } = require("../middleware/auth");
 const aiProvider = require("../services/ai/groqProvider");
 router.use(protect);
+
+async function askGroqWithTimeout(context, question, reqId, fallback) {
+  try {
+    const promise = aiProvider.generateSummary(context, question, reqId);
+    const timeout = new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 25000));
+    return await Promise.race([promise, timeout]);
+  } catch (err) {
+    console.error(`[${reqId}] Groq timeout or error:`, err.message);
+    return fallback;
+  }
+}
+
 function fmtDate(d) {
   if (!d) return "-";
   const date = new Date(d);

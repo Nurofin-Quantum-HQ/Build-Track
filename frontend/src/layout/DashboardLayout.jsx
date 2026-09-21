@@ -11,10 +11,11 @@ import { notificationAPI } from "../api";
 export default function DashboardLayout() {
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [unreadCount, setUnreadCount] = useState(0);
+
   const navigate = useNavigate();
   const location = useLocation();
-  const { fetchAll, totalAlertCount } = useNotificationStore();
+  const fetchAll = useNotificationStore(s => s.fetchAll);
+  const totalAlertCount = useNotificationStore(s => s.systemNotifications ? s.systemNotifications.filter(n => !n.read).length : 0);
 
   useEffect(() => {
     fetchAll();
@@ -30,22 +31,7 @@ export default function DashboardLayout() {
     return () => window.removeEventListener("resize", onResize);
   }, []);
 
-  useEffect(() => {
-    let active = true;
-    const fetchUnread = () => {
-      notificationAPI.getUnreadCount()
-        .then(res => {
-          if (active) setUnreadCount(res.data?.unreadCount || 0);
-        })
-        .catch(() => {});
-    };
-    fetchUnread();
-    const interval = setInterval(fetchUnread, 60000);
-    return () => {
-      active = false;
-      clearInterval(interval);
-    };
-  }, [location.pathname]);
+
 
   return (
     <div style={{ display: "flex", height: "100vh", overflow: "hidden", background: colors.bg }}>
@@ -138,7 +124,7 @@ export default function DashboardLayout() {
               style={{ position: "relative" }}
             >
               <Bell size={20} />
-              {Math.max(totalAlertCount || 0, unreadCount || 0) > 0 && (
+              {totalAlertCount > 0 && (
                 <span
                   style={{
                     position: "absolute",
@@ -160,7 +146,7 @@ export default function DashboardLayout() {
                     pointerEvents: "none",
                   }}
                 >
-                  {Math.max(totalAlertCount || 0, unreadCount || 0) > 99 ? "99+" : Math.max(totalAlertCount || 0, unreadCount || 0)}
+                  {totalAlertCount > 99 ? "99+" : totalAlertCount}
                 </span>
               )}
             </button>

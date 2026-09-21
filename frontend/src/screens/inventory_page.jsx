@@ -895,7 +895,7 @@ export default function InventoryPage() {
                           style={{ padding: "6px 12px", borderRadius: radius.sm, border: `1px solid ${colors.cardBorder}`, background: colors.cardBg, color: colors.textSecondary, fontWeight: 700, fontSize: 11, cursor: "pointer" }}>
                           {expandedItems[item._id] ? "Hide Logs" : "View Logs"}
                         </button>
-                        <button onClick={() => navigate(`/manualentry?type=${activeTabKey}&project=${item.project?._id || item.project}&name=${item.materialName}&unit=${item.unit}&brand=${item.brand || ""}`)}
+                        <button onClick={() => navigate(`/manualentry?type=${activeTabKey}&project=${item.project?._id || item.project}&name=${item.materialName}&unit=${item.unit}&brand=${item.brand || ""}&returnUrl=${encodeURIComponent("/inventory")}`)}
                           style={{ padding: "8px 16px", borderRadius: radius.sm, border: "none", background: gradients.primaryButton, color: "#FFF", fontWeight: 700, fontSize: 12, cursor: "pointer" }}>
                           Add More
                         </button>

@@ -2,7 +2,9 @@ import { AlertTriangle, HelpCircle } from 'lucide-react';
 import { colors, radius, typography } from '../../styles/designTokens';
 import Button from './Button';
 
-export default function ConfirmDialog({ message, danger, confirmLabel, onConfirm, onCancel }) {
+export default function ConfirmDialog({ open, message, danger, confirmLabel, onConfirm, onCancel }) {
+  if (!open) return null;
+
   return (
     <div
       onClick={onCancel}

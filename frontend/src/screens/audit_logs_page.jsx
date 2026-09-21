@@ -3,13 +3,14 @@ import { transactionAPI, projectAPI, authAPI } from "../api";
 import { useAuth } from "../contexts/AuthContext";
 import { Lock, Search, ClipboardList, AlertTriangle } from "lucide-react";
 import ModuleTour from "../components/ModuleTour";
+import { colors, gradients, radius, typography } from "../styles/designTokens";
 
 const ITEMS_PER_PAGE = 15;
 
 const ACTION_META = {
   create:   { icon: "+", bg: "#dcfce7", color: "#16a34a", border: "#bbf7d0", label: "Created" },
-  update:   { icon: "~", bg: "#FFF5F0", color: "#EA580C", border: "#FDE8D8", label: "Updated" },
-  delete:   { icon: "×", bg: "#fee2e2", color: "#dc2626", border: "#fca5a5", label: "Deleted" },
+  update:   { icon: "~", bg: colors.primaryLight || "#FFF5F0", color: colors.primary, border: "#FDE8D8", label: "Updated" },
+  delete:   { icon: "x", bg: "#fee2e2", color: "#dc2626", border: "#fca5a5", label: "Deleted" },
   approve:  { icon: "✓", bg: "#ccfbf1", color: "#0d9488", border: "#99f6e4", label: "Approved" },
 };
 
@@ -62,13 +63,21 @@ function buildLogs(transactions, projects, users) {
     const userName = resolveUser(t.createdBy || t.user);
     const projectName = resolveProject(t.project);
     const date = t.updatedAt || t.createdAt || t.date;
+    const amountStr = t.amount ? `₹${t.amount}` : '';
+    const details = [
+      t.type || "General",
+      projectName ? `Project: ${projectName}` : "",
+      amountStr,
+      t.category ? `Category: ${t.category}` : "",
+      t.vendorName ? `Vendor: ${t.vendorName}` : ""
+    ].filter(Boolean).join(" • ");
 
     if (t.status === "approved" || t.status === "rejected") {
       logs.push({
         id: `tx-approve-${t._id}`,
         action: "approve",
         description: `${userName} ${t.status === "approved" ? "approved" : "rejected"} transaction "${t.title || "Untitled"}"`,
-        detail: projectName ? `Project: ${projectName}` : "",
+        detail: details,
         timestamp: date,
         user: userName,
       });
@@ -79,7 +88,7 @@ function buildLogs(transactions, projects, users) {
         id: `tx-create-${t._id}`,
         action: "create",
         description: `${userName} created transaction "${t.title || "Untitled"}"`,
-        detail: `${t.type || "General"}${projectName ? " · " + projectName : ""}`,
+        detail: details,
         timestamp: t.createdAt,
         user: userName,
       });
@@ -90,7 +99,7 @@ function buildLogs(transactions, projects, users) {
         id: `tx-update-${t._id}`,
         action: "update",
         description: `${userName} updated transaction "${t.title || "Untitled"}"`,
-        detail: projectName ? `Project: ${projectName}` : "",
+        detail: details,
         timestamp: t.updatedAt,
         user: userName,
       });
@@ -100,12 +109,19 @@ function buildLogs(transactions, projects, users) {
   (projects || []).forEach((p) => {
     const userName = resolveUser(p.createdBy || p.user);
     const projectName = p.projectName || p.name || "Untitled Project";
+    
+    const details = [
+      p.status ? `Status: ${p.status}` : "",
+      p.budget ? `Budget: ₹${p.budget}` : "",
+      p.location ? `Loc: ${p.location}` : ""
+    ].filter(Boolean).join(" • ");
+
     if (p.createdAt) {
       logs.push({
         id: `proj-create-${p._id}`,
         action: "create",
         description: `${userName} created project "${projectName}"`,
-        detail: p.status ? `Status: ${p.status}` : "",
+        detail: details,
         timestamp: p.createdAt,
         user: userName,
       });
@@ -116,7 +132,7 @@ function buildLogs(transactions, projects, users) {
         id: `proj-update-${p._id}`,
         action: "update",
         description: `${userName} updated project "${projectName}"`,
-        detail: "",
+        detail: details,
         timestamp: p.updatedAt,
         user: userName,
       });
@@ -435,10 +451,10 @@ export default function AuditLogsPage() {
               border: "1px solid #FDE8D8",
             }}
           >
-            <div style={{ fontSize: 11, fontWeight: 700, color: "#EA580C", letterSpacing: "0.08em", marginBottom: 8 }}>
+            <div style={{ fontSize: 11, fontWeight: 700, color: colors.primary, letterSpacing: "0.08em", marginBottom: 8 }}>
               UPDATES
             </div>
-            <div style={{ fontSize: 26, fontWeight: 800, color: "#F97316" }}>{counts.update}</div>
+            <div style={{ fontSize: 26, fontWeight: 800, color: colors.primary }}>{counts.update}</div>
           </div>
           <div
             style={{
@@ -491,9 +507,9 @@ export default function AuditLogsPage() {
                   fontWeight: 600,
                   cursor: "pointer",
                   transition: "all 0.15s",
-                  background: filter === f ? "#ea580c" : "#fff",
+                  background: filter === f ? colors.primary : "#fff",
                   color: filter === f ? "#fff" : "#555",
-                  borderColor: filter === f ? "#ea580c" : "#e5e5e5",
+                  borderColor: filter === f ? colors.primary : "#e5e5e5",
                 }}
               >
                 {f}
@@ -555,7 +571,7 @@ export default function AuditLogsPage() {
                   width: 40,
                   height: 40,
                   border: "3px solid #e5e5e5",
-                  borderTopColor: "#ea580c",
+                  borderTopColor: colors.primary,
                   borderRadius: "50%",
                   animation: "spin 0.8s linear infinite",
                 }}
@@ -747,8 +763,8 @@ export default function AuditLogsPage() {
                       fontSize: 13,
                       cursor: typeof p === "number" ? "pointer" : "default",
                       fontWeight: 600,
-                      borderColor: page === p ? "#ea580c" : "#e5e5e5",
-                      background: page === p ? "#ea580c" : "#fff",
+                      borderColor: page === p ? colors.primary : "#e5e5e5",
+                      background: page === p ? colors.primary : "#fff",
                       color: page === p ? "#fff" : "#555",
                       display: "flex",
                       alignItems: "center",

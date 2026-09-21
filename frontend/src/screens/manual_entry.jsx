@@ -228,6 +228,12 @@ export default function ManualEntryPage() {
       const qBrand = params.get("brand");
       const qIsDuplicate = params.get("isDuplicate") === "true";
       const qSourceTxId = params.get("sourceTransactionId");
+      const qReturnUrl = params.get("returnUrl");
+      if (qReturnUrl) {
+         window.btManualEntryReturnUrl = decodeURIComponent(qReturnUrl);
+      } else {
+         window.btManualEntryReturnUrl = null;
+      }
 
       setIsEditing(false);
       setIsDuplicate(qIsDuplicate);
@@ -591,7 +597,16 @@ export default function ManualEntryPage() {
           setPaymentHistory([]);
           setPaymentResult(null);
         setAttachments([]);
-        setTimeout(() => setSuccessMsg(""), 3000);
+        if (window.btManualEntryReturnUrl) {
+          setTimeout(() => {
+            navigate(window.btManualEntryReturnUrl);
+            window.btManualEntryReturnUrl = null;
+          }, 1500);
+        } else {
+          setTimeout(() => {
+            navigate("/inventory");
+          }, 1500);
+        }
       }
     } catch (err) {
       setErrMsg(err.response?.data?.message || `Failed to ${isEditing ? "update" : "save"} entry.`);
