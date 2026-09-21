@@ -410,24 +410,24 @@ router.get("/:id", async (req, res) => {
     const tx = await Transaction.findById(req.params.id)
       .populate("worker", "name trade")
       .populate("project", "projectName status progress createdBy");
-    if (!tx) return res.status(404).json({ message: "Transaction not found" });
+    if (!tx) { await session.abortTransaction(); return res.status(404).json({ message: 'Transaction not found' }); }
     if (req.user.role !== "Admin") {
       const adminId = await getAdminId(req.user);
       if (tx.project) {
         const pDoc = await Project.findOne(canAccessProjectFilter(req, tx.project._id || tx.project));
         if (!pDoc) {
-          return res.status(403).json({ message: "Access denied to this transaction" });
+          { await session.abortTransaction(); return res.status(403).json({ message: 'Access denied to this transaction' }); }
         }
       } else {
         const isOwnOrAdmin = tx.createdBy?.toString() === req.user._id.toString() || (adminId && tx.createdBy?.toString() === adminId.toString());
         if (!isOwnOrAdmin) {
-          return res.status(403).json({ message: "Access denied to this transaction" });
+          { await session.abortTransaction(); return res.status(403).json({ message: 'Access denied to this transaction' }); }
         }
       }
     } else {
       if (tx.project && tx.project.createdBy.toString() !== req.user._id.toString()) {
         if (tx.createdBy.toString() !== req.user._id.toString()) {
-          return res.status(403).json({ message: "Access denied to this transaction" });
+          { await session.abortTransaction(); return res.status(403).json({ message: 'Access denied to this transaction' }); }
         }
       }
     }
@@ -453,9 +453,7 @@ router.post("/", requirePermission(["manage_expenses", "add_entries"]), async (r
     userPermissions.includes("approve_payments") ||
     userPermissions.includes("mark_paid");
   if ((paymentStatus === "Paid" || Number(paidAmount) > 0) && !canMarkPaid) {
-    return res.status(403).json({
-      message: "Insufficient permissions to record payments or mark as Paid",
-    });
+    { await session.abortTransaction(); return res.status(403).json({ message: 'Insufficient permissions to record payments or mark as Paid' }); }
   }
   const session = await mongoose.startSession();
   session.startTransaction();
@@ -626,7 +624,7 @@ if (req.body.paymentReceipt) {
             attachmentFiles,
           screenshotUrl,
           paymentReceipt: paymentReceiptUrl,
-          paymentHistory: req.body.paymentHistory && req.body.paymentHistory.length > 0 ? req.body.paymentHistory : (paidAmt > 0 ? [{
+          paymentHistory: req.body.paymentHistory ? (typeof req.body.paymentHistory === 'string' ? JSON.parse(req.body.paymentHistory) : req.body.paymentHistory) : (paidAmt > 0 ? [{
             date: paymentDate || date || new Date(),
             method: normalizePaymentMode(paymentMode), amount: paidAmt, note: notes || "Initial payment on creation"
           }] : []),
@@ -748,18 +746,18 @@ router.put("/:id", requirePermission(["manage_expenses", "add_entries"]), async 
   session.startTransaction();
   try {
     const tx = await Transaction.findById(req.params.id).session(session);
-    if (!tx) return res.status(404).json({ message: "Transaction not found" });
+    if (!tx) { await session.abortTransaction(); return res.status(404).json({ message: 'Transaction not found' }); }
     if (req.user.role !== "Admin") {
       const adminId = await getAdminId(req.user);
       if (tx.project) {
         const pDoc = await Project.findOne(canAccessProjectFilter(req, tx.project)).session(session);
         if (!pDoc) {
-          return res.status(403).json({ message: "Access denied to this transaction" });
+          { await session.abortTransaction(); return res.status(403).json({ message: 'Access denied to this transaction' }); }
         }
       } else {
         const isOwnOrAdmin = tx.createdBy?.toString() === req.user._id.toString() || (adminId && tx.createdBy?.toString() === adminId.toString());
         if (!isOwnOrAdmin) {
-          return res.status(403).json({ message: "Access denied to this transaction" });
+          { await session.abortTransaction(); return res.status(403).json({ message: 'Access denied to this transaction' }); }
         }
       }
     } else {
@@ -767,7 +765,7 @@ router.put("/:id", requirePermission(["manage_expenses", "add_entries"]), async 
         const pDoc = await Project.findById(tx.project).session(session);
         if (pDoc && pDoc.createdBy.toString() !== req.user._id.toString()) {
           if (tx.createdBy.toString() !== req.user._id.toString()) {
-            return res.status(403).json({ message: "Access denied to this transaction" });
+            { await session.abortTransaction(); return res.status(403).json({ message: 'Access denied to this transaction' }); }
           }
         }
       }
@@ -779,9 +777,7 @@ router.put("/:id", requirePermission(["manage_expenses", "add_entries"]), async 
       userPermissions.includes("mark_paid");
     if ((paymentStatus === "Paid" || paidAmount !== undefined) && !canMarkPaid) {
       if (paymentStatus === "Paid" || (paidAmount !== undefined && Number(paidAmount) !== tx.paidAmount)) {
-        return res.status(403).json({
-          message: "Insufficient permissions to record payments or mark as Paid",
-        });
+        { await session.abortTransaction(); return res.status(403).json({ message: 'Insufficient permissions to record payments or mark as Paid' }); }
       }
     }
     const {
@@ -1077,18 +1073,18 @@ router.delete("/:id", async (req, res) => {
   session.startTransaction();
   try {
     const tx = await Transaction.findById(req.params.id).session(session);
-    if (!tx) return res.status(404).json({ message: "Transaction not found" });
+    if (!tx) { await session.abortTransaction(); return res.status(404).json({ message: 'Transaction not found' }); }
     if (req.user.role !== "Admin") {
       const adminId = await getAdminId(req.user);
       if (tx.project) {
         const pDoc = await Project.findOne(canAccessProjectFilter(req, tx.project)).session(session);
         if (!pDoc) {
-          return res.status(403).json({ message: "Access denied to this transaction" });
+          { await session.abortTransaction(); return res.status(403).json({ message: 'Access denied to this transaction' }); }
         }
       } else {
         const isOwnOrAdmin = tx.createdBy?.toString() === req.user._id.toString() || (adminId && tx.createdBy?.toString() === adminId.toString());
         if (!isOwnOrAdmin) {
-          return res.status(403).json({ message: "Access denied to this transaction" });
+          { await session.abortTransaction(); return res.status(403).json({ message: 'Access denied to this transaction' }); }
         }
       }
     } else {
@@ -1096,7 +1092,7 @@ router.delete("/:id", async (req, res) => {
         const pDoc = await Project.findById(tx.project).session(session);
         if (pDoc && pDoc.createdBy.toString() !== req.user._id.toString()) {
           if (tx.createdBy.toString() !== req.user._id.toString()) {
-            return res.status(403).json({ message: "Access denied to this transaction" });
+            { await session.abortTransaction(); return res.status(403).json({ message: 'Access denied to this transaction' }); }
           }
         }
       }
@@ -1136,7 +1132,7 @@ router.put("/:id/approve", requirePermission(["approve_payments", "add_entries",
   session.startTransaction();
   try {
     const tx = await Transaction.findById(req.params.id).session(session);
-    if (!tx) return res.status(404).json({ message: "Transaction not found" });
+    if (!tx) { await session.abortTransaction(); return res.status(404).json({ message: 'Transaction not found' }); }
     if (tx.approvalStatus === "Approved") {
       return res.status(400).json({ message: "Transaction is already approved" });
     }
@@ -1192,7 +1188,7 @@ router.put("/:id/reject", requirePermission(["approve_payments", "add_entries", 
   try {
     const { rejectionReason } = req.body;
     const tx = await Transaction.findById(req.params.id);
-    if (!tx) return res.status(404).json({ message: "Transaction not found" });
+    if (!tx) return res.status(404).json({ message: 'Transaction not found' });
     if (tx.approvalStatus === "Approved") {
       return res.status(400).json({ message: "Cannot reject an already approved transaction" });
     }

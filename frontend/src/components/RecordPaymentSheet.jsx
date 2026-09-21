@@ -656,7 +656,6 @@ export default function RecordPaymentSheet({ open, entry, projects, onClose, onS
                 inputMode="decimal"
                 value={amount}
                 onChange={(e) => handleAmountChange(e.target.value)}
-                disabled={selectedStatus === "pending"}
                 placeholder="0.00"
                 style={{
                   flex: 1,

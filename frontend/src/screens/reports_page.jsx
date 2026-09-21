@@ -4,9 +4,12 @@ import { projectAPI, transactionAPI } from "../api";
 import { SpendVsBudgetChart } from "../components/Charts";
 import { MetricCard, CategoryBudgetBar } from "../components/MetricCards";
 import { Badge, Button, Card } from "../components/ui";
+import RecordPaymentSheet from "../components/RecordPaymentSheet";
+import CsvImport from "../components/CsvImport";
 import {
   Search, Download, FileText, ChevronDown, Calendar, Filter, RefreshCw,
-  BarChart3, Layers, Wrench, Users, TrendingUp, Sparkles, HelpCircle
+  BarChart3, Layers, Wrench, Users, TrendingUp, Sparkles, HelpCircle,
+  Settings2, Edit, CreditCard
 } from "lucide-react";
 import ModuleTour from "../components/ModuleTour";
 
@@ -61,6 +64,12 @@ export default function ReportsPage() {
   const [sortAsc, setSortAsc] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const rowsPerPage = 10;
+  
+  const [activeColumns, setActiveColumns] = useState(["date", "title", "type", "amount", "status", "actions"]);
+  const [showColumnsMenu, setShowColumnsMenu] = useState(false);
+  const [showImportModal, setShowImportModal] = useState(false);
+  const [recordPaymentOpen, setRecordPaymentOpen] = useState(false);
+  const [recordPaymentEntry, setRecordPaymentEntry] = useState(null);
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
   const [runTour, setRunTour] = useState(false);
 
@@ -149,8 +158,49 @@ export default function ReportsPage() {
   const handleSort = (col) => { if (sortCol === col) setSortAsc(!sortAsc); else { setSortCol(col); setSortAsc(true); } };
 
   const exportCsv = () => {
+    let maxPayments = 0;
+    filtered.forEach(t => {
+      if (t.paymentHistory && t.paymentHistory.length > maxPayments) {
+        maxPayments = t.paymentHistory.length;
+      }
+    });
+
+    const formatLocal = (dStr) => {
+      if (!dStr) return "";
+      const d = new Date(dStr);
+      if (isNaN(d.getTime())) return dStr;
+      const pad = (n) => n.toString().padStart(2, '0');
+      return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+    };
+
     const headers = ["Date", "Description", "Type", "Category", "Amount", "Status", "Payment"];
-    const rows = filtered.map(t => [t.date ? new Date(t.date).toISOString().split("T")[0] : "", t.title || "", t.type || "", t.category || "", t.amount || 0, t.approvalStatus || "", t.paymentStatus || ""]);
+    if (maxPayments > 0) {
+      for (let i = 1; i <= maxPayments; i++) {
+        headers.push(`Payment ${i} Amount`, `Payment ${i} Date`, `Payment ${i} Mode`);
+      }
+    }
+
+    const rows = filtered.map(t => {
+      const baseRow = [
+        formatLocal(t.date),
+        t.title || "", t.type || "", t.category || "", t.amount || 0,
+        t.approvalStatus || "", t.paymentStatus || ""
+      ];
+      if (maxPayments > 0) {
+        for (let i = 0; i < maxPayments; i++) {
+          if (t.paymentHistory && t.paymentHistory[i]) {
+            const p = t.paymentHistory[i];
+            baseRow.push(p.amount || 0);
+            baseRow.push(formatLocal(p.date));
+            baseRow.push(p.method || p.mode || "");
+          } else {
+            baseRow.push("", "", "");
+          }
+        }
+      }
+      return baseRow;
+    });
+
     const csv = [headers, ...rows].map(r => r.map(c => `"${c}"`).join(",")).join("\n");
     const blob = new Blob([csv], { type: "text/csv" });
     const url = URL.createObjectURL(blob);
@@ -277,64 +327,111 @@ export default function ReportsPage() {
           </Card>
         </div>
 
-        <div className="tour-log">
-          <Card>
-            <div style={{ padding: "14px 20px", borderBottom: "1px solid #F1F5F9", display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 10 }}>
-            <span style={{ fontSize: 15, fontWeight: 700, color: "#111827" }}>Transaction Log ({filtered.length})</span>
-            <div style={{ display: "flex", gap: 6 }}>
-              <Button variant="secondary" size="sm" icon={<Download size={12} />} onClick={exportCsv}>CSV</Button>
-              <Button variant="secondary" size="sm" icon={<FileText size={12} />} onClick={exportPdf}>PDF</Button>
-            </div>
-          </div>
-          <div style={{ overflowX: "auto" }}>
-            <table style={{ width: "100%", borderCollapse: "collapse" }}>
-              <thead>
-                <tr style={{ background: "#F8FAFC" }}>
-                  {[["date", "Date"], ["title", "Description"], ["type", "Type"], ["amount", "Amount"], ["status", "Payment"]].map(([col, label]) => (
-                    <th key={col} onClick={() => handleSort(col)}
-                      style={{ padding: "10px 14px", textAlign: "left", fontSize: 11, fontWeight: 700, color: "#64748B", letterSpacing: "0.04em", cursor: "pointer", userSelect: "none", whiteSpace: "nowrap" }}>
-                      {label} {sortCol === col ? (sortAsc ? "\u2191" : "\u2193") : ""}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {paginated.map(t => {
-                  const tc = TYPE_COLORS[t.type] || TYPE_COLORS.Expense;
-                  const pc = PAYMENT_COLORS[t.paymentStatus] || PAYMENT_COLORS.Pending;
-                  return (
-                    <tr key={t._id}
-                      onClick={() => navigate('/entry-detail', { state: { entry: t } })}
-                      className="hover-bg-subtle"
-                      style={{ borderBottom: "1px solid #F1F5F9", cursor: "pointer" }}>
-                      <td style={{ padding: "10px 14px", fontSize: 13, color: "#475569", whiteSpace: "nowrap" }}>
-                        {t.date ? new Date(t.date).toLocaleDateString("en-IN") : "\u2014"}
-                      </td>
-                      <td style={{ padding: "10px 14px", fontSize: 13, fontWeight: 500, color: "#111827", maxWidth: 250, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                        {t.title || "\u2014"}
-                      </td>
-                      <td style={{ padding: "10px 14px" }}>
-                        <Badge variant={t.type === "Wages" ? "success" : t.type === "Expense" ? "warning" : "info"} size="sm">
-                          {t.type === "Wages" ? "Labour" : t.type === "Expense" ? "Equipment" : t.type}
-                        </Badge>
-                      </td>
-                      <td style={{ padding: "10px 14px", fontSize: 14, fontWeight: 600, color: t.type === "Income" ? "#22C55E" : "#DC2626", textAlign: "right" }}>
-                        {t.type === "Income" ? "+" : "-"}₹{(t.amount || 0).toLocaleString("en-IN")}
-                      </td>
-                      <td style={{ padding: "10px 14px" }}>
-                        <Badge variant={t.paymentStatus === "Paid" ? "success" : t.paymentStatus === "Partial" ? "warning" : "info"} size="sm">
-                          {t.paymentStatus || "\u2014"}
-                        </Badge>
-                      </td>
-                    </tr>
-                  );
-                })}
-                {paginated.length === 0 && (
-                  <tr><td colSpan={5} style={{ padding: 48, textAlign: "center", color: "#94A3B8", fontSize: 14 }}>No entries match your filters</td></tr>
+
+
+          <div className="tour-log">
+            <Card>
+              <div style={{ padding: "14px 20px", borderBottom: "1px solid #F1F5F9", display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 10 }}>
+              <span style={{ fontSize: 15, fontWeight: 700, color: "#111827" }}>Transaction Log ({filtered.length})</span>
+              <div style={{ display: "flex", gap: 6, position: "relative" }}>
+                <Button variant="secondary" size="sm" icon={<Settings2 size={12} />} onClick={() => setShowColumnsMenu(!showColumnsMenu)}>Columns</Button>
+                {showColumnsMenu && (
+                  <div style={{ position: "absolute", top: 32, right: 120, background: "#fff", border: "1px solid #E5E7EB", borderRadius: 8, padding: 8, boxShadow: "0 4px 12px rgba(0,0,0,0.1)", zIndex: 10, display: "flex", flexDirection: "column", gap: 6, width: 140 }}>
+                    {["date", "title", "type", "amount", "status", "actions"].map(c => (
+                      <label key={c} style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13, cursor: "pointer", color: "#475569" }}>
+                        <input type="checkbox" checked={activeColumns.includes(c)} onChange={(e) => {
+                          if (e.target.checked) setActiveColumns([...activeColumns, c]);
+                          else setActiveColumns(activeColumns.filter(col => col !== c));
+                        }} />
+                        {c.charAt(0).toUpperCase() + c.slice(1)}
+                      </label>
+                    ))}
+                  </div>
                 )}
-              </tbody>
-            </table>
-          </div>
+                <Button variant="secondary" size="sm" onClick={() => setShowImportModal(true)}>Import / Revert CSV</Button>
+                <Button variant="secondary" size="sm" icon={<Download size={12} />} onClick={exportCsv}>Export CSV</Button>
+                <Button variant="secondary" size="sm" icon={<FileText size={12} />} onClick={exportPdf}>PDF</Button>
+              </div>
+            </div>
+            <div style={{ overflowX: "auto" }}>
+              <table style={{ width: "100%", borderCollapse: "collapse" }}>
+                <thead>
+                  <tr style={{ background: "#F8FAFC" }}>
+                    {[
+                      { key: "date", label: "Date" },
+                      { key: "title", label: "Description" },
+                      { key: "type", label: "Type" },
+                      { key: "amount", label: "Amount" },
+                      { key: "status", label: "Payment" },
+                      { key: "actions", label: "Actions" },
+                    ].filter(c => activeColumns.includes(c.key)).map(c => (
+                      <th key={c.key} onClick={() => handleSort(c.key)}
+                        style={{ padding: "10px 14px", textAlign: c.key === "amount" ? "right" : "left", fontSize: 11, fontWeight: 700, color: "#64748B", letterSpacing: "0.04em", cursor: "pointer", userSelect: "none", whiteSpace: "nowrap" }}>
+                        {c.label} {sortCol === c.key ? (sortAsc ? "\u2191" : "\u2193") : ""}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {paginated.map(t => {
+                    const tc = TYPE_COLORS[t.type] || TYPE_COLORS.Expense;
+                    const pc = PAYMENT_COLORS[t.paymentStatus] || PAYMENT_COLORS.Pending;
+                    const numPayments = t.paymentHistory?.length || 0;
+                    return (
+                      <tr key={t._id}
+                        className="hover-bg-subtle"
+                        style={{ borderBottom: "1px solid #F1F5F9", cursor: "pointer" }}>
+                        {activeColumns.includes("date") && (
+                          <td onClick={() => navigate('/entry-detail', { state: { entry: t } })} style={{ padding: "10px 14px", fontSize: 13, color: "#475569", whiteSpace: "nowrap" }}>
+                            {t.date ? new Date(t.date).toLocaleDateString("en-IN") : "\u2014"}
+                          </td>
+                        )}
+                        {activeColumns.includes("title") && (
+                          <td onClick={() => navigate('/entry-detail', { state: { entry: t } })} style={{ padding: "10px 14px", fontSize: 13, fontWeight: 500, color: "#111827", maxWidth: 250, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                            {t.title || "\u2014"}
+                          </td>
+                        )}
+                        {activeColumns.includes("type") && (
+                          <td onClick={() => navigate('/entry-detail', { state: { entry: t } })} style={{ padding: "10px 14px" }}>
+                            <Badge variant={t.type === "Wages" ? "success" : t.type === "Expense" ? "warning" : "info"} size="sm">
+                              {t.type === "Wages" ? "Labour" : t.type === "Expense" ? "Equipment" : t.type}
+                            </Badge>
+                          </td>
+                        )}
+                        {activeColumns.includes("amount") && (
+                          <td onClick={() => navigate('/entry-detail', { state: { entry: t } })} style={{ padding: "10px 14px", fontSize: 14, fontWeight: 600, color: t.type === "Income" ? "#22C55E" : "#DC2626", textAlign: "right" }}>
+                            {t.type === "Income" ? "+" : "-"}&#8377;{(t.amount || 0).toLocaleString("en-IN")}
+                          </td>
+                        )}
+                        {activeColumns.includes("status") && (
+                          <td onClick={() => navigate('/entry-detail', { state: { entry: t } })} style={{ padding: "10px 14px" }}>
+                            <Badge variant={t.paymentStatus === "Paid" ? "success" : t.paymentStatus === "Partial" ? "warning" : "info"} size="sm">
+                              {t.paymentStatus || "\u2014"}
+                            </Badge>
+                            {numPayments > 0 && <span style={{ fontSize: 11, color: "#94A3B8", marginLeft: 6 }}>({numPayments})</span>}
+                          </td>
+                        )}
+                        {activeColumns.includes("actions") && (
+                          <td style={{ padding: "10px 14px" }}>
+                            <div style={{ display: "flex", gap: 6 }}>
+                              <button onClick={(e) => { e.stopPropagation(); navigate(`/manualentry?type=${t.type.toLowerCase()}&id=${t._id}&returnUrl=/reports`); }} title="Edit Entry" style={{ padding: 4, background: "transparent", border: "none", cursor: "pointer", color: "#64748B" }}>
+                                <Edit size={14} />
+                              </button>
+                              <button onClick={(e) => { e.stopPropagation(); setRecordPaymentEntry({ rawTx: t }); setRecordPaymentOpen(true); }} title="Record Payment" style={{ padding: 4, background: "transparent", border: "none", cursor: "pointer", color: "#F97316" }}>
+                                <CreditCard size={14} />
+                              </button>
+                            </div>
+                          </td>
+                        )}
+                      </tr>
+                    );
+                  })}
+                  {paginated.length === 0 && (
+                    <tr><td colSpan={activeColumns.length} style={{ padding: 48, textAlign: "center", color: "#94A3B8", fontSize: 14 }}>No entries match your filters</td></tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
           {sorted.length > rowsPerPage && (
             <div style={{ padding: "10px 20px", borderTop: "1px solid #F1F5F9", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
               <span style={{ fontSize: 12, color: "#64748B" }}>Showing {(currentPage - 1) * rowsPerPage + 1}–{Math.min(currentPage * rowsPerPage, sorted.length)} of {sorted.length}</span>
@@ -349,6 +446,27 @@ export default function ReportsPage() {
           </Card>
         </div>
       </div>
+      
+      {showImportModal && (
+        <div style={{ position: "fixed", inset: 0, zIndex: 1100, background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }}>
+          <div style={{ background: "#fff", borderRadius: 18, width: "100%", maxWidth: 900, maxHeight: "90vh", overflowY: "auto", position: "relative" }}>
+            <button onClick={() => setShowImportModal(false)} style={{ position: "absolute", top: 16, right: 16, background: "#F1F5F9", border: "none", width: 32, height: 32, borderRadius: 16, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", color: "#64748B", fontWeight: "bold" }}>X</button>
+            <div style={{ padding: "16px 20px 0" }}>
+              <h2 style={{ margin: 0, fontSize: 18, fontWeight: 800 }}>Import or Revert CSV</h2>
+            </div>
+            <div style={{ padding: 20 }}>
+              <CsvImport onComplete={() => window.location.reload()} />
+            </div>
+          </div>
+        </div>
+      )}
+
+      <RecordPaymentSheet
+        open={recordPaymentOpen}
+        entry={recordPaymentEntry}
+        onClose={() => setRecordPaymentOpen(false)}
+        onSaved={() => window.location.reload()}
+      />
     </div>
   );
 }
