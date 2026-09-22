@@ -163,8 +163,12 @@ const transactionSchema = new mongoose.Schema(
       set: toObjectIdOrNull,
     },
     date: {
-      type: Date,
-      default: Date.now,
+      type: String, // Stored as YYYY-MM-DD
+      default: () => new Date().toISOString().split("T")[0],
+    },
+    transactionId: {
+      type: String,
+      trim: true,
     },
     paymentStatus: {
       type: String,
@@ -189,7 +193,9 @@ const transactionSchema = new mongoose.Schema(
       ],
       default: "Cash",
     },
-    paymentDate: Date,
+    paymentDate: {
+      type: String, // Stored as YYYY-MM-DD
+    },
     paidAmount: {
       type: Number,
       default: 0,
@@ -259,13 +265,13 @@ const transactionSchema = new mongoose.Schema(
     },
     paymentHistory: {
       type: [
-        {
-          date: { type: Date, default: Date.now },
-          method: String,
-          amount: { type: Number, min: 0, max: 999999999 },
-          note: String,
-          receipt: String,
-        }
+          {
+            date: { type: String },
+            method: String,
+            amount: { type: Number, min: 0, max: 999999999 },
+            note: String,
+            receipt: String,
+          }
       ],
       default: [],
     },
@@ -338,4 +344,9 @@ transactionSchema.index({ project: 1, date: -1 });
 transactionSchema.index({ date: -1 });
 transactionSchema.index({ project: 1, type: 1 });
 transactionSchema.index({ project: 1, activityId: 1, approvalStatus: 1, type: 1 });
+transactionSchema.index(
+  { transactionId: 1 },
+  { unique: true, partialFilterExpression: { transactionId: { $type: "string", $ne: "" } } }
+);
+
 module.exports = mongoose.model("Transaction", transactionSchema);

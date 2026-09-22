@@ -129,7 +129,7 @@ export default function VoiceAssistantPage() {
   useEffect(() => {
     useProjectStore.getState().fetchContext().then(list => setProjects(list || [])).catch(() => {});
     storeFetchTx().then(list => {
-      const all = list || txStore || [];
+      const all = list || useTransactionStore.getState().transactions || [];
       const typeMap = { material: 'Materials', labor: 'Wages', equipment: 'Expense' };
       const currentType = typeMap[entryType];
       const filtered = all.filter(t => {
@@ -145,7 +145,7 @@ export default function VoiceAssistantPage() {
       });
       setRecentEntries(filtered.slice(0, 5));
     }).catch(() => setRecentEntries([])).finally(() => setRecentLoading(false));
-  }, [txStore, storeFetchTx, entryType, executionContext.project]);
+  }, [storeFetchTx, entryType, executionContext.project]);
 
   useEffect(() => {
     return () => {

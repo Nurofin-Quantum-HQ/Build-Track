@@ -127,7 +127,13 @@ export function mapTransactionToEntry(tx) {
     }
   }
 
-  const paymentDateRaw = tx.paymentDate ? new Date(tx.paymentDate) : null;
+  const paymentDateRaw = (typeof tx.paymentDate === 'string' && /^\\d{4}-\\d{2}-\\d{2}$/.test(tx.paymentDate)) 
+    ? tx.paymentDate 
+    : (tx.paymentDate ? new Date(tx.paymentDate) : null);
+
+  const parsedDate = (typeof tx.date === 'string' && /^\\d{4}-\\d{2}-\\d{2}$/.test(tx.date))
+    ? tx.date
+    : (tx.date ? new Date(tx.date) : (tx.createdAt ? new Date(tx.createdAt) : new Date()));
 
   return {
     id: tx._id || String(new Date().getTime()),
@@ -136,7 +142,7 @@ export function mapTransactionToEntry(tx) {
     amount: amount,
     paidAmount: parsedPaidAmount,
     paymentHistory: parsedPaymentHistory,
-    date: tx.date ? new Date(tx.date) : (tx.createdAt ? new Date(tx.createdAt) : new Date()),
+    date: parsedDate,
     description: String(tx.materialName || tx.title || tx.description || tx.name || 'Entry'),
     brand: String(tx.brand || tx.materialName || tx.name || ''),
     ratePerUnit: typeof tx.rate === 'number' ? tx.rate : 0,

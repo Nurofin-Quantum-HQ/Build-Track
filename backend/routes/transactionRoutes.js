@@ -590,8 +590,7 @@ if (req.body.paymentReceipt) {
             workerId || null,
           project:
             projectId || null,
-          date:
-            date || new Date(),
+          date: date ? String(date).split("T")[0] : new Date().toISOString().split("T")[0],
           notes,
           category:
             resolvedCategory,
@@ -619,7 +618,7 @@ if (req.body.paymentReceipt) {
             "Pending",
           paymentMode:
             normalizePaymentMode(paymentMode),
-          paymentDate,
+          paymentDate: paymentDate ? String(paymentDate).split("T")[0] : null,
           paidAmount: paidAmt,
           remarks,
           attachments:
@@ -1243,59 +1242,115 @@ router.post("/bulk", requirePermission(["manage_expenses", "add_entries"]), asyn
   if (!transactions || !Array.isArray(transactions) || transactions.length === 0) {
     return res.status(400).json({ message: "No transactions provided for bulk upload" });
   }
+
   const results = {
     total: transactions.length,
     successCount: 0,
     failedCount: 0,
     failures: []
   };
+
   const adminId = await getAdminId(req.user);
   const txApprovalStatus = req.user.role === "Admin" ? "Approved" : "Pending";
   const approvedBy = req.user.role === "Admin" ? req.user._id : null;
   const approvedAt = req.user.role === "Admin" ? new Date() : null;
-  for (let i = 0; i < transactions.length; i++) {
+
+  // Deduplicate incoming CSV payload based on transactionId (keep last occurrence)
+  const uniqueTransactions = [];
+  const txMap = new Map();
+  let skippedCount = 0;
+
+  for (const t of transactions) {
+    if (t.rowStatus && t.rowStatus.trim().toLowerCase() === 'unchanged') {
+      skippedCount++;
+      continue;
+    }
+    if (t.transactionId && t.transactionId.trim() !== '') {
+      txMap.set(t.transactionId.trim(), t);
+    } else {
+      uniqueTransactions.push(t); // No transactionId, always insert
+    }
+  }
+  for (const t of txMap.values()) {
+    uniqueTransactions.push(t);
+  }
+
+  // Pre-fetch related workers and projects to avoid N+1
+  const projectsList = await Project.find({ createdBy: adminId }).lean();
+  const workersList = await Worker.find({ createdBy: adminId }).lean();
+
+  const projectCache = {};
+  const projectNameCache = {};
+  for (const p of projectsList) {
+    projectCache[p._id.toString()] = p;
+    if (p.projectName) projectNameCache[p.projectName.trim().toLowerCase()] = p;
+  }
+
+  const workerCache = {};
+  const workerNameCache = {};
+  for (const w of workersList) {
+    workerCache[w._id.toString()] = w;
+    if (w.name) workerNameCache[w.name.trim().toLowerCase()] = w;
+  }
+
+  // Pre-fetch existing transactions by transactionId to know which ones will update
+  const incomingTxIds = Array.from(txMap.keys());
+  const existingTransactions = incomingTxIds.length > 0 
+    ? await Transaction.find({ transactionId: { $in: incomingTxIds } }, { transactionId: 1 }).lean()
+    : [];
+  const existingTxIdSet = new Set(existingTransactions.map(t => t.transactionId));
+
+  const operations = [];
+  const inventoryOps = [];
+  const projectOps = [];
+
+  let createdCount = 0;
+  let updatedCount = 0;
+
+  for (let i = 0; i < uniqueTransactions.length; i++) {
     try {
-      const payload = transactions[i];
+      const payload = uniqueTransactions[i];
       const {
         title, type, worker, project, date, notes,
         category, brand, subType, unit, quantity, rate,
         materialType, paymentStatus, paymentMode, paymentDate, paidAmount: _paidAmount,
         remarks, amount: rawAmount, floor, floorId, phase, phaseId, activity, activityId,
-        supplier, gst, isWithGst, overtime, eSignStatus, clientEmail
+        supplier, gst, isWithGst, overtime, eSignStatus, clientEmail, transactionId
       } = payload;
+
       if (!title || !title.trim()) throw new Error("Title is required");
       if (!type) throw new Error("Transaction type is required");
+
       const resolvedCategory = category !== undefined ? category : "";
       const normalizedMaterialType = type === "Materials" ? normalizeMaterialType(materialType, subType) : "";
+
       let workerId = parseId(worker);
-      let projectId = parseId(project);
-      if (workerId) {
-        const wDoc = await Worker.findOne({ _id: workerId, createdBy: adminId }).lean();
-        if (!wDoc) workerId = null;
-      } else if (worker) {
-        const wDoc = await Worker.findOne({ createdBy: adminId, name: String(worker).trim() }).lean();
-        workerId = wDoc?._id || null;
-      }
-      if (projectId) {
-        const pDoc = await Project.findOne(canAccessProjectFilter(req, projectId));
-        if (!pDoc) throw new Error(`Access denied or Project not found for project: ${project}`);
-      } else if (project) {
-        const pDoc = await Project.findOne({ createdBy: adminId, projectName: String(project).trim() }).lean();
-        if (pDoc) {
-          projectId = pDoc._id;
-        } else {
-          throw new Error(`Project not found: ${project}`);
-        }
+      if (workerId && workerCache[workerId]) {
+        // valid
+      } else if (worker && workerNameCache[String(worker).trim().toLowerCase()]) {
+        workerId = workerNameCache[String(worker).trim().toLowerCase()]._id;
       } else {
-        throw new Error("Valid Project ID or name is required");
+        workerId = null;
       }
+
+      let projectId = parseId(project);
+      if (projectId && projectCache[projectId]) {
+        // valid
+      } else if (project && projectNameCache[String(project).trim().toLowerCase()]) {
+        projectId = projectNameCache[String(project).trim().toLowerCase()]._id;
+      } else {
+        throw new Error(`Valid Project ID or name is required, got: ${project}`);
+      }
+
       const qty      = Number(quantity)  || 0;
       const rt       = Number(rate)      || 0;
       const ot       = Number(overtime)  || 0;
       const paidAmt  = parseAmount(_paidAmount);
       const gstVal   = Number(gst)       || 0;
+
       if (qty < 0 || rt < 0) throw new Error("Quantity and rate must be positive");
       const finalAmount = calculateAmount({ type, quantity: qty, rate: rt, overtime: ot, rawAmount });
+
       const amountErr = validateTransactionAmounts({
         amount:     finalAmount,
         quantity:   qty,
@@ -1305,61 +1360,144 @@ router.post("/bulk", requirePermission(["manage_expenses", "add_entries"]), asyn
         overtime:   ot,
       });
       if (amountErr) throw new Error(`Invalid transaction data: ${amountErr}`);
-      
-      let transaction;
-      if (payload._id && mongoose.Types.ObjectId.isValid(payload._id)) {
-        transaction = await Transaction.findById(payload._id);
-      }
-      
+
+      const validTxId = transactionId && transactionId.trim() !== '' ? transactionId.trim() : undefined;
+
       const txData = {
         title: title.trim(),
         type, worker: workerId || null, project: projectId,
-        date: date || new Date(), notes, category: resolvedCategory, brand, supplier,
+        date: date ? String(date).split("T")[0] : new Date().toISOString().split("T")[0], 
+        notes, category: resolvedCategory, brand, supplier,
         gst, isWithGst, subType, materialType: normalizedMaterialType,
         unit: normalizeUnit(unit), quantity: qty, rate: rt, overtime: ot, amount: finalAmount,
         floor, floorId, phase, phaseId, activity, activityId,
         paymentStatus: paymentStatus || "Pending", paymentMode: normalizePaymentMode(paymentMode),
-        paymentDate, paidAmount: paidAmt, remarks,
-        paymentHistory: payload.paymentHistory && payload.paymentHistory.length > 0 ? payload.paymentHistory : (paidAmt > 0 ? [{
-          date: paymentDate || date || new Date(),
-          method: normalizePaymentMode(paymentMode), amount: paidAmt, note: notes || "Initial payment on bulk creation"
-        }] : []),
-        approvalStatus: txApprovalStatus, approvedBy, approvedAt
+        paymentDate: paymentDate ? String(paymentDate).split("T")[0] : null, paidAmount: paidAmt, remarks,
+        approvalStatus: txApprovalStatus, approvedBy, approvedAt,
+        transactionId: validTxId
       };
-
-      if (transaction) {
-        transaction.set(txData);
-      } else {
-        transaction = new Transaction({
-          createdBy: req.user._id,
-          ...txData
-        });
+      
+      // Calculate remainingAmount based on paymentStatus
+      if (txData.paymentStatus === "Paid") {
+        txData.paidAmount = finalAmount;
+        txData.remainingAmount = 0;
+      } else if (txData.paymentStatus === "Pending") {
+        txData.paidAmount = 0;
+        txData.remainingAmount = finalAmount;
+      } else if (txData.paymentStatus === "Partial") {
+        txData.remainingAmount = finalAmount - txData.paidAmount;
       }
       
-      await transaction.save();
-      if ((type === "Materials" || type === "Wages" || type === "Expense") && qty > 0 && projectId && txApprovalStatus === "Approved") {
+      // Payment history logic
+      let finalHistory = [];
+      if (payload.paymentHistory && payload.paymentHistory.length > 0) {
+        finalHistory = payload.paymentHistory.map(p => ({
+          date: p.date ? String(p.date).split("T")[0] : txData.date,
+          method: normalizePaymentMode(p.method),
+          amount: parseAmount(p.amount),
+          note: p.note || p.notes || ""
+        }));
+      } else if (txData.paidAmount > 0) {
+        finalHistory = [{
+          date: txData.paymentDate || txData.date || new Date().toISOString().split("T")[0],
+          method: normalizePaymentMode(paymentMode),
+          amount: txData.paidAmount,
+          note: notes || "Initial payment on bulk creation"
+        }];
+      }
+      txData.paymentHistory = finalHistory;
+
+      if (validTxId) {
+        operations.push({
+          updateOne: {
+            filter: { transactionId: validTxId },
+            update: { $set: txData, $setOnInsert: { createdBy: req.user._id, approvalStatus: txApprovalStatus, approvedBy, approvedAt } },
+            upsert: true
+          }
+        });
+        if (existingTxIdSet.has(validTxId)) {
+          updatedCount++;
+        } else {
+          createdCount++;
+        }
+      } else {
+        operations.push({
+          insertOne: {
+            document: { createdBy: req.user._id, approvalStatus: txApprovalStatus, approvedBy, approvedAt, ...txData }
+          }
+        });
+        createdCount++;
+      }
+      
+      if (!validTxId && (type === "Materials" || type === "Wages" || type === "Expense") && qty > 0 && projectId && txApprovalStatus === "Approved") {
         const inventoryDelta = (type === "Materials" && normalizedMaterialType === "usage") ? -qty : qty;
-        await applyInventoryDelta(adminId, projectId, resolvedCategory || title, unit, inventoryDelta, type, null);
+        inventoryOps.push({ adminId, projectId, category: resolvedCategory || title, unit: txData.unit, delta: inventoryDelta, type });
       }
-      if (projectId && phaseId && activityId && txApprovalStatus === "Approved") {
-        await updateProjectPhaseBudget(projectId, phaseId, activityId, type, finalAmount, null);
+      
+      if (!validTxId && projectId && phaseId && activityId && txApprovalStatus === "Approved") {
+        projectOps.push({ projectId, phaseId, activityId, type, finalAmount });
       }
-      results.successCount++;
+
     } catch (err) {
       results.failedCount++;
       results.failures.push({
         index: i,
-        title: transactions[i].title || 'Unknown',
+        title: uniqueTransactions[i]?.title || 'Unknown',
         reason: err.message || "Failed to save transaction"
       });
     }
   }
 
-  // Update onboarding if they used bulk CSV successfully
+  // Execute bulk operations in batches of 500
+  const BATCH_SIZE = 500;
+  for (let i = 0; i < operations.length; i += BATCH_SIZE) {
+    const batch = operations.slice(i, i + BATCH_SIZE);
+    try {
+      const writeResult = await Transaction.bulkWrite(batch, { ordered: false });
+      results.successCount += (writeResult.insertedCount + writeResult.upsertedCount + writeResult.modifiedCount);
+    } catch (err) {
+      console.error("Bulk write error:", err);
+      if (err.writeErrors) {
+        err.writeErrors.forEach(we => {
+          results.failedCount++;
+          // we.index gives the index in the batch
+          const op = batch[we.index];
+          const txTitle = op && op.insertOne ? op.insertOne.document.title : (op && op.updateOne ? op.updateOne.update.$set.title : 'Unknown');
+          results.failures.push({ row: "Bulk Write", title: txTitle, error: we.errmsg });
+          
+          if (op && op.updateOne && existingTxIdSet.has(op.updateOne.filter.transactionId)) {
+            updatedCount = Math.max(0, updatedCount - 1);
+          } else {
+            createdCount = Math.max(0, createdCount - 1);
+          }
+        });
+        // Add successful ones from this batch
+        results.successCount += (err.insertedCount || 0) + (err.upsertedCount || 0) + (err.modifiedCount || 0);
+      } else {
+        // If it failed outside writeErrors (e.g. timeout)
+        results.failedCount += batch.length;
+      }
+    }
+  }
+  
+  results.created = createdCount;
+  results.updated = updatedCount;
+  results.unchangedSkipped = skippedCount;
+  
+  // Apply inventory and budget for new ones concurrently
+  await Promise.all([
+    ...inventoryOps.map(inv => 
+      applyInventoryDelta(inv.adminId, inv.projectId, inv.category, inv.unit, inv.delta, inv.type, null).catch(() => {})
+    ),
+    ...projectOps.map(pOp => 
+      updateProjectPhaseBudget(pOp.projectId, pOp.phaseId, pOp.activityId, pOp.type, pOp.finalAmount, null).catch(() => {})
+    )
+  ]);
+
   if (results.successCount > 0) {
     await User.findByIdAndUpdate(req.user._id, {
       $set: { "onboarding.hasUsedBulkCSV": true }
-    });
+    }).catch(() => {});
   }
 
   res.status(207).json({

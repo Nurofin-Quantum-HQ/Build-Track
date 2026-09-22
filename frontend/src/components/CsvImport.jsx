@@ -143,6 +143,13 @@ const COLUMN_MAPPINGS = {
     "Rate": "rate",
     "Rate (₹)": "rate",
     "rate": "rate",
+    "Amount (INR)": "amount",
+    "Rate/Day": "rate",
+    "Rent Rate": "rate",
+    "Days": "quantity",
+    "Duration": "quantity",
+    "Worker Type": "title",
+    "Equipment": "title",
     "Category / Trade": "category",
     "Category": "category",
     "category": "category",
@@ -172,6 +179,9 @@ const COLUMN_MAPPINGS = {
     "date": "date",
     "Purchased Date": "date",
     "Payment Date": "paymentDate",
+    "Transaction ID": "transactionId",
+    "transactionId": "transactionId",
+    "transactionid": "transactionId",
     "Project": "project",
     "Floor": "floor",
     "floor": "floor",
@@ -542,17 +552,21 @@ export default function CsvImport({ onComplete }) {
   }, []);
 
   useEffect(() => {
-    if (!preview || !projects.length) {
-      setResolvedRows([]);
+    if (!preview || loadingProjects) {
       return;
     }
     const columnMapping = COLUMN_MAPPINGS[selectedTemplate] || COLUMN_MAPPINGS.all;
     const resolved = preview.rows.map(row => {
+      const rowStatus = row["Row Status"] || row["RowStatus"] || row["Action"] || row["action"] || "";
+      const statusLower = rowStatus.trim().toLowerCase();
+      if (statusLower === "unchanged") {
+        return { skipped: true, raw: row };
+      }
       const payload = mapRowToPayload(row, selectedTemplate, columnMapping, projects);
       return { raw: row, payload };
     });
     setResolvedRows(resolved);
-  }, [preview, projects, selectedTemplate]);
+  }, [preview, projects, selectedTemplate, loadingProjects]);
 
   const handleFile = (file) => {
     if (!file || !file.name.endsWith(".csv")) {
@@ -590,47 +604,71 @@ export default function CsvImport({ onComplete }) {
 
     setImporting(true);
     setError("");
-    setImportErrors([]);
-    setImportProgress({ current: 0, total: preview.total });
-
-    const transactions = resolvedRows.map(({ payload }) => {
-      const qty = payload.quantity || 0;
-      const rt = payload.rate || 0;
-      return {
-        _id: payload._id,
-        title: payload.title || "Item",
-        type: payload.type || "Expense",
-        project: payload.project,
-        date: payload.date ? new Date(payload.date).toISOString() : new Date().toISOString(),
-        quantity: qty,
-        rate: rt,
-        amount: payload.amount !== undefined ? payload.amount : (qty * rt),
-        unit: payload.unit || "",
-        brand: payload.brand || "",
-        category: payload.category || "",
-        supplier: payload.supplier || payload.operator || "",
-        floor: payload.floor || "",
-        phase: payload.phase || "",
-        phaseId: payload.phaseId || "",
-        activity: payload.activity || "",
-        activityId: payload.activityId || "",
-        isWithGst: payload.isWithGst || false,
-        gst: payload.gstPercentage || 0,
-        gstPercentage: payload.gstPercentage || 0,
-        overtime: payload.overtime || 0,
-        paymentHistory: payload.paymentHistory || [],
-        paymentStatus: payload.paymentStatus || "Pending",
-        paidAmount: payload.paidAmount,
-        paymentMode: payload.paymentMode,
-        notes: payload.notes || "",
-        subType: payload.subtype || "",
-        workType: payload.workType || "",
-        contractor: payload.contractor || "",
-        model: payload.model || ""
-      };
-    });
+    const rowsToImport = resolvedRows.filter(r => !r.skipped);
+    setImportProgress({ current: 0, total: rowsToImport.length });
 
     try {
+      const transactions = rowsToImport.map(({ payload }) => {
+        const qty = payload.quantity || 0;
+        const rt = payload.rate || 0;
+        
+        const pad = (n) => n.toString().padStart(2, '0');
+        const formatLocalYMD = (d) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+        
+        let safeDate = formatLocalYMD(new Date());
+        if (payload.date) {
+          const parts = String(payload.date).trim().split(/[\/-]/);
+          if (parts.length === 3) {
+            const [dStr, mStr, yStr] = parts;
+            if (yStr.length === 4) {
+              safeDate = `${yStr}-${mStr.padStart(2, "0")}-${dStr.padStart(2, "0")}`;
+            } else if (dStr.length === 4) {
+              safeDate = `${dStr}-${mStr.padStart(2, "0")}-${yStr.padStart(2, "0")}`;
+            } else {
+               const dObj = new Date(String(payload.date).trim());
+               if (!isNaN(dObj.getTime())) safeDate = formatLocalYMD(dObj);
+            }
+          } else {
+            const dObj = new Date(String(payload.date).trim());
+            if (!isNaN(dObj.getTime())) safeDate = formatLocalYMD(dObj);
+          }
+        }
+
+        return {
+          _id: payload._id,
+          transactionId: payload._id || payload.transactionId,
+          title: payload.title || "Item",
+          type: payload.type || "Expense",
+          project: payload.project,
+          date: safeDate,
+          quantity: qty,
+          rate: rt,
+          amount: payload.amount !== undefined ? payload.amount : (qty * rt),
+          unit: payload.unit || "",
+          brand: payload.brand || "",
+          category: payload.category || "",
+          supplier: payload.supplier || payload.operator || "",
+          floor: payload.floor || "",
+          phase: payload.phase || "",
+          phaseId: payload.phaseId || "",
+          activity: payload.activity || "",
+          activityId: payload.activityId || "",
+          isWithGst: payload.isWithGst || false,
+          gst: payload.gstPercentage || 0,
+          gstPercentage: payload.gstPercentage || 0,
+          overtime: payload.overtime || 0,
+          paymentHistory: payload.paymentHistory || [],
+          paymentStatus: payload.paymentStatus || "Pending",
+          paidAmount: payload.paidAmount,
+          paymentMode: payload.paymentMode,
+          notes: payload.notes || "",
+          subType: payload.subtype || "",
+          workType: payload.workType || "",
+          contractor: payload.contractor || "",
+          model: payload.model || ""
+        };
+      });
+
       const response = await transactionAPI.createBulk({ transactions });
       const data = response.data?.results || response.data;
 
@@ -717,6 +755,7 @@ export default function CsvImport({ onComplete }) {
     if (!resolvedRows.length) return [];
     const errors = [];
     resolvedRows.forEach((r, idx) => {
+      if (!r || r.skipped) return;
       const err = getRowError(r, idx);
       if (err) errors.push({ row: idx + 1, message: err });
     });
@@ -724,12 +763,14 @@ export default function CsvImport({ onComplete }) {
   }, [resolvedRows, selectedTemplate]);
 
   const getRowStatus = (resolved, index) => {
+    if (!resolved || resolved.skipped) return "skipped";
     const err = getRowError(resolved, index);
     if (err) return "error";
     return "ok";
   };
 
-  const canProceedWithImport = resolvedRows.length > 0 && rowValidationErrors.length === 0;
+  const hasUnskipped = resolvedRows.some(r => r && !r.skipped);
+  const canProceedWithImport = hasUnskipped && rowValidationErrors.length === 0;
   const allResolved = canProceedWithImport;
   const unresolvedCount = rowValidationErrors.length;
 
@@ -887,11 +928,11 @@ export default function CsvImport({ onComplete }) {
                 border: "none", borderRadius: 8, fontWeight: 600, fontSize: 13,
                 cursor: importing || !canProceedWithImport ? "not-allowed" : "pointer",
               }}>
-              {importing ? `Importing ${importProgress.current}/${importProgress.total}…` : `Import ${preview.total} Entries`}
+              {importing ? `Importing ${importProgress.current}/${importProgress.total}…` : `Import ${resolvedRows.filter(r => !r.skipped).length} Entries`}
             </button>
           </div>
 
-          {resolvedRows.length > 0 && (
+          {!loadingProjects && (hasUnskipped ? (
             <div style={{
               marginBottom: 12, padding: "12px 14px", borderRadius: 10,
               background: canProceedWithImport ? "#dcfce7" : "#fee2e2",
@@ -900,7 +941,7 @@ export default function CsvImport({ onComplete }) {
             }}>
               {canProceedWithImport ? (
                 <span style={{ color: "#166534", fontWeight: 600 }}>
-                  ✅ All {resolvedRows.length} rows matched and validated successfully. Ready to import!
+                  ✅ All changed rows matched and validated successfully. Ready to import!
                 </span>
               ) : (
                 <div style={{ color: "#991b1b" }}>
@@ -925,7 +966,19 @@ export default function CsvImport({ onComplete }) {
                 </div>
               )}
             </div>
-          )}
+          ) : (
+            preview.total > 0 && (
+              <div style={{
+                marginBottom: 12, padding: "12px 14px", borderRadius: 10,
+                background: "#f1f5f9",
+                border: "1px solid #e2e8f0",
+                fontSize: 12.5,
+                color: "#475569"
+              }}>
+                ℹ️ <strong>0 changed rows found.</strong> All {preview.total} rows have the 'Row Status' set to 'unchanged'. Change the status to 'changed' for the rows you want to update.
+              </div>
+            )
+          ))}
 
           {importing && (
             <div style={{ marginBottom: 12 }}>
@@ -959,11 +1012,13 @@ export default function CsvImport({ onComplete }) {
                   const status = resolved ? getRowStatus(resolved, i) : "pending";
                   return (
                     <tr key={i} style={{ borderBottom: "1px solid #f5f5f5", background: status === "error" ? "#fff5f5" : "transparent" }}>
-                      <td style={{ padding: "8px 6px", textAlign: "center" }} title={rowErr || "Valid row"}>
+                      <td style={{ padding: "8px 6px", textAlign: "center" }} title={status === "skipped" ? "Skipped (unchanged)" : rowErr || "Valid row"}>
                         {status === "ok" ? (
                           <span style={{ color: "#22c55e", fontSize: 14 }}>✓</span>
                         ) : status === "error" ? (
                           <span style={{ color: "#ef4444", fontSize: 14, fontWeight: "bold" }}>✗</span>
+                        ) : status === "skipped" ? (
+                          <span style={{ color: "#94a3b8", fontSize: 14 }}>—</span>
                         ) : (
                           <span style={{ color: "#aaa", fontSize: 14 }}>…</span>
                         )}

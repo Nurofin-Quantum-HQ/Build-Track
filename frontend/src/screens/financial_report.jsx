@@ -185,29 +185,35 @@ export default function FinancialReportPage() {
   }, []);
 
   const loadData = useCallback((force = false) => {
-    if (projStore.length === 0 && txStore.length === 0) setLoading(true);
+    if (useProjectStore.getState().projects.length === 0 && useTransactionStore.getState().transactions.length === 0) setLoading(true);
     setError("");
     Promise.all([
       storeFetchProjects({}, force),
       storeFetchTransactions({ limit: 10000, filterByViewAccess: true }, force)
     ])
       .then(([projList, rawList]) => {
-        const pList = projList || projStore || [];
-        setProjects(pList);
-
-        const list = rawList || txStore || [];
-        const mappedList = list
-          .filter(isReportEntry)
-          .map(tx => mapTransactionToEntry(tx));
-        setTransactions(mappedList);
+        // Data is synced via useEffects below
       })
       .catch(() => setError("Failed to load project details and reports log."))
       .finally(() => setLoading(false));
-  }, [projStore, txStore, storeFetchProjects, storeFetchTransactions]);
+  }, [storeFetchProjects, storeFetchTransactions]);
 
   useEffect(() => {
     loadData();
   }, [loadData]);
+
+  useEffect(() => {
+    if (projStore) {
+      setProjects(projStore);
+    }
+  }, [projStore]);
+
+  useEffect(() => {
+    if (txStore) {
+      const mappedList = txStore.filter(isReportEntry).map(tx => mapTransactionToEntry(tx));
+      setTransactions(mappedList);
+    }
+  }, [txStore]);
 
   const saveActiveColumns = (updated) => {
     setActiveColumns(updated);
@@ -575,7 +581,7 @@ export default function FinancialReportPage() {
 
     try {
       const activeCols = (activeColumns && activeColumns[activeTab]) || DEFAULT_COLS[activeTab] || [];
-      const headers = ['Transaction ID', ...activeCols.map(col => col === "Amount" ? "Amount (INR)" : col)];
+      const headers = ['Transaction ID', 'Row Status', ...activeCols.map(col => col === "Amount" ? "Amount (INR)" : col)];
 
       let maxPayments = 0;
       for (const entry of filteredEntries) {
@@ -606,7 +612,7 @@ export default function FinancialReportPage() {
         const statusStr = getPaymentStatusLabel(entry.paymentStatus);
         const payDateStr = formatLocal(entry.paymentDate);
 
-        const rowValues = [entry.rawTx?._id || ""];
+        const rowValues = [entry.rawTx?._id || "", "unchanged"];
         for (const col of activeCols) {
           if (col === 'Purchased Date') {
             rowValues.push(dateStr);
@@ -773,7 +779,7 @@ export default function FinancialReportPage() {
   };
 
   const activeCols = (activeColumns && activeColumns[activeTab]) || DEFAULT_COLS[activeTab] || [];
-  const uiActiveCols = [...activeCols, 'Approval', 'Add More', 'Record Payment', 'Actions'];
+  const uiActiveCols = [...activeCols, 'Add More', 'Record Payment', 'Actions'];
 
   const canRecordPayment = can('mark_paid') || can('approve_payments') || user?.role === 'Admin';
   const canApprove = can('approve_payments') || user?.role === 'Admin';

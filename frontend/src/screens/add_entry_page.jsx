@@ -151,7 +151,7 @@ export default function AddEntryPage() {
         </div>
 
         <div className="tour-bulk-csv">
-          <CsvImport onComplete={() => {}} />
+          <CsvImport onComplete={() => window.location.reload()} />
         </div>
       </div>
     </div>

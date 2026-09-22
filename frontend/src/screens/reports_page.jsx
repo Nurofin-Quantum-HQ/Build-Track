@@ -170,10 +170,10 @@ export default function ReportsPage() {
       const d = new Date(dStr);
       if (isNaN(d.getTime())) return dStr;
       const pad = (n) => n.toString().padStart(2, '0');
-      return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+      return `${pad(d.getDate())}/${pad(d.getMonth() + 1)}/${d.getFullYear()}`;
     };
 
-    const headers = ["Date", "Description", "Type", "Category", "Amount", "Status", "Payment"];
+    const headers = ["Transaction ID", "Action", "Date", "Description", "Type", "Category", "Amount", "Approval Status", "Payment Status"];
     if (maxPayments > 0) {
       for (let i = 1; i <= maxPayments; i++) {
         headers.push(`Payment ${i} Amount`, `Payment ${i} Date`, `Payment ${i} Mode`);
@@ -182,6 +182,8 @@ export default function ReportsPage() {
 
     const rows = filtered.map(t => {
       const baseRow = [
+        t._id || t.id || "",
+        "", // Action column left empty by default
         formatLocal(t.date),
         t.title || "", t.type || "", t.category || "", t.amount || 0,
         t.approvalStatus || "", t.paymentStatus || ""

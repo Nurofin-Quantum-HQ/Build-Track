@@ -197,26 +197,30 @@ export default function InventoryPage() {
   }, []);
 
   const fetchInventory = useCallback((force = false) => {
-    if (dbInventoryStore.length === 0 && txStore.length === 0) setLoading(true);
+    if (useInventoryStore.getState().items.length === 0 && useTransactionStore.getState().transactions.length === 0) setLoading(true);
     Promise.all([
       storeFetchInventory(force),
       storeFetchTx({ limit: 10000, filterByViewAccess: true }, force),
       storeFetchProj({}, force)
     ])
-      .then(([dbItems, txItems, projList]) => {
-        setDbInventory(dbItems || dbInventoryStore);
-        setTransactions(txItems || txStore);
-        setProjects(projList || projStore);
-        const drafts = {};
-        (dbItems || dbInventoryStore || []).forEach(item => { drafts[item._id] = Number(item.threshold ?? 5); });
-        setThresholdDrafts(prev => ({ ...prev, ...drafts }));
-      })
+      .then(() => {}) // synced via useEffects below
       .catch(() => setToast({ msg: "Failed to load inventory", type: "error" }))
       .finally(() => setLoading(false));
-  }, [dbInventoryStore, txStore, projStore, storeFetchInventory, storeFetchTx, storeFetchProj]);
+  }, [storeFetchInventory, storeFetchTx, storeFetchProj]);
 
   useEffect(() => { fetchInventory(); }, [fetchInventory]);
   useEffect(() => { setCategoryFilter("All"); }, [activeTab]);
+
+  useEffect(() => { if (dbInventoryStore) setDbInventory(dbInventoryStore); }, [dbInventoryStore]);
+  useEffect(() => { if (txStore) setTransactions(txStore); }, [txStore]);
+  useEffect(() => { if (projStore) setProjects(projStore); }, [projStore]);
+  useEffect(() => {
+    if (dbInventoryStore) {
+      const drafts = {};
+      dbInventoryStore.forEach(item => { drafts[item._id] = Number(item.threshold ?? 5); });
+      setThresholdDrafts(prev => ({ ...prev, ...drafts }));
+    }
+  }, [dbInventoryStore]);
 
   const activeTabKey = TABS[activeTab].key;
 
