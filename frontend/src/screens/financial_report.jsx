@@ -100,10 +100,10 @@ const DEFAULT_COLS = {
 };
 
 const ALL_COLS = {
-  All: ['Purchased Date', 'Project', 'Type', 'Description', 'Brand', 'Floor', 'Phase', 'Activity', 'Unit', 'Status', 'Amount', 'Paid', 'Remaining', 'Payment Date'],
-  Materials: ['Purchased Date', 'Project', 'Material', 'Brand', 'Rate', 'Qty', 'Unit', 'Floor', 'Phase', 'Activity', 'Status', 'Amount', 'Paid', 'Remaining', 'Payment Date'],
-  Labour: ['Purchased Date', 'Project', 'Worker Type', 'Rate/Day', 'Days', 'Unit', 'Floor', 'Phase', 'Activity', 'Status', 'Amount', 'Paid', 'Remaining', 'Payment Date'],
-  Equipment: ['Purchased Date', 'Project', 'Equipment', 'Rent Rate', 'Duration', 'Unit', 'Floor', 'Phase', 'Activity', 'Status', 'Amount', 'Paid', 'Remaining', 'Payment Date']
+  All: ['Created At', 'Purchased Date', 'Project', 'Type', 'Description', 'Brand', 'Floor', 'Phase', 'Activity', 'Unit', 'Status', 'Amount', 'Paid', 'Remaining', 'Payment Date'],
+  Materials: ['Created At', 'Purchased Date', 'Project', 'Material', 'Brand', 'Rate', 'Qty', 'Unit', 'Floor', 'Phase', 'Activity', 'Status', 'Amount', 'Paid', 'Remaining', 'Payment Date'],
+  Labour: ['Created At', 'Purchased Date', 'Project', 'Worker Type', 'Rate/Day', 'Days', 'Unit', 'Floor', 'Phase', 'Activity', 'Status', 'Amount', 'Paid', 'Remaining', 'Payment Date'],
+  Equipment: ['Created At', 'Purchased Date', 'Project', 'Equipment', 'Rent Rate', 'Duration', 'Unit', 'Floor', 'Phase', 'Activity', 'Status', 'Amount', 'Paid', 'Remaining', 'Payment Date']
 };
 
 export default function FinancialReportPage() {
@@ -580,7 +580,10 @@ export default function FinancialReportPage() {
     }
 
     try {
-      const activeCols = (activeColumns && activeColumns[activeTab]) || DEFAULT_COLS[activeTab] || [];
+      const exportAll = window.confirm("Do you want to export ALL columns?\n\nClick OK to export all available columns.\nClick Cancel to export only the currently visible columns.");
+      const activeCols = exportAll 
+          ? (ALL_COLS[activeTab] || [])
+          : ((activeColumns && activeColumns[activeTab]) || DEFAULT_COLS[activeTab] || []);
       const headers = ['Transaction ID', 'Action', ...activeCols.map(col => col === "Amount" ? "Amount (INR)" : col)];
 
       let maxPayments = 0;
@@ -612,9 +615,18 @@ export default function FinancialReportPage() {
         const statusStr = getPaymentStatusLabel(entry.paymentStatus);
         const payDateStr = formatLocal(entry.paymentDate);
 
+        const formatDateTime = (dStr) => {
+          if (!dStr) return "";
+          const d = new Date(dStr);
+          if (isNaN(d.getTime())) return "";
+          const pad = (n) => n.toString().padStart(2, '0');
+          return `${pad(d.getDate())}-${pad(d.getMonth() + 1)}-${d.getFullYear()} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+        };
         const rowValues = [entry.rawTx?._id || "", "unchanged"];
         for (const col of activeCols) {
-          if (col === 'Purchased Date') {
+          if (col === 'Created At') {
+            rowValues.push(formatDateTime(entry.rawTx?.createdAt));
+          } else if (col === 'Purchased Date') {
             rowValues.push(dateStr);
           } else if (col === 'Payment Date') {
             rowValues.push(payDateStr);
