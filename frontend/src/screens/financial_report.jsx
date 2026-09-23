@@ -574,14 +574,14 @@ export default function FinancialReportPage() {
     setPaymentSheetOpen(true);
   };
 
-  const handleExportCSV = () => {
+  const handleExportCSV = (exportAll) => {
     if (filteredEntries.length === 0) {
       setToast({ msg: "No report entries to export.", type: "error" });
       return;
     }
 
     try {
-      const exportAll = window.confirm("Do you want to export ALL columns?\n\nClick OK to export all available columns.\nClick Cancel to export only the currently visible columns.");
+
       const activeCols = exportAll 
           ? (ALL_COLS[activeTab] || [])
           : ((activeColumns && activeColumns[activeTab]) || DEFAULT_COLS[activeTab] || []);
