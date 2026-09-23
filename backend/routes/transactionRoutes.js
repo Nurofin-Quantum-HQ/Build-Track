@@ -590,7 +590,7 @@ if (req.body.paymentReceipt) {
             workerId || null,
           project:
             projectId || null,
-          date: date ? String(date).split("T")[0] : new Date().toISOString().split("T")[0],
+          date: date ? String(date) : new Date().toISOString(),
           notes,
           category:
             resolvedCategory,
@@ -618,7 +618,7 @@ if (req.body.paymentReceipt) {
             "Pending",
           paymentMode:
             normalizePaymentMode(paymentMode),
-          paymentDate: paymentDate ? String(paymentDate).split("T")[0] : null,
+          paymentDate: paymentDate ? String(paymentDate) : null,
           paidAmount: paidAmt,
           remarks,
           attachments:
@@ -1366,13 +1366,13 @@ router.post("/bulk", requirePermission(["manage_expenses", "add_entries"]), asyn
       const txData = {
         title: title.trim(),
         type, worker: workerId || null, project: projectId,
-        date: date ? String(date).split("T")[0] : new Date().toISOString().split("T")[0], 
+        date: date ? String(date) : new Date().toISOString(), 
         notes, category: resolvedCategory, brand, supplier,
         gst, isWithGst, subType, materialType: normalizedMaterialType,
         unit: normalizeUnit(unit), quantity: qty, rate: rt, overtime: ot, amount: finalAmount,
         floor, floorId, phase, phaseId, activity, activityId,
         paymentStatus: paymentStatus || "Pending", paymentMode: normalizePaymentMode(paymentMode),
-        paymentDate: paymentDate ? String(paymentDate).split("T")[0] : null, paidAmount: paidAmt, remarks,
+        paymentDate: paymentDate ? String(paymentDate) : null, paidAmount: paidAmt, remarks,
         approvalStatus: txApprovalStatus, approvedBy, approvedAt,
         transactionId: validTxId
       };
@@ -1392,7 +1392,7 @@ router.post("/bulk", requirePermission(["manage_expenses", "add_entries"]), asyn
       let finalHistory = [];
       if (payload.paymentHistory && payload.paymentHistory.length > 0) {
         finalHistory = payload.paymentHistory.map(p => ({
-          date: p.date ? String(p.date).split("T")[0] : txData.date,
+          date: p.date ? String(p.date) : txData.date,
           method: normalizePaymentMode(p.method),
           amount: parseAmount(p.amount),
           note: p.note || p.notes || ""

@@ -58,9 +58,18 @@ function formatDate(d) {
   return `${dt.getDate()} ${months[dt.getMonth()]} ${dt.getFullYear()}`;
 }
 
-function formatTime(d) {
-  if (!d) return "";
-  const dt = new Date(d);
+function formatTime(dStr, rawTxId) {
+  let d = null;
+  if (dStr) {
+    d = new Date(dStr);
+    if (d.toISOString().endsWith("T00:00:00.000Z") && rawTxId && rawTxId.length === 24) {
+      d = new Date(parseInt(rawTxId.substring(0,8), 16) * 1000);
+    }
+  } else if (rawTxId && rawTxId.length === 24) {
+    d = new Date(parseInt(rawTxId.substring(0,8), 16) * 1000);
+  }
+  if (!d || isNaN(d.getTime())) return "";
+  const dt = d;
   const h = dt.getHours(), m = String(dt.getMinutes()).padStart(2, "0");
   return `${h % 12 || 12}:${m} ${h < 12 ? "AM" : "PM"}`;
 }
@@ -321,7 +330,7 @@ export default function TransactionLog() {
                         {t.date ? `${formatDate(t.date)}` : ''}
                         <span style={{ color: colors.border }}>&middot;</span>
                         <Clock size={12} color={colors.textTertiary} />
-                        {t.date ? `${formatTime(t.date)}` : ''}
+                        {`${formatTime(t.createdAt || t.date, t._id)}`}
                       </span>
                       <span style={{ fontSize: 16, fontWeight: 800, color: isPositive ? colors.success : colors.textPrimary }}>
                         {isPositive ? '+' : '-'}₹{(t.amount || 0).toLocaleString("en-IN")}
