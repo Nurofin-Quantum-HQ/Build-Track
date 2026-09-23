@@ -79,7 +79,22 @@ function formatDateShort(d) {
 function formatDateLong(dt) {
   if (!dt) return "—";
   const date = new Date(dt);
+  if (isNaN(date.getTime())) return String(dt);
+  
+  const isMidnightUTC = typeof dt === 'string' && (dt.endsWith('T00:00:00.000Z') || !dt.includes('T') && dt.length <= 10);
+  
   const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  
+  if (isMidnightUTC) {
+    const parts = dt.split('T')[0].split('-');
+    if (parts.length === 3) {
+      const year = parts[0];
+      const month = months[parseInt(parts[1], 10) - 1];
+      const day = parts[2];
+      return `${day} ${month} ${year}`;
+    }
+  }
+  
   const day = String(date.getDate()).padStart(2, '0');
   const month = months[date.getMonth()];
   const year = date.getFullYear();
