@@ -116,6 +116,7 @@ export default function FinancialReportPage() {
   const [error, setError] = useState("");
   const [toast, setToast] = useState({ msg: "", type: "info" });
 
+  const [showExportModal, setShowExportModal] = useState(false);
   const [selectedProjectId, setSelectedProjectId] = useState("all");
   const [selectedFloor, setSelectedFloor] = useState("");
   const [selectedPhaseId, setSelectedPhaseId] = useState("");
@@ -615,17 +616,34 @@ export default function FinancialReportPage() {
         const statusStr = getPaymentStatusLabel(entry.paymentStatus);
         const payDateStr = formatLocal(entry.paymentDate);
 
-        const formatDateTime = (dStr) => {
-          if (!dStr) return "";
-          const d = new Date(dStr);
-          if (isNaN(d.getTime())) return "";
+        const formatDateTime = (dStr, rawTxId) => {
+          let d = null;
+          if (dStr) {
+            d = new Date(dStr);
+            // If it's a date-only string like "2026-09-22" mapped to midnight UTC,
+            // fallback to _id to avoid 5:30 AM local time issue
+            if (d.toISOString().endsWith("T00:00:00.000Z") && rawTxId && rawTxId.length === 24) {
+              const timestamp = parseInt(rawTxId.substring(0, 8), 16) * 1000;
+              d = new Date(timestamp);
+            }
+          } else if (rawTxId && rawTxId.length === 24) {
+            const timestamp = parseInt(rawTxId.substring(0, 8), 16) * 1000;
+            d = new Date(timestamp);
+          }
+          if (!d || isNaN(d.getTime())) return "";
+
+          let hours = d.getHours();
+          const minutes = d.getMinutes();
+          const ampm = hours >= 12 ? 'PM' : 'AM';
+          hours = hours % 12;
+          hours = hours ? hours : 12; // the hour '0' should be '12'
           const pad = (n) => n.toString().padStart(2, '0');
-          return `${pad(d.getDate())}-${pad(d.getMonth() + 1)}-${d.getFullYear()} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+          return `${pad(d.getDate())}-${pad(d.getMonth() + 1)}-${d.getFullYear()} ${pad(hours)}:${pad(minutes)} ${ampm}`;
         };
         const rowValues = [entry.rawTx?._id || "", "unchanged"];
         for (const col of activeCols) {
           if (col === 'Created At') {
-            rowValues.push(formatDateTime(entry.rawTx?.createdAt));
+            rowValues.push(formatDateTime(entry.rawTx?.createdAt, entry.rawTx?._id));
           } else if (col === 'Purchased Date') {
             rowValues.push(dateStr);
           } else if (col === 'Payment Date') {
