@@ -1411,7 +1411,7 @@ router.post("/bulk", requirePermission(["manage_expenses", "add_entries"]), asyn
         operations.push({
             updateOne: {
               filter: mongoose.Types.ObjectId.isValid(validTxId) ? { _id: validTxId } : { transactionId: validTxId },
-            update: { $set: txData, $setOnInsert: { createdBy: req.user._id, approvalStatus: txApprovalStatus, approvedBy, approvedAt } },
+              update: { $set: txData, $setOnInsert: { createdBy: req.user._id } },
             upsert: true
           }
         });
