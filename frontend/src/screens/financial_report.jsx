@@ -581,7 +581,7 @@ export default function FinancialReportPage() {
 
     try {
       const activeCols = (activeColumns && activeColumns[activeTab]) || DEFAULT_COLS[activeTab] || [];
-      const headers = ['Transaction ID', 'Row Status', ...activeCols.map(col => col === "Amount" ? "Amount (INR)" : col)];
+      const headers = ['Transaction ID', 'Action', ...activeCols.map(col => col === "Amount" ? "Amount (INR)" : col)];
 
       let maxPayments = 0;
       for (const entry of filteredEntries) {
