@@ -894,7 +894,7 @@ export default function FinancialReportPage() {
 
             <div style={{ position: "relative" }}>
             <button
-              onClick={handleExportCSV}
+              onClick={() => setShowExportModal(true)}
               disabled={filteredEntries.length === 0}
               style={{
                 padding: "9px 18px",
@@ -1825,6 +1825,57 @@ export default function FinancialReportPage() {
             </div>
             <div style={{ padding: 20 }}>
               <CsvImport onComplete={() => window.location.reload()} />
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Export Options Modal */}
+      {showExportModal && (
+        <div style={{ position: "fixed", inset: 0, zIndex: 1200, background: "rgba(0,0,0,0.5)", backdropFilter: "blur(4px)", display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }}>
+          <div style={{ background: "#fff", borderRadius: 16, width: "100%", maxWidth: 400, overflow: "hidden", boxShadow: "0 25px 50px -12px rgba(0,0,0,0.25)", display: "flex", flexDirection: "column" }}>
+            <div style={{ padding: "20px", borderBottom: "1px solid #f1f5f9" }}>
+              <h3 style={{ margin: 0, fontSize: "18px", fontWeight: "700", color: "#0f172a" }}>Export CSV</h3>
+              <p style={{ margin: "4px 0 0", fontSize: "14px", color: "#64748b" }}>Choose how you want to export your data.</p>
+            </div>
+            
+            <div style={{ padding: "20px", display: "flex", flexDirection: "column", gap: "12px" }}>
+              <button
+                onClick={() => {
+                  setShowExportModal(false);
+                  handleExportCSV(true);
+                }}
+                style={{ textAlign: "left", padding: "16px", borderRadius: "12px", border: "1px solid #e2e8f0", background: "#fff", cursor: "pointer", transition: "all 0.2s" }}
+                onMouseOver={(e) => { e.currentTarget.style.borderColor = "#3b82f6"; e.currentTarget.style.background = "#eff6ff"; }}
+                onMouseOut={(e) => { e.currentTarget.style.borderColor = "#e2e8f0"; e.currentTarget.style.background = "#fff"; }}
+              >
+                <div style={{ fontWeight: "600", color: "#0f172a", fontSize: "15px" }}>Export All Columns</div>
+                <div style={{ fontSize: "13px", color: "#64748b", marginTop: "2px" }}>Includes every available data point</div>
+              </button>
+              
+              <button
+                onClick={() => {
+                  setShowExportModal(false);
+                  handleExportCSV(false);
+                }}
+                style={{ textAlign: "left", padding: "16px", borderRadius: "12px", border: "1px solid #e2e8f0", background: "#fff", cursor: "pointer", transition: "all 0.2s" }}
+                onMouseOver={(e) => { e.currentTarget.style.borderColor = "#3b82f6"; e.currentTarget.style.background = "#eff6ff"; }}
+                onMouseOut={(e) => { e.currentTarget.style.borderColor = "#e2e8f0"; e.currentTarget.style.background = "#fff"; }}
+              >
+                <div style={{ fontWeight: "600", color: "#0f172a", fontSize: "15px" }}>Export Visible Columns</div>
+                <div style={{ fontSize: "13px", color: "#64748b", marginTop: "2px" }}>Includes only the columns you currently see</div>
+              </button>
+            </div>
+            
+            <div style={{ padding: "16px 20px", background: "#f8fafc", display: "flex", justifyContent: "flex-end" }}>
+              <button
+                onClick={() => setShowExportModal(false)}
+                style={{ padding: "8px 16px", borderRadius: "8px", border: "none", background: "transparent", color: "#475569", fontWeight: "600", cursor: "pointer" }}
+                onMouseOver={(e) => e.currentTarget.style.background = "#e2e8f0"}
+                onMouseOut={(e) => e.currentTarget.style.background = "transparent"}
+              >
+                Cancel
+              </button>
             </div>
           </div>
         </div>
