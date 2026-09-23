@@ -78,32 +78,39 @@ function formatDateShort(d) {
 
 function formatDateLong(dt) {
   if (!dt) return "—";
-  const date = new Date(dt);
-  if (isNaN(date.getTime())) return String(dt);
   
-  const isMidnightUTC = typeof dt === 'string' && (dt.endsWith('T00:00:00.000Z') || !dt.includes('T') && dt.length <= 10);
+  let dateObj = dt;
+  if (!(dt instanceof Date)) {
+    dateObj = new Date(dt);
+  }
+  
+  if (isNaN(dateObj.getTime())) return String(dt);
+  
+  let isMidnightUTC = false;
+  if (typeof dt === 'string') {
+    isMidnightUTC = dt.endsWith('T00:00:00.000Z') || (!dt.includes('T') && dt.length <= 10);
+  } else if (dt instanceof Date) {
+    isMidnightUTC = dt.toISOString().endsWith('T00:00:00.000Z');
+  }
   
   const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
   
   if (isMidnightUTC) {
-    const parts = dt.split('T')[0].split('-');
-    if (parts.length === 3) {
-      const year = parts[0];
-      const month = months[parseInt(parts[1], 10) - 1];
-      const day = parts[2];
-      return `${day} ${month} ${year}`;
-    }
+    const dayStr = String(dateObj.getUTCDate()).padStart(2, '0');
+    const monthStr = months[dateObj.getUTCMonth()];
+    const yearStr = dateObj.getUTCFullYear();
+    return `${dayStr} ${monthStr} ${yearStr}`;
   }
   
-  const day = String(date.getDate()).padStart(2, '0');
-  const month = months[date.getMonth()];
-  const year = date.getFullYear();
-  const hour24 = date.getHours();
+  const day = String(dateObj.getDate()).padStart(2, '0');
+  const month = months[dateObj.getMonth()];
+  const year = dateObj.getFullYear();
+  const hour24 = dateObj.getHours();
   const ampm = hour24 >= 12 ? 'PM' : 'AM';
   let hour12 = hour24 % 12;
   if (hour12 === 0) hour12 = 12;
   const hour = String(hour12).padStart(2, '0');
-  const minute = String(date.getMinutes()).padStart(2, '0');
+  const minute = String(dateObj.getMinutes()).padStart(2, '0');
   return `${day} ${month} ${year} ${hour}:${minute} ${ampm}`;
 }
 
