@@ -669,6 +669,13 @@ export default function CsvImport({ onComplete }) {
         };
       });
 
+      // Create backup before bulk import
+      try {
+        await transactionAPI.backupCsv();
+      } catch (backupErr) {
+        console.warn("Failed to create backup, continuing with import", backupErr);
+      }
+
       const response = await transactionAPI.createBulk({ transactions });
       const data = response.data?.results || response.data;
 

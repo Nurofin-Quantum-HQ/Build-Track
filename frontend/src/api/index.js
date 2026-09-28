@@ -91,6 +91,7 @@ export const transactionAPI = {
   approve:    (id)     => api.put(`/transactions/${id}/approve`, {}),
   reject:     (id, d)  => api.put(`/transactions/${id}/reject`, d),
   revertCsv:  ()       => api.post("/transactions/revert-csv"),
+  backupCsv:  ()       => api.post("/transactions/backup-csv"),
 };
 
 export const projectUpdateAPI = {

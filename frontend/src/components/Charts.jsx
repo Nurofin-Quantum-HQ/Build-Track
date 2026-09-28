@@ -39,7 +39,10 @@ export function SpendVsBudgetChart({ data }) {
           <XAxis dataKey="category" tick={{ fontSize: 12, fill: "#666" }} />
           <YAxis tickFormatter={fmtINR} tick={{ fontSize: 11, fill: "#888" }} width={60} />
           <Tooltip
-            formatter={(value, name) => [fmtINR(value), name === "actual" ? "Actual Spent" : "Budget"]}
+            formatter={(value, name) => {
+              if (name === "Actual Spent" || name === "actual") return [fmtINR(value), "Actual Paid Amount"];
+              return [fmtINR(value), "Budget"];
+            }}
             contentStyle={{ borderRadius: 10, border: "1px solid #e5e5e5", fontSize: 13 }}
           />
           <Legend wrapperStyle={{ fontSize: 12, paddingTop: 10 }} />
