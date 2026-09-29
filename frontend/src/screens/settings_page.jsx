@@ -11,6 +11,7 @@ import {
   CreditCard, Palette, Moon, Monitor, Smartphone, Download, AlertTriangle, HelpCircle,
   Save, Check, Building, Upload, X, Type, Image as ImageIcon
 } from "lucide-react";
+import { ThemePicker } from '../components/ThemePicker';
 import ModuleTour from "../components/ModuleTour";
 import { COMPANY_FONT_OPTIONS } from "../pages/signup_page";
 import perfLogger from "../utils/performanceLogger";
@@ -567,6 +568,15 @@ export default function SettingsPage() {
               </div>
 
               <div>
+                <div>
+                  <label style={{ fontSize: 12, fontWeight: 600, color: "#64748B", display: "flex", alignItems: "center", gap: 6, marginBottom: 8, marginTop: 16 }}>
+                    <Palette size={14} color="#F97316" />
+                    PORTAL THEME COLOR
+                  </label>
+                  <div style={{ width: 250, marginBottom: 24 }}>
+                    <ThemePicker />
+                  </div>
+                </div>
                 <Button
                   variant="primary"
                   size="md"

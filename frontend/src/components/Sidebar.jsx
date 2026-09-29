@@ -1,7 +1,6 @@
 import { useState, useEffect } from "react";
 import { NavLink, useLocation } from "react-router-dom";
 import { navItems, adminNavItems } from "../navItems";
-import { ThemePicker } from './ThemePicker';
 import { resolveImageUrl } from "../utils/imageUrl";
 import { LogOut, HelpCircle } from "lucide-react";
 import { colors, gradients, radius, typography } from "../styles/designTokens";
@@ -339,7 +338,6 @@ export default function Sidebar() {
           <HelpCircle size={14} />
           App Tour
         </button>
-        <ThemePicker />
         <button
           onClick={() => window.open('https://github.com/Nurofin-Quantum-HQ/Build-Track-App/releases/latest/download/app-release.apk', '_blank')}
           style={{
