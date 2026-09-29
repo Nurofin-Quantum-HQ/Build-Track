@@ -104,8 +104,8 @@ export const FLOOR_KEYWORDS = [
 ];
 
 export const ENTRY_TYPES = [
-  { id: 'material', label: 'Material', icon: 'Package', color: '#EA580C' },
-  { id: 'labour',   label: 'Labour',   icon: 'Users',    color: '#F97316' },
+  { id: 'material', label: 'Material', icon: 'Package', color: 'var(--color-primary-hover, #EA580C)' },
+  { id: 'labour',   label: 'Labour',   icon: 'Users',    color: 'var(--color-primary, #F97316)' },
   { id: 'equipment', label: 'Equipment', icon: 'Cog',     color: '#059669' },
 ];
 

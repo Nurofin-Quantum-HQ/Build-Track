@@ -1,7 +1,7 @@
 const TYPES = [
-  { key: "Materials", label: "Materials", icon: "🧱", desc: "Cement, steel, sand, bricks & more", color: "#F97316", bg: "#FFF5F0" },
+  { key: "Materials", label: "Materials", icon: "🧱", desc: "Cement, steel, sand, bricks & more", color: "var(--color-primary, #F97316)", bg: "#FFF5F0" },
   { key: "Wages",     label: "Labour",     icon: "👷", desc: "Worker wages & daily payments",   color: "#166534", bg: "#f0fdf4" },
-  { key: "Expense",   label: "Equipment",  icon: "🚜", desc: "Machinery, rentals & transport",  color: "#EA580C", bg: "#FFF7F0" },
+  { key: "Expense",   label: "Equipment",  icon: "🚜", desc: "Machinery, rentals & transport",  color: "var(--color-primary-hover, #EA580C)", bg: "#FFF7F0" },
   { key: "Income",    label: "Income",     icon: "💰", desc: "Client payments & advances",      color: "#047857", bg: "#ecfdf5" },
 ];
 

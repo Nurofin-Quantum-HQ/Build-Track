@@ -34,7 +34,7 @@ const TYPE_STYLES = {
   Materials: { bg: colors.primaryLight, color: colors.primary, label: "Materials", icon: Package },
   Wages:     { bg: colors.successLight, color: colors.success, label: "Labour", icon: Users },
   Expense:   { bg: colors.warningLight, color: colors.warning, label: "Equipment", icon: Wrench },
-  Income:    { bg: "#FFF5F0", color: "#EA580C", label: "Income", icon: TrendingUp },
+  Income:    { bg: "#FFF5F0", color: "var(--color-primary-hover, #EA580C)", label: "Income", icon: TrendingUp },
 };
 
 const FILTERS = [

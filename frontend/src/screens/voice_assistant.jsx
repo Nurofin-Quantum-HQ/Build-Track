@@ -30,9 +30,9 @@ const STATUS = {
 };
 
 const ENTRY_TYPES = [
-  { id: 'material', label: 'Material', icon: 'material', color: '#F97316' },
-  { id: 'labor', label: 'Labor', icon: 'labor', color: '#EA580C' },
-  { id: 'equipment', label: 'Equipment', icon: 'equipment', color: '#FB923C' },
+  { id: 'material', label: 'Material', icon: 'material', color: 'var(--color-primary, #F97316)' },
+  { id: 'labor', label: 'Labor', icon: 'labor', color: 'var(--color-primary-hover, #EA580C)' },
+  { id: 'equipment', label: 'Equipment', icon: 'equipment', color: 'var(--color-primary-light, #FB923C)' },
 ];
 
 const typeIcons = {

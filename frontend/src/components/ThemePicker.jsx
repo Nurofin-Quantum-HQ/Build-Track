@@ -39,7 +39,7 @@ const adjustColor = (hex, amount) => {
 
 export function ThemePicker() {
   const [isOpen, setIsOpen] = useState(false);
-  const [themeColor, setThemeColor] = useState('#F97316');
+  const [themeColor, setThemeColor] = useState('var(--color-primary, #F97316)');
 
   useEffect(() => {
     const saved = localStorage.getItem('bt_theme_color');
@@ -115,7 +115,7 @@ export function ThemePicker() {
             style={{ width: '100%', height: 40, border: 'none', cursor: 'pointer', padding: 0 }}
           />
           <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginTop: 4 }}>
-            {['#F97316', '#2563EB', '#16A34A', '#9333EA', '#E11D48'].map(c => (
+            {['var(--color-primary, #F97316)', '#2563EB', '#16A34A', '#9333EA', '#E11D48'].map(c => (
               <div 
                 key={c}
                 onClick={() => { setThemeColor(c); applyTheme(c); setIsOpen(false); }}

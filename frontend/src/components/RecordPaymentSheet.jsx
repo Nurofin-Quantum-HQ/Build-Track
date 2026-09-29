@@ -14,7 +14,7 @@ import {
 import { transactionAPI, esignAPI } from "../api";
 import useTransactionStore from "../stores/transactionStore";
 
-const primaryBlue = "#F97316";
+const primaryBlue = "var(--color-primary, #F97316)";
 
 const PAYMENT_METHODS = [
   { value: "UPI", icon: Smartphone },
@@ -404,7 +404,7 @@ export default function RecordPaymentSheet({ open, entry, projects, onClose, onS
               width: "100%",
               padding: 18,
               borderRadius: 18,
-              background: "linear-gradient(135deg, #F97316 0%, #EA580C 100%)",
+              background: "linear-gradient(135deg, var(--color-primary, #F97316) 0%, var(--color-primary-hover, #EA580C) 100%)",
               marginBottom: 20,
             }}
           >
@@ -611,7 +611,7 @@ export default function RecordPaymentSheet({ open, entry, projects, onClose, onS
                       onClick={esignPolling ? () => setEsignPolling(false) : startEsignFlow}
                       style={{
                         padding: "10px", borderRadius: 8, border: "none",
-                        background: esignPolling ? "#FEE2E2" : "#F97316",
+                        background: esignPolling ? "#FEE2E2" : "var(--color-primary, #F97316)",
                         color: esignPolling ? "#DC2626" : "#FFF",
                         fontWeight: 700, fontSize: 12, cursor: "pointer",
                         fontFamily: "inherit"
@@ -861,7 +861,7 @@ export default function RecordPaymentSheet({ open, entry, projects, onClose, onS
               flex: 5,
               height: 46,
               borderRadius: 11,
-              background: "linear-gradient(135deg, #F97316, #EA580C)",
+              background: "linear-gradient(135deg, var(--color-primary, #F97316), var(--color-primary-hover, #EA580C))",
               border: "none",
               fontSize: 12,
               fontWeight: 800,

@@ -8,19 +8,19 @@ import autoTable from "jspdf-autotable";
 import { ArrowLeft } from "lucide-react";
 
 const TYPE_DOT = {
-  Materials: "#F97316",
-  Wages: "#EA580C",
-  Expense: "#ea580c",
+  Materials: "var(--color-primary, #F97316)",
+  Wages: "var(--color-primary-hover, #EA580C)",
+  Expense: "var(--color-primary-hover, #EA580C)",
   Income: "#16a34a",
-  Equipment: "#ea580c",
+  Equipment: "var(--color-primary-hover, #EA580C)",
 };
 
 const TYPE_BADGE = {
-  Materials: { bg: "#FFF5F0", color: "#F97316" },
+  Materials: { bg: "#FFF5F0", color: "var(--color-primary, #F97316)" },
   Wages: { bg: "#f0fdf4", color: "#166534" },
-  Expense: { bg: "#FFF5F0", color: "#EA580C" },
+  Expense: { bg: "#FFF5F0", color: "var(--color-primary-hover, #EA580C)" },
   Income: { bg: "#ecfdf5", color: "#047857" },
-  Equipment: { bg: "#FFF5F0", color: "#EA580C" },
+  Equipment: { bg: "#FFF5F0", color: "var(--color-primary-hover, #EA580C)" },
 };
 
 export default function ProjectReportPage() {
@@ -72,7 +72,7 @@ export default function ProjectReportPage() {
     return (
       <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", minHeight: "100vh", background: "#f7f7f8" }}>
         <div style={{ background: "#fee2e2", border: "1px solid #fca5a5", borderRadius: 10, padding: "12px 16px", color: "#991b1b", fontSize: 13, marginBottom: 16 }}>⚠️ {error}</div>
-        <button onClick={() => navigate("/projects")} style={{ padding: "10px 20px", background: "#ea580c", color: "#fff", border: "none", borderRadius: 10, fontWeight: 600, cursor: "pointer" }}>Back to Projects</button>
+        <button onClick={() => navigate("/projects")} style={{ padding: "10px 20px", background: "var(--color-primary-hover, #EA580C)", color: "#fff", border: "none", borderRadius: 10, fontWeight: 600, cursor: "pointer" }}>Back to Projects</button>
       </div>
     );
   }
@@ -169,7 +169,7 @@ export default function ProjectReportPage() {
           </div>
         </div>
         <div style={{ display: "flex", gap: 8 }}>
-          <button onClick={exportPdf} style={{ padding: "8px 14px", background: "#F97316", border: "none", borderRadius: 8, fontSize: 12, fontWeight: 600, color: "#fff", cursor: "pointer" }}>📄 Export PDF</button>
+          <button onClick={exportPdf} style={{ padding: "8px 14px", background: "var(--color-primary, #F97316)", border: "none", borderRadius: 8, fontSize: 12, fontWeight: 600, color: "#fff", cursor: "pointer" }}>📄 Export PDF</button>
           <button onClick={exportCsv} style={{ padding: "8px 14px", background: "#f3f4f6", border: "1px solid #e5e5e5", borderRadius: 8, fontSize: 12, fontWeight: 600, color: "#555", cursor: "pointer" }}>📥 Export CSV</button>
         </div>
       </div>
@@ -188,10 +188,10 @@ export default function ProjectReportPage() {
           </div>
           <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
             <span style={{ fontSize: 13, fontWeight: 600, color: "#444" }}>Progress</span>
-            <span style={{ fontSize: 13, fontWeight: 700, color: "#ea580c" }}>{project.progress || 0}%</span>
+            <span style={{ fontSize: 13, fontWeight: 700, color: "var(--color-primary-hover, #EA580C)" }}>{project.progress || 0}%</span>
           </div>
           <div style={{ height: 8, background: "#f0f0f0", borderRadius: 4, overflow: "hidden" }}>
-            <div style={{ width: `${project.progress || 0}%`, height: "100%", background: "#ea580c", borderRadius: 4, transition: "width 0.4s ease" }} />
+            <div style={{ width: `${project.progress || 0}%`, height: "100%", background: "var(--color-primary-hover, #EA580C)", borderRadius: 4, transition: "width 0.4s ease" }} />
           </div>
         </div>
 
@@ -217,8 +217,8 @@ export default function ProjectReportPage() {
 
         <div style={{ ...cardStyle, marginBottom: 20 }}>
           <div style={{ fontSize: 15, fontWeight: 700, color: "#1a1a1a", marginBottom: 16 }}>Category Breakdown</div>
-          <CategoryBudgetBar name="Material" spent={stats.material} budget={project.budgetMaterial || project.budget?.material || 0} color="#F97316" />
-          <CategoryBudgetBar name="Labour" spent={stats.labour} budget={project.budgetLabour || project.budget?.labour || 0} color="#EA580C" />
+          <CategoryBudgetBar name="Material" spent={stats.material} budget={project.budgetMaterial || project.budget?.material || 0} color="var(--color-primary, #F97316)" />
+          <CategoryBudgetBar name="Labour" spent={stats.labour} budget={project.budgetLabour || project.budget?.labour || 0} color="var(--color-primary-hover, #EA580C)" />
           <CategoryBudgetBar name="Equipment" spent={stats.equipment} budget={project.budgetEquipment || project.budget?.equipment || 0} color="#0891b2" />
         </div>
 

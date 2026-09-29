@@ -5,11 +5,11 @@
   --bg-card: rgba(255, 255, 255, 0.68);
   --bg-subtle: rgba(255, 241, 232, 0.5);
   --bg-hover: rgba(255, 247, 240, 0.85);
-  --primary: #F97316;
-  --primary-hover: #EA580C;
+  --primary: var(--color-primary, #F97316);
+  --primary-hover: var(--color-primary-hover, #EA580C);
   --primary-light: rgba(255, 245, 240, 0.85);
   --primary-subtle: rgba(255, 247, 240, 0.6);
-  --primary-gradient: linear-gradient(90deg, #F97316 0%, #FB923C 100%);
+  --primary-gradient: linear-gradient(90deg, var(--color-primary, #F97316) 0%, var(--color-primary-light, #FB923C) 100%);
   --border: rgba(230, 234, 242, 0.6);
   --border-light: rgba(241, 245, 249, 0.5);
   --text-primary: #111827;
@@ -22,7 +22,7 @@
   --danger-light: rgba(254, 242, 242, 0.8);
   --warning: #F59E0B;
   --warning-light: rgba(255, 251, 235, 0.8);
-  --info: #F97316;
+  --info: var(--color-primary, #F97316);
   --info-light: rgba(255, 245, 240, 0.85);
   --radius-sm: 6px;
   --radius-md: 8px;
@@ -81,7 +81,7 @@ a:hover { color: var(--primary-hover); }
 
 button { cursor: pointer; font-family: inherit; border: none; background: none; }
 button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-visible, [tabindex]:focus-visible {
-  outline: 2px solid #F97316;
+  outline: 2px solid var(--color-primary, #F97316);
   outline-offset: 2px;
   border-radius: 6px;
 }
@@ -113,7 +113,7 @@ input, textarea, select { font-family: inherit; }
 .hover-lift:hover {
   transform: translateY(-3px);
   box-shadow: 0 12px 20px -8px rgba(249, 115, 22, 0.08), 0 4px 12px -2px rgba(0, 0, 0, 0.03);
-  border-color: #F9731633;
+  border-color: var(--color-primary, #F97316)33;
 }
 
 .focus-gradient-ring {
@@ -121,7 +121,7 @@ input, textarea, select { font-family: inherit; }
 }
 .focus-gradient-ring:focus {
   outline: none;
-  border-color: #F97316;
+  border-color: var(--color-primary, #F97316);
   box-shadow: 0 0 0 3px rgba(249, 115, 22, 0.15);
 }
 
@@ -187,7 +187,7 @@ select:disabled, input:disabled, textarea:disabled {
 }
 
 select:focus, input:focus, textarea:focus {
-  border-color: #F97316 !important;
+  border-color: var(--color-primary, #F97316) !important;
   box-shadow: 0 0 0 3px rgba(249, 115, 22, 0.12) !important;
   background: rgba(255, 255, 255, 0.8) !important;
 }
@@ -262,7 +262,7 @@ th, td {
 }
 
 .nurofin-btn {
-  background: linear-gradient(90deg, #F97316, #FB923C) !important;
+  background: linear-gradient(90deg, var(--color-primary, #F97316), var(--color-primary-light, #FB923C)) !important;
   transition: opacity 200ms ease !important;
 }
 .nurofin-btn:hover {
@@ -270,8 +270,8 @@ th, td {
 }
 
 .nurofin-btn-outline {
-  border: 1.5px solid #F97316 !important;
-  color: #F97316 !important;
+  border: 1.5px solid var(--color-primary, #F97316) !important;
+  color: var(--color-primary, #F97316) !important;
   transition: opacity 200ms ease !important;
 }
 .nurofin-btn-outline:hover {
@@ -296,7 +296,7 @@ th, td {
 }
 
 .view-all-btn { transition: color 150ms ease; }
-.view-all-btn:hover { color: #EA580C !important; }
+.view-all-btn:hover { color: var(--color-primary-hover, #EA580C) !important; }
 
 .recent-entry-row { transition: background 150ms ease; }
 .recent-entry-row:hover { background: rgba(255, 255, 255, 0.4); }
@@ -671,7 +671,7 @@ input.custom-input-field:active {
 }
 
 .premium-input-wrapper.focused {
-  border-color: #F97316;
+  border-color: var(--color-primary, #F97316);
   box-shadow: 0 0 0 3px rgba(249, 115, 22, 0.08);
 }
 
@@ -691,7 +691,7 @@ input.custom-input-field:active {
 }
 
 .signup-input-wrapper.focused {
-  border-color: #F97316;
+  border-color: var(--color-primary, #F97316);
   box-shadow: 0 0 0 3px rgba(249, 115, 22, 0.1);
 }
 

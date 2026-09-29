@@ -247,9 +247,9 @@ export default function AuditLogsPage() {
           display: "flex",
           flexDirection: "column",
           width: "100%",
-          height: "100vh",
-          fontFamily: "'Segoe UI', sans-serif",
-          background: "#f7f7f8",
+          
+          
+          background: 'transparent',
           alignItems: "center",
           justifyContent: "center",
         }}
@@ -324,9 +324,9 @@ export default function AuditLogsPage() {
         display: "flex",
         flexDirection: "column",
         width: "100%",
-        height: "100vh",
-        fontFamily: "'Segoe UI', sans-serif",
-        background: "#f7f7f8",
+        
+        
+        background: 'transparent',
         overflow: "hidden",
         minHeight: 0,
       }}

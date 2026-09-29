@@ -58,8 +58,8 @@ import {
   calculateFilteredCostSummary
 } from "../utils/reportCalculations";
 
-const primaryBlue = "#F97316";
-const primaryPurple = "#EA580C";
+const primaryBlue = "var(--color-primary, #F97316)";
+const primaryPurple = "var(--color-primary-hover, #EA580C)";
 const primaryLightBlue = "#06B6D4";
 
 function formatINR(n) {
@@ -946,7 +946,7 @@ export default function FinancialReportPage() {
         <div
           onClick={() => navigate("/ai-chat")}
           style={{
-            background: "linear-gradient(135deg, #F97316 0%, rgba(249, 115, 22, 0.8) 100%)",
+            background: "linear-gradient(135deg, var(--color-primary, #F97316) 0%, rgba(249, 115, 22, 0.8) 100%)",
             borderRadius: radius.lg,
             padding: "16px 20px",
             marginBottom: 24,
@@ -1151,7 +1151,7 @@ export default function FinancialReportPage() {
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 14 }}>
 
             {/* ROW 1: Total Billed, Paid, Remaining */}
-            <div style={{ background: "linear-gradient(135deg, #F97316 0%, #EA580C 100%)", borderRadius: radius.lg, padding: "18px 20px", boxShadow: shadows.card, display: "flex", flexDirection: "column", justifyContent: "space-between", minHeight: 104 }}>
+            <div style={{ background: "linear-gradient(135deg, var(--color-primary, #F97316) 0%, var(--color-primary-hover, #EA580C) 100%)", borderRadius: radius.lg, padding: "18px 20px", boxShadow: shadows.card, display: "flex", flexDirection: "column", justifyContent: "space-between", minHeight: 104 }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
                 <span style={{ fontSize: 13, fontWeight: "700", color: "rgba(255,255,255,0.85)" }}>Total Billed</span>
                 <span style={{ width: 28, height: 28, borderRadius: 8, background: "rgba(255,255,255,0.2)", display: "flex", alignItems: "center", justifyContent: "center" }}><CreditCard size={16} color="#FFF" /></span>
@@ -1340,7 +1340,7 @@ export default function FinancialReportPage() {
                 style={{
                   width: "100%",
                   padding: "12px",
-                  background: activeTab === "Materials" ? "#F97316" : activeTab === "Labour" ? primaryPurple : primaryLightBlue,
+                  background: activeTab === "Materials" ? "var(--color-primary, #F97316)" : activeTab === "Labour" ? primaryPurple : primaryLightBlue,
                   borderRadius: 10,
                   color: "#FFFFFF",
                   fontWeight: "700",
@@ -1363,7 +1363,7 @@ export default function FinancialReportPage() {
         {activeTab !== "All" && !reportGenerated ? (
 
           <div style={{ background: colors.cardBg, borderRadius: radius.lg, border: `1px solid ${colors.cardBorder}`, padding: "60px 20px", textAlign: "center", boxShadow: shadows.card }}>
-            <div style={{ width: 56, height: 56, borderRadius: "50%", background: activeTab === "Materials" ? "#F9731615" : activeTab === "Labour" ? `${primaryPurple}15` : `${primaryLightBlue}15`, display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 16px", color: activeTab === "Materials" ? "#F97316" : activeTab === "Labour" ? primaryPurple : primaryLightBlue }}>
+            <div style={{ width: 56, height: 56, borderRadius: "50%", background: activeTab === "Materials" ? "var(--color-primary, #F97316)15" : activeTab === "Labour" ? `${primaryPurple}15` : `${primaryLightBlue}15`, display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 16px", color: activeTab === "Materials" ? "var(--color-primary, #F97316)" : activeTab === "Labour" ? primaryPurple : primaryLightBlue }}>
               <FileText size={24} />
             </div>
             <h3 style={{ fontSize: 15, fontWeight: "700", color: colors.textPrimary, margin: "0 0 6px" }}>Configure Filters</h3>
@@ -1452,8 +1452,8 @@ export default function FinancialReportPage() {
                             } else if (colName === "Project") {
                               return <td key={colName} style={{ ...valStyle, fontWeight: "600" }}>{projectName}</td>;
                             } else if (colName === "Type") {
-                              const chipColor = entry.type === "material" ? "#F97316" : entry.type === "labour" ? primaryPurple : primaryLightBlue;
-                              const chipBg = entry.type === "material" ? "#F9731615" : entry.type === "labour" ? `${primaryPurple}15` : `${primaryLightBlue}15`;
+                              const chipColor = entry.type === "material" ? "var(--color-primary, #F97316)" : entry.type === "labour" ? primaryPurple : primaryLightBlue;
+                              const chipBg = entry.type === "material" ? "var(--color-primary, #F97316)15" : entry.type === "labour" ? `${primaryPurple}15` : `${primaryLightBlue}15`;
                               return (
                                 <td key={colName} style={valStyle}>
                                   <span style={{ padding: "3px 10px", borderRadius: 6, fontSize: 10.5, fontWeight: "700", background: chipBg, color: chipColor }}>
@@ -1775,11 +1775,11 @@ export default function FinancialReportPage() {
                           {formatINR(ph.amount)}
                         </span>
                         <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
-                          <span style={{ fontSize: 11, padding: "2px 6px", background: "#FDE8D8", color: "#F97316", borderRadius: 4, fontWeight: 600 }}>
+                          <span style={{ fontSize: 11, padding: "2px 6px", background: "#FDE8D8", color: "var(--color-primary, #F97316)", borderRadius: 4, fontWeight: 600 }}>
                             {ph.method || "—"}
                           </span>
                           {ph.receipt && (
-                            <a href={ph.receipt} target="_blank" rel="noopener noreferrer" style={{ fontSize: 11, color: "#EA580C", fontWeight: 600, textDecoration: "none" }}>
+                            <a href={ph.receipt} target="_blank" rel="noopener noreferrer" style={{ fontSize: 11, color: "var(--color-primary-hover, #EA580C)", fontWeight: 600, textDecoration: "none" }}>
                               Receipt ↗
                             </a>
                           )}

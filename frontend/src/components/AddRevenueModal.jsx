@@ -10,7 +10,7 @@ import {
 } from "lucide-react";
 import { transactionAPI, esignAPI } from "../api";
 
-const primaryBlue = "#F97316";
+const primaryBlue = "var(--color-primary, #F97316)";
 
 const PAYMENT_METHODS = [
   { value: "UPI", icon: Smartphone },

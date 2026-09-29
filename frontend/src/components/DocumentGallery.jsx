@@ -21,7 +21,7 @@ export default function DocumentGallery({ documents = [], onDeleteDocument, canM
   return (
     <div style={{ background: "#fff", borderRadius: 12, border: "1px solid #E5E7EB", padding: 20 }}>
       <div style={{ fontSize: 15, fontWeight: 700, color: "#111827", marginBottom: 14, display: "flex", alignItems: "center", gap: 8 }}>
-        <FileText size={18} color="#F97316" />
+        <FileText size={18} color="var(--color-primary, #F97316)" />
         Blueprints & Documents ({documents.length})
       </div>
 
@@ -37,7 +37,7 @@ export default function DocumentGallery({ documents = [], onDeleteDocument, canM
                 {img ? (
                   <img src={fileUrl} alt={fileName} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
                 ) : (
-                  <FileText size={36} color="#F97316" />
+                  <FileText size={36} color="var(--color-primary, #F97316)" />
                 )}
                 <div style={{ position: "absolute", inset: 0, background: "rgba(0,0,0,0.3)", opacity: 0, transition: "opacity 0.2s", display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}
                   onMouseEnter={e => e.currentTarget.style.opacity = 1}

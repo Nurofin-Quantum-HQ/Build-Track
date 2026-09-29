@@ -37,11 +37,11 @@ const typeIcons = {
 };
 
 const typeColors = {
-  approval: { bg: '#FFF5F0', color: '#F97316' },
+  approval: { bg: '#FFF5F0', color: 'var(--color-primary, #F97316)' },
   payment: { bg: '#F0FDF4', color: '#22C55E' },
-  inventory: { bg: '#FFF7ED', color: '#F97316' },
-  project: { bg: '#FFF7F0', color: '#EA580C' },
-  worker: { bg: '#FFF5F0', color: '#FB923C' },
+  inventory: { bg: '#FFF7ED', color: 'var(--color-primary, #F97316)' },
+  project: { bg: '#FFF7F0', color: 'var(--color-primary-hover, #EA580C)' },
+  worker: { bg: '#FFF5F0', color: 'var(--color-primary-light, #FB923C)' },
   task: { bg: '#EEF2FF', color: '#4F46E5' },
   system: { bg: '#F1F5F9', color: '#64748B' },
 };
@@ -140,7 +140,7 @@ export default function NotificationsPage() {
               </h2>
               <span
                 style={{
-                  background: totalAlertsCount > 0 ? '#F97316' : '#22C55E',
+                  background: totalAlertsCount > 0 ? 'var(--color-primary, #F97316)' : '#22C55E',
                   color: '#FFF',
                   fontSize: 11,
                   padding: '3px 10px',
@@ -208,7 +208,7 @@ export default function NotificationsPage() {
                 padding: '7px 14px',
                 borderRadius: 8,
                 border: isActive ? 'none' : '1px solid #E5E7EB',
-                background: isActive ? '#F97316' : '#fff',
+                background: isActive ? 'var(--color-primary, #F97316)' : '#fff',
                 color: isActive ? '#FFF' : '#64748B',
                 fontWeight: 600,
                 fontSize: 13,
@@ -233,7 +233,7 @@ export default function NotificationsPage() {
                   color: isActive
                     ? '#FFF'
                     : t.isWarning
-                    ? '#F97316'
+                    ? 'var(--color-primary, #F97316)'
                     : '#64748B',
                   padding: '1px 7px',
                   borderRadius: 10,
@@ -258,7 +258,7 @@ export default function NotificationsPage() {
                 <span style={{ fontSize: 16, fontWeight: 700, color: '#111827' }}>Today</span>
                 <span
                   style={{
-                    background: '#F97316',
+                    background: 'var(--color-primary, #F97316)',
                     color: '#FFF',
                     fontSize: 11,
                     padding: '2px 8px',
@@ -324,7 +324,7 @@ export default function NotificationsPage() {
                         background: '#FFF',
                         borderRadius: 16,
                         border: '1px solid #FED7AA',
-                        borderLeft: '4px solid #F97316',
+                        borderLeft: '4px solid var(--color-primary, #F97316)',
                         boxShadow: '0 4px 14px rgba(249, 115, 22, 0.08)',
                         cursor: 'pointer',
                         transition: 'transform 0.15s, box-shadow 0.15s',
@@ -348,7 +348,7 @@ export default function NotificationsPage() {
                             display: 'flex',
                             alignItems: 'center',
                             justifyContent: 'center',
-                            color: '#F97316',
+                            color: 'var(--color-primary, #F97316)',
                           }}
                         >
                           <AlertTriangle size={18} />
@@ -359,8 +359,8 @@ export default function NotificationsPage() {
                       </div>
 
                       <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 }}>
-                        <div style={{ width: 7, height: 7, borderRadius: '50%', background: '#F97316' }} />
-                        <span style={{ color: '#F97316', fontSize: 11, fontWeight: 700, letterSpacing: '0.05em' }}>
+                        <div style={{ width: 7, height: 7, borderRadius: '50%', background: 'var(--color-primary, #F97316)' }} />
+                        <span style={{ color: 'var(--color-primary, #F97316)', fontSize: 11, fontWeight: 700, letterSpacing: '0.05em' }}>
                           INVENTORY WARNING
                         </span>
                         {projectName && (
@@ -393,7 +393,7 @@ export default function NotificationsPage() {
                           style={{
                             fontSize: 12,
                             fontWeight: 600,
-                            color: '#F97316',
+                            color: 'var(--color-primary, #F97316)',
                             display: 'flex',
                             alignItems: 'center',
                             gap: 4,
@@ -605,7 +605,7 @@ export default function NotificationsPage() {
                       background: '#FFF',
                       borderRadius: 16,
                       border: '1px solid #E5E7EB',
-                      borderLeft: n.read ? '3px solid #E2E8F0' : '4px solid #F97316',
+                      borderLeft: n.read ? '3px solid #E2E8F0' : '4px solid var(--color-primary, #F97316)',
                       opacity: n.read ? 0.75 : 1,
                       cursor: 'pointer',
                       transition: 'transform 0.15s, box-shadow 0.15s',

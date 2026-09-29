@@ -12,7 +12,7 @@ import ModuleTour from "../components/ModuleTour";
 
 const STATUS_STYLE = {
   planning:   { bg: "#FFF8E1", text: "#F57F17", border: "#FFC107", label: "Planning" },
-  inprogress: { bg: "#FFF5F0", text: "#EA580C", border: "#F97316", label: "In Progress" },
+  inprogress: { bg: "#FFF5F0", text: "var(--color-primary-hover, #EA580C)", border: "var(--color-primary, #F97316)", label: "In Progress" },
   onhold:     { bg: "#FFF3E0", text: "#E65100", border: "#FF9800", label: "On Hold" },
   completed:  { bg: "#E8F5E9", text: "#2E7D32", border: "#43A047", label: "Completed" },
   cancelled:  { bg: "#FFEBEE", text: "#C62828", border: "#E53935", label: "Review Needed" },
@@ -151,8 +151,8 @@ export default function ProjectsPage() {
               padding: '12px 4px 12px', marginRight: 20,
               background: 'none', border: 'none', cursor: 'pointer',
               fontSize: 14, fontWeight: activeTab === t ? 600 : 400,
-              color: activeTab === t ? '#F97316' : '#64748B',
-              borderBottom: activeTab === t ? '2px solid #F97316' : '2px solid transparent',
+              color: activeTab === t ? 'var(--color-primary, #F97316)' : '#64748B',
+              borderBottom: activeTab === t ? '2px solid var(--color-primary, #F97316)' : '2px solid transparent',
               transition: 'all 150ms', whiteSpace: 'nowrap',
               fontFamily: 'inherit',
             }}>
@@ -224,17 +224,17 @@ export default function ProjectsPage() {
                     )}
 
                     {isAdmin && (
-                      <div style={{ fontSize: 13, fontWeight: 600, color: '#F97316', marginBottom: 14 }}>
+                      <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-primary, #F97316)', marginBottom: 14 }}>
                         ₹{spent.toLocaleString("en-IN")} of ₹{budget.toLocaleString("en-IN")}
                       </div>
                     )}
 
                     <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
                       <span style={{ fontSize: 12, fontWeight: 600, color: '#64748B' }}>Overall Progress</span>
-                      <span style={{ fontSize: 12, fontWeight: 700, color: '#F97316' }}>{Math.round(progress * 100)}%</span>
+                      <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--color-primary, #F97316)' }}>{Math.round(progress * 100)}%</span>
                     </div>
                     <div style={{ height: 6, background: '#F1F5F9', borderRadius: 3, overflow: 'hidden', marginBottom: 16 }}>
-                      <div style={{ width: `${Math.round(progress * 100)}%`, height: '100%', background: '#F97316', borderRadius: 3, transition: 'width 0.4s ease' }} />
+                      <div style={{ width: `${Math.round(progress * 100)}%`, height: '100%', background: 'var(--color-primary, #F97316)', borderRadius: 3, transition: 'width 0.4s ease' }} />
                     </div>
 
                     <div style={{ borderTop: '1px solid #F1F5F9', paddingTop: 12, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -245,9 +245,9 @@ export default function ProjectsPage() {
                           </button>
                         )}
                       </div>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 13, fontWeight: 700, color: '#F97316' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 13, fontWeight: 700, color: 'var(--color-primary, #F97316)' }}>
                         <span>View Details</span>
-                        <ArrowRight size={14} color="#F97316" />
+                        <ArrowRight size={14} color="var(--color-primary, #F97316)" />
                       </div>
                     </div>
                   </div>

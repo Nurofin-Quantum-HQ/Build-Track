@@ -283,7 +283,7 @@ export default function SignUpPage() {
             <div style={{ marginTop: 28 }}>
               <h1 className="animate-fade-up" style={{ fontFamily: "'Outfit', sans-serif", fontSize: "44px", fontWeight: "900", color: "#0F172A", lineHeight: 1.15, margin: "0 0 16px", letterSpacing: "-1.5px", animationDelay: "0.2s" }}>
                 Build smarter.<br />
-                <span style={{ background: "linear-gradient(135deg, #EA580C 0%, #F97316 100%)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>Track everything.</span>
+                <span style={{ background: "linear-gradient(135deg, var(--color-primary-hover, #EA580C) 0%, var(--color-primary, #F97316) 100%)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>Track everything.</span>
               </h1>
 
               <p className="animate-fade-up" style={{ fontSize: "16px", color: "#334155", lineHeight: 1.7, margin: "0 0 44px", animationDelay: "0.3s", fontWeight: "500" }}>
@@ -293,7 +293,7 @@ export default function SignUpPage() {
               <div className="animate-fade-up" style={{ display: "flex", flexDirection: "column", gap: "24px", animationDelay: "0.4s" }}>
                 {features.map((item, idx) => (
                   <div key={idx} style={{ display: "flex", alignItems: "flex-start", gap: "14px" }}>
-                    <div style={{ width: "24px", height: "24px", borderRadius: "50%", background: "#FFFFFF", border: "1.5px solid rgba(249, 115, 22, 0.4)", display: "flex", alignItems: "center", justifyContent: "center", color: "#EA580C", flexShrink: 0, marginTop: "1px", boxShadow: "0 2px 8px rgba(234, 88, 12, 0.12)" }}>
+                    <div style={{ width: "24px", height: "24px", borderRadius: "50%", background: "#FFFFFF", border: "1.5px solid rgba(249, 115, 22, 0.4)", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--color-primary-hover, #EA580C)", flexShrink: 0, marginTop: "1px", boxShadow: "0 2px 8px rgba(234, 88, 12, 0.12)" }}>
                       <CheckCircle size={14} />
                     </div>
                     <div>
@@ -447,7 +447,7 @@ export default function SignUpPage() {
                     onClick={handleSendOtp}
                     disabled={otpLoading || !email.trim()}
                     style={{
-                      background: "linear-gradient(90deg, #F97316 0%, #FB923C 100%)",
+                      background: "linear-gradient(90deg, var(--color-primary, #F97316) 0%, var(--color-primary-light, #FB923C) 100%)",
                       color: "#fff",
                       border: "none",
                       borderRadius: 8,
@@ -517,7 +517,7 @@ export default function SignUpPage() {
                     </button>
                   </div>
                   <div style={{ display: 'flex', justifyContent: 'flex-start', marginTop: -14, marginBottom: 14 }}>
-                    <button type="button" onClick={handleSendOtp} style={{ background: 'none', border: 'none', color: '#F97316', fontSize: '11px', fontWeight: '700', cursor: 'pointer', padding: 0 }}>Resend Code</button>
+                    <button type="button" onClick={handleSendOtp} style={{ background: 'none', border: 'none', color: 'var(--color-primary, #F97316)', fontSize: '11px', fontWeight: '700', cursor: 'pointer', padding: 0 }}>Resend Code</button>
                   </div>
                 </div>
               )}
@@ -542,10 +542,10 @@ export default function SignUpPage() {
                   <div style={{ marginBottom: 18 }}>
                     <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
                       <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: "12px", fontWeight: "700", color: "#334155" }}>
-                        <Type size={14} color="#F97316" />
+                        <Type size={14} color="var(--color-primary, #F97316)" />
                         <span>Company Name Font Style</span>
                       </label>
-                      <span style={{ fontSize: "11px", color: "#F97316", fontWeight: "600" }}>Live Preview</span>
+                      <span style={{ fontSize: "11px", color: "var(--color-primary, #F97316)", fontWeight: "600" }}>Live Preview</span>
                     </div>
 
                     <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, maxHeight: "150px", overflowY: "auto", padding: "2px" }}>
@@ -559,7 +559,7 @@ export default function SignUpPage() {
                             style={{
                               padding: "8px 10px",
                               borderRadius: 10,
-                              border: isSelected ? "2px solid #F97316" : "1.5px solid #E2E8F0",
+                              border: isSelected ? "2px solid var(--color-primary, #F97316)" : "1.5px solid #E2E8F0",
                               background: isSelected ? "#FFF7ED" : "#FFFFFF",
                               cursor: "pointer",
                               textAlign: "left",
@@ -570,7 +570,7 @@ export default function SignUpPage() {
                               boxShadow: isSelected ? "0 2px 8px rgba(249, 115, 22, 0.15)" : "none",
                             }}
                           >
-                            <span style={{ fontSize: "10.5px", color: isSelected ? "#EA580C" : "#64748B", fontWeight: 700 }}>
+                            <span style={{ fontSize: "10.5px", color: isSelected ? "var(--color-primary-hover, #EA580C)" : "#64748B", fontWeight: 700 }}>
                               {f.name}
                             </span>
                             <span
@@ -594,7 +594,7 @@ export default function SignUpPage() {
 
                   <div style={{ marginBottom: 18 }}>
                     <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: "12px", fontWeight: "700", color: "#334155", marginBottom: 6 }}>
-                      <ImageIcon size={14} color="#F97316" />
+                      <ImageIcon size={14} color="var(--color-primary, #F97316)" />
                       <span>Company Logo <span style={{ fontWeight: 500, color: "#94A3B8" }}>(Optional)</span></span>
                     </label>
 
@@ -627,7 +627,7 @@ export default function SignUpPage() {
                             <button
                               type="button"
                               onClick={() => logoInputRef.current?.click()}
-                              style={{ background: "none", border: "none", color: "#F97316", fontSize: "11px", fontWeight: "700", padding: 0, cursor: "pointer" }}
+                              style={{ background: "none", border: "none", color: "var(--color-primary, #F97316)", fontSize: "11px", fontWeight: "700", padding: 0, cursor: "pointer" }}
                             >
                               Change logo
                             </button>
@@ -657,10 +657,10 @@ export default function SignUpPage() {
                           gap: 10,
                           transition: "all 0.15s ease",
                         }}
-                        onMouseEnter={(e) => { e.currentTarget.style.borderColor = "#F97316"; e.currentTarget.style.background = "#FFF7ED"; }}
+                        onMouseEnter={(e) => { e.currentTarget.style.borderColor = "var(--color-primary, #F97316)"; e.currentTarget.style.background = "#FFF7ED"; }}
                         onMouseLeave={(e) => { e.currentTarget.style.borderColor = "#CBD5E1"; e.currentTarget.style.background = "#F8FAFC"; }}
                       >
-                        <Upload size={16} color="#F97316" />
+                        <Upload size={16} color="var(--color-primary, #F97316)" />
                         <span style={{ fontSize: "12px", fontWeight: "600", color: "#475569" }}>
                           Upload Logo (Optional)
                         </span>
@@ -744,8 +744,8 @@ export default function SignUpPage() {
                         onClick={() => { setAgreed(v => !v); setErrors(p => ({...p, agreed: ""})); }}
                         style={{
                           width: 18, height: 18, borderRadius: 5, flexShrink: 0, marginTop: 2,
-                          border: `2px solid ${errors.agreed ? "#dc2626" : agreed ? "#F97316" : "#d0d0d0"}`,
-                          background: agreed ? "#F97316" : "#fff",
+                          border: `2px solid ${errors.agreed ? "#dc2626" : agreed ? "var(--color-primary, #F97316)" : "#d0d0d0"}`,
+                          background: agreed ? "var(--color-primary, #F97316)" : "#fff",
                           display: "flex", alignItems: "center", justifyContent: "center",
                           transition: "all 0.15s", cursor: "pointer",
                         }}>
@@ -757,9 +757,9 @@ export default function SignUpPage() {
                       </div>
                       <span style={{ fontSize: "13px", color: "#71717A", lineHeight: 1.6, fontWeight: "500" }}>
                         By creating an account, you agree to our{" "}
-                        <span style={{ color: "#F97316", fontWeight: "700", cursor: "pointer" }}>Terms</span>
+                        <span style={{ color: "var(--color-primary, #F97316)", fontWeight: "700", cursor: "pointer" }}>Terms</span>
                         {" "}and{" "}
-                        <span style={{ color: "#F97316", fontWeight: "700", cursor: "pointer" }}>Privacy Policy</span>.
+                        <span style={{ color: "var(--color-primary, #F97316)", fontWeight: "700", cursor: "pointer" }}>Privacy Policy</span>.
                       </span>
                     </label>
                     {errors.agreed && (
@@ -779,7 +779,7 @@ export default function SignUpPage() {
                       padding: "14px",
                       borderRadius: 12,
                       border: "none",
-                      background: "linear-gradient(90deg, #F97316 0%, #FB923C 100%)",
+                      background: "linear-gradient(90deg, var(--color-primary, #F97316) 0%, var(--color-primary-light, #FB923C) 100%)",
                       color: "#FFF",
                       fontWeight: "800",
                       fontSize: "13.5px",
@@ -814,7 +814,7 @@ export default function SignUpPage() {
                     border: "none",
                     padding: 0,
                     cursor: "pointer",
-                    color: "#EA580C",
+                    color: "var(--color-primary-hover, #EA580C)",
                     fontWeight: "700",
                     fontSize: "13.5px"
                   }}

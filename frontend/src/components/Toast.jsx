@@ -8,7 +8,7 @@ const TOAST_STYLES = {
     bg: "#fee2e2", border: "#fca5a5", color: "#991b1b", icon: "⚠️",
   },
   info: {
-    bg: "#FFF5F0", border: "#FDE8D8", color: "#EA580C", icon: "ℹ️",
+    bg: "#FFF5F0", border: "#FDE8D8", color: "var(--color-primary-hover, #EA580C)", icon: "ℹ️",
   },
 };
 
@@ -95,7 +95,7 @@ export function ConfirmDialog({ message, onConfirm, onCancel, confirmLabel = "Co
             onClick={onConfirm}
             style={{
               padding: "10px 22px",
-              background: danger ? "#dc2626" : "#F97316",
+              background: danger ? "#dc2626" : "var(--color-primary, #F97316)",
               color: "#fff", border: "none", borderRadius: 10,
               fontWeight: 700, fontSize: 14, cursor: "pointer",
               boxShadow: danger

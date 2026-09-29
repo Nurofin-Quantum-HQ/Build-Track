@@ -44,7 +44,7 @@ export default function ExecutionContextStep({ projects, onComplete, onCancel })
           justifyContent: 'center',
           margin: '0 auto 16px',
         }}>
-          <Building size={28} color="#F97316" />
+          <Building size={28} color="var(--color-primary, #F97316)" />
         </div>
         <h2 style={{
           fontSize: 20,
@@ -252,7 +252,7 @@ export default function ExecutionContextStep({ projects, onComplete, onCancel })
             borderRadius: 12,
             border: 'none',
             background: selectedProject
-              ? 'linear-gradient(135deg, #F97316 0%, #EA580C 100%)'
+              ? 'linear-gradient(135deg, var(--color-primary, #F97316) 0%, var(--color-primary-hover, #EA580C) 100%)'
               : '#E5E7EB',
             color: selectedProject ? '#FFFFFF' : '#9CA3AF',
             fontSize: 14,

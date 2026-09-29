@@ -244,7 +244,7 @@ export default function AIChatPage() {
           {!isUser && (
             <div style={{
               width: 32, height: 32, borderRadius: "50%", flexShrink: 0,
-              background: "linear-gradient(135deg, #ea580c, #c2410c)",
+              background: "linear-gradient(135deg, var(--color-primary-hover, #EA580C), #c2410c)",
               display: "flex", alignItems: "center", justifyContent: "center",
               fontSize: 14, color: "#fff", fontWeight: 700, boxShadow: "0 2px 8px rgba(234,88,12,0.3)",
             }}>AI</div>
@@ -253,7 +253,7 @@ export default function AIChatPage() {
             <div style={{
               padding: isUser ? "10px 16px" : "12px 16px",
               borderRadius: isUser ? "16px 16px 4px 16px" : "16px 16px 16px 4px",
-              background: isUser ? "linear-gradient(135deg, #ea580c, #c2410c)" : "#fff",
+              background: isUser ? "linear-gradient(135deg, var(--color-primary-hover, #EA580C), #c2410c)" : "#fff",
               color: isUser ? "#fff" : "#1a1a1a",
               fontSize: 14, lineHeight: 1.6, fontWeight: isUser ? 500 : 400,
               boxShadow: isUser ? "0 2px 12px rgba(234,88,12,0.25)" : "0 1px 6px rgba(0,0,0,0.06)",
@@ -265,7 +265,7 @@ export default function AIChatPage() {
             {msg.total_amount != null && (
               <div style={{
                 marginTop: 8, padding: "8px 14px", background: "#fff5f0", borderRadius: 10,
-                border: "1px solid #fed7aa", fontSize: 13, fontWeight: 700, color: "#ea580c",
+                border: "1px solid #fed7aa", fontSize: 13, fontWeight: 700, color: "var(--color-primary-hover, #EA580C)",
                 display: "inline-flex", alignItems: "center", gap: 6,
               }}>
                 Total: ₹{Number(msg.total_amount).toLocaleString("en-IN")}
@@ -302,7 +302,7 @@ export default function AIChatPage() {
         <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
           <div style={{
             width: 36, height: 36, borderRadius: 10,
-            background: "linear-gradient(135deg, #ea580c, #c2410c)",
+            background: "linear-gradient(135deg, var(--color-primary-hover, #EA580C), #c2410c)",
             display: "flex", alignItems: "center", justifyContent: "center",
             fontSize: 16, color: "#fff", fontWeight: 700,
             boxShadow: "0 2px 8px rgba(234,88,12,0.3)",
@@ -319,7 +319,7 @@ export default function AIChatPage() {
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
           {selectedProject && (
             <span style={{
-              fontSize: 11, fontWeight: 700, color: "#ea580c",
+              fontSize: 11, fontWeight: 700, color: "var(--color-primary-hover, #EA580C)",
               background: "#fff5f0", border: "1px solid #fed7aa",
               borderRadius: 20, padding: "4px 12px", letterSpacing: "0.04em",
               maxWidth: 180, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
@@ -352,8 +352,8 @@ export default function AIChatPage() {
                   boxShadow: "0 1px 4px rgba(0,0,0,0.04)",
                 }}
                 onMouseEnter={(e) => {
-                  e.currentTarget.style.borderColor = "#ea580c";
-                  e.currentTarget.style.color = "#ea580c";
+                  e.currentTarget.style.borderColor = "var(--color-primary-hover, #EA580C)";
+                  e.currentTarget.style.color = "var(--color-primary-hover, #EA580C)";
                   e.currentTarget.style.background = "#fff5f0";
                   e.currentTarget.style.transform = "translateY(-1px)";
                   e.currentTarget.style.boxShadow = "0 4px 12px rgba(234,88,12,0.15)";
@@ -378,7 +378,7 @@ export default function AIChatPage() {
           <div style={{ display: "flex", alignItems: "flex-end", gap: 8 }}>
             <div style={{
               width: 32, height: 32, borderRadius: "50%", flexShrink: 0,
-              background: "linear-gradient(135deg, #ea580c, #c2410c)",
+              background: "linear-gradient(135deg, var(--color-primary-hover, #EA580C), #c2410c)",
               display: "flex", alignItems: "center", justifyContent: "center",
               fontSize: 14, color: "#fff", fontWeight: 700,
               boxShadow: "0 2px 8px rgba(234,88,12,0.3)",
@@ -410,7 +410,7 @@ export default function AIChatPage() {
           transition: "border-color 0.2s, box-shadow 0.2s",
         }}
           onFocus={(e) => {
-            e.currentTarget.style.borderColor = "#ea580c";
+            e.currentTarget.style.borderColor = "var(--color-primary-hover, #EA580C)";
             e.currentTarget.style.boxShadow = "0 0 0 3px rgba(234,88,12,0.1)";
           }}
           onBlur={(e) => {
@@ -445,7 +445,7 @@ export default function AIChatPage() {
             disabled={!input.trim() || loading}
             style={{
               width: 40, height: 40, borderRadius: 12, flexShrink: 0,
-              background: input.trim() && !loading ? "#ea580c" : "#e5e5e5",
+              background: input.trim() && !loading ? "var(--color-primary-hover, #EA580C)" : "#e5e5e5",
               border: "none", cursor: input.trim() && !loading ? "pointer" : "not-allowed",
               display: "flex", alignItems: "center", justifyContent: "center",
               transition: "background 0.2s, transform 0.15s",
@@ -459,7 +459,7 @@ export default function AIChatPage() {
             }}
             onMouseLeave={(e) => {
               if (input.trim() && !loading) {
-                e.currentTarget.style.background = "#ea580c";
+                e.currentTarget.style.background = "var(--color-primary-hover, #EA580C)";
                 e.currentTarget.style.transform = "scale(1)";
               }
             }}

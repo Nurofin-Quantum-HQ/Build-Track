@@ -217,7 +217,7 @@ export default function LoginPage() {
             <div style={{ marginTop: 28 }}>
               <h1 className="animate-fade-up" style={{ fontFamily: "'Outfit', sans-serif", fontSize: "44px", fontWeight: "900", color: "#0F172A", lineHeight: 1.15, margin: "0 0 16px", letterSpacing: "-1.5px", animationDelay: "0.2s" }}>
                 The Platform for<br />
-                <span style={{ background: "linear-gradient(135deg, #EA580C 0%, #F97316 100%)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>Modern Construction.</span>
+                <span style={{ background: "linear-gradient(135deg, var(--color-primary-hover, #EA580C) 0%, var(--color-primary, #F97316) 100%)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>Modern Construction.</span>
               </h1>
 
               <p className="animate-fade-up" style={{ fontSize: "16px", color: "#334155", lineHeight: 1.7, margin: "0 0 44px", animationDelay: "0.3s", fontWeight: "500" }}>
@@ -231,7 +231,7 @@ export default function LoginPage() {
                   { title: "Automated Reports", desc: "Instantly export visual cost reports, invoices, and audit summaries." }
                 ].map((item, idx) => (
                   <div key={idx} style={{ display: "flex", alignItems: "flex-start", gap: "14px" }}>
-                    <div style={{ width: "24px", height: "24px", borderRadius: "50%", background: "#FFFFFF", border: "1.5px solid rgba(249, 115, 22, 0.4)", display: "flex", alignItems: "center", justifyContent: "center", color: "#EA580C", flexShrink: 0, marginTop: "1px", boxShadow: "0 2px 8px rgba(234, 88, 12, 0.12)" }}>
+                    <div style={{ width: "24px", height: "24px", borderRadius: "50%", background: "#FFFFFF", border: "1.5px solid rgba(249, 115, 22, 0.4)", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--color-primary-hover, #EA580C)", flexShrink: 0, marginTop: "1px", boxShadow: "0 2px 8px rgba(234, 88, 12, 0.12)" }}>
                       <CheckCircle size={14} />
                     </div>
                     <div>
@@ -387,7 +387,7 @@ export default function LoginPage() {
                     setForgotErr("");
                   }}
                   className="login-link-btn"
-                        style={{ fontSize: "12.5px", fontWeight: "700", color: "#EA580C", cursor: "pointer" }}
+                        style={{ fontSize: "12.5px", fontWeight: "700", color: "var(--color-primary-hover, #EA580C)", cursor: "pointer" }}
                 >
                   {showForgot ? "← Back to login" : "Forgot password?"}
                 </span>
@@ -430,7 +430,7 @@ export default function LoginPage() {
                       padding: "12px",
                       borderRadius: 10,
                       border: "none",
-                  background: "linear-gradient(90deg, #F97316 0%, #FB923C 100%)",
+                  background: "linear-gradient(90deg, var(--color-primary, #F97316) 0%, var(--color-primary-light, #FB923C) 100%)",
                       color: "#FFF",
                       fontWeight: "700",
                       fontSize: "13px",
@@ -452,7 +452,7 @@ export default function LoginPage() {
                     {!showReset && (
                       <span
                         onClick={() => setShowReset(true)}
-                  style={{ fontSize: "12.5px", fontWeight: "700", color: "#EA580C", cursor: "pointer" }}
+                  style={{ fontSize: "12.5px", fontWeight: "700", color: "var(--color-primary-hover, #EA580C)", cursor: "pointer" }}
                       >
                         Already have a token?
                       </span>
@@ -478,7 +478,7 @@ export default function LoginPage() {
                         } finally { 
                           setResetLoading(false); 
                         }
-                      }} style={{ width: "100%", padding: "12px", borderRadius: 10, background: "linear-gradient(90deg, #F97316 0%, #FB923C 100%)", color: "#FFF", fontWeight: "700", border: "none", cursor: resetLoading ? "not-allowed" : "pointer", opacity: resetLoading ? 0.6 : 1 }}>
+                      }} style={{ width: "100%", padding: "12px", borderRadius: 10, background: "linear-gradient(90deg, var(--color-primary, #F97316) 0%, var(--color-primary-light, #FB923C) 100%)", color: "#FFF", fontWeight: "700", border: "none", cursor: resetLoading ? "not-allowed" : "pointer", opacity: resetLoading ? 0.6 : 1 }}>
                         {resetLoading ? "Resetting..." : "Reset Password"}
                       </button>
                     </div>
@@ -502,7 +502,7 @@ export default function LoginPage() {
                   padding: "14px",
                   borderRadius: 12,
                   border: "none",
-                  background: "linear-gradient(90deg, #F97316 0%, #FB923C 100%)",
+                  background: "linear-gradient(90deg, var(--color-primary, #F97316) 0%, var(--color-primary-light, #FB923C) 100%)",
                   color: "#FFF",
                   fontWeight: "800",
                   fontSize: "13.5px",
@@ -567,7 +567,7 @@ export default function LoginPage() {
                     border: "none",
                     padding: 0,
                     cursor: "pointer",
-                    color: "#EA580C",
+                    color: "var(--color-primary-hover, #EA580C)",
                     fontWeight: "700",
                     fontSize: "13.5px"
                   }}

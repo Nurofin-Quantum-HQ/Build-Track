@@ -114,7 +114,7 @@ const CHECKMARK = (
   <span style={{
     display: "inline-flex", alignItems: "center", justifyContent: "center",
     width: 18, height: 18, borderRadius: "50%", background: "#fff5f0",
-    color: "#ea580c", fontSize: 11, fontWeight: 800, flexShrink: 0,
+    color: "var(--color-primary-hover, #EA580C)", fontSize: 11, fontWeight: 800, flexShrink: 0,
   }}>✓</span>
 );
 
@@ -171,7 +171,7 @@ function PhoneModal({ planTitle, onSubmit, onCancel, loading }) {
             width: 44, height: 44, borderRadius: 12, background: "#fff5f0",
             display: "flex", alignItems: "center", justifyContent: "center",
           }}>
-            <Phone size={20} color="#ea580c" />
+            <Phone size={20} color="var(--color-primary-hover, #EA580C)" />
           </div>
           <div>
             <div style={{ fontWeight: 700, fontSize: 16, color: "#1a1a1a" }}>
@@ -190,7 +190,7 @@ function PhoneModal({ planTitle, onSubmit, onCancel, loading }) {
 
         <form onSubmit={handleSubmit}>
           <label style={{ fontSize: 13, fontWeight: 600, color: "#374151", display: "block", marginBottom: 6 }}>
-            Mobile Number <span style={{ color: "#ea580c" }}>*</span>
+            Mobile Number <span style={{ color: "var(--color-primary-hover, #EA580C)" }}>*</span>
           </label>
           <input
             ref={inputRef}
@@ -217,7 +217,7 @@ function PhoneModal({ planTitle, onSubmit, onCancel, loading }) {
               type="checkbox"
               checked={savePhone}
               onChange={e => setSavePhone(e.target.checked)}
-              style={{ accentColor: "#ea580c", width: 15, height: 15 }}
+              style={{ accentColor: "var(--color-primary-hover, #EA580C)", width: 15, height: 15 }}
             />
             Save this number to my profile for future payments
           </label>
@@ -227,7 +227,7 @@ function PhoneModal({ planTitle, onSubmit, onCancel, loading }) {
             disabled={loading}
             style={{
               width: "100%", padding: "12px 0", borderRadius: 12,
-              background: loading ? "#f5f5f5" : "#ea580c",
+              background: loading ? "#f5f5f5" : "var(--color-primary-hover, #EA580C)",
               color: loading ? "#999" : "#fff",
               border: "none", fontWeight: 700, fontSize: 15,
               cursor: loading ? "not-allowed" : "pointer",
@@ -478,7 +478,7 @@ export default function SubscriptionPage() {
 
         {/* Hero banner */}
         <div style={{
-          background: "linear-gradient(135deg, #ea580c 0%, #f97316 50%, #fb923c 100%)",
+          background: "linear-gradient(135deg, var(--color-primary-hover, #EA580C) 0%, var(--color-primary, #F97316) 50%, var(--color-primary-light, #FB923C) 100%)",
           borderRadius: "clamp(16px,2vw,20px)",
           padding: isNarrow ? "28px 20px" : "40px 44px",
           color: "#fff",
@@ -523,7 +523,7 @@ export default function SubscriptionPage() {
               </div>
               <div>
                 <div style={{ fontSize: 13, fontWeight: 700, color: "#1a1a1a" }}>
-                  Current Plan: <span style={{ color: "#ea580c" }}>{PLANS.find(p => p.id === currentPlan)?.title || "Free"}</span>
+                  Current Plan: <span style={{ color: "var(--color-primary-hover, #EA580C)" }}>{PLANS.find(p => p.id === currentPlan)?.title || "Free"}</span>
                 </div>
                 {subStatus.endDate && (
                   <div style={{ fontSize: 11, color: "#888", marginTop: 2 }}>
@@ -535,7 +535,7 @@ export default function SubscriptionPage() {
             {subStatus.status && subStatus.status !== "cancelled" && (
               <span style={{
                 fontSize: 11, fontWeight: 700,
-                color: subStatus.status === "active" ? "#16a34a" : "#ea580c",
+                color: subStatus.status === "active" ? "#16a34a" : "var(--color-primary-hover, #EA580C)",
                 background: subStatus.status === "active" ? "#f0fdf4" : "#fff5f0",
                 padding: "4px 12px", borderRadius: 20, letterSpacing: "0.03em",
                 textTransform: "uppercase",
@@ -589,7 +589,7 @@ export default function SubscriptionPage() {
                 style={{
                   background: plan.highlighted ? "linear-gradient(180deg, #fff5f0 0%, #fff 40%)" : "#fff",
                   borderRadius: "clamp(14px,1.5vw,18px)",
-                  border: plan.highlighted ? "2px solid #ea580c" : "1px solid #ebebeb",
+                  border: plan.highlighted ? "2px solid var(--color-primary-hover, #EA580C)" : "1px solid #ebebeb",
                   padding: "clamp(20px,2.5vw,28px)",
                   display: "flex", flexDirection: "column",
                   position: "relative",
@@ -611,7 +611,7 @@ export default function SubscriptionPage() {
                   {plan.highlighted && (
                     <span style={{
                       fontSize: 10, fontWeight: 800, color: "#fff",
-                      background: "#ea580c", padding: "3px 10px",
+                      background: "var(--color-primary-hover, #EA580C)", padding: "3px 10px",
                       borderRadius: 20, letterSpacing: "0.05em", textTransform: "uppercase",
                     }}>Most Popular</span>
                   )}
@@ -635,7 +635,7 @@ export default function SubscriptionPage() {
                 <div style={{ marginBottom: 20 }}>
                   <span style={{
                     fontSize: "clamp(28px,3vw,36px)", fontWeight: 800,
-                    color: plan.highlighted ? "#ea580c" : "#1a1a1a", letterSpacing: "-1px",
+                    color: plan.highlighted ? "var(--color-primary-hover, #EA580C)" : "#1a1a1a", letterSpacing: "-1px",
                   }}>
                     {plan.price === 0 ? "₹0" : `₹${plan.price.toLocaleString("en-IN")}`}
                   </span>
@@ -672,9 +672,9 @@ export default function SubscriptionPage() {
                     disabled={isCurrent || isProcessing}
                     style={{
                       width: "100%", padding: "12px 0", borderRadius: 12,
-                      border: isCurrent ? "1px solid #e5e5e5" : plan.highlighted ? "none" : "2px solid #ea580c",
-                      background: isCurrent ? "#f5f5f5" : plan.highlighted ? "#ea580c" : "#fff",
-                      color: isCurrent ? "#999" : plan.highlighted ? "#fff" : "#ea580c",
+                      border: isCurrent ? "1px solid #e5e5e5" : plan.highlighted ? "none" : "2px solid var(--color-primary-hover, #EA580C)",
+                      background: isCurrent ? "#f5f5f5" : plan.highlighted ? "var(--color-primary-hover, #EA580C)" : "#fff",
+                      color: isCurrent ? "#999" : plan.highlighted ? "#fff" : "var(--color-primary-hover, #EA580C)",
                       fontWeight: 700, fontSize: 14,
                       cursor: isCurrent || isProcessing ? "not-allowed" : "pointer",
                       boxShadow: isCurrent ? "none" : plan.highlighted ? "0 4px 14px rgba(234,88,12,0.35)" : "none",
@@ -695,7 +695,7 @@ export default function SubscriptionPage() {
                     onMouseLeave={e => {
                       if (isCurrent || isProcessing) return;
                       if (plan.highlighted) {
-                        e.currentTarget.style.background = "#ea580c";
+                        e.currentTarget.style.background = "var(--color-primary-hover, #EA580C)";
                         e.currentTarget.style.transform = "translateY(0)";
                         e.currentTarget.style.boxShadow = "0 4px 14px rgba(234,88,12,0.35)";
                       } else {
@@ -721,7 +721,7 @@ export default function SubscriptionPage() {
         <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 12, marginTop: 8, paddingBottom: 20 }}>
           <span
             style={{
-              fontSize: 14, color: "#ea580c", fontWeight: 700,
+              fontSize: 14, color: "var(--color-primary-hover, #EA580C)", fontWeight: 700,
               cursor: "pointer", padding: "8px 20px", borderRadius: 10,
               background: "#fff5f0", border: "1px solid #fde8d8",
               transition: "background 0.15s",

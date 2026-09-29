@@ -93,7 +93,7 @@ export default function AdminOverviewPage() {
         {[
           { label: 'Team Members', value: stats.totalUsers, color: colors.primaryBlue, bg: '#FFF5F0' },
           { label: 'Active Projects', value: stats.activeProjects, color: colors.success, bg: '#E6F9F0' },
-          { label: 'Total Entries', value: stats.totalEntries, color: '#EA580C', bg: '#FFF5F0' },
+          { label: 'Total Entries', value: stats.totalEntries, color: 'var(--color-primary-hover, #EA580C)', bg: '#FFF5F0' },
           { label: 'Recent (50)', value: stats.recentEntries, color: colors.warning, bg: '#FFF4E0' },
         ].map((stat) => (
           <Card key={stat.label} padding="20px">

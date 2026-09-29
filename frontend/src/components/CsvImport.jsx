@@ -838,9 +838,9 @@ export default function CsvImport({ onComplete }) {
           ].map(t => (
             <button key={t.key} onClick={() => setSelectedTemplate(t.key)}
               style={{
-                padding: "8px 16px", borderRadius: 8, border: `1px solid ${selectedTemplate === t.key ? "#F97316" : "#e5e5e5"}`,
+                padding: "8px 16px", borderRadius: 8, border: `1px solid ${selectedTemplate === t.key ? "var(--color-primary, #F97316)" : "#e5e5e5"}`,
                 background: selectedTemplate === t.key ? "#FFF5F0" : "#fafafa",
-                color: selectedTemplate === t.key ? "#F97316" : "#555",
+                color: selectedTemplate === t.key ? "var(--color-primary, #F97316)" : "#555",
                 fontWeight: 600, fontSize: 12, cursor: "pointer",
                 transition: "all 0.2s",
               }}>
@@ -922,7 +922,7 @@ export default function CsvImport({ onComplete }) {
             <div style={{ fontSize: 13, color: "#555" }}>
               <strong>{preview.total}</strong> rows found
               {preview.detectedType && (
-                <span style={{ marginLeft: 8, padding: "2px 8px", background: "#FFF5F0", color: "#F97316", borderRadius: 4, fontSize: 11, fontWeight: 600 }}>
+                <span style={{ marginLeft: 8, padding: "2px 8px", background: "#FFF5F0", color: "var(--color-primary, #F97316)", borderRadius: 4, fontSize: 11, fontWeight: 600 }}>
                   Auto-detected: {preview.detectedType}
                 </span>
               )}
@@ -930,7 +930,7 @@ export default function CsvImport({ onComplete }) {
             <button onClick={doImport} disabled={importing || !canProceedWithImport}
               style={{
                 padding: "8px 20px",
-                background: importing ? "#FB923C" : !canProceedWithImport ? "#ccc" : gradients.primaryButton,
+                background: importing ? "var(--color-primary-light, #FB923C)" : !canProceedWithImport ? "#ccc" : gradients.primaryButton,
                 color: "#fff",
                 border: "none", borderRadius: 8, fontWeight: 600, fontSize: 13,
                 cursor: importing || !canProceedWithImport ? "not-allowed" : "pointer",

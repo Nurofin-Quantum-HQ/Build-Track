@@ -14,18 +14,18 @@ import {
 import ModuleTour from "../components/ModuleTour";
 
 const TYPE_COLORS = {
-  Materials: { bg: "#FFF5F0", color: "#F97316" },
+  Materials: { bg: "#FFF5F0", color: "var(--color-primary, #F97316)" },
   Wages: { bg: "#F0FDF4", color: "#22C55E" },
-  Expense: { bg: "#FFF7F0", color: "#EA580C" },
+  Expense: { bg: "#FFF7F0", color: "var(--color-primary-hover, #EA580C)" },
   Income: { bg: "#ECFDF5", color: "#10B981" },
-  Equipment: { bg: "#FFF7F0", color: "#EA580C" },
+  Equipment: { bg: "#FFF7F0", color: "var(--color-primary-hover, #EA580C)" },
 };
 
 const PAYMENT_COLORS = {
   Paid: { bg: "#F0FDF4", color: "#166534" },
   Partial: { bg: "#FFFBEB", color: "#B45309" },
   Pending: { bg: "#FEF2F2", color: "#DC2626" },
-  Advance: { bg: "#FFF5F0", color: "#F97316" },
+  Advance: { bg: "#FFF5F0", color: "var(--color-primary, #F97316)" },
 };
 
 const DATE_PRESETS = [
@@ -248,7 +248,7 @@ export default function ReportsPage() {
           <button onClick={() => setRunTour(true)} title="Help" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 36, height: 36, background: '#fff', border: '1px solid #E5E7EB', borderRadius: 8, cursor: 'pointer' }}>
             <HelpCircle size={16} color="#64748B" />
           </button>
-          <Button variant="primary" size="md" onClick={() => navigate("/ai-chat")} style={{ background: "linear-gradient(135deg, #F97316, #FB923C)", border: "none" }}>
+          <Button variant="primary" size="md" onClick={() => navigate("/ai-chat")} style={{ background: "linear-gradient(135deg, var(--color-primary, #F97316), var(--color-primary-light, #FB923C))", border: "none" }}>
             <Sparkles size={14} /> Ask AI
           </Button>
         </div>
@@ -301,7 +301,7 @@ export default function ReportsPage() {
           <div style={{ display: "flex", gap: 6, marginTop: 14, flexWrap: "wrap" }}>
             {TYPES.map(t => (
               <button key={t.value} onClick={() => setSelectedType(t.value)}
-                style={{ padding: "6px 14px", borderRadius: 6, border: `1px solid ${selectedType === t.value ? "#F97316" : "#E5E7EB"}`, background: selectedType === t.value ? "#F97316" : "#fff", color: selectedType === t.value ? "#fff" : "#475569", fontSize: 13, fontWeight: 600, cursor: "pointer", transition: "all 0.15s", fontFamily: "inherit" }}>
+                style={{ padding: "6px 14px", borderRadius: 6, border: `1px solid ${selectedType === t.value ? "var(--color-primary, #F97316)" : "#E5E7EB"}`, background: selectedType === t.value ? "var(--color-primary, #F97316)" : "#fff", color: selectedType === t.value ? "#fff" : "#475569", fontSize: 13, fontWeight: 600, cursor: "pointer", transition: "all 0.15s", fontFamily: "inherit" }}>
                 {t.label}
               </button>
             ))}
@@ -310,9 +310,9 @@ export default function ReportsPage() {
         </div>
 
         <div className="tour-metrics" style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr 1fr" : "repeat(4, 1fr)", gap: 14, marginBottom: 16 }}>
-          <MetricCard icon={<BarChart3 size={16} />} label="Total Cost" value={stats.total} budget={projects.find(p => (p._id || p.id) === selectedProject)?.budget?.["total"] || projects.find(p => (p._id || p.id) === selectedProject)?.totalBudget || 0} color="#F97316" />
-          <MetricCard icon={<Layers size={16} />} label="Material" value={stats.material} budget={projects.find(p => (p._id || p.id) === selectedProject)?.budgetMaterial || 0} color="#F97316" />
-          <MetricCard icon={<Users size={16} />} label="Labour" value={stats.labour} budget={projects.find(p => (p._id || p.id) === selectedProject)?.budgetLabour || 0} color="#EA580C" />
+          <MetricCard icon={<BarChart3 size={16} />} label="Total Cost" value={stats.total} budget={projects.find(p => (p._id || p.id) === selectedProject)?.budget?.["total"] || projects.find(p => (p._id || p.id) === selectedProject)?.totalBudget || 0} color="var(--color-primary, #F97316)" />
+          <MetricCard icon={<Layers size={16} />} label="Material" value={stats.material} budget={projects.find(p => (p._id || p.id) === selectedProject)?.budgetMaterial || 0} color="var(--color-primary, #F97316)" />
+          <MetricCard icon={<Users size={16} />} label="Labour" value={stats.labour} budget={projects.find(p => (p._id || p.id) === selectedProject)?.budgetLabour || 0} color="var(--color-primary-hover, #EA580C)" />
           <MetricCard icon={<Wrench size={16} />} label="Equipment" value={stats.equipment} budget={projects.find(p => (p._id || p.id) === selectedProject)?.budgetEquipment || 0} color="#06B6D4" />
         </div>
 
@@ -323,8 +323,8 @@ export default function ReportsPage() {
           </Card>
           <Card padding="20px">
             <div style={{ fontSize: 15, fontWeight: 700, color: "#111827", marginBottom: 14 }}>Category Breakdown</div>
-            <CategoryBudgetBar name="Material" spent={stats.material} budget={projects.find(p => (p._id || p.id) === selectedProject)?.budgetMaterial || 0} color="#F97316" />
-            <CategoryBudgetBar name="Labour" spent={stats.labour} budget={projects.find(p => (p._id || p.id) === selectedProject)?.budgetLabour || 0} color="#EA580C" />
+            <CategoryBudgetBar name="Material" spent={stats.material} budget={projects.find(p => (p._id || p.id) === selectedProject)?.budgetMaterial || 0} color="var(--color-primary, #F97316)" />
+            <CategoryBudgetBar name="Labour" spent={stats.labour} budget={projects.find(p => (p._id || p.id) === selectedProject)?.budgetLabour || 0} color="var(--color-primary-hover, #EA580C)" />
             <CategoryBudgetBar name="Equipment" spent={stats.equipment} budget={projects.find(p => (p._id || p.id) === selectedProject)?.budgetEquipment || 0} color="#06B6D4" />
           </Card>
         </div>
@@ -419,7 +419,7 @@ export default function ReportsPage() {
                               <button onClick={(e) => { e.stopPropagation(); navigate(`/manualentry?type=${t.type.toLowerCase()}&id=${t._id}&returnUrl=/reports`); }} title="Edit Entry" style={{ padding: 4, background: "transparent", border: "none", cursor: "pointer", color: "#64748B" }}>
                                 <Edit size={14} />
                               </button>
-                              <button onClick={(e) => { e.stopPropagation(); setRecordPaymentEntry({ rawTx: t }); setRecordPaymentOpen(true); }} title="Record Payment" style={{ padding: 4, background: "transparent", border: "none", cursor: "pointer", color: "#F97316" }}>
+                              <button onClick={(e) => { e.stopPropagation(); setRecordPaymentEntry({ rawTx: t }); setRecordPaymentOpen(true); }} title="Record Payment" style={{ padding: 4, background: "transparent", border: "none", cursor: "pointer", color: "var(--color-primary, #F97316)" }}>
                                 <CreditCard size={14} />
                               </button>
                             </div>

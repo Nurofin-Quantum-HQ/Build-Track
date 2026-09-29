@@ -12,7 +12,7 @@ export default function LightPremiumInput({ icon: Icon, rightElement, label, err
             display: "block",
             fontSize: "12.5px",
             fontWeight: "700",
-            color: error ? "#EF4444" : focused ? "#EA580C" : "#334155",
+            color: error ? "#EF4444" : focused ? "var(--color-primary-hover, #EA580C)" : "#334155",
             marginBottom: 6,
             letterSpacing: "-0.01em",
             transition: "color 0.15s ease"
@@ -30,7 +30,7 @@ export default function LightPremiumInput({ icon: Icon, rightElement, label, err
           <Icon
             size={17}
             style={{
-              color: focused ? "#EA580C" : "#94A3B8",
+              color: focused ? "var(--color-primary-hover, #EA580C)" : "#94A3B8",
               marginRight: 10,
               flexShrink: 0,
               transition: "color 0.15s ease"

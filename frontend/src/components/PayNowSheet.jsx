@@ -12,7 +12,7 @@ import {
   X,
 } from "lucide-react";
 
-const primaryBlue = "#F97316";
+const primaryBlue = "var(--color-primary, #F97316)";
 
 const PAYMENT_METHODS = [
   { value: "UPI", icon: Smartphone },
@@ -259,7 +259,7 @@ export default function PayNowSheet({
               width: "100%",
               padding: 18,
               borderRadius: 18,
-              background: "linear-gradient(135deg, #F97316 0%, #EA580C 100%)",
+              background: "linear-gradient(135deg, var(--color-primary, #F97316) 0%, var(--color-primary-hover, #EA580C) 100%)",
               marginBottom: 20,
             }}
           >
@@ -669,7 +669,7 @@ export default function PayNowSheet({
               flex: 5,
               height: 46,
               borderRadius: 11,
-              background: "linear-gradient(135deg, #F97316, #EA580C)",
+              background: "linear-gradient(135deg, var(--color-primary, #F97316), var(--color-primary-hover, #EA580C))",
               border: "none",
               fontSize: 12,
               fontWeight: 800,

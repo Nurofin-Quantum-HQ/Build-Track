@@ -14,11 +14,11 @@
 }
 
 a {
-  color: #F97316;
+  color: var(--color-primary, #F97316);
   text-decoration: none;
 }
 a:hover {
-  color: #EA580C;
+  color: var(--color-primary-hover, #EA580C);
   text-decoration: none;
 }
 

@@ -51,7 +51,7 @@ export default function ExecutionContextSelector({ value, onChange, compact }) {
       borderRadius: compact ? 0 : 12,
       padding: compact ? 0 : "16px 20px",
     }}>
-      {!compact && <div style={{ fontSize: 13, fontWeight: 600, color: "#EA580C", marginBottom: 12 }}>📍 Execution Context</div>}
+      {!compact && <div style={{ fontSize: 13, fontWeight: 600, color: "var(--color-primary-hover, #EA580C)", marginBottom: 12 }}>📍 Execution Context</div>}
       <div style={rowStyle}>
         <div>
           <label style={labelStyle}>PROJECT</label>

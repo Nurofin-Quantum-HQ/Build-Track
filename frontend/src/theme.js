@@ -1,7 +1,7 @@
 export const COLORS = {
-  primary:        "#F97316",
-  primaryDark:    "#EA580C",
-  primaryPurple:  "#FB923C",
+  primary:        "var(--color-primary, #F97316)",
+  primaryDark:    "var(--color-primary-hover, #EA580C)",
+  primaryPurple:  "var(--color-primary-light, #FB923C)",
   primaryLight:   "#FFF5F0",
 
   background:     "#FFF1E8",
@@ -15,7 +15,7 @@ export const COLORS = {
   textPrimary:    "#1A1A2E",
   textMedium:     "#4B5563",
   textSecondary:  "#6B7280",
-  textBlue:       "#F97316",
+  textBlue:       "var(--color-primary, #F97316)",
   textAmount:     "#1A1A2E",
 
   divider:        "#E5E7EB",
@@ -28,7 +28,7 @@ export const COLORS = {
   success:        "#10B981",
   warning:        "#F59E0B",
   error:          "#EF4444",
-  info:           "#F97316",
+  info:           "var(--color-primary, #F97316)",
 
   badgeSuccessBg: "#E6F9F0",
   badgeSuccessText: "#15803D",
@@ -37,11 +37,11 @@ export const COLORS = {
   badgePendingBg: "#FFF0D6",
   badgePendingText: "#92400E",
   badgeInfoBg:    "#FFF5F0",
-  badgeInfoText:  "#EA580C",
+  badgeInfoText:  "var(--color-primary-hover, #EA580C)",
 
-  authStart:      "#EA580C",
-  authMid:        "#F97316",
-  authEnd:        "#FB923C",
+  authStart:      "var(--color-primary-hover, #EA580C)",
+  authMid:        "var(--color-primary, #F97316)",
+  authEnd:        "var(--color-primary-light, #FB923C)",
 };
 
 export const GRADIENTS = {

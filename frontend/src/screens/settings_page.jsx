@@ -420,7 +420,7 @@ export default function SettingsPage() {
                         style={{
                           padding: "10px 12px",
                           borderRadius: 10,
-                          border: isSelected ? "2px solid #F97316" : "1.5px solid #E2E8F0",
+                          border: isSelected ? "2px solid var(--color-primary, #F97316)" : "1.5px solid #E2E8F0",
                           background: isSelected ? "#FFF7ED" : "#FFFFFF",
                           cursor: "pointer",
                           textAlign: "left",
@@ -645,7 +645,7 @@ export default function SettingsPage() {
           </SectionCard>
 
           {subscription && (
-            <SectionCard gradient="linear-gradient(135deg, #F97316, #EA580C)" title="Subscription">
+            <SectionCard gradient="linear-gradient(135deg, var(--color-primary, #F97316), var(--color-primary-hover, #EA580C))" title="Subscription">
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
                 <div>
                   <div style={{ fontSize: 11, fontWeight: 600, opacity: 0.7, letterSpacing: "0.05em", marginBottom: 4, color: "#fff", textTransform: "uppercase" }}>CURRENT PLAN</div>
