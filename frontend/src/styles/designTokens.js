@@ -3,8 +3,8 @@ export const colors = {
   card: 'var(--glass-bg)',
   subtle: 'var(--bg-subtle)',
   hover: 'var(--bg-hover)',
-  primary: '#F97316',
-  primaryHover: '#EA580C',
+  primary: 'var(--color-primary, #F97316)',
+  primaryHover: 'var(--color-primary-hover, #EA580C)',
   primaryLight: 'var(--primary-light)',
   primarySubtle: 'var(--primary-subtle)',
   border: 'var(--border)',
@@ -19,7 +19,7 @@ export const colors = {
   dangerLight: 'var(--danger-light)',
   warning: '#F59E0B',
   warningLight: 'var(--warning-light)',
-  info: '#F97316',
+  info: 'var(--color-primary, #F97316)',
   infoLight: 'var(--info-light)',
 };
 
@@ -78,12 +78,12 @@ colors.textLight = colors.textSecondary;
 colors.textMedium = colors.textSecondary;
 colors.inputBorder = colors.border;
 colors.divider = colors.border;
-colors.gradientStart = '#F97316';
-colors.gradientMid = '#FB923C';
-colors.gradientEnd = '#FB923C';
-colors.authStart = '#EA580C';
-colors.authMid = '#F97316';
-colors.authEnd = '#FB923C';
+colors.gradientStart = 'var(--color-primary, #F97316)';
+colors.gradientMid = 'var(--color-primary-light, #FB923C)';
+colors.gradientEnd = 'var(--color-primary-light, #FB923C)';
+colors.authStart = 'var(--color-primary-hover, #EA580C)';
+colors.authMid = 'var(--color-primary, #F97316)';
+colors.authEnd = 'var(--color-primary-light, #FB923C)';
 colors.bgBase1 = colors.bg;
 colors.bgBase2 = colors.subtle;
 colors.bgBase3 = colors.subtle;

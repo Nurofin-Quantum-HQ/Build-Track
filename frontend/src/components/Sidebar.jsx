@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { NavLink, useLocation } from "react-router-dom";
 import { navItems, adminNavItems } from "../navItems";
+import { ThemePicker } from './ThemePicker';
 import { resolveImageUrl } from "../utils/imageUrl";
 import { LogOut, HelpCircle } from "lucide-react";
 import { colors, gradients, radius, typography } from "../styles/designTokens";
@@ -337,6 +338,29 @@ export default function Sidebar() {
         >
           <HelpCircle size={14} />
           App Tour
+        </button>
+        <ThemePicker />
+        <button
+          onClick={() => window.open('https://github.com/Nurofin-Quantum-HQ/Build-Track-App/releases/latest/download/app-release.apk', '_blank')}
+          style={{
+            width: "100%",
+            padding: "10px 12px",
+            marginTop: 8,
+            borderRadius: "10px",
+            fontSize: 13,
+            fontWeight: 700,
+            color: "#fff",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            gap: 8,
+            cursor: "pointer",
+            border: "none",
+            background: gradients.primaryButton,
+          }}
+        >
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+          Download App
         </button>
       </div>
     </aside>
