@@ -3,7 +3,7 @@ import { Outlet, useNavigate, useLocation } from "react-router-dom";
 import Sidebar from "../components/Sidebar";
 import AppTour from "../components/AppTour";
 import { Bell, Settings } from "lucide-react";
-import { colors, typography } from "../styles/designTokens";
+import { colors, typography, gradients } from "../styles/designTokens";
 import nurofinLogo from "../assets/nurofin-black.svg";
 import useNotificationStore from "../stores/notificationStore";
 import { notificationAPI } from "../api";
@@ -34,7 +34,7 @@ export default function DashboardLayout() {
 
 
   return (
-    <div style={{ display: "flex", height: "100vh", overflow: "hidden", background: colors.bg }}>
+    <div style={{ display: "flex", height: "100vh", overflow: "hidden", background: gradients.pageBackground }}>
       <AppTour />
       {isMobile && sidebarOpen && (
         <div
