@@ -52,12 +52,12 @@ export const typography = {
 };
 
 export const gradients = {
-  primaryGradient: 'linear-gradient(90deg, #F97316 0%, #FB923C 100%)',
-  primaryButton: 'linear-gradient(90deg, #F97316 0%, #F97316 100%)',
-  progressBar: 'linear-gradient(90deg, #F97316 0%, #FB923C 100%)',
-  navActiveItem: 'linear-gradient(90deg, #F97316 0%, #FB923C 100%)',
-  authBackground: 'linear-gradient(135deg, #EA580C 0%, #F97316 50%, #FB923C 100%)',
-  pageBackground: 'radial-gradient(circle at top right, #FFF1E8, #ffffff)',
+  primaryGradient: 'linear-gradient(90deg, var(--color-primary, #F97316) 0%, var(--color-primary-light, #FB923C) 100%)',
+  primaryButton: 'linear-gradient(90deg, var(--color-primary, #F97316) 0%, var(--color-primary, #F97316) 100%)',
+  progressBar: 'linear-gradient(90deg, var(--color-primary, #F97316) 0%, var(--color-primary-light, #FB923C) 100%)',
+  navActiveItem: 'linear-gradient(90deg, var(--color-primary, #F97316) 0%, var(--color-primary-light, #FB923C) 100%)',
+  authBackground: 'linear-gradient(135deg, var(--color-primary-hover, #EA580C) 0%, var(--color-primary, #F97316) 50%, var(--color-primary-light, #FB923C) 100%)',
+  pageBackground: 'radial-gradient(circle at top right, rgba(var(--color-primary-rgb, 249, 115, 22), 0.15), #ffffff)',
 };
 
 export const buttonStyles = {
