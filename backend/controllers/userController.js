@@ -7,6 +7,7 @@ const safeUser = (user) => ({
   companyName:      user.companyName || (user.createdBy && typeof user.createdBy === 'object' ? user.createdBy.companyName : '') || '',
   companyFontStyle: user.companyFontStyle || (user.createdBy && typeof user.createdBy === 'object' ? user.createdBy.companyFontStyle : 'Inter') || 'Inter',
   companyLogo:      user.companyLogo || (user.createdBy && typeof user.createdBy === 'object' ? user.createdBy.companyLogo : null) || null,
+  themePreference:  user.themePreference || null,
   phone:            user.phone || null,
   role:             user.role   || "Mason",
   permissions:      Array.isArray(user.permissions) ? user.permissions : [],
@@ -27,7 +28,7 @@ const updateProfile = async (req, res) => {
     const userId = req.user?.id || req.user?._id;
     if (!userId) return res.status(401).json({ message: "Not authenticated" });
 
-    const { name, email, profilePhoto, role, phone, companyName, companyFontStyle, companyLogo, preferences } = req.body;
+    const { name, email, profilePhoto, role, phone, companyName, companyFontStyle, companyLogo, preferences, themePreference } = req.body;
     const user = await User.findById(userId).select("-password");
     if (!user) return res.status(404).json({ message: "User not found" });
 
@@ -47,6 +48,10 @@ const updateProfile = async (req, res) => {
       user.companyLogo = (companyLogo === "" || companyLogo === null || companyLogo === "delete") ? null : String(companyLogo);
     }
 
+    
+    if (themePreference !== undefined) {
+      user.themePreference = themePreference === null ? null : String(themePreference).trim();
+    }
     if (name !== undefined) {
       const trimmedName = String(name).trim();
       if (!trimmedName) {

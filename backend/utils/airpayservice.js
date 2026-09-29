@@ -108,6 +108,10 @@ async function buildPaymentPayload({
   buyerCountry,
   buyerPinCode,
   returnUrl,
+  isRecurring,
+  startDate,
+  endDate,
+  recurringPeriod,
 }) {
   const cfg           = getConfig();
   const isSandbox     = (process.env.AIRPAY_ENV || '').toLowerCase() === 'sandbox';
@@ -157,6 +161,20 @@ async function buildPaymentPayload({
   if (buyerState   && buyerState.trim())   transactionData.buyer_state   = buyerState.trim();
   if (buyerPinCode && /^[1-9][0-9]{2}\s?[0-9]{3}$/.test(buyerPinCode.trim()))
     transactionData.buyer_pincode = buyerPinCode.trim();
+
+  // Autopay / Mandate fields
+  if (isRecurring) {
+    transactionData.channel = 'enach'; // Required by Airpay to trigger Mandate/UPI Autopay flow
+    // Default to a wide window if dates aren't passed strictly
+    transactionData.start_date = startDate || new Date().toISOString().split('T')[0];
+    
+    // Add 10 years to end date if not provided
+    let defaultEndDate = new Date();
+    defaultEndDate.setFullYear(defaultEndDate.getFullYear() + 10);
+    transactionData.end_date = endDate || defaultEndDate.toISOString().split('T')[0];
+    
+    transactionData.period = recurringPeriod || 'Monthly';
+  }
 
   const encdata  = encrypt(JSON.stringify(transactionData), encryptionKey);
   const checksum = generateChecksum(transactionData);

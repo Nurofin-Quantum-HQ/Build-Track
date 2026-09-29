@@ -20,6 +20,7 @@ const userSchema = new mongoose.Schema(
     companyName: { type: String, trim: true, default: "" },
     companyFontStyle: { type: String, trim: true, default: "Inter" },
     companyLogo: { type: String, default: null },
+    themePreference: { type: String, default: null },
     role: {
       type: String,
       default: "Mason",

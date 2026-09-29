@@ -79,6 +79,7 @@ const safeUser = (user) => {
     companyName: user.companyName || (user.createdBy && typeof user.createdBy === 'object' ? user.createdBy.companyName : '') || '',
     companyFontStyle: user.companyFontStyle || (user.createdBy && typeof user.createdBy === 'object' ? user.createdBy.companyFontStyle : 'Inter') || 'Inter',
     companyLogo: user.companyLogo || (user.createdBy && typeof user.createdBy === 'object' ? user.createdBy.companyLogo : null) || null,
+      themePreference: user.themePreference || null,
     role: user.role || "Mason",
     permissions: Array.isArray(user.permissions) ? user.permissions : [],
     projectIds,
