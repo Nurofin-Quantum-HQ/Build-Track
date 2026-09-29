@@ -319,41 +319,14 @@ export default function AuditLogsPage() {
   }
 
   return (
-    <div
-      style={{
-        display: "flex",
-        flexDirection: "column",
-        width: "100%",
-        
-        
-        background: 'transparent',
-        overflow: "hidden",
-        minHeight: 0,
-      }}
-    >
+    <div style={{ padding: '28px 32px', maxWidth: 1200, margin: '0 auto', animation: 'fadeUp 300ms ease', display: 'flex', flexDirection: 'column', height: '100%', width: '100%' }}>
       <ModuleTour steps={tourSteps} run={runTour} setRun={setRunTour} moduleName="AuditLogs" />
       {/* ── Top Bar ── */}
-      <div className="tour-header"
-        style={{
-          flexShrink: 0,
-          background: "#fff",
-          borderBottom: "1px solid #ebebeb",
-          padding: "16px 24px",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-          gap: 12,
-          flexWrap: "wrap",
-        }}
-      >
-        <div>
-          <h1 style={{ margin: 0, fontSize: 20, fontWeight: 700, color: "#1a1a1a" }}>
-            Audit Logs
-          </h1>
-          <p style={{ margin: "2px 0 0", fontSize: 12, color: "#888" }}>
-            Recent system activity across projects, transactions, and users.
-          </p>
-        </div>
+      <div className="tour-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 24, flexWrap: 'wrap', gap: 16 }}>
+          <div>
+            <h1 style={{ fontSize: 28, fontWeight: 700, color: '#111827', letterSpacing: '-0.03em', margin: 0, marginBottom: 4 }}>Audit Logs</h1>
+            <p style={{ margin: 0, fontSize: 14, color: '#64748B' }}>Recent system activity across projects, transactions, and users.</p>
+          </div>
         <button
           onClick={fetchLogs}
           style={{
