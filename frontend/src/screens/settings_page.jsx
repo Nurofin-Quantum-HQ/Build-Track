@@ -19,7 +19,7 @@ import perfLogger from "../utils/performanceLogger";
 function Toggle({ on, onToggle }) {
   return (
     <div onClick={onToggle}
-      style={{ width: 46, height: 24, borderRadius: 12, cursor: "pointer", background: on ? "#F97316" : "#CBD5E1", position: "relative", transition: "background 0.2s", flexShrink: 0 }}>
+      style={{ width: 46, height: 24, borderRadius: 12, cursor: "pointer", background: on ? "var(--color-primary, #F97316)" : "#CBD5E1", position: "relative", transition: "background 0.2s", flexShrink: 0 }}>
       <div style={{ position: "absolute", top: 2, left: on ? 24 : 2, width: 20, height: 20, borderRadius: "50%", background: "#fff", boxShadow: "0 1px 3px rgba(0,0,0,0.15)", transition: "left 0.2s" }} />
     </div>
   );
@@ -342,7 +342,7 @@ export default function SettingsPage() {
                 <div style={{ width: 76, height: 76, borderRadius: "50%", background: "#F1F5F9", overflow: "hidden", display: "flex", alignItems: "center", justifyContent: "center", border: "2px solid #E5E7EB" }}>
                   {profileImage ? <img src={profileImage} alt="Profile" style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : <User size={32} color="#94A3B8" />}
                 </div>
-                <div onClick={() => profileInputRef.current.click()} style={{ position: "absolute", bottom: 0, right: 0, width: 24, height: 24, borderRadius: "50%", background: "#F97316", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", border: "2px solid #fff" }}>
+                <div onClick={() => profileInputRef.current.click()} style={{ position: "absolute", bottom: 0, right: 0, width: 24, height: 24, borderRadius: "50%", background: "var(--color-primary, #F97316)", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", border: "2px solid #fff" }}>
                   <Camera size={12} color="#fff" />
                 </div>
               </div>
@@ -403,10 +403,10 @@ export default function SettingsPage() {
               <div>
                 <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
                   <label style={{ fontSize: 12, fontWeight: 600, color: "#64748B", display: "flex", alignItems: "center", gap: 6 }}>
-                    <Type size={14} color="#F97316" />
+                    <Type size={14} color="var(--color-primary, #F97316)" />
                     COMPANY NAME FONT STYLE
                   </label>
-                  <span style={{ fontSize: "11px", color: "#F97316", fontWeight: "600" }}>Live Typeface Preview</span>
+                  <span style={{ fontSize: "11px", color: "var(--color-primary, #F97316)", fontWeight: "600" }}>Live Typeface Preview</span>
                 </div>
 
                 <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: 8 }}>
@@ -431,7 +431,7 @@ export default function SettingsPage() {
                           boxShadow: isSelected ? "0 2px 8px rgba(249, 115, 22, 0.15)" : "none",
                         }}
                       >
-                        <span style={{ fontSize: "11px", color: isSelected ? "#EA580C" : "#64748B", fontWeight: 700 }}>
+                        <span style={{ fontSize: "11px", color: isSelected ? "var(--color-primary-hover, #EA580C)" : "#64748B", fontWeight: 700 }}>
                           {f.name}
                         </span>
                         <span
@@ -455,7 +455,7 @@ export default function SettingsPage() {
 
               <div>
                 <label style={{ fontSize: 12, fontWeight: 600, color: "#64748B", display: "flex", alignItems: "center", gap: 6, marginBottom: 8 }}>
-                  <ImageIcon size={14} color="#F97316" />
+                  <ImageIcon size={14} color="var(--color-primary, #F97316)" />
                   COMPANY LOGO <span style={{ fontWeight: 400, color: "#94A3B8" }}>(Optional — if omitted, only company name appears)</span>
                 </label>
 
@@ -488,7 +488,7 @@ export default function SettingsPage() {
                         <button
                           type="button"
                           onClick={() => companyLogoInputRef.current?.click()}
-                          style={{ background: "none", border: "none", color: "#F97316", fontSize: "12px", fontWeight: "700", padding: 0, cursor: "pointer", marginTop: 2 }}
+                          style={{ background: "none", border: "none", color: "var(--color-primary, #F97316)", fontSize: "12px", fontWeight: "700", padding: 0, cursor: "pointer", marginTop: 2 }}
                         >
                           Replace logo
                         </button>
@@ -518,10 +518,10 @@ export default function SettingsPage() {
                       gap: 10,
                       transition: "all 0.15s ease",
                     }}
-                    onMouseEnter={(e) => { e.currentTarget.style.borderColor = "#F97316"; e.currentTarget.style.background = "#FFF7ED"; }}
+                    onMouseEnter={(e) => { e.currentTarget.style.borderColor = "var(--color-primary, #F97316)"; e.currentTarget.style.background = "#FFF7ED"; }}
                     onMouseLeave={(e) => { e.currentTarget.style.borderColor = "#CBD5E1"; e.currentTarget.style.background = "#F8FAFC"; }}
                   >
-                    <Upload size={18} color="#F97316" />
+                    <Upload size={18} color="var(--color-primary, #F97316)" />
                     <span style={{ fontSize: "13px", fontWeight: "600", color: "#475569" }}>
                       Upload Company Logo (PNG, JPG, SVG)
                     </span>
@@ -531,7 +531,7 @@ export default function SettingsPage() {
 
               {/* Sidebar Preview Box */}
               <div style={{ padding: "14px 18px", borderRadius: 12, background: "rgba(249, 115, 22, 0.05)", border: "1px solid rgba(249, 115, 22, 0.15)" }}>
-                <div style={{ fontSize: "11px", fontWeight: 700, color: "#EA580C", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 8 }}>
+                <div style={{ fontSize: "11px", fontWeight: 700, color: "var(--color-primary-hover, #EA580C)", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 8 }}>
                   Sidebar Top Preview
                 </div>
                 <div style={{
@@ -570,7 +570,7 @@ export default function SettingsPage() {
               <div>
                 <div>
                   <label style={{ fontSize: 12, fontWeight: 600, color: "#64748B", display: "flex", alignItems: "center", gap: 6, marginBottom: 8, marginTop: 16 }}>
-                    <Palette size={14} color="#F97316" />
+                    <Palette size={14} color="var(--color-primary, #F97316)" />
                     PORTAL THEME COLOR
                   </label>
                   <div style={{ width: 250, marginBottom: 24 }}>
