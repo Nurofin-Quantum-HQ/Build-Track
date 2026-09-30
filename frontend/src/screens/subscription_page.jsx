@@ -402,6 +402,31 @@ export default function SubscriptionPage() {
     }
   };
 
+  /** Cancels the active subscription */
+  const handleCancelSubscription = async () => {
+    if (!window.confirm("Are you sure you want to cancel your subscription? You will be reverted to the Free plan.")) return;
+    try {
+      setProcessing("cancel");
+      const { data } = await subscriptionAPI.cancel();
+      if (data.success) {
+        // Refresh status
+        const statusRes = await subscriptionAPI.getStatus();
+        if (statusRes.data.hasSubscription) {
+          setCurrentPlan(statusRes.data.plan || "free");
+          setSubStatus(statusRes.data);
+        } else {
+          setCurrentPlan("free");
+          setSubStatus({ hasSubscription: false, plan: "free" });
+        }
+        alert("Subscription cancelled successfully.");
+      }
+    } catch (err) {
+      setError(err.response?.data?.message || "Failed to cancel subscription.");
+    } finally {
+      setProcessing(null);
+    }
+  };
+
   if (loading) {
     return (
       <div style={{
@@ -533,17 +558,33 @@ export default function SubscriptionPage() {
                 )}
               </div>
             </div>
-            {subStatus.status && subStatus.status !== "cancelled" && (
-              <span style={{
-                fontSize: 11, fontWeight: 700,
-                color: subStatus.status === "active" ? "#16a34a" : "var(--color-primary-hover, #EA580C)",
-                background: subStatus.status === "active" ? "#f0fdf4" : "#fff5f0",
-                padding: "4px 12px", borderRadius: 20, letterSpacing: "0.03em",
-                textTransform: "uppercase",
-              }}>
-                {subStatus.status}
-              </span>
-            )}
+            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+              {subStatus.status && subStatus.status !== "cancelled" && (
+                <span style={{
+                  fontSize: 11, fontWeight: 700,
+                  color: subStatus.status === "active" ? "#16a34a" : "var(--color-primary-hover, #EA580C)",
+                  background: subStatus.status === "active" ? "#f0fdf4" : "#fff5f0",
+                  padding: "4px 12px", borderRadius: 20, letterSpacing: "0.03em",
+                  textTransform: "uppercase",
+                }}>
+                  {subStatus.status}
+                </span>
+              )}
+              {subStatus.status === "active" && isAdmin && currentPlan !== "free" && (
+                <button
+                  onClick={handleCancelSubscription}
+                  disabled={processing === "cancel"}
+                  style={{
+                    background: "none", border: "1px solid #ff4d4f",
+                    color: "#ff4d4f", padding: "4px 12px", borderRadius: 20,
+                    fontSize: 11, fontWeight: 700, cursor: "pointer",
+                    textTransform: "uppercase", letterSpacing: "0.03em"
+                  }}
+                >
+                  {processing === "cancel" ? "Cancelling..." : "Cancel Plan"}
+                </button>
+              )}
+            </div>
           </div>
         )}
 
