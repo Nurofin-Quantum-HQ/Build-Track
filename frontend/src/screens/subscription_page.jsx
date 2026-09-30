@@ -349,7 +349,7 @@ export default function SubscriptionPage() {
       setProcessing(planId);
       setError("");
 
-      const payload = { plan: planId };
+      const payload = { plan: planId, isRecurring: true };
       if (phoneData) {
         payload.phone     = phoneData.phone;
         payload.savePhone = phoneData.savePhone;
@@ -385,6 +385,7 @@ export default function SubscriptionPage() {
         plan: phonePlan,
         phone,
         savePhone,
+        isRecurring: true,
       });
 
       if (data.success && data.paymentParams) {

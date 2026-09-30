@@ -499,7 +499,12 @@ export default function ManualEntryPage() {
         amount: grandTotal,
         type: typeMap[entryType],
         project: selectedProject,
-        date: new Date(date).toISOString(),
+        date: (() => {
+            const d = new Date(date);
+            const now = new Date();
+            d.setHours(now.getHours(), now.getMinutes(), now.getSeconds());
+            return d.toISOString();
+          })(),
         notes: notes || "",
         quantity: qty,
         rate: rate,

@@ -1,4 +1,6 @@
-﻿import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
+import { useAuth } from '../contexts/AuthContext';
+import api from '../api';
 import { Palette } from 'lucide-react';
 import { colors } from '../styles/designTokens';
 
@@ -38,18 +40,24 @@ const adjustColor = (hex, amount) => {
 };
 
 export function ThemePicker() {
+  const { user, updateUser } = useAuth();
   const [isOpen, setIsOpen] = useState(false);
   const [themeColor, setThemeColor] = useState('var(--color-primary, #F97316)');
 
   useEffect(() => {
-    const saved = localStorage.getItem('bt_theme_color');
-    if (saved) {
-      setThemeColor(saved);
-      applyTheme(saved);
+    if (user?.themePreference) {
+      setThemeColor(user.themePreference);
+      applyTheme(user.themePreference, false);
+    } else {
+      const saved = localStorage.getItem('bt_theme_color');
+      if (saved) {
+        setThemeColor(saved);
+        applyTheme(saved, false);
+      }
     }
-  }, []);
+  }, [user?.themePreference]);
 
-  const applyTheme = (color) => {
+  const applyTheme = (color, saveToBackend = false) => {
     const hover = adjustColor(color, -20); // darken
     const light = adjustColor(color, 30);  // lighten
     const rgb = hexToRgb(color);
@@ -59,12 +67,20 @@ export function ThemePicker() {
     document.documentElement.style.setProperty('--color-primary-light', light);
     document.documentElement.style.setProperty('--color-primary-rgb', rgb);
     localStorage.setItem('bt_theme_color', color);
+    
+    if (saveToBackend && user) {
+      api.put('/auth/profile', { themePreference: color })
+        .then(res => {
+          if (updateUser) updateUser(res.data.user);
+        })
+        .catch(err => console.error("Failed to sync theme", err));
+    }
   };
 
   const handleChange = (e) => {
     const c = e.target.value;
     setThemeColor(c);
-    applyTheme(c);
+    applyTheme(c, true);
   };
 
   return (
@@ -118,7 +134,7 @@ export function ThemePicker() {
             {['var(--color-primary, #F97316)', '#2563EB', '#16A34A', '#9333EA', '#E11D48'].map(c => (
               <div 
                 key={c}
-                onClick={() => { setThemeColor(c); applyTheme(c); setIsOpen(false); }}
+                onClick={() => { setThemeColor(c); applyTheme(c, true); setIsOpen(false); }}
                 style={{ width: 24, height: 24, borderRadius: '50%', background: c, cursor: 'pointer', border: '2px solid white', boxShadow: '0 1px 3px rgba(0,0,0,0.2)' }}
               />
             ))}
