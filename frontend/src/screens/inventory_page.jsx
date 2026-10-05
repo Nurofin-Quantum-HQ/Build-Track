@@ -575,7 +575,37 @@ export default function InventoryPage() {
           </div>
         )}
 
-        <div className="tour-tabs" style={{ display: "flex", gap: 5, padding: 5, marginBottom: 12, background: colors.cardBg, borderRadius: radius.md, border: `1px solid #E8E5F6`, boxShadow: shadows.card }}>
+        <div className="tour-tabs" style={{ display: "flex", background: colors.cardBg, borderRadius: radius.md, border: `1.2px solid ${colors.cardBorder}`, padding: 4, marginBottom: 20, boxShadow: shadows.card }}>
+          {["All", "Materials", "Labour", "Equipment", "Stock View"].map(tab => {
+            const active = tab === "Stock View";
+            return (
+              <button
+                key={tab}
+                onClick={() => {
+                  if (tab !== "Stock View") {
+                    navigate("/reports", { state: { activeTab: tab } });
+                  }
+                }}
+                style={{
+                  flex: 1,
+                  padding: "10px 0",
+                  borderRadius: radius.sm,
+                  border: "none",
+                  background: active ? gradients.primaryButton : "transparent",
+                  color: active ? "#FFF" : colors.textMedium,
+                  fontWeight: "700",
+                  fontSize: 13,
+                  cursor: "pointer",
+                  transition: "all 0.2s"
+                }}
+              >
+                {tab}
+              </button>
+            );
+          })}
+        </div>
+
+        <div style={{ display: "flex", gap: 5, padding: 5, marginBottom: 12, background: colors.cardBg, borderRadius: radius.md, border: `1px solid #E8E5F6`, boxShadow: shadows.card }}>
           {TABS.map((tab, i) => {
             const active = i === activeTab;
             return (
@@ -583,12 +613,12 @@ export default function InventoryPage() {
                 style={{
                   flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
                   padding: "11px 0", borderRadius: 10, border: "none", cursor: "pointer",
-                  background: active ? gradients.primaryButton : "transparent",
-                  color: active ? "#FFF" : "#4B4966",
+                  background: active ? `${colors.primaryBlue}15` : "transparent",
+                  color: active ? colors.primaryBlue : "#4B4966",
                   fontWeight: active ? 800 : 600, fontSize: 12.5, transition: "all 0.2s",
                 }}>
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d={tab.icon} /></svg>
-                {tab.label}
+                {tab.label} Stock
               </button>
             );
           })}

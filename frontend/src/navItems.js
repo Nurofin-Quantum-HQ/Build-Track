@@ -23,7 +23,7 @@ export const navItems = [
   { label: "Voice", path: "/voice", icon: Mic },
   { label: "Log", path: "/transaction", icon: ClipboardList },
   { label: "Projects", path: "/projects", icon: Building2 },
-  { label: "Inventory", path: "/inventory", icon: Package },
+  
   { label: "Assign Task", path: "/assign-task", icon: ListTodo },
   { label: "Notifications", path: "/notifications", icon: Bell },
   { label: "Reports", path: "/reports", icon: BarChart3 },

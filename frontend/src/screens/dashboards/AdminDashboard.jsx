@@ -95,7 +95,7 @@ export default function AdminDashboard() {
       workerAPI.getAll().catch(() => ({ data: { workers: [] } })),
     ]).then(([projList, dashRes, workerRes]) => {
       if (projList && projList.length > 0 && !selectedProjectId) {
-        setSelectedProjectId(projList[0]._id || projList[0].id);
+        setSelectedProjectId("all");
       }
       
       if (projList && projList.length === 0) {
@@ -162,12 +162,20 @@ export default function AdminDashboard() {
   const recentEntries = projectTransactions.slice(0, 5);
   const incomeTransactions = projectTransactions.filter(t => t.type === 'Income').slice(0, 5);
 
-  const progressRaw = Number(selectedProject?.progress || 0);
+  const progressRaw = selectedProject 
+    ? Number(selectedProject?.progress || 0) 
+    : projects.length ? (projects.reduce((sum, p) => sum + Number(p.progress || 0), 0) / projects.length) : 0;
   const progress = progressRaw > 1 ? progressRaw / 100 : progressRaw;
-  const totalCost = Number(selectedProject?.spentAmount || 0);
-  const totalRevenue = Number(selectedProject?.totalIncome || 0);
+  const totalCost = selectedProject 
+    ? Number(selectedProject?.spentAmount || 0) 
+    : projects.reduce((sum, p) => sum + Number(p.spentAmount || 0), 0);
+  const totalRevenue = selectedProject 
+    ? Number(selectedProject?.totalIncome || 0)
+    : projects.reduce((sum, p) => sum + Number(p.totalIncome || 0), 0);
   const netCashflow = totalRevenue - totalCost;
-  const budget = Number(selectedProject?.totalBudget || selectedProject?.budget?.total || 0);
+  const budget = selectedProject 
+    ? Number(selectedProject?.totalBudget || selectedProject?.budget?.total || 0)
+    : projects.reduce((sum, p) => sum + Number(p.totalBudget || p.budget?.total || 0), 0);
 
   if (loading) {
     return (
@@ -302,6 +310,7 @@ export default function AdminDashboard() {
               e.currentTarget.style.boxShadow = '0 1px 2px rgba(0, 0, 0, 0.02)';
             }}
           >
+            <option value="all">Global Financial Overview (All Projects)</option>
             {projects.length === 0 && <option value="">No projects active</option>}
             {projects.map((p) => (
               <option key={p._id || p.id} value={p._id || p.id}>

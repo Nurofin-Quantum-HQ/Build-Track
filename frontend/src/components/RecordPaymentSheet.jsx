@@ -293,7 +293,12 @@ export default function RecordPaymentSheet({ open, entry, projects, onClose, onS
         paidAmount: totalPaid,
         paymentMode: apiPaymentMode,
         notes: notes.trim(),
-        paymentDate: new Date(paymentDate).toISOString(),
+        paymentDate: (() => {
+          if (!paymentDate) return new Date().toISOString();
+          const [y, m, d] = paymentDate.split('-');
+          const now = new Date();
+          return new Date(y, m - 1, d, now.getHours(), now.getMinutes(), now.getSeconds()).toISOString();
+        })(),
       };
 
       if (requestEsign) {

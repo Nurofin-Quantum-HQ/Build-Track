@@ -110,8 +110,8 @@ const COLUMN_MAPPINGS = {
   },
   all: {
     "Amount": "amount",
-    "Amount (INR)": "amount",
-    "amount (inr)": "amount",
+    
+    
     "amount": "amount",
     "Total Amount": "amount",
     "Paid Amount": "paidAmount",
@@ -143,7 +143,7 @@ const COLUMN_MAPPINGS = {
     "Rate": "rate",
     "Rate (₹)": "rate",
     "rate": "rate",
-    "Amount (INR)": "amount",
+    
     "Rate/Day": "rate",
     "Rent Rate": "rate",
     "Days": "quantity",

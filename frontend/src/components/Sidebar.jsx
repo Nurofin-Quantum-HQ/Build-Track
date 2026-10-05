@@ -147,7 +147,7 @@ export default function Sidebar() {
           if (item.label === "Projects") return isAdminOrSupervisor || user?.permissions?.includes('create_project') || user?.permissions?.includes('view_assigned_project') || user?.permissions?.includes('view_projects');
           if (item.label === "Add Entry" || item.label === "Voice") return isAdminOrSupervisor || user?.permissions?.includes('add_entries');
           if (item.label === "Log") return true;
-          if (item.label === "Inventory") return isAdminOrSupervisor || user?.permissions?.includes('manage_inventory');
+          
           if (item.label === "Assign Task") return isAdminOrSupervisor || user?.permissions?.includes('assign_tasks');
           if (item.label === "Notifications") return true;
           if (item.label === "Reports") return isAdminOrSupervisor || user?.permissions?.includes('view_reports');

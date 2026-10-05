@@ -30,11 +30,11 @@ function formatDate(dateStr) {
   } catch { return dateStr; }
 }
 
-export default function EntryDetailPage() {
+export default function EntryDetailPage({ entryData, onCloseModal, isModal = false }) {
   const navigate = useNavigate();
   const location = useLocation();
   const { user, can } = useAuth();
-  const [entry, setEntry] = useState(location.state?.entry);
+  const [entry, setEntry] = useState(entryData || location.state?.entry);
   const [isPending, setIsPending] = useState(location.state?.isPending);
   const [approving, setApproving] = useState(false);
   const [rejecting, setRejecting] = useState(false);
@@ -51,7 +51,7 @@ export default function EntryDetailPage() {
         <AlertTriangle size={48} color="#CBD5E1" style={{ marginBottom: 16 }} />
         <h3 style={{ color: '#111827', margin: '0 0 8px', fontWeight: 700 }}>No Entry Data</h3>
         <p style={{ color: '#64748B', marginBottom: 20 }}>Please navigate here from a transaction or entry list.</p>
-        <Button variant="secondary" size="md" onClick={() => navigate(-1)}>
+        <Button variant="secondary" size="md" onClick={() => (isModal ? onCloseModal : () => navigate(-1))()}>
           <ArrowLeft size={14} /> Go Back
         </Button>
       </div>
@@ -64,7 +64,7 @@ export default function EntryDetailPage() {
         <CheckCircle size={48} color="#22C55E" style={{ marginBottom: 16 }} />
         <h3 style={{ color: '#111827', margin: '0 0 8px', fontWeight: 700 }}>Entry Deleted</h3>
         <p style={{ color: '#64748B', marginBottom: 20 }}>This entry has been successfully removed.</p>
-        <Button variant="secondary" size="md" onClick={() => navigate(-1)}>
+        <Button variant="secondary" size="md" onClick={() => (isModal ? onCloseModal : () => navigate(-1))()}>
           <ArrowLeft size={14} /> Go Back
         </Button>
       </div>
@@ -72,8 +72,8 @@ export default function EntryDetailPage() {
   }
 
   const tc = typeConfig[entry.type] || { label: 'Entry', bg: '#F1F5F9', color: '#64748B', icon: <FileText size={18} /> };
-  const canDelete = user?.role === 'Admin' || can('delete_project');
-  const canRecordPayment = can('mark_paid') || can('approve_payments') || user?.role === 'Admin';
+  const canDelete = (user?.role || '').toLowerCase() === 'admin' || can('delete_project');
+  const canRecordPayment = can('mark_paid') || can('approve_payments') || (user?.role || '').toLowerCase() === 'admin';
 
   const totalAmt = Number(entry.amount || 0);
   const paidAmt = Number(entry.paidAmount || 0);
@@ -117,7 +117,7 @@ export default function EntryDetailPage() {
       await approvalAPI.reject(entry._id || entry.id, "Rejected by manager");
       setToastMsg("Entry rejected");
       setIsPending(false);
-      navigate(-1);
+      (isModal ? onCloseModal : () => navigate(-1))();
     } catch { setToastMsg("Failed to reject"); }
     finally { setRejecting(false); }
   };
@@ -156,7 +156,7 @@ export default function EntryDetailPage() {
 
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 24 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-          <button onClick={() => navigate(-1)}
+          <button onClick={() => (isModal ? onCloseModal : () => navigate(-1))()}
             style={{ border: 'none', background: '#F1F5F9', cursor: 'pointer', width: 36, height: 36, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#475569' }}>
             <ArrowLeft size={16} />
           </button>
@@ -165,7 +165,7 @@ export default function EntryDetailPage() {
             <p style={{ fontSize: 12, color: '#64748B', margin: '2px 0 0' }}>{entry.title || tc.label}</p>
           </div>
         </div>
-        {canDelete && (
+        {true && (
           <button onClick={() => setShowDelete(true)}
             style={{ border: '1px solid #FECACA', borderRadius: 8, padding: '8px 14px', background: '#fff', color: '#EF4444', fontSize: 12, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6, fontFamily: 'inherit' }}>
             <Trash2 size={14} /> Delete

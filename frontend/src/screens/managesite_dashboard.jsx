@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 import { projectAPI, transactionAPI } from "../api";
@@ -512,103 +512,98 @@ export default function ManageSitePage() {
     }
     return (
       <CollapsibleCard title={SECTIONS.tracker} icon={<ClipboardCheck size={16} />} subtitle={`${trackerDone}/${trackerTotal} done`} defaultOpen>
-        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-          {phases.map(phase => {
-            const pDone = phase.activities?.filter(a => isActivityCompleted(a, phase, p)).length || 0;
-            const pTotal = phase.activities?.length || 0;
-            const pPct = pTotal > 0 ? pDone / pTotal : 0;
-            const isExpanded = expandedPhase === phase.id;
-            return (
-              <div key={phase.id} style={{ background: "#fff", borderRadius: 10, border: "1px solid #E5E7EB", overflow: "hidden" }}>
-                <div onClick={() => setExpandedPhase(isExpanded ? null : phase.id)} style={{ padding: "12px 14px", display: "flex", alignItems: "center", gap: 10, cursor: "pointer", userSelect: "none" }}>
-                  <div style={{ width: 32, height: 32, borderRadius: 8, background: phase.isCustom ? "#FFF7F0" : "#FFF5F0", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, color: phase.isCustom ? "var(--color-primary-hover, #EA580C)" : "var(--color-primary, #F97316)" }}>
-                    {phase.isCustom ? <Sparkles size={14} /> : <Settings size={14} />}
-                  </div>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontSize: 14, fontWeight: 600, color: "#111827" }}>{phase.phaseName}</div>
-                    <div style={{ fontSize: 11, color: "#64748B", fontWeight: 500 }}>{pDone} of {pTotal} activities done</div>
-                  </div>
-                  <div style={{ textAlign: "right" }}>
-                    <div style={{ fontSize: 12, fontWeight: 700, color: pPct >= 1 ? "#22C55E" : "var(--color-primary, #F97316)" }}>{Math.round(pPct * 100)}%</div>
-                    <ChevronDown size={14} color="#94A3B8" style={{ transform: isExpanded ? "rotate(180deg)" : "none", transition: "transform 0.18s", marginLeft: "auto" }} />
-                  </div>
-                </div>
-                {pTotal > 0 && (
-                  <div style={{ padding: "0 14px 6px" }}>
-                    <div style={{ height: 3, background: "#F1F5F9", borderRadius: 8, overflow: "hidden" }}>
-                      <div style={{ width: `${pPct * 100}%`, height: "100%", background: pPct >= 1 ? "#22C55E" : "var(--color-primary, #F97316)", borderRadius: 8, transition: "width 0.3s" }} />
-                    </div>
-                  </div>
-                )}
-                {isExpanded && phase.activities?.map(act => {
-                  const actBud = (act.budgetMaterial || 0) + (act.budgetLabour || 0) + (act.budgetEquipment || 0);
-                  const isBudgetExpanded = expandedActivityBudgets[act.id];
-                  const dateLabel = _completedDateLabel(act);
-                  const spentForAct = _spentForActivity(act.id);
-                  const spentMat = transactions.filter(t => (t.activity === act.id || t.activityId === act.id) && t.type === "Materials").reduce((s, t) => s + Number(t.amount || 0), 0);
-                  const spentLab = transactions.filter(t => (t.activity === act.id || t.activityId === act.id) && (t.type === "Wages" || t.type === "Labour")).reduce((s, t) => s + Number(t.amount || 0), 0);
-                  const spentEqu = transactions.filter(t => (t.activity === act.id || t.activityId === act.id) && (t.type === "Expense" || t.type === "Equipment")).reduce((s, t) => s + Number(t.amount || 0), 0);
-                  return (
-                    <div key={act.id}>
-                      <div style={{ padding: "8px 14px 8px 18px", borderTop: "1px solid #F1F5F9" }}>
-                        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                          <div onClick={e => { e.stopPropagation(); handleToggleActivity(phase.id, act.id); }}
-                            style={{ width: 20, height: 20, borderRadius: 5, border: `1.5px solid ${_isC(act) ? "#22C55E" : "#CBD5E1"}`, background: _isC(act) ? "#22C55E" : "transparent", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, cursor: "pointer", transition: "all 0.18s" }}>
-                            {_isC(act) && <Check size={12} color="#fff" strokeWidth={3} />}
-                          </div>
-                          <div style={{ flex: 1, minWidth: 0 }}>
-                            <span style={{ fontSize: 13, fontWeight: _isC(act) ? 500 : 500, color: _isC(act) ? "#94A3B8" : "#111827", textDecoration: _isC(act) ? "line-through" : "none" }}>
-                              {act.name}
-                            </span>
-                            {_isC(act) && dateLabel && (
-                              <div style={{ display: "flex", alignItems: "center", gap: 3, marginTop: 2 }}>
-                                <Check size={10} color="#22C55E" strokeWidth={3} />
-                                <span style={{ fontSize: 10, color: "#22C55E", fontWeight: 600 }}>Completed {dateLabel}</span>
+        <div style={{ overflowX: "auto" }}>
+          <table style={{ width: "100%", minWidth: "800px", borderCollapse: "collapse", textAlign: "left" }}>
+            <thead>
+              <tr style={{ borderBottom: "2px solid #E5E7EB", color: "#64748B", fontSize: 12, textTransform: "uppercase" }}>
+                <th style={{ padding: "12px 16px", fontWeight: 700 }}>Phase & Activity</th>
+                <th style={{ padding: "12px 16px", fontWeight: 700 }}>Status</th>
+                <th style={{ padding: "12px 16px", fontWeight: 700 }}>Budget (,1)</th>
+                <th style={{ padding: "12px 16px", fontWeight: 700 }}>Spend (,1)</th>
+                <th style={{ padding: "12px 16px", fontWeight: 700 }}>Variance (,1)</th>
+                <th style={{ padding: "12px 16px", fontWeight: 700, textAlign: "right" }}>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {phases.map(phase => {
+                const phaseBud = phase.activities?.reduce((sum, act) => sum + (act.budgetMaterial || 0) + (act.budgetLabour || 0) + (act.budgetEquipment || 0), 0) || 0;
+                const phaseSpent = phase.activities?.reduce((sum, act) => sum + _spentForActivity(act.id), 0) || 0;
+                const phaseVariance = phaseBud - phaseSpent;
+                const pTotal = phase.activities?.length || 0;
+                const pDone = phase.activities?.filter(a => isActivityCompleted(a, phase, p)).length || 0;
+                
+                return (
+                  <React.Fragment key={phase.id}>
+                    {/* Phase Header Row */}
+                    <tr style={{ background: "#F8FAFC", borderBottom: "1px solid #E5E7EB" }}>
+                      <td style={{ padding: "12px 16px", fontWeight: 800, color: "#111827", display: "flex", alignItems: "center", gap: 8 }}>
+                        {phase.isCustom ? <Sparkles size={14} color="var(--color-primary-hover, #EA580C)" /> : <Settings size={14} color="var(--color-primary, #F97316)" />}
+                        {phase.phaseName}
+                      </td>
+                      <td style={{ padding: "12px 16px", fontSize: 12, color: "#64748B", fontWeight: 600 }}>
+                        {pDone} / {pTotal} Done
+                      </td>
+                      <td style={{ padding: "12px 16px", fontWeight: 800, color: "#111827" }}>{phaseBud.toLocaleString("en-IN")}</td>
+                      <td style={{ padding: "12px 16px", fontWeight: 800, color: "#111827" }}>{phaseSpent.toLocaleString("en-IN")}</td>
+                      <td style={{ padding: "12px 16px", fontWeight: 800, color: phaseVariance < 0 ? "#EF4444" : "#22C55E" }}>
+                        {phaseVariance.toLocaleString("en-IN")}
+                      </td>
+                      <td style={{ padding: "12px 16px" }}></td>
+                    </tr>
+                    
+                    {/* Activity Rows */}
+                    {phase.activities?.map(act => {
+                      const actBud = (act.budgetMaterial || 0) + (act.budgetLabour || 0) + (act.budgetEquipment || 0);
+                      const spentForAct = _spentForActivity(act.id);
+                      const actVariance = actBud - spentForAct;
+                      const isC = _isC(act);
+                      const dateLabel = _completedDateLabel(act);
+
+                      return (
+                        <tr key={act.id} style={{ borderBottom: "1px solid #F1F5F9", background: "#FFF" }}>
+                          <td style={{ padding: "12px 16px 12px 32px" }}>
+                            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                              <div onClick={e => { e.stopPropagation(); handleToggleActivity(phase.id, act.id); }}
+                                style={{ width: 18, height: 18, borderRadius: 4, border: `1.5px solid ${isC ? "#22C55E" : "#CBD5E1"}`, background: isC ? "#22C55E" : "transparent", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", flexShrink: 0 }}>
+                                {isC && <Check size={12} color="#fff" strokeWidth={3} />}
                               </div>
-                            )}
-                          </div>
-                          <Badge variant={_isC(act) ? "success" : "warning"} size="sm">{_isC(act) ? "Done" : "Pending"}</Badge>
-                          <div onClick={e => { e.stopPropagation(); navigate("/add-entry", { state: { project: p, prefill: { phase: phase.phaseName, activity: act.name } } }); }}
-                            style={{ padding: "4px 8px", borderRadius: 6, background: "#FFF5F0", border: "1px solid #FDE8D8", fontSize: 10, fontWeight: 700, color: "var(--color-primary, #F97316)", cursor: "pointer", fontFamily: 'inherit' }}>
-                            ADD
-                          </div>
-                          {_isC(act) && (
-                            <div onClick={e => { e.stopPropagation(); setViewingActivity(act); }}
-                              style={{ padding: "4px 8px", borderRadius: 6, background: "#F0FDF4", border: "1px solid #BBF7D0", fontSize: 10, fontWeight: 700, color: "#22C55E", cursor: "pointer", fontFamily: 'inherit' }}>
-                              VIEW
-                            </div>
-                          )}
-                          {isAdmin && (
-                            <div onClick={() => setExpandedActivityBudgets(prev => ({ ...prev, [act.id]: !prev[act.id] }))} style={{ cursor: "pointer", display: "flex", color: "#94A3B8" }}>
-                              <ChevronDown size={14} style={{ transform: isBudgetExpanded ? "rotate(180deg)" : "none", transition: "transform 0.18s" }} />
-                            </div>
-                          )}
-                        </div>
-                        {isAdmin && isBudgetExpanded && (
-                          <div style={{ margin: "8px 0 4px", padding: 12, background: "#F8FAFC", borderRadius: 8, border: "1px solid #E5E7EB" }}>
-                            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
-                              <span style={{ fontSize: 12, fontWeight: 600, color: "#111827" }}>Activity Budget Allocation</span>
-                              <div onClick={e => { e.stopPropagation(); openBudgetDialog(act); }} style={{ padding: "3px 8px", borderRadius: 6, background: "#FFF5F0", display: "flex", alignItems: "center", gap: 4, cursor: "pointer" }}>
-                                <Pencil size={10} color="var(--color-primary, #F97316)" />
-                                <span style={{ fontSize: 10, fontWeight: 700, color: "var(--color-primary, #F97316)" }}>Update Budget</span>
+                              <div>
+                                <div style={{ fontSize: 13, fontWeight: isC ? 500 : 600, color: isC ? "#94A3B8" : "#111827", textDecoration: isC ? "line-through" : "none" }}>{act.name}</div>
+                                {isC && dateLabel && <div style={{ fontSize: 10, color: "#22C55E", fontWeight: 600 }}>Completed {dateLabel}</div>}
                               </div>
                             </div>
-                            <BudgetRow label="Materials" allocated={act.budgetMaterial || 0} spent={spentMat} color="var(--color-primary, #F97316)" />
-                            <div style={{ height: 6 }} />
-                            <BudgetRow label="Labour" allocated={act.budgetLabour || 0} spent={spentLab} color="#22C55E" />
-                            <div style={{ height: 6 }} />
-                            <BudgetRow label="Equipment" allocated={act.budgetEquipment || 0} spent={spentEqu} color="#F59E0B" />
-                            <div style={{ height: 1, background: "#F1F5F9", margin: "10px 0" }} />
-                            <BudgetRow label="Total Budget" allocated={actBud} spent={spentForAct} color="var(--color-primary-hover, #EA580C)" bold />
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            );
-          })}
+                          </td>
+                          <td style={{ padding: "12px 16px" }}>
+                            <Badge variant={isC ? "success" : "warning"} size="sm">{isC ? "Done" : "Pending"}</Badge>
+                          </td>
+                          <td style={{ padding: "12px 16px", fontSize: 13, fontWeight: 600, color: "#475569" }}>{actBud.toLocaleString("en-IN")}</td>
+                          <td style={{ padding: "12px 16px", fontSize: 13, fontWeight: 600, color: "#475569" }}>{spentForAct.toLocaleString("en-IN")}</td>
+                          <td style={{ padding: "12px 16px", fontSize: 13, fontWeight: 600, color: actVariance < 0 ? "#EF4444" : (actVariance > 0 ? "#22C55E" : "#94A3B8") }}>
+                            {actVariance.toLocaleString("en-IN")}
+                          </td>
+                          <td style={{ padding: "12px 16px", textAlign: "right" }}>
+                            <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", gap: 6 }}>
+                              <div onClick={e => { e.stopPropagation(); navigate("/add-entry", { state: { project: p, prefill: { phase: phase.phaseName, activity: act.name } } }); }}
+                                style={{ padding: "4px 8px", borderRadius: 6, background: "#FFF5F0", border: "1px solid #FDE8D8", fontSize: 10, fontWeight: 700, color: "var(--color-primary, #F97316)", cursor: "pointer" }}>ADD</div>
+                              {isC && (
+                                <div onClick={e => { e.stopPropagation(); setViewingActivity(act); }}
+                                  style={{ padding: "4px 8px", borderRadius: 6, background: "#F0FDF4", border: "1px solid #BBF7D0", fontSize: 10, fontWeight: 700, color: "#22C55E", cursor: "pointer" }}>VIEW</div>
+                              )}
+                              {isAdmin && (
+                                <div onClick={e => { e.stopPropagation(); openBudgetDialog(act); }} style={{ padding: "4px 8px", borderRadius: 6, background: "#F8FAFC", border: "1px solid #E2E8F0", fontSize: 10, fontWeight: 700, color: "#475569", cursor: "pointer", display: "flex", alignItems: "center", gap: 4 }}>
+                                  <Pencil size={10} /> BUDGET
+                                </div>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </React.Fragment>
+                );
+              })}
+            </tbody>
+          </table>
         </div>
 
         {budgetDialogActivity && (

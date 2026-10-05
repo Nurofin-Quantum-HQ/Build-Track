@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 import {
   projectAPI,
@@ -47,7 +47,8 @@ import {
   IndianRupee,
   HelpCircle,
   CheckCircle,
-  Clock
+  Clock,
+  Trash2
 } from "lucide-react";
 import ModuleTour from "../components/ModuleTour";
 import { SpendVsBudgetChart } from "../components/Charts";
@@ -77,7 +78,7 @@ function formatDateShort(d) {
 }
 
 function formatDateLong(dt) {
-  if (!dt) return "—";
+  if (!dt) return "-";
   
   let dateObj = dt;
   if (!(dt instanceof Date)) {
@@ -86,25 +87,18 @@ function formatDateLong(dt) {
   
   if (isNaN(dateObj.getTime())) return String(dt);
   
-  let isMidnightUTC = false;
-  if (typeof dt === 'string') {
-    isMidnightUTC = dt.endsWith('T00:00:00.000Z') || (!dt.includes('T') && dt.length <= 10);
-  } else if (dt instanceof Date) {
-    isMidnightUTC = dt.toISOString().endsWith('T00:00:00.000Z');
-  }
+  const isMidnightLocal = dateObj.getHours() === 0 && dateObj.getMinutes() === 0 && dateObj.getSeconds() === 0;
   
   const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-  
-  if (isMidnightUTC) {
-    const dayStr = String(dateObj.getUTCDate()).padStart(2, '0');
-    const monthStr = months[dateObj.getUTCMonth()];
-    const yearStr = dateObj.getUTCFullYear();
-    return `${dayStr} ${monthStr} ${yearStr}`;
-  }
   
   const day = String(dateObj.getDate()).padStart(2, '0');
   const month = months[dateObj.getMonth()];
   const year = dateObj.getFullYear();
+  
+  if (isMidnightLocal) {
+    return `${day} ${month} ${year}`;
+  }
+  
   const hour24 = dateObj.getHours();
   const ampm = hour24 >= 12 ? 'PM' : 'AM';
   let hour12 = hour24 % 12;
@@ -139,22 +133,22 @@ export default function FinancialReportPage() {
   const [toast, setToast] = useState({ msg: "", type: "info" });
 
   const [showExportModal, setShowExportModal] = useState(false);
-  const [selectedProjectId, setSelectedProjectId] = useState("all");
-  const [selectedFloor, setSelectedFloor] = useState("");
-  const [selectedPhaseId, setSelectedPhaseId] = useState("");
-  const [selectedActivityName, setSelectedActivityName] = useState("");
-  const [datePreset, setDatePreset] = useState("All Time");
-  const [startDate, setStartDate] = useState(null);
-  const [endDate, setEndDate] = useState(null);
+  const [selectedProjectId, setSelectedProjectId] = useState(() => sessionStorage.getItem("fr_proj") || "all");
+  const [selectedFloor, setSelectedFloor] = useState(() => sessionStorage.getItem("fr_floor") || "");
+  const [selectedPhaseId, setSelectedPhaseId] = useState(() => sessionStorage.getItem("fr_phase") || "");
+  const [selectedActivityName, setSelectedActivityName] = useState(() => sessionStorage.getItem("fr_activity") || "");
+  const [datePreset, setDatePreset] = useState(() => sessionStorage.getItem("fr_datePreset") || "All Time");
+  const [startDate, setStartDate] = useState(() => sessionStorage.getItem("fr_startDate") ? new Date(sessionStorage.getItem("fr_startDate")) : null);
+  const [endDate, setEndDate] = useState(() => sessionStorage.getItem("fr_endDate") ? new Date(sessionStorage.getItem("fr_endDate")) : null);
 
-  const [activeTab, setActiveTab] = useState("All");
+  const location = useLocation(); const [activeTab, setActiveTab] = useState(() => location.state?.activeTab || sessionStorage.getItem("fr_tab") || "All");
 
-  const [searchQuery, setSearchQuery] = useState("");
-  const [selectedItemName, setSelectedItemName] = useState("");
+  const [searchQuery, setSearchQuery] = useState(() => sessionStorage.getItem("fr_search") || "");
+  const [selectedItemName, setSelectedItemName] = useState(() => sessionStorage.getItem("fr_item") || "");
   const [reportGenerated, setReportGenerated] = useState(false);
   const [showSuggestions, setShowSuggestions] = useState(false);
 
-  const [selectedPaymentStatus, setSelectedPaymentStatus] = useState("All");
+  const [selectedPaymentStatus, setSelectedPaymentStatus] = useState(() => sessionStorage.getItem("fr_payStatus") || "All");
   const [sortColumn, setSortColumn] = useState("date");
   const [sortAscending, setSortAscending] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
@@ -189,6 +183,26 @@ export default function FinancialReportPage() {
   const [showImportModal, setShowImportModal] = useState(false);
 
   const clearToast = useCallback(() => setToast({ msg: "", type: "info" }), []);
+
+  useEffect(() => {
+    sessionStorage.setItem('fr_proj', selectedProjectId);
+    sessionStorage.setItem('fr_floor', selectedFloor);
+    sessionStorage.setItem('fr_phase', selectedPhaseId);
+    sessionStorage.setItem('fr_activity', selectedActivityName);
+    sessionStorage.setItem('fr_datePreset', datePreset);
+    if (startDate) sessionStorage.setItem('fr_startDate', startDate.toISOString());
+    else sessionStorage.removeItem('fr_startDate');
+    if (endDate) sessionStorage.setItem('fr_endDate', endDate.toISOString());
+    else sessionStorage.removeItem('fr_endDate');
+    sessionStorage.setItem('fr_tab', activeTab);
+    sessionStorage.setItem('fr_search', searchQuery);
+    sessionStorage.setItem('fr_item', selectedItemName);
+    sessionStorage.setItem('fr_payStatus', selectedPaymentStatus);
+  }, [
+    selectedProjectId, selectedFloor, selectedPhaseId, selectedActivityName, 
+    datePreset, startDate, endDate, activeTab, searchQuery, selectedItemName, selectedPaymentStatus
+  ]);
+
 
   const { projects: projStore, fetchProjects: storeFetchProjects } = useProjectStore();
   const { transactions: txStore, fetchTransactions: storeFetchTransactions } = useTransactionStore();
@@ -1222,7 +1236,13 @@ export default function FinancialReportPage() {
             return (
               <button
                 key={tab}
-                onClick={() => setActiveTab(tab)}
+                onClick={() => {
+                  if (tab === "Stock View") {
+                    navigate("/inventory");
+                  } else {
+                    setActiveTab(tab);
+                  }
+                }}
                 style={{
                   flex: 1,
                   padding: "10px 0",
@@ -1712,11 +1732,17 @@ export default function FinancialReportPage() {
       )}
 
       {detailsEntry && (
-        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", zIndex: 900, display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}>
-          <div style={{ background: "#FFF", borderRadius: 16, width: 360, padding: 22, boxShadow: shadows.card }}>
+        <div onClick={() => setDetailsEntry(null)} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", zIndex: 900, display: "flex", alignItems: "flex-start", justifyContent: "flex-end" }}>
+          <style>{`
+            @keyframes slideInRightFR {
+              from { transform: translateX(100%); }
+              to { transform: translateX(0); }
+            }
+          `}</style>
+          <div onClick={e => e.stopPropagation()} style={{ background: "#FFF", width: "100%", maxWidth: 420, height: "100vh", padding: "28px 32px", boxShadow: "-4px 0 15px rgba(0,0,0,0.1)", overflowY: "auto", animation: "slideInRightFR 0.3s forwards" }}>
 
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
-              <h3 style={{ margin: 0, fontSize: 16, fontWeight: 800, color: primaryBlue }}>Entry Details</h3>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 24 }}>
+              <h3 style={{ margin: 0, fontSize: 20, fontWeight: 800, color: primaryBlue }}>Entry Details</h3>
               <button onClick={() => setDetailsEntry(null)} style={{ background: "none", border: "none", cursor: "pointer", color: colors.textLight }}><X size={18} /></button>
             </div>
 
@@ -1834,6 +1860,26 @@ export default function FinancialReportPage() {
               </button>
             </div>
 
+            {true && (
+              <button
+                onClick={async () => {
+                  if (window.confirm("Are you sure you want to delete this entry? This action cannot be undone.")) {
+                    try {
+                      await transactionAPI.delete(detailsEntry.rawTx?._id || detailsEntry.id || detailsEntry._id);
+                      setToast({ msg: "Entry deleted successfully.", type: "success" });
+                      setDetailsEntry(null);
+                      loadData(true);
+                    } catch (e) {
+                      setToast({ msg: "Failed to delete entry.", type: "error" });
+                    }
+                  }
+                }}
+                style={{ width: "100%", marginTop: 12, padding: "8px 0", border: `1.2px solid #ef4444`, background: "#fef2f2", borderRadius: 8, fontSize: 11.5, fontWeight: "700", color: "#dc2626", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 4 }}
+              >
+                <Trash2 size={12} /> Delete Entry
+              </button>
+            )}
+
           </div>
         </div>
       )}
@@ -1917,3 +1963,5 @@ export default function FinancialReportPage() {
     </div>
   );
 }
+
+

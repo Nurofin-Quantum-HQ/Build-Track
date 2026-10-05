@@ -6,6 +6,7 @@ import { MetricCard, CategoryBudgetBar } from "../components/MetricCards";
 import { Badge, Button, Card } from "../components/ui";
 import RecordPaymentSheet from "../components/RecordPaymentSheet";
 import CsvImport from "../components/CsvImport";
+import EntryDetailPage from "./entry_detail_page";
 import {
   Search, Download, FileText, ChevronDown, Calendar, Filter, RefreshCw,
   BarChart3, Layers, Wrench, Users, TrendingUp, Sparkles, HelpCircle,
@@ -70,6 +71,7 @@ export default function ReportsPage() {
   const [showImportModal, setShowImportModal] = useState(false);
   const [recordPaymentOpen, setRecordPaymentOpen] = useState(false);
   const [recordPaymentEntry, setRecordPaymentEntry] = useState(null);
+  const [selectedEntryDetails, setSelectedEntryDetails] = useState(null);
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
   const [runTour, setRunTour] = useState(false);
 
@@ -384,29 +386,29 @@ export default function ReportsPage() {
                         className="hover-bg-subtle"
                         style={{ borderBottom: "1px solid #F1F5F9", cursor: "pointer" }}>
                         {activeColumns.includes("date") && (
-                          <td onClick={() => navigate('/entry-detail', { state: { entry: t } })} style={{ padding: "10px 14px", fontSize: 13, color: "#475569", whiteSpace: "nowrap" }}>
+                          <td onClick={() => setSelectedEntryDetails(t)} style={{ padding: "10px 14px", fontSize: 13, color: "#475569", whiteSpace: "nowrap" }}>
                             {t.date ? new Date(t.date).toLocaleDateString("en-IN") : "\u2014"}
                           </td>
                         )}
                         {activeColumns.includes("title") && (
-                          <td onClick={() => navigate('/entry-detail', { state: { entry: t } })} style={{ padding: "10px 14px", fontSize: 13, fontWeight: 500, color: "#111827", maxWidth: 250, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                          <td onClick={() => setSelectedEntryDetails(t)} style={{ padding: "10px 14px", fontSize: 13, fontWeight: 500, color: "#111827", maxWidth: 250, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                             {t.title || "\u2014"}
                           </td>
                         )}
                         {activeColumns.includes("type") && (
-                          <td onClick={() => navigate('/entry-detail', { state: { entry: t } })} style={{ padding: "10px 14px" }}>
+                          <td onClick={() => setSelectedEntryDetails(t)} style={{ padding: "10px 14px" }}>
                             <Badge variant={t.type === "Wages" ? "success" : t.type === "Expense" ? "warning" : "info"} size="sm">
                               {t.type === "Wages" ? "Labour" : t.type === "Expense" ? "Equipment" : t.type}
                             </Badge>
                           </td>
                         )}
                         {activeColumns.includes("amount") && (
-                          <td onClick={() => navigate('/entry-detail', { state: { entry: t } })} style={{ padding: "10px 14px", fontSize: 14, fontWeight: 600, color: t.type === "Income" ? "#22C55E" : "#DC2626", textAlign: "right" }}>
+                          <td onClick={() => setSelectedEntryDetails(t)} style={{ padding: "10px 14px", fontSize: 14, fontWeight: 600, color: t.type === "Income" ? "#22C55E" : "#DC2626", textAlign: "right" }}>
                             {t.type === "Income" ? "+" : "-"}&#8377;{(t.amount || 0).toLocaleString("en-IN")}
                           </td>
                         )}
                         {activeColumns.includes("status") && (
-                          <td onClick={() => navigate('/entry-detail', { state: { entry: t } })} style={{ padding: "10px 14px" }}>
+                          <td onClick={() => setSelectedEntryDetails(t)} style={{ padding: "10px 14px" }}>
                             <Badge variant={t.paymentStatus === "Paid" ? "success" : t.paymentStatus === "Partial" ? "warning" : "info"} size="sm">
                               {t.paymentStatus || "\u2014"}
                             </Badge>
@@ -469,6 +471,22 @@ export default function ReportsPage() {
         onClose={() => setRecordPaymentOpen(false)}
         onSaved={() => window.location.reload()}
       />
+
+      {selectedEntryDetails && (
+        <div onClick={() => setSelectedEntryDetails(null)} style={{ position: "fixed", inset: 0, zIndex: 1200, background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "flex-start", justifyContent: "flex-end" }}>
+          <style>{`
+            @keyframes slideInRight {
+              from { transform: translateX(100%); }
+              to { transform: translateX(0); }
+            }
+          `}</style>
+          <div onClick={(e) => e.stopPropagation()} style={{ background: "#fff", width: "100%", maxWidth: 680, height: "100vh", overflowY: "auto", boxShadow: "-4px 0 15px rgba(0,0,0,0.1)", animation: "slideInRight 0.3s forwards" }}>
+            <EntryDetailPage entryData={selectedEntryDetails} isModal={true} onCloseModal={() => {
+              setSelectedEntryDetails(null);
+            }} />
+          </div>
+        </div>
+      )}
     </div>
   );
 }

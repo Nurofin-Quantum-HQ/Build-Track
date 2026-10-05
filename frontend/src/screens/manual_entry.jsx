@@ -4,7 +4,7 @@ import { transactionAPI } from "../api";
 import useProjectStore from "../stores/projectStore";
 import { Toast } from "../components/Toast";
 import { colors, radius, shadows, gradients, typography } from "../styles/designTokens";
-import { Building, ChevronDown, HelpCircle, CheckCircle, X } from "lucide-react";
+import { Building, ChevronDown, HelpCircle, CheckCircle, X, Trash2 } from "lucide-react";
 import ModuleTour from "../components/ModuleTour";
 import PayNowSheet from "../components/PayNowSheet";
 import { useAuth } from "../contexts/AuthContext";
@@ -175,7 +175,7 @@ export default function ManualEntryPage() {
       const eType = typeMapRev[tx.type] || "material";
       setEntryType(eType);
       setSelectedProject(tx.project?._id || tx.project || "");
-      if (tx.date || tx.createdAt) {
+      if (!isDuplicate && (tx.date || tx.createdAt)) {
         setDate(new Date(tx.date || tx.createdAt).toISOString().split("T")[0]);
       }
       setNotes(tx.notes || "");
@@ -265,7 +265,7 @@ export default function ManualEntryPage() {
             const eType = typeMapRev[tx.type] || qType || "material";
             setEntryType(eType);
             setSelectedProject(tx.project?._id || tx.project || qProject || "");
-            if (tx.date || tx.createdAt) {
+            if (!isDuplicate && (tx.date || tx.createdAt)) {
               setDate(new Date(tx.date || tx.createdAt).toISOString().split("T")[0]);
             }
             setNotes(tx.notes || "");
@@ -333,7 +333,7 @@ export default function ManualEntryPage() {
         const eType = typeMapRev[tx.type] || "material";
         setEntryType(eType);
         setSelectedProject(tx.project?._id || tx.project || "");
-        if (tx.date || tx.createdAt) {
+        if (!isDuplicate && (tx.date || tx.createdAt)) {
           setDate(new Date(tx.date || tx.createdAt).toISOString().split("T")[0]);
         }
         setNotes(tx.notes || "");
@@ -602,16 +602,14 @@ export default function ManualEntryPage() {
           setPaymentHistory([]);
           setPaymentResult(null);
         setAttachments([]);
-        if (window.btManualEntryReturnUrl) {
-          setTimeout(() => {
-            navigate(window.btManualEntryReturnUrl);
-            window.btManualEntryReturnUrl = null;
-          }, 1500);
-        } else {
-          setTimeout(() => {
-            navigate("/inventory");
-          }, 1500);
-        }
+        
+        setTimeout(() => {
+            if (window.history.state && window.history.state.idx > 0) {
+              navigate(-1);
+            } else {
+              navigate("/reports");
+            }
+        }, 1500);
       }
     } catch (err) {
       setErrMsg(err.response?.data?.message || `Failed to ${isEditing ? "update" : "save"} entry.`);
@@ -1146,6 +1144,29 @@ export default function ManualEntryPage() {
             <><div style={{ width: 18, height: 18, borderRadius: "50%", border: "2px solid rgba(255,255,255,0.3)", borderTopColor: "#FFF", animation: "spin 0.7s linear infinite" }} /> Saving...</>
           ) : isEditing ? "Update Entry" : `Save ${entryType.charAt(0).toUpperCase() + entryType.slice(1)} Entry`}
         </button>
+
+        {isEditing && (
+          <button onClick={async () => {
+             if (window.confirm("Are you sure you want to delete this entry? This action cannot be undone.")) {
+                 try {
+                     setSaving(true);
+                     await transactionAPI.delete(editingId);
+                     if (window.history.state && window.history.state.idx > 0) { navigate(-1); } else { navigate("/reports"); }
+                 } catch (e) {
+                     setErrMsg("Failed to delete entry");
+                     setSaving(false);
+                 }
+             }
+          }} disabled={saving}
+          style={{
+            marginTop: 12, width: "100%", padding: "16px 0", borderRadius: radius.md, border: "1px solid #FECACA",
+            background: "#FFF", color: "#EF4444", fontWeight: 700, fontSize: 16,
+            cursor: saving ? "not-allowed" : "pointer", opacity: saving ? 0.7 : 1,
+            display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
+          }}>
+            <Trash2 size={18} /> Delete Entry
+          </button>
+        )}
       </div>
 
       <PayNowSheet
