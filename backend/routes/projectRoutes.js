@@ -16,6 +16,7 @@ const {
 const upload = require("../config/multer");
 const { getFileUrl, deleteFile } = require("../config/fileHelpers");
 const Subscription = require("../models/Subscription");
+const { buildProjectInsights } = require("../services/projectInsights");
 router.use(protect);
 const normalizeProjectBudget = (project) => {
   if (!project) return project;
@@ -439,6 +440,25 @@ router.get("/:id/budget", requirePermission(VIEW_PROJECTS), async (req, res) => 
     res.json(report);
   } catch (err) {
     res.status(500).json({ message: "Failed to fetch project budget analysis" });
+  }
+});
+// Project insights: budget-vs-actual per phase/category, earned value, budget bridge,
+// spend curve and alerts. Read-only financial view, so it needs the reports
+// permission (Admins pass automatically) on top of normal project access.
+router.get("/:id/insights", requirePermission(["view_reports"]), async (req, res) => {
+  try {
+    if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+      return res.status(404).json({ message: "Project not found" });
+    }
+    const project = await Project.findOne(canAccessProjectFilter(req, req.params.id)).lean();
+    if (!project) return res.status(404).json({ message: "Project not found" });
+    const transactions = await Transaction.find({ project: project._id })
+      .select("type amount date createdAt approvalStatus phase phaseId activityId supplier paidAmount remainingAmount")
+      .lean();
+    res.json(buildProjectInsights(project, transactions));
+  } catch (err) {
+    console.error("GET /projects/:id/insights error:", err);
+    res.status(500).json({ message: "Failed to build project insights" });
   }
 });
 router.post("/", requirePermission(["create_project", "manage_team"]), async (req, res) => {

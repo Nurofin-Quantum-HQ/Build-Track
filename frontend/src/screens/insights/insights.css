@@ -1,0 +1,218 @@
+/* Project insights (Pulse v2) — light, shadcn "Clean Slate" tokens, scoped to .pi */
+@import url("https://fonts.googleapis.com/css2?family=Fira+Code:wght@500;600&family=Fira+Sans:wght@400;500;600;700&display=swap");
+
+.pi {
+  --bg: #f8fafc;
+  --card: #ffffff;
+  --muted: #f1f5f9;
+  --border: #e2e8f0;
+  --border-strong: #cbd5e1;
+  --ink: #0f172a;
+  --ink-2: #334155;
+  --ink-3: #64748b;
+  --primary: #4f46e5;
+  --primary-soft: #eef2ff;
+  --material: #2a78d6;
+  --labour: #eb6834;
+  --equipment: #199e70;
+  --plan: #cbd5e1;
+  --good: #15803d;
+  --good-soft: #dcfce7;
+  --warn: #b45309;
+  --warn-soft: #fef3c7;
+  --bad: #dc2626;
+  --bad-soft: #fee2e2;
+  --under: #2a78d6;
+  --radius: 12px;
+  --shadow: 0 1px 2px rgba(15, 23, 42, 0.04), 0 2px 8px rgba(15, 23, 42, 0.04);
+
+  font-family: "Fira Sans", system-ui, sans-serif;
+  font-variant-numeric: tabular-nums;
+  color: var(--ink);
+  background: var(--bg);
+  min-height: 100vh;
+  width: 100%;
+}
+.pi *,
+.pi *::before,
+.pi *::after { box-sizing: border-box; }
+
+.pi-mono { font-family: "Fira Code", ui-monospace, monospace; }
+
+/* ── Header ─────────────────────────────────────────────────────────────── */
+.pi-header {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  background: rgba(255, 255, 255, 0.92);
+  backdrop-filter: saturate(1.4) blur(8px);
+  border-bottom: 1px solid var(--border);
+}
+.pi-header-inner {
+  max-width: 1440px;
+  margin: 0 auto;
+  padding: 14px 28px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+.pi-crumbs { font-size: 13px; color: var(--ink-3); display: flex; gap: 6px; align-items: center; }
+.pi-crumbs button { color: var(--ink-3); font: inherit; cursor: pointer; }
+.pi-crumbs button:hover { color: var(--ink); text-decoration: underline; }
+.pi-title { font-size: 22px; font-weight: 600; letter-spacing: -0.02em; margin: 2px 0 0; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.pi-sub { font-size: 13px; color: var(--ink-3); margin-top: 2px; }
+.pi-header-actions { margin-left: auto; display: flex; gap: 8px; align-items: center; }
+
+.pi-btn {
+  display: inline-flex; align-items: center; gap: 6px;
+  height: 36px; padding: 0 14px;
+  border-radius: 8px; border: 1px solid var(--border);
+  background: var(--card); color: var(--ink);
+  font: 500 13.5px "Fira Sans", sans-serif;
+  cursor: pointer; transition: background 150ms ease, border-color 150ms ease;
+}
+.pi-btn:hover { background: var(--muted); }
+.pi-btn:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
+.pi-btn.icon { width: 36px; padding: 0; justify-content: center; }
+
+/* ── Grid ───────────────────────────────────────────────────────────────── */
+.pi-main { max-width: 1440px; margin: 0 auto; padding: 24px 28px 48px; }
+.pi-grid { display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); gap: 16px; }
+.span-3 { grid-column: span 3; } .span-4 { grid-column: span 4; } .span-5 { grid-column: span 5; }
+.span-6 { grid-column: span 6; } .span-7 { grid-column: span 7; } .span-8 { grid-column: span 8; }
+.span-12 { grid-column: span 12; }
+@media (max-width: 1200px) {
+  .span-3, .span-4, .span-5, .span-6, .span-7, .span-8 { grid-column: span 6; }
+  .pi-grid > .wide-md { grid-column: span 12; }
+}
+@media (max-width: 760px) {
+  .pi-grid > * { grid-column: span 12 !important; }
+  .pi-header-inner, .pi-main { padding-left: 16px; padding-right: 16px; }
+}
+
+/* ── Card ───────────────────────────────────────────────────────────────── */
+.pi-card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 20px;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+.pi-card-h { display: flex; align-items: flex-start; gap: 12px; margin-bottom: 16px; }
+.pi-card-t { font-size: 15.5px; font-weight: 600; margin: 0; }
+.pi-card-d { font-size: 13px; color: var(--ink-3); margin: 3px 0 0; line-height: 1.45; }
+.pi-card-h .pi-card-a { margin-left: auto; }
+
+.pi-badge {
+  display: inline-flex; align-items: center; gap: 4px;
+  height: 22px; padding: 0 8px; border-radius: 6px;
+  font-size: 12px; font-weight: 600; white-space: nowrap;
+}
+.pi-badge.good { color: var(--good); background: var(--good-soft); }
+.pi-badge.warn { color: var(--warn); background: var(--warn-soft); }
+.pi-badge.bad { color: var(--bad); background: var(--bad-soft); }
+.pi-badge.muted { color: var(--ink-3); background: var(--muted); }
+.pi-badge.info { color: var(--primary); background: var(--primary-soft); }
+
+.pi-overline { font-size: 11px; font-weight: 600; letter-spacing: 0.06em; color: var(--ink-3); text-transform: uppercase; }
+.pi-legend { display: flex; flex-wrap: wrap; gap: 6px 16px; font-size: 12.5px; color: var(--ink-2); }
+.pi-legend span { display: inline-flex; align-items: center; gap: 6px; }
+.pi-sw { width: 10px; height: 10px; border-radius: 3px; display: inline-block; }
+.pi-sw.line { width: 16px; height: 0; border-top: 2px solid; border-radius: 0; }
+.pi-sw.dash { width: 16px; height: 0; border-top: 2px dashed; border-radius: 0; }
+
+/* ── Verdict ────────────────────────────────────────────────────────────── */
+.pi-verdict-h { font-size: 21px; font-weight: 600; line-height: 1.3; letter-spacing: -0.01em; margin: 14px 0 6px; }
+.pi-meter { position: relative; height: 22px; margin-top: 18px; }
+.pi-meter-track { position: absolute; top: 7px; left: 0; right: 0; height: 8px; display: flex; gap: 2px; }
+.pi-meter-track i { display: block; height: 8px; border-radius: 4px; }
+.pi-meter-dot {
+  position: absolute; top: 0; width: 22px; height: 22px; margin-left: -11px;
+  border-radius: 50%; background: #fff; border: 3px solid var(--ink);
+  transition: left 600ms cubic-bezier(.2,.8,.2,1);
+}
+.pi-meter-dot::after { content: ""; position: absolute; inset: 4px; border-radius: 50%; background: var(--ink); }
+.pi-meter-labels { display: flex; font-size: 11.5px; color: var(--ink-3); margin-top: 6px; }
+.pi-why { margin: 14px 0 0; padding: 14px 0 0; border-top: 1px solid var(--border); list-style: none; }
+.pi-why li { display: flex; gap: 8px; font-size: 13.5px; color: var(--ink-2); padding: 3px 0; }
+
+/* ── KPI ────────────────────────────────────────────────────────────────── */
+.pi-kpis { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; height: 100%; }
+.pi-kpi { padding: 16px; }
+.pi-kpi-l { display: flex; justify-content: space-between; font-size: 13px; color: var(--ink-3); font-weight: 500; }
+.pi-kpi-v { font-size: 26px; font-weight: 700; letter-spacing: -0.02em; margin: 10px 0 2px; }
+.pi-kpi-s { font-size: 12.5px; color: var(--ink-3); }
+
+/* ── Alerts ─────────────────────────────────────────────────────────────── */
+.pi-alert { display: flex; align-items: center; gap: 12px; padding: 10px 8px; margin: 0 -8px; border-radius: 8px; min-height: 52px; width: calc(100% + 16px); text-align: left; font: inherit; color: inherit; background: none; border: 0; }
+button.pi-alert { cursor: pointer; }
+button.pi-alert:hover { background: var(--muted); }
+.pi-alert-i { width: 34px; height: 34px; border-radius: 8px; display: grid; place-items: center; flex-shrink: 0; }
+.pi-alert-t { font-size: 13.5px; font-weight: 500; }
+.pi-alert-d { font-size: 12.5px; color: var(--ink-3); }
+
+/* ── Matrix ─────────────────────────────────────────────────────────────── */
+.pi-matrix { width: 100%; border-collapse: separate; border-spacing: 3px; font-size: 13px; }
+.pi-matrix th { font-size: 11.5px; font-weight: 600; color: var(--ink-3); text-align: center; padding: 0 0 6px; letter-spacing: 0.02em; }
+.pi-matrix th:first-child { text-align: left; }
+.pi-matrix tr.row { cursor: pointer; }
+.pi-matrix tr.row:hover td.name { color: var(--primary); }
+.pi-matrix tr.row:focus-visible { outline: 2px solid var(--primary); }
+.pi-matrix td.name { padding: 6px 8px 6px 0; border-top: 1px solid var(--border); min-width: 140px; width: 28%; }
+.pi-matrix td.cell { min-width: 78px; height: 48px; border-radius: 6px; text-align: center; vertical-align: middle; }
+.pi-cell-v { font-family: "Fira Code", monospace; font-size: 13px; font-weight: 500; }
+.pi-cell-f { font-size: 11px; font-weight: 600; margin-top: 1px; }
+
+/* ── Bars ───────────────────────────────────────────────────────────────── */
+.pi-bridge-row { display: grid; grid-template-columns: minmax(120px, 1.1fr) 1fr 72px; align-items: center; gap: 12px; min-height: 40px; padding: 2px 6px; margin: 0 -6px; border-radius: 6px; width: calc(100% + 12px); background: none; border: 0; font: inherit; color: inherit; text-align: left; }
+button.pi-bridge-row { cursor: pointer; }
+button.pi-bridge-row:hover { background: var(--muted); }
+.pi-bridge-bar { position: relative; height: 18px; }
+.pi-bridge-bar .zero { position: absolute; top: 0; bottom: 0; width: 1px; background: var(--border-strong); }
+.pi-bridge-bar .seg { position: absolute; top: 3px; bottom: 3px; border-radius: 3px; transition: left 500ms, width 500ms; }
+.pi-total-row { display: flex; justify-content: space-between; align-items: baseline; padding: 10px 0; }
+
+.pi-dumb { position: relative; height: 16px; }
+.pi-dumb .tick { position: absolute; top: 0; bottom: 0; width: 1px; background: var(--border); }
+.pi-dumb .link { position: absolute; top: 6.5px; height: 3px; border-radius: 2px; }
+.pi-dumb .dot { position: absolute; top: 2px; width: 12px; height: 12px; margin-left: -6px; border-radius: 50%; }
+
+.pi-stack { display: flex; height: 28px; border-radius: 6px; overflow: hidden; gap: 2px; }
+.pi-stack > div { display: grid; place-items: center; color: #fff; font-size: 12px; font-weight: 700; min-width: 0; }
+
+.pi-table { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+.pi-table th { font-size: 11px; font-weight: 600; color: var(--ink-3); letter-spacing: 0.06em; text-transform: uppercase; text-align: right; padding: 0 0 8px; }
+.pi-table th:first-child, .pi-table td:first-child { text-align: left; }
+.pi-table td { border-top: 1px solid var(--border); padding: 10px 0; text-align: right; }
+
+.pi-progress { height: 6px; background: var(--muted); border-radius: 3px; overflow: hidden; }
+.pi-progress > div { height: 100%; background: var(--primary); border-radius: 3px; }
+
+/* ── Tooltip (recharts) ─────────────────────────────────────────────────── */
+.pi-tip { background: var(--ink); color: #fff; border-radius: 8px; padding: 8px 10px; font: 500 12.5px "Fira Sans", sans-serif; box-shadow: 0 8px 24px rgba(15,23,42,.18); }
+.pi-tip b { font-weight: 600; }
+.pi-tip .row { display: flex; align-items: center; gap: 6px; color: #cbd5e1; }
+
+/* ── Sheet ──────────────────────────────────────────────────────────────── */
+.pi-overlay { position: fixed; inset: 0; background: rgba(15, 23, 42, 0.35); z-index: 50; animation: pi-fade 180ms ease; }
+.pi-sheet {
+  position: fixed; top: 0; right: 0; bottom: 0; width: min(560px, 100vw);
+  background: var(--bg); z-index: 51; overflow-y: auto;
+  border-left: 1px solid var(--border); box-shadow: -12px 0 40px rgba(15,23,42,.12);
+  animation: pi-slide 220ms cubic-bezier(.2,.8,.2,1);
+}
+.pi-sheet-h { position: sticky; top: 0; background: #fff; border-bottom: 1px solid var(--border); padding: 16px 20px; display: flex; align-items: center; gap: 12px; z-index: 1; }
+.pi-sheet-b { padding: 20px; display: grid; gap: 14px; }
+@keyframes pi-fade { from { opacity: 0; } }
+@keyframes pi-slide { from { transform: translateX(24px); opacity: 0; } }
+@media (prefers-reduced-motion: reduce) {
+  .pi *, .pi-overlay, .pi-sheet { animation: none !important; transition: none !important; }
+}
+
+.pi-skel { background: var(--muted); border-radius: var(--radius); animation: pi-pulse 1.4s ease-in-out infinite; }
+@keyframes pi-pulse { 50% { opacity: .55; } }
+.pi .spin { animation: pi-spin 0.9s linear infinite; }
+@keyframes pi-spin { to { transform: rotate(360deg); } }

@@ -180,7 +180,8 @@ export default function Sidebar() {
                 location.pathname === "/managesite" ||
                 location.pathname === "/newproject" ||
                 location.pathname.startsWith("/project-detail") ||
-                location.pathname.startsWith("/project-report")
+                location.pathname.startsWith("/project-report") ||
+                location.pathname.startsWith("/project-insights")
               ));
               return {
                 ...linkStyle,
@@ -197,7 +198,8 @@ export default function Sidebar() {
                 location.pathname === "/managesite" ||
                 location.pathname === "/newproject" ||
                 location.pathname.startsWith("/project-detail") ||
-                location.pathname.startsWith("/project-report")
+                location.pathname.startsWith("/project-report") ||
+                location.pathname.startsWith("/project-insights")
               ));
               return (
                 <>

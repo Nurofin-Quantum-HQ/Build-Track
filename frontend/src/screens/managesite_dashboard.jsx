@@ -14,7 +14,7 @@ import {
   Building2, MapPin, Calendar, User, Hash, Phone, Code, Wrench,
   Home, Layers, Bed, Bath, Settings, Zap, Flame, ChefHat, Sun,
   Clock, IndianRupee, CreditCard, PiggyBank, Target, ClipboardCheck,
-  List, Camera, FileText, Send, Trash2, Info, AlertCircle, Sparkles,
+  List, Camera, FileText, Send, Trash2, Info, AlertCircle, Sparkles, TrendingUp,
 } from "lucide-react";
 
 const SECTIONS = {
@@ -82,7 +82,7 @@ export default function ManageSitePage() {
   const location = useLocation();
   const project = location.state?.project || null;
   const projectId = project?._id || project?.id;
-  const { isAdmin } = useAuth();
+  const { isAdmin, user } = useAuth();
 
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
   const [toast, setToast] = useState({ msg: "", type: "info" });
@@ -95,6 +95,10 @@ export default function ManageSitePage() {
   const [expandedActivityBudgets, setExpandedActivityBudgets] = useState({});
   const [viewingActivity, setViewingActivity] = useState(null);
   const [localProject, setLocalProject] = useState(project);
+  // Insights is a financial view. Mirror the backend's requirePermission exactly
+  // (Admin, or an explicit view_reports grant) so the button never leads to a 403.
+  const canViewInsights = isAdmin || (user?.permissions || []).includes("view_reports");
+  const openInsights = () => navigate(`/project-insights/${projectId}`, { state: { project: localProject || project } });
   const clearToast = useCallback(() => setToast({ msg: "", type: "info" }), []);
 
   useEffect(() => {
@@ -833,6 +837,11 @@ export default function ManageSitePage() {
           </div>
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          {canViewInsights && (
+            <button onClick={openInsights} style={{ padding: "6px 12px", background: "#EEF2FF", border: "1px solid #C7D2FE", borderRadius: 8, fontSize: 12, fontWeight: 600, color: "#4338CA", cursor: "pointer", display: "flex", alignItems: "center", gap: 6, fontFamily: 'inherit' }}>
+              <TrendingUp size={14} /> Insights
+            </button>
+          )}
           <button onClick={handleExportCSV} style={{ padding: "6px 12px", background: "#fff", border: "1px solid #E5E7EB", borderRadius: 8, fontSize: 12, fontWeight: 600, color: "#475569", cursor: "pointer", display: "flex", alignItems: "center", gap: 6, fontFamily: 'inherit' }}>
             <FileDown size={14} /> Export
           </button>
@@ -951,10 +960,11 @@ export default function ManageSitePage() {
         {renderRecentEntries()}
 
         <CollapsibleCard title="Actions" icon={<Zap size={16} />} defaultOpen>
-          <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr 1fr" : "repeat(4, 1fr)", gap: 10 }}>
+          <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr 1fr" : `repeat(${canViewInsights ? 5 : 4}, 1fr)`, gap: 10 }}>
             <ActionBtn icon={<FileText size={18} />} label="Add Entry" onClick={() => navigate("/add-entry", { state: { project: p } })} borderColor="var(--color-primary-hover, #EA580C)" />
             <ActionBtn icon={<MicIcon />} label="Voice Entry" onClick={() => navigate("/voice", { state: { project: p } })} borderColor="var(--color-primary-hover, #EA580C)" />
             <ActionBtn icon={<BarChartIcon />} label="View Reports" onClick={() => navigate("/project-report/" + projectId, { state: { project: p } })} borderColor="var(--color-primary-light, #FB923C)" />
+            {canViewInsights && <ActionBtn icon={<TrendingUp size={18} />} label="Insights" onClick={openInsights} borderColor="#4F46E5" />}
             <ActionBtn icon={<Building2 size={18} />} label="Full Details" onClick={() => navigate("/project-detail/" + projectId, { state: { project: p } })} borderColor="#22C55E" />
           </div>
         </CollapsibleCard>

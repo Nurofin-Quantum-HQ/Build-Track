@@ -31,6 +31,7 @@ const InventoryPage    = lazy(() => import("./screens/inventory_page"));
 const SubscriptionPage = lazy(() => import("./screens/subscription_page"));
 const AuditLogsPage     = lazy(() => import("./screens/audit_logs_page"));
 const ProjectReport    = lazy(() => import("./screens/project_report_page"));
+const ProjectInsights  = lazy(() => import("./screens/insights/ProjectInsightsPage"));
 
 export const routePreloaders = {
   "/": () => import("./screens/dashboard_page"),
@@ -149,6 +150,7 @@ function AppRoutes() {
           <Route path="/settings"    element={<Settings />} />
           <Route path="/managesite"  element={<ManageSite />} />
           <Route path="/project-report/:id" element={<ProjectReport />} />
+          <Route path="/project-insights/:id" element={<ProjectInsights />} />
           <Route path="/reports/:id" element={<ProjectReport />} />
 
           <Route path="/approvals"  element={
