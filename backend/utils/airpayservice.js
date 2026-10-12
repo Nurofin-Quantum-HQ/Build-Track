@@ -185,6 +185,7 @@ async function buildPaymentPayload({
     postUrl: `${AIRPAY_PAYMENT_BASE_URL}?token=${accessToken}`,
     formFields: {
       privatekey,
+      orderid: orderId,
       merchant_id: cfg.merchantId,
       encdata,
       checksum,
