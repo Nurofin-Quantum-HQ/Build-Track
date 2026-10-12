@@ -140,6 +140,57 @@ describe('buildProjectInsights', () => {
     expect(b.untagged).toBe(40);
   });
 
+  test('refunds (negative income) are netted, not dropped', () => {
+    const out = buildProjectInsights(project(), [
+      tx({ type: 'Income', amount: 2500000 }),
+      tx({ type: 'Income', amount: -100000 }),
+      tx({ type: 'Income', amount: -100000 }),
+    ], NOW);
+    expect(out.spend.incomeReceived).toBe(2500000);
+    expect(out.spend.incomeReturned).toBe(200000);
+    expect(out.spend.income).toBe(2300000);
+  });
+
+  test('entries saved before approvals existed (no status) count as approved', () => {
+    const out = buildProjectInsights(project(), [tx({ activityId: 'a1', approvalStatus: undefined }), tx({ activityId: 'a1', approvalStatus: null })], NOW);
+    expect(out.spend.actual).toBe(200);
+    expect(out.spend.pendingCount).toBe(0);
+  });
+
+  test('budgets but nothing ticked: no efficiency guess, phases land on max(budget, spent)', () => {
+    const p = project();
+    p.selectedPhases[0].activities[0].completed = false;
+    const out = buildProjectInsights(p, [tx({ type: 'Wages', activityId: 'a1', amount: 450 })], NOW);
+    expect(out.capabilities.forecastMethod).toBe('budget');
+    expect(out.performance.cpi).toBeNull();
+    expect(out.progress.workDonePct).toBeNull();
+    expect(out.phases[0].forecast).toBe(600);            // budget 600 > spent 450
+    expect(out.phases[0].forecastByCat.labour).toBe(450); // labour already over its 200
+    expect(out.bridge.forecast).toBe(600);
+    expect(out.alerts.some((a) => a.kind === 'setup_ticks')).toBe(true);
+  });
+
+  test('no activity budgets: no bridge, forecast = max(budget, spent), spend-vs-work warning', () => {
+    const p = { _id: 'k', budget: { total: 2000000 }, dates: { startDate: '2026-01-01' },
+      selectedPhases: [{ id: 'f', phaseName: 'Finishing', activities: [
+        { id: 'x1', name: 'Paint', completed: true }, { id: 'x2', name: 'Tiles', completed: false } ] }] };
+    const out = buildProjectInsights(p, [tx({ amount: 1986000, phaseId: 'f' })], NOW);
+    expect(out.capabilities.forecastMethod).toBe('project');
+    expect(out.bridge).toBeNull();
+    expect(out.performance.eac).toBe(2000000);
+    expect(out.progress.workDonePct).toBe(50);
+    expect(out.health.drivers.join(' ')).toMatch(/99% of the budget is spent but 50% of activities are done/);
+    expect(out.alerts.some((a) => a.kind === 'setup_budgets')).toBe(true);
+  });
+
+  test('months follow India time for mobile timestamps', () => {
+    const out = buildProjectInsights(project(), [
+      tx({ amount: 10, date: '2026-09-30T18:30:00.000Z' }), // 1 Oct IST, sent by mobile
+      tx({ amount: 20, date: '2026-09-30' }),
+    ], NOW);
+    expect(out.timeline.monthly.map((m) => `${m.month}:${m.total}`)).toEqual(['2026-09:20', '2026-10:10']);
+  });
+
   test('sCurve is monotonic and clamped', () => {
     expect(sCurve(-1)).toBe(0);
     expect(sCurve(2)).toBe(1);

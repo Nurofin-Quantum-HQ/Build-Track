@@ -47,6 +47,7 @@ export default function ProjectInsightsPage() {
   }, [phase]);
 
   const openById = (pid) => setPhase(data?.phases.find((p) => p.id === pid) || null);
+  const caps = data?.capabilities || { phaseBudgets: true, completionTracking: true };
   const p = data?.project;
   const backToProject = () =>
     fromProject ? navigate("/managesite", { state: { project: fromProject } }) : navigate("/projects");
@@ -101,8 +102,13 @@ export default function ProjectInsightsPage() {
 
             {data.phases.length > 0 ? (
               <>
-                <PhaseMatrix phases={data.phases} onOpen={setPhase} className="span-7 wide-md" />
-                <Bridge d={data} onPhase={openById} className="span-5 wide-md" />
+                <PhaseMatrix phases={data.phases} onOpen={setPhase} hasBudgets={!!caps.phaseBudgets} className="span-7 wide-md" />
+                {data.bridge ? (
+                  <Bridge d={data} onPhase={openById} className="span-5 wide-md" />
+                ) : (
+                  <SetupCard className="span-5 wide-md" title="Budget bridge"
+                    text="Shows how each phase moves the final cost away from the budget. It needs activity budgets: add them to this project's phases in project settings." />
+                )}
               </>
             ) : (
               <section className="pi-card span-12">
@@ -114,7 +120,14 @@ export default function ProjectInsightsPage() {
             <SpendCurve d={data} className="span-8 wide-md" />
             <ProgressLine d={data} className="span-4 wide-md" />
 
-            {data.phases.length > 0 && <SpendVsWork phases={data.phases} onOpen={setPhase} className="span-6" />}
+            {data.phases.length > 0 && (caps.phaseBudgets && caps.completionTracking ? (
+              <SpendVsWork phases={data.phases} onOpen={setPhase} className="span-6" />
+            ) : (
+              <SetupCard className="span-6" title="Spend vs work, by phase"
+                text={caps.phaseBudgets
+                  ? "Compares money spent with work delivered in each phase. Tick activities as done on the project page to turn it on."
+                  : "Compares money spent with work delivered in each phase. It needs activity budgets and activities ticked as done."} />
+            ))}
             <Monthly d={data} className={data.phases.length > 0 ? "span-6" : "span-12"} />
 
             <Mix d={data} className="span-4" />
@@ -126,6 +139,15 @@ export default function ProjectInsightsPage() {
 
       <PhaseSheet phase={phase} onClose={() => setPhase(null)} />
     </div>
+  );
+}
+
+function SetupCard({ title, text, className }) {
+  return (
+    <section className={`pi-card ${className}`}>
+      <h2 className="pi-card-t">{title}</h2>
+      <p className="pi-card-d" style={{ marginTop: 8, maxWidth: 520 }}>{text}</p>
+    </section>
   );
 }
 

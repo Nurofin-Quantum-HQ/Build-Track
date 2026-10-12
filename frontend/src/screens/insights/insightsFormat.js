@@ -1,4 +1,4 @@
-import { AlertTriangle, AlertCircle, Info, CheckCircle2, ArrowUpRight, Eye, Clock, Check } from "lucide-react";
+import { AlertTriangle, AlertCircle, Info, CheckCircle2, ArrowUpRight, Eye, Clock, Check, CircleDashed } from "lucide-react";
 
 // ── Format ───────────────────────────────────────────────────────────────────
 export function inr(v, { sign = false } = {}) {
@@ -32,6 +32,7 @@ export const PHASE = {
   over: { tone: "bad", label: "Over budget", Icon: ArrowUpRight },
   watch: { tone: "warn", label: "Watch", Icon: Eye },
   not_started: { tone: "muted", label: "Not started", Icon: Clock },
+  unbudgeted: { tone: "muted", label: "No budget", Icon: CircleDashed },
   ok: { tone: "good", label: "On plan", Icon: Check },
 };
 export const SEV = {

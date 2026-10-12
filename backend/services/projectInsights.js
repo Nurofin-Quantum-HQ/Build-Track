@@ -6,8 +6,15 @@
 // Conventions (kept identical to computeActivityBudgetSummaries in projectRoutes
 // so numbers match the activity tracker on Project Detail):
 //   Materials -> material, Wages -> labour, Equipment + Expense -> equipment
-//   ("Equipment & other"). Only Approved transactions count as actual spend;
+//   ("Equipment & other"). Approved transactions count as actual spend (entries
+//   saved before approvals existed have no status and count as approved);
 //   Pending ones are reported separately. Income never counts as spend.
+//   Negative amounts are refunds / credits and are netted, never dropped.
+//
+// Forecast method depends on what the project actually records:
+//   "efficiency" — activity budgets AND activities ticked done: earned value (50/50 rule).
+//   "budget"     — activity budgets, nothing ticked: each phase lands on max(budget, spent).
+//   "project"    — no activity budgets: the project lands on max(budget, spent).
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 const CATS = ["material", "labour", "equipment"];
@@ -36,6 +43,21 @@ const toDate = (v) => {
   if (!v) return null;
   const d = new Date(v);
   return Number.isNaN(d.getTime()) ? null : d;
+};
+// The calendar day an entry belongs to, in India time. Dates arrive as
+// "YYYY-MM-DD" (web, CSV) or as a UTC timestamp of local midnight (mobile), so
+// "2026-09-30T18:30:00Z" is 1 Oct. Returned as UTC midnight of that day.
+const IST_MS = 330 * 60 * 1000;
+const entryDay = (v) => {
+  if (!v) return null;
+  if (typeof v === "string" && /^\d{4}-\d{2}-\d{2}$/.test(v)) {
+    const [y, m, d] = v.split("-").map(Number);
+    return new Date(Date.UTC(y, m - 1, d));
+  }
+  const d = toDate(v);
+  if (!d) return null;
+  const ist = new Date(d.getTime() + IST_MS);
+  return new Date(Date.UTC(ist.getUTCFullYear(), ist.getUTCMonth(), ist.getUTCDate()));
 };
 const monthKey = (d) =>
   `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}`;
@@ -93,26 +115,31 @@ function buildProjectInsights(project, transactions, now = new Date()) {
   let pendingCount = 0;
   let paid = 0;
   let outstanding = 0;
-  let income = 0;
+  let incomeIn = 0;
+  let incomeReturned = 0;
   let firstSpendDate = null;
   let recentSpend = 0; // last 60 days, for burn rate
   const recentCutoff = now.getTime() - 60 * DAY_MS;
 
   for (const tx of transactions || []) {
     const amount = num(tx.amount);
-    if (amount <= 0) continue;
+    if (amount === 0) continue;
+    const approval = tx.approvalStatus == null || tx.approvalStatus === "" ? "Approved" : tx.approvalStatus;
     if (tx.type === "Income") {
-      if (tx.approvalStatus !== "Rejected") income += amount;
+      if (approval !== "Rejected") {
+        if (amount > 0) incomeIn += amount;
+        else incomeReturned -= amount;
+      }
       continue;
     }
     const cat = TYPE_TO_CAT[tx.type];
     if (!cat) continue;
-    if (tx.approvalStatus === "Pending") {
+    if (approval === "Pending") {
       pendingAmount += amount;
       pendingCount += 1;
       continue;
     }
-    if (tx.approvalStatus !== "Approved") continue;
+    if (approval !== "Approved") continue;
 
     addTo(actualByCat, cat, amount);
     paid += num(tx.paidAmount);
@@ -128,7 +155,7 @@ function buildProjectInsights(project, transactions, now = new Date()) {
     else addTo(unallocated, cat, amount);
     if (hit) addTo(hit.activity.actual, cat, amount);
 
-    const d = toDate(tx.date) || toDate(tx.createdAt);
+    const d = entryDay(tx.date) || entryDay(tx.createdAt);
     if (d) {
       const key = monthKey(d);
       if (!months.has(key)) months.set(key, { month: key, ...emptyBuckets() });
@@ -187,18 +214,23 @@ function buildProjectInsights(project, transactions, now = new Date()) {
       CATS.map((c) => [c, p.activities.reduce((t, a) => t + a.planned[c] * earnedShare(a), 0)])
     );
   }
-  let workDoneFraction;
-  if (phasePlanned.total > 0) {
+  const hasPhaseBudgets = phasePlanned.total > 0;
+  const tracksCompletion = activitiesDone > 0;
+  const forecastMethod = hasPhaseBudgets && tracksCompletion ? "efficiency" : hasPhaseBudgets ? "budget" : "project";
+  // Work done is only known when someone ticks activities (or sets progress);
+  // null means "not recorded", never 0%.
+  let workDoneFraction = null;
+  if (forecastMethod === "efficiency") {
     workDoneFraction = phases.reduce((s, p) => s + p.earned, 0) / phasePlanned.total;
-  } else if (activitiesTotal > 0) {
+  } else if (activitiesTotal > 0 && tracksCompletion) {
     workDoneFraction = activitiesDone / activitiesTotal;
   } else {
     // project.progress is saved as a 0–1 fraction by PUT /projects/:id, but older
     // records hold a 0–100 percentage.
     const raw = num(project.progress);
-    workDoneFraction = Math.min(Math.max(raw > 1 ? raw / 100 : raw, 0), 1);
+    if (raw > 0) workDoneFraction = Math.min(Math.max(raw > 1 ? raw / 100 : raw, 0), 1);
   }
-  const ev = bac * workDoneFraction;
+  const ev = forecastMethod === "efficiency" ? bac * workDoneFraction : null;
   const ac = actualByCat.total;
 
   // ── Schedule ──────────────────────────────────────────────────────────────
@@ -222,13 +254,11 @@ function buildProjectInsights(project, transactions, now = new Date()) {
       daysLeft: Math.round((end - now) / DAY_MS),
       timeElapsedPct: round(Math.min(Math.max(t, 0), 1) * 100, 1),
     };
-    pv = bac * sCurve(t);
+    if (forecastMethod === "efficiency") pv = bac * sCurve(t);
   }
 
-  const cpi = ac > 0 && ev > 0 ? ev / ac : null;
-  const spi = pv && pv > 0 ? ev / pv : null;
-  const eac = cpi ? ac + (bac - ev) / cpi : null;
-  const vac = eac != null ? bac - eac : null;
+  const cpi = ev != null && ac > 0 && ev > 0 ? ev / ac : null;
+  const spi = ev != null && pv && pv > 0 ? ev / pv : null;
 
   // ── Phase finishing touches ───────────────────────────────────────────────
   for (const p of phases) {
@@ -237,19 +267,25 @@ function buildProjectInsights(project, transactions, now = new Date()) {
     const earnedPct = p.planned.total > 0 ? p.earned / p.planned.total : workPct;
     p.workDonePct = round(workPct * 100, 1);
     p.earnedPct = round(earnedPct * 100, 1);
-    // Where this phase lands if it keeps its current cost efficiency.
-    p.forecast =
-      p.earned > 0 && p.actual.total > 0
-        ? round(p.actual.total + (p.planned.total - p.earned) * (p.actual.total / p.earned))
-        : null;
+    const phaseDone = p.activitiesTotal > 0 && p.activitiesDone === p.activitiesTotal;
+    if (forecastMethod === "efficiency" && p.earned > 0 && p.actual.total > 0) {
+      // Where this phase lands if it keeps its current cost efficiency.
+      p.forecast = round(p.actual.total + (p.planned.total - p.earned) * (p.actual.total / p.earned));
+    } else if (forecastMethod !== "project") {
+      // No efficiency signal: an unfinished phase uses at least its full budget.
+      p.forecast = round(phaseDone ? p.actual.total : Math.max(p.planned.total, p.actual.total));
+    } else {
+      p.forecast = null;
+    }
     p.earned = round(p.earned);
     // Same projection per category; untouched categories land on plan.
     p.forecastByCat = Object.fromEntries(
       CATS.map((c) => {
         const e = p.earnedByCat[c];
         const a = p.actual[c];
+        if (forecastMethod === "project") return [c, null];
+        if (forecastMethod === "budget" || e <= 0) return [c, round(phaseDone ? a : Math.max(p.planned[c], a))];
         if (a === 0) return [c, round(p.planned[c])];
-        if (e <= 0) return [c, null];
         return [c, round(a + (p.planned[c] - e) * (a / e))];
       })
     );
@@ -260,7 +296,8 @@ function buildProjectInsights(project, transactions, now = new Date()) {
     const overCats = CATS.filter((c) => p.planned[c] > 0 && p.actual[c] > p.planned[c]);
     const trendingOver = p.forecast != null && p.planned.total > 0 && p.forecast > p.planned.total * 1.1;
     if (spentPct != null && spentPct > 1) p.status = "over";
-    else if (overCats.length || trendingOver || (spentPct != null && spentPct - earnedPct > 0.15)) p.status = "watch";
+    else if (overCats.length || trendingOver || (forecastMethod === "efficiency" && spentPct != null && spentPct - earnedPct > 0.15)) p.status = "watch";
+    else if (p.planned.total === 0 && (p.actual.total > 0 || p.activitiesDone > 0)) p.status = "unbudgeted";
     else if (p.actual.total === 0 && p.activitiesDone === 0) p.status = "not_started";
     else p.status = "ok";
     p.overCategories = overCats;
@@ -268,21 +305,30 @@ function buildProjectInsights(project, transactions, now = new Date()) {
 
   // ── Budget bridge (waterfall): budget → reserve → per-phase deltas → untagged → forecast.
   // A bottom-up forecast that adds up exactly, so every rupee is traceable to a phase.
-  const bridgeSteps = phases
-    .map((p) => ({
-      phaseId: p.id,
-      name: p.name,
-      delta: round(p.forecast != null ? p.forecast - p.planned.total : Math.max(0, p.actual.total - p.planned.total)),
-    }))
-    .filter((st) => st.delta !== 0);
-  const reserve = usePhasePlan ? 0 : round(phasePlanned.total - bac);
-  const bridge = {
-    budget: round(bac),
-    reserve,
-    steps: bridgeSteps,
-    untagged: round(unallocated.total),
-    forecast: round(bac + reserve + bridgeSteps.reduce((t, st) => t + st.delta, 0) + unallocated.total),
-  };
+  // Only meaningful when phases carry budgets; otherwise there is nothing to bridge.
+  let bridge = null;
+  if (hasPhaseBudgets) {
+    const bridgeSteps = phases
+      .map((p) => ({
+        phaseId: p.id,
+        name: p.name,
+        delta: round(p.forecast != null ? p.forecast - p.planned.total : Math.max(0, p.actual.total - p.planned.total)),
+      }))
+      .filter((st) => st.delta !== 0);
+    const reserve = usePhasePlan ? 0 : round(phasePlanned.total - bac);
+    bridge = {
+      budget: round(bac),
+      reserve,
+      steps: bridgeSteps,
+      untagged: round(unallocated.total),
+      forecast: round(bac + reserve + bridgeSteps.reduce((t, st) => t + st.delta, 0) + unallocated.total),
+    };
+  }
+  let eac = null;
+  if (forecastMethod === "efficiency" && cpi) eac = ac + (bac - ev) / cpi;
+  else if (bridge) eac = bridge.forecast;
+  else if (bac > 0 || ac > 0) eac = Math.max(bac, ac);
+  const vac = eac != null ? bac - eac : null;
 
   // ── Timeline: monthly burn + cumulative planned/actual/forecast ──────────
   const monthly = [...months.values()].sort((a, b2) => a.month.localeCompare(b2.month));
@@ -317,9 +363,18 @@ function buildProjectInsights(project, transactions, now = new Date()) {
   // ── Health score ──────────────────────────────────────────────────────────
   let score = 100;
   const drivers = [];
+  const spentFrac = bac > 0 ? ac / bac : null;
   if (bac > 0 && ac > bac) {
     score -= 35;
     drivers.push("Spend has passed the total budget");
+  } else if (spentFrac != null && schedule.timeElapsedPct != null && spentFrac * 100 - schedule.timeElapsedPct > 15) {
+    score -= 10;
+    drivers.push(`${Math.round(spentFrac * 100)}% of the budget is spent with ${Math.round(schedule.timeElapsedPct)}% of the time gone`);
+  }
+  if (forecastMethod !== "efficiency" && spentFrac != null && workDoneFraction != null && spentFrac - workDoneFraction > 0.2) {
+    const gap = (spentFrac - workDoneFraction) * 100;
+    score -= Math.min(25, gap / 2);
+    drivers.push(`${Math.round(spentFrac * 100)}% of the budget is spent but ${Math.round(workDoneFraction * 100)}% of activities are done`);
   }
   if (cpi != null && cpi < 1) {
     const hit = Math.min(30, (1 - cpi) * 100);
@@ -347,7 +402,7 @@ function buildProjectInsights(project, transactions, now = new Date()) {
     score -= Math.min(20, overPhases.length * 6);
     drivers.push(`${overPhases.length} phase${overPhases.length > 1 ? "s" : ""} over budget`);
   }
-  if (end && now > end && workDoneFraction < 1) {
+  if (end && now > end && (workDoneFraction == null || workDoneFraction < 1)) {
     score -= 15;
     drivers.push("Past the expected end date");
   }
@@ -375,7 +430,7 @@ function buildProjectInsights(project, transactions, now = new Date()) {
     });
   });
   phases
-    .filter((p) => p.forecast != null && p.planned.total > 0 && p.forecast > p.planned.total * 1.1 && p.earnedPct < 100)
+    .filter((p) => forecastMethod === "efficiency" && p.forecast != null && p.planned.total > 0 && p.forecast > p.planned.total * 1.1 && p.earnedPct < 100)
     .sort((a, b2) => b2.forecast - b2.planned.total - (a.forecast - a.planned.total))
     .slice(0, 2)
     .forEach((p) => {
@@ -392,7 +447,7 @@ function buildProjectInsights(project, transactions, now = new Date()) {
   if (dailyBurn > 0 && bac > ac) {
     const runway = (bac - ac) / dailyBurn;
     const exhaust = new Date(now.getTime() + runway * DAY_MS);
-    if (end && exhaust < end && workDoneFraction < 1) {
+    if (end && exhaust < end && (workDoneFraction == null || workDoneFraction < 1)) {
       alerts.push({
         severity: "warning",
         kind: "runway",
@@ -414,6 +469,11 @@ function buildProjectInsights(project, transactions, now = new Date()) {
   }
   if (ac > 0 && unallocated.total / ac > 0.05) {
     alerts.push({ severity: "info", kind: "unallocated", title: "Spend not tagged to a phase", amount: round(unallocated.total) });
+  }
+  if (phases.length && !hasPhaseBudgets && ac > 0) {
+    alerts.push({ severity: "info", kind: "setup_budgets", title: "Add activity budgets to compare each phase against its plan" });
+  } else if (hasPhaseBudgets && !tracksCompletion && ac > 0) {
+    alerts.push({ severity: "info", kind: "setup_ticks", title: "Tick activities as done for a sharper forecast" });
   }
 
   const strip = (p) => ({
@@ -438,7 +498,13 @@ function buildProjectInsights(project, transactions, now = new Date()) {
     progress: {
       activitiesDone,
       activitiesTotal,
-      workDonePct: round(workDoneFraction * 100, 1),
+      workDonePct: workDoneFraction == null ? null : round(workDoneFraction * 100, 1),
+    },
+    capabilities: {
+      phaseBudgets: hasPhaseBudgets,
+      completionTracking: tracksCompletion,
+      endDate: !!end,
+      forecastMethod,
     },
     budget: {
       total: round(bac),
@@ -456,11 +522,13 @@ function buildProjectInsights(project, transactions, now = new Date()) {
       pendingCount,
       paid: round(paid),
       outstanding: round(outstanding),
-      income: round(income),
+      income: round(incomeIn - incomeReturned),
+      incomeReceived: round(incomeIn),
+      incomeReturned: round(incomeReturned),
       dailyBurn: round(dailyBurn),
     },
     performance: {
-      earnedValue: round(ev),
+      earnedValue: ev == null ? null : round(ev),
       plannedValue: pv == null ? null : round(pv),
       cpi: cpi == null ? null : round(cpi, 3),
       spi: spi == null ? null : round(spi, 3),

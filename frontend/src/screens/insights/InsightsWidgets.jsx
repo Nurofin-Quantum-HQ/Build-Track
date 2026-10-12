@@ -43,18 +43,27 @@ function Tip({ children }) {
 // ── Verdict ──────────────────────────────────────────────────────────────────
 export function Verdict({ d }) {
   const h = HEALTH[d.health.status] || HEALTH.on_track;
-  const forecast = d.bridge?.forecast ?? d.performance.eac;
+  const method = d.capabilities?.forecastMethod || "efficiency";
+  const forecast = d.performance.eac;
   const budget = d.budget.total;
-  const delta = forecast == null ? null : forecast - budget;
-  const deltaPct = delta == null || budget <= 0 ? null : (delta / budget) * 100;
-  const headline =
-    forecast == null
+  const spent = d.spend.actual;
+  // Without activity budgets there is nothing to project from: state spend vs budget.
+  const useSpend = method === "project";
+  const ref = useSpend ? spent : forecast;
+  const delta = ref == null || budget <= 0 ? null : ref - budget;
+  const deltaPct = delta == null ? null : (delta / budget) * 100;
+  const headline = useSpend
+    ? budget > 0
+      ? `${inr(spent)} spent of the ${inr(budget)} budget — ${inr(Math.abs(budget - spent))} ${spent > budget ? "over" : "left"}.`
+      : `${inr(spent)} spent so far. No budget set.`
+    : forecast == null
       ? "Not enough approved spend yet to forecast the final cost."
       : Math.abs(delta) < budget * 0.01
         ? `Forecast to finish on budget at ${inr(forecast)}.`
         : delta > 0
           ? `Forecast to finish at ${inr(forecast)} — ${inr(delta)} over budget.`
           : `Forecast to finish at ${inr(forecast)} — ${inr(-delta)} under budget.`;
+  const basis = method === "budget" ? "Assumes each unfinished phase uses its full budget." : method === "efficiency" ? "Based on cost per activity completed so far." : null;
   const score = d.health.score;
   return (
     <Card className="span-4 wide-md">
@@ -65,11 +74,18 @@ export function Verdict({ d }) {
         </span>
       </div>
       <p className="pi-verdict-h">{headline}</p>
-      {deltaPct != null && Math.abs(deltaPct) >= 1 && (
-        <p style={{ margin: 0, fontSize: 14, fontWeight: 500, color: delta > 0 ? "var(--bad)" : "var(--good)" }}>
-          {deltaPct > 0 ? "+" : ""}{deltaPct.toFixed(1)}% vs the {inr(budget)} budget
-        </p>
-      )}
+      {useSpend
+        ? budget > 0 && (
+          <p style={{ margin: 0, fontSize: 14, fontWeight: 500, color: spent > budget ? "var(--bad)" : "var(--ink-2)" }}>
+            {d.spend.spentPct?.toFixed(1)}% of the budget used
+          </p>
+        )
+        : deltaPct != null && Math.abs(deltaPct) >= 1 && (
+          <p style={{ margin: 0, fontSize: 14, fontWeight: 500, color: delta > 0 ? "var(--bad)" : "var(--good)" }}>
+            {deltaPct > 0 ? "+" : ""}{deltaPct.toFixed(1)}% vs the {inr(budget)} budget
+          </p>
+        )}
+      {basis && <p style={{ margin: "4px 0 0", fontSize: 12.5, color: "var(--ink-3)" }}>{basis}</p>}
       <div className="pi-meter" role="meter" aria-valuemin={0} aria-valuemax={100} aria-valuenow={score} aria-label="Health score">
         <div className="pi-meter-track">
           <i style={{ flex: 55, background: "#fecaca" }} />
@@ -104,11 +120,13 @@ export function Kpis({ d }) {
   const dl = d.schedule.daysLeft;
   const items = [
     { l: "Spent", v: inr(d.spend.actual), s: `${pct(d.spend.spentPct)} of ${inr(d.budget.total)}` },
-    { l: "Value of work done", v: inr(d.performance.earnedValue), s: `${pct(d.progress.workDonePct)} earned` },
+    d.performance.earnedValue != null
+      ? { l: "Value of work done", v: inr(d.performance.earnedValue), s: `${pct(d.progress.workDonePct)} earned` }
+      : { l: "Work done", v: d.progress.workDonePct == null ? "—" : pct(d.progress.workDonePct), s: d.progress.workDonePct == null ? "Tick activities as done to track" : `${d.progress.activitiesDone} of ${d.progress.activitiesTotal} activities` },
     {
       l: "Cost efficiency",
       v: cpi == null ? "—" : `₹${cpi.toFixed(2)}`,
-      s: cpi == null ? "Needs approved spend" : "of work per ₹1 spent",
+      s: cpi == null ? (d.capabilities?.phaseBudgets ? "Tick activities as done to measure" : "Needs activity budgets") : "of work per ₹1 spent",
       b: cpi == null ? null : cpi >= 1 ? ["good", "Efficient"] : cpi >= 0.9 ? ["warn", "Slight leak"] : ["bad", "Leaking"],
     },
     {
@@ -191,7 +209,10 @@ export function Bridge({ d, onPhase, className = "span-5" }) {
     rows.push({ label, from: run, to: run + delta, delta, ...extra });
     run += delta;
   };
-  if (Math.abs(b.reserve) >= 1) add("Unassigned reserve", b.reserve, { hint: "Budget not given to any phase" });
+  if (Math.abs(b.reserve) >= 1) {
+    if (b.reserve < 0) add("Unassigned reserve", b.reserve, { hint: "Budget not given to any phase" });
+    else add("Phases over project budget", b.reserve, { hint: "Phase budgets add up to more" });
+  }
   [...b.steps].sort((x, y) => y.delta - x.delta).forEach((s) => add(s.name, s.delta, { phaseId: s.phaseId }));
   if (Math.abs(b.untagged) >= 1) add("Untagged spend", b.untagged, { hint: "Entries without a phase" });
   const lo = Math.min(0, ...rows.map((r) => Math.min(r.from, r.to)));
@@ -275,12 +296,14 @@ function MatrixCell({ planned, actual, forecast, bold }) {
   );
 }
 
-export function PhaseMatrix({ phases, onOpen, className = "span-7" }) {
+export function PhaseMatrix({ phases, onOpen, className = "span-7", hasBudgets = true }) {
   return (
     <Card
       className={className}
-      title="Phase budgets"
-      description="Number = % of each budget already spent. Colour = where it is heading at completion. Click a phase for detail."
+      title={hasBudgets ? "Phase budgets" : "Spend by phase"}
+      description={hasBudgets
+        ? "Number = % of each budget already spent. Colour = where it is heading at completion. Click a phase for detail."
+        : "This project has no activity budgets yet, so each cell shows the amount spent. Add budgets in project settings to compare against plan."}
     >
       <div style={{ overflowX: "auto" }}>
         <table className="pi-matrix">
@@ -370,9 +393,9 @@ export function ProgressLine({ d, className = "span-4" }) {
   const spent = d.spend.spentPct ?? 0;
   const work = d.progress.workDonePct;
   const time = d.schedule.timeElapsedPct;
-  const gap = spent - work;
+  const gap = work == null ? null : spent - work;
   const items = [
-    ["Work done", work, "var(--good)"],
+    ...(work != null ? [["Work done", work, "var(--good)"]] : []),
     ["Money spent", spent, "var(--primary)"],
     ...(time != null ? [["Time used", time, "var(--ink-3)"]] : []),
   ];
@@ -391,11 +414,13 @@ export function ProgressLine({ d, className = "span-4" }) {
       ))}
       <div style={{ marginTop: "auto", display: "flex", gap: 8, padding: 12, borderRadius: 8, background: gap > 3 ? "var(--warn-soft)" : "var(--muted)", fontSize: 13.5, color: "var(--ink-2)" }}>
         {gap > 3 ? <AlertTriangle size={17} color="var(--warn)" style={{ flexShrink: 0 }} /> : <TrendingUp size={17} color="var(--ink-3)" style={{ flexShrink: 0 }} />}
-        {gap > 3
-          ? `Money is ${gap.toFixed(0)} pts ahead of work — paying for work not yet delivered.`
-          : gap < -3
-            ? `Work is ${(-gap).toFixed(0)} pts ahead of money — good cost control.`
-            : "Money and work are moving together."}
+        {gap == null
+          ? "Work done isn't recorded yet. Tick activities as done on the project page to compare work against money."
+          : gap > 3
+            ? `Money is ${gap.toFixed(0)} pts ahead of work — paying for work not yet delivered.`
+            : gap < -3
+              ? `Work is ${(-gap).toFixed(0)} pts ahead of money — good cost control.`
+              : "Money and work are moving together."}
       </div>
     </Card>
   );
@@ -436,9 +461,9 @@ export function SpendCurve({ d, className = "span-8" }) {
       action={
         <div className="pi-legend">
           <span><i className="pi-sw line" style={{ borderColor: "var(--primary)" }} />Actual</span>
-          <span><i className="pi-sw dash" style={{ borderColor: "var(--ink-3)" }} />Planned</span>
-          <span><i className="pi-sw dash" style={{ borderColor: "var(--bad)" }} />Forecast</span>
-          <span><i className="pi-sw dash" style={{ borderColor: "#d97706" }} />Budget</span>
+          {data.some((r) => r.planned != null) && <span><i className="pi-sw dash" style={{ borderColor: "var(--ink-3)" }} />Planned</span>}
+          {data.some((r) => r.forecast != null) && <span><i className="pi-sw dash" style={{ borderColor: "var(--bad)" }} />Forecast</span>}
+          {d.budget.total > 0 && <span><i className="pi-sw dash" style={{ borderColor: "#d97706" }} />Budget</span>}
         </div>
       }
     >
@@ -573,7 +598,7 @@ export function Cash({ d, className = "span-4" }) {
     ["Paid out", inr(s.paid), "var(--good)", CheckCircle2],
     ["Still owed to vendors", inr(s.outstanding), "var(--warn)", Clock],
     ["Awaiting approval", inr(s.pendingApproval), "var(--ink-3)", CircleDot, `${s.pendingCount} entries`],
-    ["Received from client", inr(s.income), "var(--ink-3)", ArrowDownRight],
+    ["Received from client", inr(s.income), "var(--ink-3)", ArrowDownRight, s.incomeReturned > 0 ? `${inr(s.incomeReceived)} received · ${inr(s.incomeReturned)} returned` : undefined],
     [net >= 0 ? "Cash in hand" : "Funding gap", inr(Math.abs(net)), net >= 0 ? "var(--good)" : "var(--bad)", Circle, "Received minus paid out"],
   ];
   return (
