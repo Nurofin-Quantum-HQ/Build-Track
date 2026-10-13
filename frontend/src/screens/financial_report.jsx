@@ -133,7 +133,7 @@ export default function FinancialReportPage() {
   const [toast, setToast] = useState({ msg: "", type: "info" });
 
   const [showExportModal, setShowExportModal] = useState(false);
-  const [selectedProjectId, setSelectedProjectId] = useState(() => sessionStorage.getItem("fr_proj") || "all");
+  const [selectedProjectId, setSelectedProjectId] = useState(() => sessionStorage.getItem("fr_proj") || useProjectStore.getState().selectedProject?._id || "all");
   const [selectedFloor, setSelectedFloor] = useState(() => sessionStorage.getItem("fr_floor") || "");
   const [selectedPhaseId, setSelectedPhaseId] = useState(() => sessionStorage.getItem("fr_phase") || "");
   const [selectedActivityName, setSelectedActivityName] = useState(() => sessionStorage.getItem("fr_activity") || "");
@@ -145,7 +145,7 @@ export default function FinancialReportPage() {
 
   const [searchQuery, setSearchQuery] = useState(() => sessionStorage.getItem("fr_search") || "");
   const [selectedItemName, setSelectedItemName] = useState(() => sessionStorage.getItem("fr_item") || "");
-  const [reportGenerated, setReportGenerated] = useState(false);
+  const [reportGenerated, setReportGenerated] = useState(true);
   const [showSuggestions, setShowSuggestions] = useState(false);
 
   const [selectedPaymentStatus, setSelectedPaymentStatus] = useState(() => sessionStorage.getItem("fr_payStatus") || "All");
@@ -260,9 +260,8 @@ export default function FinancialReportPage() {
   };
 
   useEffect(() => {
-    setSearchQuery("");
     setSelectedItemName("");
-    setReportGenerated(false);
+    setReportGenerated(true);
     setShowSuggestions(false);
     setCurrentPage(1);
   }, [activeTab]);
@@ -384,30 +383,24 @@ export default function FinancialReportPage() {
         return false;
       }
 
-      if (activeTab !== "All" && reportGenerated) {
-        if (searchQuery.trim().length > 0) {
-          const q = searchQuery.toLowerCase();
-          const descMatch = entry.description.toLowerCase().includes(q);
-          const brandMatch = (entry.brand || '').toLowerCase().includes(q);
-          if (!descMatch && !brandMatch) return false;
-        }
-
-        if (selectedItemName && selectedItemName !== "All") {
-          if (entry.description !== selectedItemName) return false;
-        }
-      }
-
-      if (activeTab === "All" && searchQuery.trim().length > 0) {
-        const q = searchQuery.toLowerCase();
+      if (searchQuery.trim().length > 0) {
+        const q = searchQuery.toLowerCase().trim();
+        const cleanNumeric = q.replace(/^(rs\.?|₹)\s*/i, '').replace(/,/g, '').trim();
         const projectName = getProjectName(entry.projectId).toLowerCase();
-        const descMatch = entry.description.toLowerCase().includes(q);
+        const descMatch = (entry.description || '').toLowerCase().includes(q);
         const brandMatch = (entry.brand || '').toLowerCase().includes(q);
+        const contractorMatch = (entry.contractor || '').toLowerCase().includes(q);
+        const supplierMatch = (entry.supplier || '').toLowerCase().includes(q);
+        const categoryMatch = (entry.category || '').toLowerCase().includes(q);
+        const workerMatch = (entry.workerName || '').toLowerCase().includes(q);
+        const notesMatch = (entry.notes || '').toLowerCase().includes(q);
+        const remarksMatch = (entry.remarks || '').toLowerCase().includes(q);
         const projectMatch = projectName.includes(q);
         const floorMatch = (entry.floor || '').toLowerCase().includes(q);
         const phaseMatch = (entry.phase || '').toLowerCase().includes(q);
         const activityMatch = (entry.activity || '').toLowerCase().includes(q);
-        const amountMatch = entry.amount.toString().includes(q);
-        const typeMatch = entry.type.toLowerCase().includes(q);
+        const unitMatch = (entry.unit || '').toLowerCase().includes(q);
+        const typeMatch = (entry.type || '').toLowerCase().includes(q);
         const statusMatch = getPaymentStatusLabel(entry.paymentStatus, {
           amount: entry.amount,
           paidAmount: entry.paidAmount,
@@ -415,10 +408,54 @@ export default function FinancialReportPage() {
         const dateMatch = formatDateShort(entry.date).toLowerCase().includes(q);
         const payDateMatch = entry.paymentDate ? formatDateShort(entry.paymentDate).toLowerCase().includes(q) : false;
 
-        if (!descMatch && !brandMatch && !projectMatch && !floorMatch && !phaseMatch &&
-            !activityMatch && !amountMatch && !typeMatch && !statusMatch && !dateMatch && !payDateMatch) {
+        let amountMatch = false;
+        if (cleanNumeric.length > 0 && !isNaN(Number(cleanNumeric))) {
+          amountMatch =
+            String(entry.amount).includes(cleanNumeric) ||
+            String(Math.round(entry.amount)).includes(cleanNumeric) ||
+            String(entry.ratePerUnit || 0).includes(cleanNumeric) ||
+            String(entry.paidAmount || 0).includes(cleanNumeric) ||
+            String(Math.round(entry.paidAmount || 0)).includes(cleanNumeric) ||
+            String((entry.amount - entry.paidAmount) || 0).includes(cleanNumeric) ||
+            String(Math.round((entry.amount - entry.paidAmount) || 0)).includes(cleanNumeric) ||
+            String(entry.quantity || 0).includes(cleanNumeric);
+        }
+        if (!amountMatch) {
+          amountMatch =
+            formatINR(entry.amount).toLowerCase().includes(q) ||
+            formatINR(entry.ratePerUnit || 0).toLowerCase().includes(q) ||
+            formatINR(entry.paidAmount || 0).toLowerCase().includes(q);
+        }
+
+        let rawTxMatch = false;
+        if (entry.rawTx && typeof entry.rawTx === 'object') {
+          for (const key of Object.keys(entry.rawTx)) {
+            const val = entry.rawTx[key];
+            if (typeof val === 'string' && val.toLowerCase().includes(q)) {
+              rawTxMatch = true;
+              break;
+            }
+          }
+        }
+
+        if (!descMatch && !brandMatch && !contractorMatch && !supplierMatch &&
+            !categoryMatch && !workerMatch && !notesMatch && !remarksMatch &&
+            !projectMatch && !floorMatch && !phaseMatch && !activityMatch &&
+            !unitMatch && !amountMatch && !typeMatch && !statusMatch &&
+            !dateMatch && !payDateMatch && !rawTxMatch) {
           return false;
         }
+      }
+
+      if (activeTab !== "All" && selectedItemName && selectedItemName !== "All") {
+        const matchesItem =
+          entry.description === selectedItemName ||
+          entry.brand === selectedItemName ||
+          entry.contractor === selectedItemName ||
+          entry.category === selectedItemName ||
+          entry.supplier === selectedItemName ||
+          entry.workerName === selectedItemName;
+        if (!matchesItem) return false;
       }
 
       if (selectedPaymentStatus !== "All") {
@@ -529,8 +566,21 @@ export default function FinancialReportPage() {
 
   const textQuerySuggestions = useMemo(() => {
     if (!searchQuery.trim()) return [];
-    return uniqueItemNames.filter(name => String(name).toLowerCase().includes(searchQuery.toLowerCase()));
-  }, [uniqueItemNames, searchQuery]);
+    const q = searchQuery.toLowerCase();
+    const targetType = activeTab === "Materials" ? "material" : activeTab === "Labour" ? "labour" : (activeTab === "Equipment" ? "equipment" : null);
+    const candidates = new Set();
+    for (const e of transactions) {
+      if (targetType && e.type !== targetType) continue;
+      if (selectedProjectId !== "all" && String(e.projectId) !== selectedProjectId) continue;
+      if (e.description) candidates.add(e.description);
+      if (e.brand) candidates.add(e.brand);
+      if (e.contractor) candidates.add(e.contractor);
+      if (e.supplier) candidates.add(e.supplier);
+      if (e.workerName) candidates.add(e.workerName);
+      if (e.category) candidates.add(e.category);
+    }
+    return [...candidates].filter(name => String(name).toLowerCase().includes(q));
+  }, [transactions, activeTab, selectedProjectId, searchQuery]);
 
   const showSuggestionsList = showSuggestions && searchQuery.trim().length > 0 && textQuerySuggestions.length > 0 &&
     !(textQuerySuggestions.length === 1 && textQuerySuggestions[0].toLowerCase() === searchQuery.toLowerCase());
@@ -1027,14 +1077,26 @@ export default function FinancialReportPage() {
               <div style={{ position: "relative" }}>
                 <select
                   disabled={selectedProjectId === "all" || floors.length === 0}
-                  value={selectedFloor || "Select Floor"}
+                  value={floors.length === 0 ? "" : (selectedFloor || "Select Floor")}
                   onChange={e => {
                     setSelectedFloor(e.target.value === "Select Floor" ? "" : e.target.value);
                     setCurrentPage(1);
                   }}
-                  style={{ width: "100%", padding: "10px 14px", borderRadius: 10, border: `1.2px solid #E2E4FA`, background: selectedProjectId === "all" || floors.length === 0 ? "#F9FAFB" : "#FFF", fontSize: 13, fontWeight: "600", color: selectedProjectId === "all" || floors.length === 0 ? "#9CA3AF" : colors.textPrimary, outline: "none", appearance: "none", cursor: "pointer" }}
+                  style={{
+                    width: "100%",
+                    padding: "10px 14px",
+                    borderRadius: 10,
+                    border: `1.2px solid #E2E4FA`,
+                    background: selectedProjectId === "all" || floors.length === 0 ? "#F9FAFB" : "#FFF",
+                    fontSize: 13,
+                    fontWeight: "600",
+                    color: selectedProjectId === "all" || floors.length === 0 ? "#9CA3AF" : colors.textPrimary,
+                    outline: "none",
+                    appearance: "none",
+                    cursor: selectedProjectId === "all" || floors.length === 0 ? "not-allowed" : "pointer"
+                  }}
                 >
-                  <option value="Select Floor">Select Floor</option>
+                  <option value={floors.length === 0 ? "" : "Select Floor"}>{floors.length === 0 ? "" : "Select Floor"}</option>
                   {floors.map((fl, idx) => (
                     <option key={idx} value={typeof fl === 'string' ? fl : fl.name}>{typeof fl === 'string' ? fl : fl.name}</option>
                   ))}
@@ -1273,7 +1335,7 @@ export default function FinancialReportPage() {
                   setSearchQuery(e.target.value);
                   setCurrentPage(1);
                 }}
-                placeholder="Search by description, brand, project, phase, activity..."
+                placeholder="Search by description, brand, contractor, supplier, price..."
                 style={{ border: "none", background: "transparent", width: "100%", outline: "none", fontSize: 13, color: colors.textPrimary }}
               />
               {searchQuery.trim().length > 0 && (
@@ -1305,9 +1367,22 @@ export default function FinancialReportPage() {
                     setSelectedItemName("");
                     setShowSuggestions(true);
                   }}
-                  placeholder={`Search ${activeTab.toLowerCase()}...`}
+                  placeholder={`Search ${activeTab.toLowerCase()}, contractors, workers, prices...`}
                   style={{ border: "none", background: "transparent", width: "100%", outline: "none", fontSize: 13, color: colors.textPrimary }}
                 />
+                {searchQuery.trim().length > 0 && (
+                  <button
+                    onClick={() => {
+                      setSearchQuery("");
+                      setSelectedItemName("");
+                      setShowSuggestions(false);
+                      setCurrentPage(1);
+                    }}
+                    style={{ background: "none", border: "none", cursor: "pointer", color: "#757299", display: "flex", alignItems: "center", padding: 0 }}
+                  >
+                    <X size={16} />
+                  </button>
+                )}
               </div>
 
               {showSuggestionsList && (

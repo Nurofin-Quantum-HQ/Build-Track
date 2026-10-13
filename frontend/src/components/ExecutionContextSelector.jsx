@@ -73,17 +73,21 @@ export default function ExecutionContextSelector({ value, onChange, compact }) {
           <label style={labelStyle}>FLOOR</label>
           <div style={{ position: "relative" }}>
             <select
-              value={floor}
+              value={floors.length === 0 ? "" : floor}
               onChange={e => update({ floor: e.target.value, phaseId: "", activityId: "" })}
-              style={{ ...selectStyle, opacity: projectId ? 1 : 0.5 }}
-              disabled={!projectId}
+              style={{
+                ...selectStyle,
+                opacity: (projectId && floors.length > 0) ? 1 : 0.5,
+                cursor: (projectId && floors.length > 0) ? "pointer" : "not-allowed",
+              }}
+              disabled={!projectId || floors.length === 0}
             >
-              <option value="">Select floor</option>
+              <option value="">{floors.length === 0 ? "" : "Select floor"}</option>
               {floors.map(f => (
                 <option key={f} value={f}>{f}</option>
               ))}
             </select>
-            <span style={{ position: "absolute", right: 12, top: "50%", transform: "translateY(-50%)", color: "#aaa", pointerEvents: "none", fontSize: 12 }}>▾</span>
+            <span style={{ position: "absolute", right: 12, top: "50%", transform: "translateY(-50%)", color: (!projectId || floors.length === 0) ? "#ccc" : "#aaa", pointerEvents: "none", fontSize: 12 }}>▾</span>
           </div>
         </div>
         <div>

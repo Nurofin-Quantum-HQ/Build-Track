@@ -2,11 +2,6 @@ import { useState } from 'react';
 import { Building, ChevronDown, ChevronRight, MapPin, Layers, Hammer } from 'lucide-react';
 import { ACTIVITY_OPTIONS, PHASE_OPTIONS } from '../utils/voiceConstants';
 
-const FLOOR_OPTIONS = [
-  'Basement', 'Ground', '1st', '2nd', '3rd', '4th', '5th',
-  '6th', '7th', '8th', '9th', '10th',
-];
-
 export default function ExecutionContextStep({ projects, onComplete, onCancel }) {
   const [selectedProject, setSelectedProject] = useState(null);
   const [floor, setFloor] = useState('');
@@ -16,6 +11,9 @@ export default function ExecutionContextStep({ projects, onComplete, onCancel })
   const [showFloorDropdown, setShowFloorDropdown] = useState(false);
   const [showPhaseDropdown, setShowPhaseDropdown] = useState(false);
   const [showActivityDropdown, setShowActivityDropdown] = useState(false);
+
+  const projectFloors = selectedProject?.floors || [];
+  const hasFloors = projectFloors.length > 0;
 
   const handleComplete = () => {
     onComplete({
@@ -83,7 +81,7 @@ export default function ExecutionContextStep({ projects, onComplete, onCancel })
               {(projects || []).map((p, i) => (
                 <div
                   key={p._id || i}
-                  onClick={() => { setSelectedProject(p); setShowProjectDropdown(false); }}
+                  onClick={() => { setSelectedProject(p); setFloor(''); setShowProjectDropdown(false); }}
                   style={{
                     ...dropdownItemStyle,
                     background: selectedProject?._id === p._id ? '#FFF5F0' : 'transparent',
@@ -113,15 +111,27 @@ export default function ExecutionContextStep({ projects, onComplete, onCancel })
         </label>
         <div style={{ position: 'relative' }}>
           <button
-            onClick={() => { setShowFloorDropdown(!showFloorDropdown); setShowProjectDropdown(false); setShowPhaseDropdown(false); setShowActivityDropdown(false); }}
-            style={dropdownBtnStyle}
+            disabled={!selectedProject || !hasFloors}
+            onClick={() => {
+              if (selectedProject && hasFloors) {
+                setShowFloorDropdown(!showFloorDropdown);
+                setShowProjectDropdown(false);
+                setShowPhaseDropdown(false);
+                setShowActivityDropdown(false);
+              }
+            }}
+            style={{
+              ...dropdownBtnStyle,
+              opacity: (!selectedProject || !hasFloors) ? 0.6 : 1,
+              cursor: (!selectedProject || !hasFloors) ? 'not-allowed' : 'pointer',
+            }}
           >
-            <span style={{ color: floor ? '#1F2937' : '#9CA3AF' }}>
-              {floor || 'Select floor...'}
+            <span style={{ color: (selectedProject && hasFloors && floor) ? '#1F2937' : '#9CA3AF' }}>
+              {selectedProject && !hasFloors ? '' : (floor || 'Select floor...')}
             </span>
-            <ChevronDown size={16} color="#6B7280" />
+            <ChevronDown size={16} color={(!selectedProject || !hasFloors) ? '#D1D5DB' : '#6B7280'} />
           </button>
-          {showFloorDropdown && (
+          {showFloorDropdown && hasFloors && (
             <div style={dropdownListStyle}>
               <div
                 onClick={() => { setFloor(''); setShowFloorDropdown(false); }}
@@ -129,18 +139,21 @@ export default function ExecutionContextStep({ projects, onComplete, onCancel })
               >
                 None
               </div>
-              {FLOOR_OPTIONS.map(f => (
-                <div
-                  key={f}
-                  onClick={() => { setFloor(f); setShowFloorDropdown(false); }}
-                  style={{
-                    ...dropdownItemStyle,
-                    background: floor === f ? '#FFF5F0' : 'transparent',
-                  }}
-                >
-                  {f}
-                </div>
-              ))}
+              {projectFloors.map(f => {
+                const fName = typeof f === 'string' ? f : f.name;
+                return (
+                  <div
+                    key={fName}
+                    onClick={() => { setFloor(fName); setShowFloorDropdown(false); }}
+                    style={{
+                      ...dropdownItemStyle,
+                      background: floor === fName ? '#FFF5F0' : 'transparent',
+                    }}
+                  >
+                    {fName}
+                  </div>
+                );
+              })}
             </div>
           )}
         </div>

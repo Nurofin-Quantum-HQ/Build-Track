@@ -120,7 +120,28 @@ export default function ReportsPage() {
     if (selectedProject !== "all") list = list.filter(t => (t.project?._id || t.project) === selectedProject);
     if (selectedType !== "All") list = list.filter(t => t.type === selectedType);
     if (dateRange.start) list = list.filter(t => { const d = new Date(t.date); return d >= dateRange.start && d <= dateRange.end; });
-    if (search) { const q = search.toLowerCase(); list = list.filter(t => (t.title || "").toLowerCase().includes(q) || (t.category || "").toLowerCase().includes(q) || (t.brand || "").toLowerCase().includes(q)); }
+    if (search) {
+      const q = search.toLowerCase().trim();
+      const cleanNum = q.replace(/^(rs\.?|₹)\s*/i, '').replace(/,/g, '').trim();
+      list = list.filter(t => {
+        const titleMatch = (t.title || "").toLowerCase().includes(q);
+        const catMatch = (t.category || "").toLowerCase().includes(q);
+        const brandMatch = (t.brand || "").toLowerCase().includes(q);
+        const supplierMatch = (t.supplier || "").toLowerCase().includes(q);
+        const contractorMatch = (t.contractor || "").toLowerCase().includes(q);
+        const workerMatch = (t.worker?.name || t.workerName || "").toLowerCase().includes(q);
+        const notesMatch = (t.notes || "").toLowerCase().includes(q);
+        const remarksMatch = (t.remarks || "").toLowerCase().includes(q);
+        const statusMatch = (t.paymentStatus || "").toLowerCase().includes(q);
+        let amountMatch = false;
+        if (cleanNum && !isNaN(Number(cleanNum))) {
+          amountMatch = String(t.amount || 0).includes(cleanNum) ||
+            String(t.rate || 0).includes(cleanNum) ||
+            String(t.paidAmount || 0).includes(cleanNum);
+        }
+        return titleMatch || catMatch || brandMatch || supplierMatch || contractorMatch || workerMatch || notesMatch || remarksMatch || statusMatch || amountMatch;
+      });
+    }
     return list;
   }, [transactions, selectedProject, selectedType, dateRange, search]);
 

@@ -135,6 +135,17 @@ export function mapTransactionToEntry(tx) {
     ? tx.date
     : (tx.date ? new Date(tx.date) : (tx.createdAt ? new Date(tx.createdAt) : new Date()));
 
+  const contractor = String(
+    tx.contractor ||
+    (parsedType === 'labour' ? (tx.category || tx.supplier || '') : '')
+  );
+
+  const workerName = String(
+    tx.worker?.name ||
+    tx.workerName ||
+    (parsedType === 'labour' ? (tx.title || tx.description || '') : '')
+  );
+
   return {
     id: tx._id || String(new Date().getTime()),
     projectId: entryProjectId,
@@ -145,6 +156,12 @@ export function mapTransactionToEntry(tx) {
     date: parsedDate,
     description: String(tx.materialName || tx.title || tx.description || tx.name || 'Entry'),
     brand: String(tx.brand || tx.materialName || tx.name || ''),
+    supplier: String(tx.supplier || ''),
+    category: String(tx.category || ''),
+    contractor: contractor,
+    workerName: workerName,
+    notes: String(tx.notes || ''),
+    remarks: String(tx.remarks || ''),
     ratePerUnit: typeof tx.rate === 'number' ? tx.rate : 0,
     quantity: typeof tx.quantity === 'number' ? tx.quantity : 0,
     floor: tx.floor ? String(tx.floor) : '',
