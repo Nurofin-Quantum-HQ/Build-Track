@@ -368,11 +368,23 @@ router.get("/", async (req, res) => {
       }
     }
     if (search) {
+      let matchingWorkerIds = [];
+      try {
+        const matchingWorkers = await Worker.find({ name: { $regex: search, $options: "i" } }).select("_id");
+        matchingWorkerIds = matchingWorkers.map((w) => w._id);
+      } catch (_) {}
+
       const searchOr = [
         { title: { $regex: search, $options: "i" } },
         { notes: { $regex: search, $options: "i" } },
         { brand: { $regex: search, $options: "i" } },
+        { supplier: { $regex: search, $options: "i" } },
+        { category: { $regex: search, $options: "i" } },
+        { remarks: { $regex: search, $options: "i" } },
       ];
+      if (matchingWorkerIds.length > 0) {
+        searchOr.push({ worker: { $in: matchingWorkerIds } });
+      }
       if (query.$or) {
         query.$and = [{ $or: query.$or }, { $or: searchOr }];
         delete query.$or;
