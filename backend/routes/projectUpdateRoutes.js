@@ -32,7 +32,7 @@ function calculateProgress(stage) {
   };
   return stageMap[stage] || 0;
 }
-router.post("/", upload.array("media"), async (req, res) => {
+router.post("/", requirePermission(["submit_daily_update", "add_entries", "edit_project", "approve_updates"]), upload.array("media"), async (req, res) => {
   try {
     const { project, stage, workDone, startDate, endDate, remarks, completedTasks } = req.body;
     if (!project || !stage) {

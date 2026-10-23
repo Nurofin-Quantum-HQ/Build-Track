@@ -5,7 +5,7 @@ const Project = require("../models/Project");
 const { protect, requirePermission, getAdminId, canAccessProjectFilter } = require("../middleware/auth");
 router.use(protect);
 router.use((req, res, next) => {
-  if (req.user && (req.user.role === "Admin" || req.user.role === "Supervisor")) {
+  if (req.user && req.user.role === "Admin") {
     return next();
   }
   return requirePermission([

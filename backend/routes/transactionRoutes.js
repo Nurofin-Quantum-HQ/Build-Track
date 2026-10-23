@@ -1082,7 +1082,7 @@ router.put("/:id", requirePermission(["manage_expenses", "add_entries"]), async 
     session.endSession();
   }
 });
-router.delete("/:id", async (req, res) => {
+router.delete("/:id", requirePermission(["delete_entry"]), async (req, res) => {
   const session = await mongoose.startSession();
   session.startTransaction();
   try {
@@ -1141,7 +1141,7 @@ router.delete("/:id", async (req, res) => {
     session.endSession();
   }
 });
-router.put("/:id/approve", requirePermission(["approve_payments", "add_entries", "approve_updates"]), async (req, res) => {
+router.put("/:id/approve", requirePermission(["approve_payments", "approve_updates"]), async (req, res) => {
   const session = await mongoose.startSession();
   session.startTransaction();
   try {
@@ -1198,7 +1198,7 @@ router.put("/:id/approve", requirePermission(["approve_payments", "add_entries",
     session.endSession();
   }
 });
-router.put("/:id/reject", requirePermission(["approve_payments", "add_entries", "approve_updates"]), async (req, res) => {
+router.put("/:id/reject", requirePermission(["approve_payments", "approve_updates"]), async (req, res) => {
   try {
     const { rejectionReason } = req.body;
     const tx = await Transaction.findById(req.params.id);
@@ -1518,7 +1518,7 @@ router.post("/bulk", requirePermission(["manage_expenses", "add_entries"]), asyn
     results
   });
 });
-router.post("/:id/request-esign", async (req, res) => {
+router.post("/:id/request-esign", requirePermission(["approve_payments", "manage_expenses", "add_entries"]), async (req, res) => {
   try {
     const transactionId = req.params.id;
     const { clientEmail } = req.body;
@@ -1528,6 +1528,17 @@ router.post("/:id/request-esign", async (req, res) => {
     const transaction = await Transaction.findOne({ _id: transactionId });
     if (!transaction) {
       return res.status(404).json({ message: "Transaction not found" });
+    }
+    // Same reach rule as DELETE /:id (was: any transaction id, any company).
+    if (transaction.project) {
+      const pDoc = await Project.findOne(canAccessProjectFilter(req, transaction.project));
+      if (!pDoc) return res.status(403).json({ message: "Access denied to this transaction" });
+    } else {
+      const adminId = req.user.role === "Admin" ? req.user._id : await getAdminId(req.user);
+      const owner = transaction.createdBy?.toString();
+      if (owner !== req.user._id.toString() && !(adminId && owner === adminId.toString())) {
+        return res.status(403).json({ message: "Access denied to this transaction" });
+      }
     }
     if (transaction.paymentMode !== "Cash") {
       return res.status(400).json({ message: "E-Signature is only available for Cash transactions." });

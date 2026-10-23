@@ -602,12 +602,12 @@ router.put("/:id", protect, async (req, res) => {
   try {
     const body = req.body;
     console.log("PUT /projects/:id body.selectedPhases:", JSON.stringify(body.selectedPhases));
-    const existing = await Project.findById(req.params.id);
+    // Only projects this user can reach (was: any project id, any company).
+    const existing = await Project.findOne(canAccessProjectFilter(req, req.params.id));
     if (!existing) return res.status(404).json({ message: "Project not found" });
     const userPerms = Array.isArray(req.user.permissions) ? req.user.permissions : [];
     const hasEdit =
       req.user.role === 'Admin' ||
-      req.user.role === 'Supervisor' ||
       userPerms.includes("edit_project") ||
       userPerms.includes("manage_team") ||
       userPerms.includes("add_entry") ||

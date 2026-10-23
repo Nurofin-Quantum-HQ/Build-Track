@@ -3,7 +3,7 @@ const router = express.Router();
 const Task = require("../models/Task");
 const Project = require("../models/Project");
 const User = require("../models/User");
-const { protect } = require("../middleware/auth");
+const { protect, requirePermission, canAccessProjectFilter } = require("../middleware/auth");
 router.use(protect);
 router.get("/users", async (req, res) => {
   try {
@@ -75,7 +75,7 @@ router.get("/daily", async (req, res) => {
     res.status(500).json({ message: "Failed to fetch daily tasks" });
   }
 });
-router.post("/", async (req, res) => {
+router.post("/", requirePermission(["assign_tasks"]), async (req, res) => {
   try {
     const {
       project, title, description, assignedTo, status, time,
@@ -83,6 +83,11 @@ router.post("/", async (req, res) => {
     } = req.body;
     if (!project || !title) {
       return res.status(400).json({ message: "Project and Title are required" });
+    }
+    // Only on projects this user can reach (was: any project id).
+    const projectDoc = await Project.findOne(canAccessProjectFilter(req, project));
+    if (!projectDoc) {
+      return res.status(403).json({ message: "Access denied to this project" });
     }
     let assigneeName = "Unknown Mason";
     if (assignedTo) {
@@ -180,6 +185,15 @@ router.put("/:id", async (req, res) => {
     const isAssignee = task.assignedTo && task.assignedTo.toString() === req.user._id.toString();
     if (!isAdmin && !isCreator && !isAssignee) {
       return res.status(403).json({ message: "Access denied to update this task" });
+    }
+    // Changing what the task is / who it is for = assigning work: Admin, or the
+    // assigner while they still hold assign_tasks. The assignee may only move
+    // the status (same as PUT /:id/status).
+    const editsDetails = [title, description, time, floorId, floorName, phaseId, phaseName,
+      activityId, activityName, assignedTo].some((v) => v !== undefined);
+    const perms = Array.isArray(req.user.permissions) ? req.user.permissions : [];
+    if (editsDetails && !isAdmin && !(isCreator && perms.includes("assign_tasks"))) {
+      return res.status(403).json({ message: "Access denied — requires permission: assign_tasks" });
     }
     if (title) task.title = title;
     if (description !== undefined) task.description = description;

@@ -6,7 +6,7 @@ const upload      = require("../config/multer");
 const { getFileUrl, deleteFile } = require("../config/fileHelpers");
 router.use(protect);
 router.use((req, res, next) => {
-  if (req.user && (req.user.role === "Admin" || req.user.role === "Supervisor")) {
+  if (req.user && req.user.role === "Admin") {
     return next();
   }
   return requirePermission([
