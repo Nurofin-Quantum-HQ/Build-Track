@@ -232,11 +232,11 @@ router.get("/sign/:token", async (req, res) => {
       <meta charset="UTF-8">
       <meta name="viewport" content="width=device-width, initial-scale=1.0">
       <title>Review & Authorize Receipt</title>
-      <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+      <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Noto+Sans+Kannada:wght@400;600;700&family=Noto+Sans+Tamil:wght@400;600;700&display=swap" rel="stylesheet">
       <style>
         body {
           background-color: #F4F5FF;
-          font-family: 'Inter', sans-serif;
+          font-family: 'Inter', 'Noto Sans Kannada', 'Noto Sans Tamil', sans-serif;
           margin: 0;
           padding: 20px;
           display: flex;
@@ -260,7 +260,7 @@ router.get("/sign/:token", async (req, res) => {
           border-radius: 6px;
           border: 1px solid #E2E4F6;
           background-color: white;
-          font-family: 'Inter', sans-serif;
+          font-family: 'Inter', 'Noto Sans Kannada', 'Noto Sans Tamil', sans-serif;
           color: #1E1E2E;
           font-weight: 500;
           cursor: pointer;
@@ -317,8 +317,8 @@ router.get("/sign/:token", async (req, res) => {
         <div class="lang-selector" data-html2canvas-ignore="true">
           <select id="lang-select">
             <option value="en">English</option>
-            <option value="kn">Kannada</option>
-            <option value="ta">Tamil</option>
+            <option value="kn">ಕನ್ನಡ (Kannada)</option>
+            <option value="ta">தமிழ் (Tamil)</option>
           </select>
         </div>
         <h2 id="title-text">CASH RECEIPT</h2>
@@ -347,36 +347,38 @@ router.get("/sign/:token", async (req, res) => {
               paymentMethod: "Payment Method", notes: "Notes", date: "Date"
             }
           },
+          // Native script (not English transliteration). Please have a native
+          // speaker review these strings before release.
           kn: {
-            title: "Nagadu Rasidi",
-            btnAuth: "Naanu Angikarisuthene & Sahimaduthene",
-            btnAuthWait: "Angikarisalaguttide...",
-            stampTitle: "Angikarisalagide mattu sahimadalagide",
+            title: "ನಗದು ರಸೀದಿ",
+            btnAuth: "ನಾನು ಅಧಿಕೃತಗೊಳಿಸಿ ಸಹಿ ಮಾಡುತ್ತೇನೆ",
+            btnAuthWait: "ಅಧಿಕೃತಗೊಳಿಸಲಾಗುತ್ತಿದೆ...",
+            stampTitle: "ಅಧಿಕೃತಗೊಳಿಸಲಾಗಿದೆ ಮತ್ತು ಸಹಿ ಮಾಡಲಾಗಿದೆ",
             stampIp: "IP:",
-            stampDate: "Dinaanka:",
-            successTitle: "Rasidi Angikarisalagide",
-            successMsg: "Dhanyavadagalu! Nimmma angikaravannu surakshitavagi dakhale madalagide.",
-            errNetwork: "Network dosha. Matte prayatnisi.",
+            stampDate: "ದಿನಾಂಕ:",
+            successTitle: "ರಸೀದಿ ಅಧಿಕೃತಗೊಂಡಿದೆ",
+            successMsg: "ಧನ್ಯವಾದಗಳು! ನಿಮ್ಮ ಅಧಿಕೃತತೆಯನ್ನು ಸುರಕ್ಷಿತವಾಗಿ ದಾಖಲಿಸಲಾಗಿದೆ.",
+            errNetwork: "ನೆಟ್‌ವರ್ಕ್ ದೋಷ. ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ.",
             keys: {
-              projectName: "Project Hesaru", itemName: "Item Hesaru", type: "Vidhagalu", activityName: "Activity Hesaru", phase: "Hantha",
-              totalAmount: "Ottu Motta", alreadyPaid: "Eegagale Pavatislagide", amount: "Motta",
-              paymentMethod: "Pavathi Vidhana", notes: "Tippanigalu", date: "Dinaanka"
+              projectName: "ಯೋಜನೆಯ ಹೆಸರು", itemName: "ವಸ್ತುವಿನ ಹೆಸರು", type: "ವಿಧ", activityName: "ಚಟುವಟಿಕೆಯ ಹೆಸರು", phase: "ಹಂತ",
+              totalAmount: "ಒಟ್ಟು ಮೊತ್ತ", alreadyPaid: "ಈಗಾಗಲೇ ಪಾವತಿಸಲಾಗಿದೆ", amount: "ಮೊತ್ತ",
+              paymentMethod: "ಪಾವತಿ ವಿಧಾನ", notes: "ಟಿಪ್ಪಣಿಗಳು", date: "ದಿನಾಂಕ"
             }
           },
           ta: {
-            title: "Rokka Rasithu",
-            btnAuth: "Naan Angikarikiren & Kaiyeluthidugiren",
-            btnAuthWait: "Angikarikirathu...",
-            stampTitle: "Angikarikkappattathu mariyum kaiyeluthidappattathu",
+            title: "ரொக்க ரசீது",
+            btnAuth: "நான் அங்கீகரித்து கையொப்பமிடுகிறேன்",
+            btnAuthWait: "அங்கீகரிக்கப்படுகிறது...",
+            stampTitle: "அங்கீகரிக்கப்பட்டு கையொப்பமிடப்பட்டது",
             stampIp: "IP:",
-            stampDate: "Thethi:",
-            successTitle: "Rasithu Angikarikkappattathu",
-            successMsg: "Nandri! Ungal angikaram pathukappaga pathivu seyyappattullathu.",
-            errNetwork: "Network pizhai. Meendum muyarchi seyyavum.",
+            stampDate: "தேதி:",
+            successTitle: "ரசீது அங்கீகரிக்கப்பட்டது",
+            successMsg: "நன்றி! உங்கள் அங்கீகாரம் பாதுகாப்பாகப் பதிவு செய்யப்பட்டது.",
+            errNetwork: "இணைய பிழை. மீண்டும் முயற்சிக்கவும்.",
             keys: {
-              projectName: "Project Peyar", itemName: "Item Peyar", type: "Vagai", activityName: "Activity Peyar", phase: "Kattam",
-              totalAmount: "Motha Thogai", alreadyPaid: "Earkanave Seluthappattathu", amount: "Thogai",
-              paymentMethod: "Seluthum Murai", notes: "Kurippugal", date: "Thethi"
+              projectName: "திட்டத்தின் பெயர்", itemName: "பொருளின் பெயர்", type: "வகை", activityName: "செயல்பாட்டின் பெயர்", phase: "கட்டம்",
+              totalAmount: "மொத்தத் தொகை", alreadyPaid: "ஏற்கனவே செலுத்தப்பட்டது", amount: "தொகை",
+              paymentMethod: "செலுத்தும் முறை", notes: "குறிப்புகள்", date: "தேதி"
             }
           }
         };
@@ -421,6 +423,9 @@ router.get("/sign/:token", async (req, res) => {
           document.getElementById('error-msg').style.display = 'none';
           container.appendChild(stampDiv);
           // Take screenshot of the entire receipt
+          // Native-script fonts must be loaded before the snapshot, or the signed
+          // receipt image shows empty boxes.
+          if (document.fonts && document.fonts.ready) { try { await document.fonts.ready; } catch (_) {} }
           const canvas = await html2canvas(container, {
             scale: 2,
             backgroundColor: '#ffffff'
