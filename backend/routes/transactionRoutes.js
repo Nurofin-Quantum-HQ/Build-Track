@@ -17,6 +17,7 @@ const {
   deleteFile,
 } = require("../config/fileHelpers");
 const cloudinary = require("../config/cloudinary");
+const esignService = require("../services/esignService");
 router.get("/esign/:token", async (req, res) => {
   try {
     const transaction = await Transaction.findOne({
@@ -114,14 +115,53 @@ const validateTransactionAmounts = ({
   }
   return null;
 };
-const calculateAmount = ({ type, quantity, rate, overtime, rawAmount }) => {
+const isTrue = (v) => v === true || v === "true";
+// Material bill incl. GST, computed exactly like the app (subtotal + subtotal*pct/100)
+// so the stored amount matches what the user saw and paid.
+const withGst = (base, gst, isWithGst) => {
+  const pct = Number(gst) || 0;
+  return isTrue(isWithGst) && pct > 0 ? base + (base * pct) / 100 : base;
+};
+// Upload a data: URI receipt; returns the hosted URL or null.
+const uploadDataUri = async (dataUri, folder) => {
+  try {
+    const r = await cloudinary.uploader.upload(dataUri, { folder });
+    return r.secure_url;
+  } catch (err) {
+    console.error(`Cloudinary upload error (${folder}):`, err.message || err);
+    return null;
+  }
+};
+const isHostedOrData = (v) => typeof v === "string" && /^(https?:\/\/|data:)/i.test(v);
+// paymentHistory from the client: upload data: receipts (also accepted as
+// `receiptDataUri`) instead of storing a bare file name or raw base64.
+const prepareIncomingPaymentHistory = async (incoming, previous = []) => {
+  const out = [];
+  for (let i = 0; i < incoming.length; i++) {
+    const p = { ...(incoming[i] || {}) };
+    let receipt = p.receiptDataUri || p.receipt || "";
+    delete p.receiptDataUri;
+    if (typeof receipt === "string" && receipt.startsWith("data:")) {
+      receipt = (await uploadDataUri(receipt, "buildtrack/payment-receipts")) || "";
+    } else if (receipt && !isHostedOrData(receipt)) {
+      // only a file name came through — keep what this payment already had
+      const prev = previous[i] && previous[i].receipt;
+      receipt = isHostedOrData(prev) ? prev : "";
+    }
+    p.receipt = receipt;
+    out.push(p);
+  }
+  return out;
+};
+const calculateAmount = ({ type, quantity, rate, overtime, rawAmount, gst, isWithGst }) => {
   const qty = Number(quantity) || 0;
   const rt = Number(rate) || 0;
   const ot = Number(overtime) || 0;
   const directAmount = Number(rawAmount) || 0;
   if (type === "Materials") {
+    // A direct amount (no qty/rate) is already the bill the client entered.
     if (qty === 0 && rt === 0 && directAmount !== 0) return directAmount;
-    return qty * rt;
+    return withGst(qty * rt, gst, isWithGst);
   }
   if (type === "Wages") {
     if (qty === 0 && rt === 0 && directAmount !== 0) return directAmount + ot;
@@ -397,6 +437,11 @@ router.get("/", async (req, res) => {
       .populate("worker", "name trade")
       .populate("project", "projectName status progress")
       .sort({ date: -1, createdAt: -1 });
+    // [F2] ?expand=createdBy returns createdBy as { _id, name, role }. Opt-in:
+    // several app screens read createdBy as a plain id string.
+    if (String(req.query.expand || "").split(",").includes("createdBy")) {
+      txQuery = txQuery.populate("createdBy", "name role");
+    }
     if (limitParam > 0) txQuery = txQuery.limit(limitParam);
     const transactions = await txQuery;
     res.json({ transactions });
@@ -582,7 +627,7 @@ if (req.body.paymentReceipt) {
     if (qty < 0 || rt < 0) {
       return res.status(400).json({ message: "Quantity and rate must be positive" });
     }
-    const finalAmount = calculateAmount({ type, quantity: qty, rate: rt, overtime: ot, rawAmount });
+    const finalAmount = calculateAmount({ type, quantity: qty, rate: rt, overtime: ot, rawAmount, gst: gstVal, isWithGst });
     const amountErr = validateTransactionAmounts({
       amount:     finalAmount,
       quantity:   qty,
@@ -593,6 +638,13 @@ if (req.body.paymentReceipt) {
     });
     if (amountErr) {
       return res.status(400).json({ message: `Invalid transaction data: ${amountErr}` });
+    }
+    // [B5] Optional separate payment note, so the entry's own notes stay intact.
+    const paymentNote = req.body.paymentNote !== undefined ? String(req.body.paymentNote) : undefined;
+    let incomingHistory = null;
+    if (req.body.paymentHistory) {
+      const raw = typeof req.body.paymentHistory === 'string' ? JSON.parse(req.body.paymentHistory) : req.body.paymentHistory;
+      if (Array.isArray(raw)) incomingHistory = await prepareIncomingPaymentHistory(raw);
     }
       const transaction =
         new Transaction({
@@ -638,20 +690,20 @@ if (req.body.paymentReceipt) {
             attachmentFiles,
           screenshotUrl,
           paymentReceipt: paymentReceiptUrl,
-          paymentHistory: req.body.paymentHistory ? (typeof req.body.paymentHistory === 'string' ? JSON.parse(req.body.paymentHistory) : req.body.paymentHistory) : (paidAmt > 0 ? [{
+          paymentHistory: incomingHistory ? incomingHistory : (paidAmt > 0 ? [{
             date: paymentDate || date || new Date(),
-            method: normalizePaymentMode(paymentMode), amount: paidAmt, note: notes || "Initial payment on creation"
+            method: normalizePaymentMode(paymentMode), amount: paidAmt,
+            note: (paymentNote !== undefined ? paymentNote : notes) || "Initial payment on creation",
+            receipt: paymentReceiptUrl || undefined,
           }] : []),
           approvalStatus: txApprovalStatus,
           approvedBy: approvedBy,
           approvedAt: approvedAt,
         });
-    if (req.body.requestEsign === true && req.body.clientEmail && normalizePaymentMode(paymentMode) === "Cash") {
-      const token = crypto.randomBytes(32).toString("hex");
-      transaction.clientEmail = req.body.clientEmail;
-      transaction.eSignToken = token;
+    const wantsEsign = isTrue(req.body.requestEsign) && req.body.clientEmail && normalizePaymentMode(paymentMode) === "Cash";
+    if (wantsEsign) {
+      transaction.clientEmail = String(req.body.clientEmail).trim();
       transaction.eSignStatus = "Requested";
-      transaction.eSignExpires = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
     }
     await transaction.save({ session });
     if ((type === "Materials" || type === "Wages" || type === "Expense") && qty > 0 && projectId && txApprovalStatus === "Approved") {
@@ -678,53 +730,39 @@ if (req.body.paymentReceipt) {
         relatedModel: "Transaction"
       });
     }
-    if (transaction.eSignToken) {
-      const signUrl = `${req.protocol}://${req.get('host')}/api/esign/sign/${transaction.eSignToken}`;
-      if (process.env.AWS_ACCESS_KEY_ID && process.env.SES_FROM_EMAIL) {
-        try {
-          const sesClient = new SESClient({
-            region: process.env.AWS_REGION || 'us-east-1',
-            credentials: {
-              accessKeyId: process.env.AWS_ACCESS_KEY_ID,
-              secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY
-            }
-          });
-          const htmlContent = `
-            <div style="font-family: Arial, sans-serif; max-width: 480px; margin: 0 auto;">
-              <h2 style="color: #333;">Signature Required</h2>
-              <p style="color: #555; line-height: 1.5;">
-                Please review and sign the cash receipt for your transaction on BuildTrack.
-              </p>
-              <div style="margin: 24px 0; text-align: center;">
-                <a href="${signUrl}" style="background-color: #4F46E5; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold; display: inline-block;">Review & Sign Receipt</a>
-              </div>
-              <p style="color: #888; font-size: 13px;">
-                This link expires in 7 days.
-              </p>
-            </div>
-          `;
-          const command = new SendEmailCommand({
-            Destination: { ToAddresses: [transaction.clientEmail] },
-            Message: {
-              Body: { Html: { Data: htmlContent, Charset: "UTF-8" } },
-              Subject: { Data: "Signature Required: BuildTrack Cash Receipt", Charset: "UTF-8" }
-            },
-            Source: process.env.SES_FROM_EMAIL
-          });
-          await sesClient.send(command);
-          console.log('[Transaction] Signature email sent via SES');
-        } catch (e) {
-          console.error("Failed to send automatic e-sign email:", e);
+    // [C3] Same token system as /api/esign/sign/:token and /api/esign/status/:id.
+    let esignResult = null;
+    if (wantsEsign) {
+      try {
+        esignResult = await esignService.issueForTransaction(transaction, {
+          user: req.user,
+          clientEmail: transaction.clientEmail,
+          amount: paidAmt > 0 ? paidAmt : finalAmount,
+          method: "Cash",
+          note: paymentNote !== undefined ? paymentNote : notes,
+          date: paymentDate || date,
+          baseUrl: esignService.baseUrlFrom(req),
+        });
+        const fresh = await Transaction.findById(transaction._id).select("eSignStatus eSignToken eSignExpires eSignature eSignDate clientEmail");
+        if (fresh) {
+          transaction.eSignStatus = fresh.eSignStatus;
+          transaction.eSignToken = fresh.eSignToken;
+          transaction.eSignExpires = fresh.eSignExpires;
+          transaction.eSignature = fresh.eSignature;
+          transaction.eSignDate = fresh.eSignDate;
         }
+      } catch (e) {
+        console.error("Failed to raise e-sign request for new transaction:", e);
       }
     }
-    
+
     // Update onboarding status
     await User.findByIdAndUpdate(req.user.id, { "onboarding.hasAddedEntry": true });
 
     res.status(201).json({
       message: "Transaction saved successfully",
       transaction,
+      ...(esignResult ? { esign: esignResult } : {}),
     });
   } catch (err) {
     await session.abortTransaction();
@@ -835,12 +873,67 @@ router.put("/:id", requirePermission(["manage_expenses", "add_entries"]), async 
     const newOt       = overtime !== undefined ? Number(overtime) : tx.overtime;
     const newPaidAmt  = _paidAmount !== undefined ? parseAmount(_paidAmount) : tx.paidAmount;
     const newGstVal   = gst      !== undefined ? Number(gst)      : tx.gst;
+    // Changing the payment list is recording/editing payments: same permission
+    // as paidAmount / Paid (approve_payments or mark_paid; Admin passes).
+    if (Array.isArray(paymentHistory) && !canMarkPaid) {
+      const sig = (list) => JSON.stringify((list || []).map((p) => [
+        parseAmount(p && p.amount),
+        normalizePaymentMode((p && (p.method || p.paymentMode)) || ""),
+        String((p && (p.date || p.paymentDate)) || ""),
+        String((p && p.note) || ""),
+        typeof (p && (p.receiptDataUri || p.receipt)) === "string" && (p.receiptDataUri || p.receipt).startsWith("data:")
+          ? "new-receipt" : String((p && p.receipt) || ""),
+      ]));
+      if (sig(paymentHistory) !== sig(tx.paymentHistory)) {
+        await session.abortTransaction();
+        return res.status(403).json({ message: 'Insufficient permissions to record payments or mark as Paid' });
+      }
+    }
+    // [B7] Approved entries: only an Admin may change what was approved. Others
+    // (e.g. mark_paid users) may still record payments — the app re-sends the
+    // whole entry with a payment, so compare values instead of field presence.
+    if (req.user.role !== "Admin" && tx.approvalStatus === "Approved") {
+      const num = (v) => Number(v) || 0;
+      const txt = (v) => String(v ?? "").trim().toLowerCase();
+      const differs = (incoming, current, norm) =>
+        incoming !== undefined && incoming !== null && norm(incoming) !== norm(current);
+      const incomingProject = project !== undefined ? parseId(project) : null;
+      const directAmountEntry = tx.type === "Expense" || (num(tx.quantity) === 0 && num(tx.rate) === 0);
+      const changed = [
+        differs(title, tx.title, txt) && "title",
+        differs(type, tx.type, txt) && "type",
+        incomingProject && String(incomingProject) !== String(tx.project || "") && "project",
+        differs(quantity, tx.quantity, num) && "quantity",
+        differs(rate, tx.rate, num) && "rate",
+        differs(overtime, tx.overtime, num) && "overtime",
+        differs(gst, tx.gst, num) && "gst",
+        differs(isWithGst, tx.isWithGst, isTrue) && "isWithGst",
+        differs(category, tx.category, txt) && "category",
+        differs(unit, tx.unit, (v) => normalizeUnit(v)) && "unit",
+        directAmountEntry && rawAmount !== undefined && Math.abs(num(rawAmount) - num(tx.amount)) > 0.01 && "amount",
+      ].filter(Boolean);
+      let historyShrinks = false;
+      if (Array.isArray(paymentHistory)) {
+        const oldSum = (tx.paymentHistory || []).reduce((a, p) => a + num(p.amount), 0);
+        const newSum = paymentHistory.reduce((a, p) => a + parseAmount(p && p.amount), 0);
+        historyShrinks = paymentHistory.length < (tx.paymentHistory || []).length || newSum + 0.01 < oldSum;
+      }
+      if (changed.length > 0 || historyShrinks) {
+        await session.abortTransaction();
+        return res.status(403).json({
+          message: "This entry is approved. Only an Admin can change it; you can still record payments.",
+          fields: historyShrinks ? [...changed, "paymentHistory"] : changed,
+        });
+      }
+    }
     const finalAmount = calculateAmount({
       type:      type || tx.type,
       quantity:  newQty,
       rate:      newRt,
       overtime:  newOt,
       rawAmount: rawAmount ?? tx.amount,
+      gst:       newGstVal,
+      isWithGst: isWithGst !== undefined ? isWithGst : tx.isWithGst,
     });
     const amountErr = validateTransactionAmounts({
       amount:     finalAmount,
@@ -925,6 +1018,22 @@ router.put("/:id", requirePermission(["manage_expenses", "add_entries"]), async 
         newPaymentReceiptUrl = paymentReceipt;
       }
     }
+    // [B5] Payment note goes on the payment record, not over the entry's notes.
+    // Apps send it as `notes` with a payment; `paymentNote` is the explicit form.
+    const oldPaidAmount = tx.paidAmount || 0;
+    const recordsNewPayment = !Array.isArray(paymentHistory) && _paidAmount !== undefined &&
+      parseAmount(_paidAmount) > oldPaidAmount;
+    let noteForPayment = null;
+    let notesAreForPayment = false;
+    if (recordsNewPayment) {
+      if (req.body.paymentNote !== undefined) {
+        noteForPayment = String(req.body.paymentNote).trim() || null;
+      } else if (notes !== undefined) {
+        notesAreForPayment = true;
+        const n = String(notes).trim();
+        if (n && n !== String(tx.notes || "").trim()) noteForPayment = n;
+      }
+    }
     if (title !== undefined)
       tx.title = title.trim();
     if (type !== undefined)
@@ -935,7 +1044,7 @@ router.put("/:id", requirePermission(["manage_expenses", "add_entries"]), async 
       tx.project = projectId;
     if (date !== undefined)
       tx.date = date;
-    if (notes !== undefined)
+    if (notes !== undefined && !notesAreForPayment)
       tx.notes = notes;
     if (category !== undefined)
       tx.category = category;
@@ -948,12 +1057,13 @@ router.put("/:id", requirePermission(["manage_expenses", "add_entries"]), async 
     if (isWithGst !== undefined)
       tx.isWithGst = isWithGst;
 
-    if (requestEsign === true) {
-      if (!tx.eSignToken) {
-        tx.eSignToken = require('crypto').randomBytes(20).toString("hex");
-      }
+    // [C3] The signing request itself is raised after commit (esignService).
+    const wantsEsign = isTrue(requestEsign) &&
+      normalizePaymentMode(paymentMode || tx.paymentMode) === "Cash" &&
+      String(clientEmail || tx.clientEmail || "").trim() !== "";
+    if (wantsEsign) {
       tx.eSignStatus = "Requested";
-      if (clientEmail !== undefined) tx.clientEmail = clientEmail;
+      if (clientEmail !== undefined) tx.clientEmail = String(clientEmail).trim();
     } else if (requestEsign === false) {
       tx.eSignStatus = "Not Requested";
       tx.clientEmail = "";
@@ -1005,7 +1115,7 @@ router.put("/:id", requirePermission(["manage_expenses", "add_entries"]), async 
         paymentDate;
     }
     if (paymentHistory !== undefined && Array.isArray(paymentHistory)) {
-      tx.paymentHistory = paymentHistory;
+      tx.paymentHistory = await prepareIncomingPaymentHistory(paymentHistory, tx.paymentHistory || []);
       let sumPaid = 0;
       let lastMethod = tx.paymentMode;
       let lastDate = tx.paymentDate;
@@ -1040,7 +1150,7 @@ router.put("/:id", requirePermission(["manage_expenses", "add_entries"]), async 
           date: paymentDate || new Date(),
           method: normalizePaymentMode(paymentMode || tx.paymentMode),
           amount: delta,
-          note: remarks || notes || "Additional payment",
+          note: noteForPayment || "Additional payment",
           receipt: newPaymentReceiptUrl || undefined,
         });
       }
@@ -1069,7 +1179,26 @@ router.put("/:id", requirePermission(["manage_expenses", "add_entries"]), async 
     await session.commitTransaction();
     const reqId = req.headers['x-request-id'] || 'no-req-id';
     console.log(`[PAYMENT] Update request [${reqId}] completed successfully for TX: ${tx._id}`);
-    res.json({ message: "Transaction updated successfully", transaction: tx });
+    let esignResult = null;
+    let responseTx = tx;
+    if (wantsEsign) {
+      try {
+        const delta = (tx.paidAmount || 0) - oldPaidAmount;
+        esignResult = await esignService.issueForTransaction(tx, {
+          user: req.user,
+          clientEmail: tx.clientEmail,
+          amount: delta > 0 ? delta : (tx.paidAmount || tx.amount),
+          method: "Cash",
+          note: noteForPayment || undefined,
+          date: tx.paymentDate,
+          baseUrl: esignService.baseUrlFrom(req),
+        });
+        responseTx = (await Transaction.findById(tx._id)) || tx;
+      } catch (e) {
+        console.error("Failed to raise e-sign request for payment:", e);
+      }
+    }
+    res.json({ message: "Transaction updated successfully", transaction: responseTx, ...(esignResult ? { esign: esignResult } : {}) });
   } catch (err) {
     await session.abortTransaction();
     const reqId = req.headers['x-request-id'] || 'no-req-id';
@@ -1110,6 +1239,11 @@ router.delete("/:id", requirePermission(["delete_entry"]), async (req, res) => {
           }
         }
       }
+    }
+    // [B7] Same rule as the app: only an Admin deletes an approved entry.
+    if (req.user.role !== "Admin" && tx.approvalStatus === "Approved") {
+      await session.abortTransaction();
+      return res.status(403).json({ message: "This entry is approved. Only an Admin can delete it." });
     }
     await Transaction.deleteOne({ _id: tx._id }).session(session);
     if ((tx.type === "Materials" || tx.type === "Wages" || tx.type === "Expense") && tx.quantity > 0 && tx.approvalStatus === "Approved") {
@@ -1362,7 +1496,7 @@ router.post("/bulk", requirePermission(["manage_expenses", "add_entries"]), asyn
       const gstVal   = Number(gst)       || 0;
 
       if (qty < 0 || rt < 0) throw new Error("Quantity and rate must be positive");
-      const finalAmount = calculateAmount({ type, quantity: qty, rate: rt, overtime: ot, rawAmount });
+      const finalAmount = calculateAmount({ type, quantity: qty, rate: rt, overtime: ot, rawAmount, gst: gstVal, isWithGst });
 
       const amountErr = validateTransactionAmounts({
         amount:     finalAmount,
@@ -1543,52 +1677,21 @@ router.post("/:id/request-esign", requirePermission(["approve_payments", "manage
     if (transaction.paymentMode !== "Cash") {
       return res.status(400).json({ message: "E-Signature is only available for Cash transactions." });
     }
-    const token = crypto.randomBytes(32).toString("hex");
-    transaction.clientEmail = clientEmail;
-    transaction.eSignToken = token;
-    transaction.eSignStatus = "Requested";
-    transaction.eSignExpires = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
-    await transaction.save();
-    const signUrl = `${req.protocol}://${req.get('host')}/api/esign/sign/${token}`;    if (process.env.AWS_ACCESS_KEY_ID && process.env.SES_FROM_EMAIL) {
-      try {
-        const sesClient = new SESClient({
-          region: process.env.AWS_REGION || 'us-east-1',
-          credentials: {
-            accessKeyId: process.env.AWS_ACCESS_KEY_ID,
-            secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY
-          }
-        });
-        const htmlContent = `
-          <div style="font-family: Arial, sans-serif; max-width: 480px; margin: 0 auto;">
-            <h2 style="color: #333;">Signature Required</h2>
-            <p style="color: #555; line-height: 1.5;">
-              Please review and sign the cash receipt for your transaction on BuildTrack.
-            </p>
-            <div style="margin: 24px 0; text-align: center;">
-              <a href="${signUrl}" style="background-color: #4F46E5; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold; display: inline-block;">Review & Sign Receipt</a>
-            </div>
-            <p style="color: #888; font-size: 13px;">
-              This link expires in 7 days.
-            </p>
-          </div>
-        `;
-        const command = new SendEmailCommand({
-          Destination: { ToAddresses: [clientEmail] },
-          Message: {
-            Body: { Html: { Data: htmlContent, Charset: "UTF-8" } },
-            Subject: { Data: "Signature Required: BuildTrack Cash Receipt", Charset: "UTF-8" }
-          },
-          Source: process.env.SES_FROM_EMAIL
-        });
-        await sesClient.send(command);
-      } catch (err) {
-        console.error("SES send error:", err);
-        return res.status(500).json({ message: "Failed to send signature request email via SES" });
-      }
-    } else {
-      return res.status(500).json({ message: "Server email configuration is missing" });
-    }    console.log(`[DEV] E-SIGN LINK: ${signUrl}`);
-    res.json({ message: "Signature request sent successfully", transaction });
+    // [C3] One token system: EsignRequest behind /api/esign/sign/:token.
+    const result = await esignService.issueForTransaction(transaction, {
+      user: req.user,
+      clientEmail,
+      amount: transaction.paidAmount || transaction.amount,
+      method: "Cash",
+      date: transaction.paymentDate || transaction.date,
+      baseUrl: esignService.baseUrlFrom(req),
+    });
+    if (result.emailError) {
+      return res.status(500).json({ message: result.emailError });
+    }
+    const fresh = await Transaction.findById(transaction._id);
+    return res.json({ message: "Signature request sent successfully", transaction: fresh, esign: result });
+
   } catch (error) {
     console.error("POST /:id/request-esign error:", error);
     res.status(500).json({ message: "Server error" });

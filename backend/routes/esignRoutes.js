@@ -4,7 +4,12 @@ const express = require("express");
 const crypto = require("crypto");
 const EsignRequest = require("../models/EsignRequest");
 const { protect } = require("../middleware/auth");
+const mongoose = require("mongoose");
+const esignService = require("../services/esignService");
 const router = express.Router();
+// Remove the old 1-hour TTL on createdAt (it deleted 7-day links and signed rows).
+if (mongoose.connection.readyState === 1) EsignRequest.dropLegacyTtlIndex();
+else mongoose.connection.once("open", () => EsignRequest.dropLegacyTtlIndex());
 // [BT-SEC-03] /request and /status/:id are called by the logged-in app and now
 // require auth. The signer-facing routes (/details/:token, /submit, /sign/:token)
 // stay public — they are addressed by an unguessable 256-bit token, not by id.
@@ -72,7 +77,7 @@ router.post("/request", protect, async (req, res) => {
 });
 router.get("/details/:token", async (req, res) => {
   try {
-    const esignReq = await EsignRequest.findOne({ token: req.params.token });
+    const esignReq = await esignService.findActiveByToken(req.params.token);
     if (!esignReq) {
       return res.status(404).json({ message: "Invalid or expired token" });
     }
@@ -114,7 +119,10 @@ router.post("/submit", async (req, res) => {
     if (!token || !signatureData) {
       return res.status(400).json({ message: "Token and signatureData are required" });
     }
-    const esignReq = await EsignRequest.findOne({ token });
+    if (typeof signatureData !== 'string' || !signatureData.startsWith('data:image/')) {
+      return res.status(400).json({ message: "signatureData must be an image data URI" });
+    }
+    const esignReq = await esignService.findActiveByToken(token);
     if (!esignReq) {
       return res.status(404).json({ message: "Invalid or expired token" });
     }
@@ -124,6 +132,8 @@ router.post("/submit", async (req, res) => {
     esignReq.status = 'signed';
     esignReq.signatureData = signatureData;
     esignReq.signedAt = new Date();
+    // Keep the signed row long enough for the app's status polling.
+    esignReq.expiresAt = new Date(Date.now() + esignService.SIGNED_KEEP);
     await esignReq.save();
     let receiptUrl = signatureData;
     if (process.env.CLOUDINARY_API_KEY) {
@@ -135,6 +145,11 @@ router.post("/submit", async (req, res) => {
       } catch (err) {
         console.error("Error uploading receipt to Cloudinary:", err);
       }
+    }
+    try {
+      await esignService.writeBackToTransaction(esignReq, receiptUrl);
+    } catch (err) {
+      console.error("Error writing signed receipt back to transaction:", err);
     }
     if ((process.env.AWS_ACCESS_KEY_ID && process.env.SES_FROM_EMAIL) && esignReq.clientEmail) {
       const emailHtml = `
@@ -183,7 +198,7 @@ router.post("/submit", async (req, res) => {
 });
 router.get("/sign/:token", async (req, res) => {
   try {
-    const esignReq = await EsignRequest.findOne({ token: req.params.token });
+    const esignReq = await esignService.findActiveByToken(req.params.token);
     if (!esignReq) {
       return res.status(404).send(`
         <html><head><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>Error</title></head>
@@ -204,26 +219,25 @@ router.get("/sign/:token", async (req, res) => {
       `);
     }
     const meta = esignReq.meta || {};
-    function transliterate(text, lang) {
-      if (!text || typeof text !== 'string') return text;
-      if (lang === 'en') return text;
-      const dict = {
-        kn: { 'A': 'ಎ', 'B': 'ಬಿ', 'C': 'ಸಿ', 'D': 'ಡಿ', 'E': 'ಇ', 'Project': 'ಪ್ರಾಜೆಕ್ಟ್', 'Phase': 'ಫೇಸ್', 'Foundation': 'ಫೌಂಡೇಶನ್' },
-        ta: { 'A': 'ஏ', 'B': 'பி', 'C': 'சி', 'D': 'டி', 'E': 'இ', 'Project': 'ப்ராஜெக்ட்', 'Phase': 'ஃபேஸ்', 'Foundation': 'பவுண்டேஷன்' }
-      };
-      let res = text;
-      for (const [eng, loc] of Object.entries(dict[lang] || {})) {
-        res = res.replace(new RegExp(eng, 'gi'), loc);
-      }
-      return res;
-    }
+    const esc = (s) => String(s)
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
     const metaRows = Object.entries(meta).map(([key, val]) => {
       let formattedVal = val;
-      if (key === 'amount') formattedVal = '₹' + val;
-      else if (key === 'date' && val) formattedVal = new Date(val).toISOString().substring(0, 10);
-      else if (!val) formattedVal = 'N/A';
+      if (val === undefined || val === null || val === '') formattedVal = 'N/A';
+      else if (key === 'amount' || key === 'totalAmount' || key === 'alreadyPaid') formattedVal = '₹' + val;
+      else if (key === 'date') {
+        // Calendar date in India time (the app sends local midnight as UTC, so
+        // slicing the ISO string showed the previous day).
+        const d = new Date(val);
+        formattedVal = isNaN(d.getTime())
+          ? val
+          : d.toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' });
+      }
       const label = key.replace(/([A-Z])/g, ' $1').trim();
-      return `<div class="row"><span class="label" style="text-transform: capitalize;" data-key="${key}">${label}</span><span class="value">${formattedVal}</span></div>`;
+      // data-raw lets the page translate fixed values (type, payment method);
+      // free text the user typed is shown as entered.
+      return `<div class="row"><span class="label" style="text-transform: capitalize;" data-key="${esc(key)}">${esc(label)}</span><span class="value" data-key="${esc(key)}" data-raw="${esc(formattedVal)}">${esc(formattedVal)}</span></div>`;
     }).join('');
     const html = `
     <!DOCTYPE html>
@@ -345,7 +359,8 @@ router.get("/sign/:token", async (req, res) => {
               projectName: "Project Name", itemName: "Item Name", type: "Type", activityName: "Activity Name", phase: "Phase",
               totalAmount: "Total Amount", alreadyPaid: "Already Paid", amount: "Amount",
               paymentMethod: "Payment Method", notes: "Notes", date: "Date"
-            }
+            },
+            values: {}
           },
           // Native script (not English transliteration). Please have a native
           // speaker review these strings before release.
@@ -363,6 +378,12 @@ router.get("/sign/:token", async (req, res) => {
               projectName: "ಯೋಜನೆಯ ಹೆಸರು", itemName: "ವಸ್ತುವಿನ ಹೆಸರು", type: "ವಿಧ", activityName: "ಚಟುವಟಿಕೆಯ ಹೆಸರು", phase: "ಹಂತ",
               totalAmount: "ಒಟ್ಟು ಮೊತ್ತ", alreadyPaid: "ಈಗಾಗಲೇ ಪಾವತಿಸಲಾಗಿದೆ", amount: "ಮೊತ್ತ",
               paymentMethod: "ಪಾವತಿ ವಿಧಾನ", notes: "ಟಿಪ್ಪಣಿಗಳು", date: "ದಿನಾಂಕ"
+            },
+            // Fixed values only (entry type, payment method). User-typed text is left as entered.
+            values: {
+              "cash": "ನಗದು", "upi": "ಯುಪಿಐ", "bank transfer": "ಬ್ಯಾಂಕ್ ವರ್ಗಾವಣೆ", "card": "ಕಾರ್ಡ್", "cheque": "ಚೆಕ್",
+              "material": "ಸಾಮಗ್ರಿ", "materials": "ಸಾಮಗ್ರಿ", "labour": "ಕೂಲಿ", "wages": "ಕೂಲಿ",
+              "equipment": "ಉಪಕರಣ", "expense": "ವೆಚ್ಚ", "income": "ಆದಾಯ", "n/a": "ಲಭ್ಯವಿಲ್ಲ"
             }
           },
           ta: {
@@ -379,10 +400,24 @@ router.get("/sign/:token", async (req, res) => {
               projectName: "திட்டத்தின் பெயர்", itemName: "பொருளின் பெயர்", type: "வகை", activityName: "செயல்பாட்டின் பெயர்", phase: "கட்டம்",
               totalAmount: "மொத்தத் தொகை", alreadyPaid: "ஏற்கனவே செலுத்தப்பட்டது", amount: "தொகை",
               paymentMethod: "செலுத்தும் முறை", notes: "குறிப்புகள்", date: "தேதி"
+            },
+            values: {
+              "cash": "ரொக்கம்", "upi": "யுபிஐ", "bank transfer": "வங்கிப் பரிமாற்றம்", "card": "அட்டை", "cheque": "காசோலை",
+              "material": "பொருட்கள்", "materials": "பொருட்கள்", "labour": "கூலி", "wages": "கூலி",
+              "equipment": "உபகரணம்", "expense": "செலவு", "income": "வருமானம்", "n/a": "இல்லை"
             }
           }
         };
         let currentLang = 'en';
+        const LOCALES = { en: 'en-IN', kn: 'kn-IN', ta: 'ta-IN' };
+        const TRANSLATABLE_VALUES = { type: true, paymentMethod: true };
+        function stampTime() {
+          const opts = { timeZone: 'Asia/Kolkata', day: 'numeric', month: 'short', year: 'numeric', hour: 'numeric', minute: '2-digit' };
+          let s;
+          try { s = new Date().toLocaleString(LOCALES[currentLang] || 'en-IN', opts); }
+          catch (_) { s = new Date().toLocaleString('en-IN', opts); }
+          return s + ' IST';
+        }
         document.getElementById('lang-select').addEventListener('change', (e) => {
           currentLang = e.target.value;
           const t = i18n[currentLang];
@@ -392,11 +427,18 @@ router.get("/sign/:token", async (req, res) => {
           } else {
             document.getElementById('submit').innerText = t.btnAuthWait;
           }
+          document.documentElement.lang = currentLang;
           document.querySelectorAll('.label').forEach(el => {
             const key = el.getAttribute('data-key');
             if (t.keys[key]) {
               el.innerText = t.keys[key];
             }
+          });
+          document.querySelectorAll('.value').forEach(el => {
+            const key = el.getAttribute('data-key');
+            const raw = el.getAttribute('data-raw') || '';
+            const mapped = t.values[raw.trim().toLowerCase()];
+            el.innerText = (mapped && (TRANSLATABLE_VALUES[key] || raw === 'N/A')) ? mapped : raw;
           });
         });
         document.getElementById('submit').addEventListener('click', async () => {
@@ -415,7 +457,7 @@ router.get("/sign/:token", async (req, res) => {
           stampDiv.innerHTML = \`
             <h3 style="color: #15803D; margin: 0 0 5px 0;">\${t.stampTitle}</h3>
             <p style="color: #6B7280; font-size: 12px; margin: 0;">\${t.stampIp} ${req.ip || "Unknown"}</p>
-            <p style="color: #6B7280; font-size: 12px; margin: 0;">\${t.stampDate} ${new Date().toLocaleString()}</p>
+            <p style="color: #6B7280; font-size: 12px; margin: 0;">\${t.stampDate} \${stampTime()}</p>
           \`;
           const container = document.querySelector('.container');
           // Hide button and error before taking screenshot

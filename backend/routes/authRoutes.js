@@ -366,6 +366,7 @@ router.post("/provision", protect, authorize("Admin"), async (req, res) => {
       permissions,
       projectIds,
       projectId,
+      overseesRoles,
     } = req.body;
     const finalPassword = temporaryPassword || password;
     const activeSub = await Subscription.findOne({
@@ -424,6 +425,10 @@ router.post("/provision", protect, authorize("Admin"), async (req, res) => {
       permissions: normalizePermissions(permissions),
       projectIds: finalProjectIds,
       projectId: legacyProjectId,
+      // [C10] "Roles to oversee" chosen at creation (was ignored → empty approvals).
+      overseesRoles: Array.isArray(overseesRoles)
+        ? [...new Set(overseesRoles.map((r) => String(r).trim()).filter((r) => r && r.toLowerCase() !== "admin"))]
+        : [],
       createdBy: req.user._id,
     });
     return res.status(201).json({
@@ -679,8 +684,9 @@ router.put("/change-password", protect, async (req, res) => {
     if (!currentPassword || !newPassword) {
       return res.status(400).json({ message: "Current and new passwords are required" });
     }
-    if (String(newPassword).length < 6) {
-      return res.status(400).json({ message: "New password must be at least 6 characters" });
+    // Same rule as /reset-password.
+    if (String(newPassword).length < 8) {
+      return res.status(400).json({ message: "New password must be at least 8 characters" });
     }
     const user = await User.findById(getUserId(req));
     if (!user) return res.status(404).json({ message: "User not found" });
@@ -689,7 +695,8 @@ router.put("/change-password", protect, async (req, res) => {
     }
     const isMatch = await user.matchPassword(currentPassword);
     if (!isMatch) {
-      return res.status(401).json({ message: "Current password is incorrect" });
+      // 400, not 401: the app treats 401 as an expired session and logs out.
+      return res.status(400).json({ message: "Current password is incorrect" });
     }
     user.password = newPassword;
     await user.save();

@@ -310,7 +310,13 @@ transactionSchema.pre("save", function () {
     this.quantity &&
     this.rate
   ) {
-    this.amount = this.quantity * this.rate;
+    const base = this.quantity * this.rate;
+    const pct = Number(this.gst) || 0;
+    // Material bills include GST when isWithGst (same formula as the app and
+    // calculateAmount in transactionRoutes) — this hook used to drop it.
+    this.amount = this.type === "Materials" && this.isWithGst && pct > 0
+      ? base + (base * pct) / 100
+      : base;
   }
   // Allow a small epsilon for floating point inaccuracies
   if (Math.abs(this.paidAmount || 0) - Math.abs(this.amount || 0) > 0.01) {

@@ -139,6 +139,21 @@ exports.broadcast = async (req, res) => {
   }
 };
 
+// [D5] DELETE /api/notifications/device-token  body { token } — called on logout.
+exports.removeDeviceToken = async (req, res) => {
+  try {
+    const token = req.body && req.body.token;
+    if (!token || typeof token !== "string") {
+      return res.status(400).json({ message: "Token is required" });
+    }
+    const r = await User.updateOne({ _id: req.user._id }, { $pull: { fcmTokens: token } });
+    res.json({ success: true, removed: r.modifiedCount > 0 });
+  } catch (err) {
+    console.error("[NotificationController] removeDeviceToken Error:", err);
+    res.status(500).json({ message: "Server error" });
+  }
+};
+
 exports.registerDeviceToken = async (req, res) => {
   try {
     const { token } = req.body;
@@ -146,6 +161,12 @@ exports.registerDeviceToken = async (req, res) => {
       return res.status(400).json({ message: "Token is required" });
     }
     
+    // A device belongs to whoever is signed in on it now: drop it from any
+    // other account first (previous user on a shared phone).
+    await User.updateMany(
+      { _id: { $ne: req.user._id }, fcmTokens: token },
+      { $pull: { fcmTokens: token } }
+    );
     // Add token if it doesn't exist
     await User.findByIdAndUpdate(
       req.user._id,

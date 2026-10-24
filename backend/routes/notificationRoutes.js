@@ -10,7 +10,8 @@ const {
   markAllAsRead,
   deleteAll,
   broadcast,
-  registerDeviceToken
+  registerDeviceToken,
+  removeDeviceToken
 } = require("../controllers/notificationController");
 
 router.get("/", protect, getNotifications);
@@ -18,6 +19,7 @@ router.get("/unread-count", protect, getUnreadCount);
 router.get("/preferences", protect, getPreferences);
 router.put("/preferences", protect, updatePreferences);
 router.post("/device-token", protect, registerDeviceToken);
+router.delete("/device-token", protect, removeDeviceToken);
 router.put("/read-all", protect, markAllAsRead);
 router.delete("/all", protect, deleteAll);
 router.post("/broadcast", protect, authorize("Admin"), broadcast);

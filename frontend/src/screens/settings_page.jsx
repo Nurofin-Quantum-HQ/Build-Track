@@ -73,7 +73,6 @@ export default function SettingsPage() {
   const [companySaving, setCompanySaving] = useState(false);
   const [companySaved, setCompanySaved] = useState(false);
 
-  const [language, setLanguage] = useState("English");
   const currency = "Indian Rupee (INR)";
   const [emailNotif, setEmailNotif] = useState(true);
   const [pushNotif, setPushNotif] = useState(false);

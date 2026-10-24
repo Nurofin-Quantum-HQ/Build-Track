@@ -121,16 +121,29 @@ router.get("/history", protect, async (req, res) => {
         return res.json({ transactions: [] });
       }
     }
-    const history = await Transaction.find({
+    // [F3] Optional ?project= filter, applied in the query (before the limit).
+    // ?limit= may raise the default of 20 (max 1000).
+    const historyQuery = {
       createdBy: { $in: userIds },
       approvalStatus: { $in: ["Approved", "Rejected"] },
-    })
+    };
+    if (req.query.project && req.query.project !== "all") {
+      if (!mongoose.Types.ObjectId.isValid(req.query.project)) {
+        return res.status(400).json({ message: "Invalid project id" });
+      }
+      historyQuery.project = new mongoose.Types.ObjectId(req.query.project);
+    }
+    const requestedLimit = parseInt(req.query.limit, 10);
+    const historyLimit = Number.isFinite(requestedLimit) && requestedLimit > 0
+      ? Math.min(requestedLimit, 1000)
+      : 20;
+    const history = await Transaction.find(historyQuery)
       .select("-attachments -paymentHistory -screenshotUrl -paymentReceipt -remarks")
       .populate("createdBy", "name role")
       .populate("project", "projectName")
       .populate("approvedBy", "name")
       .sort({ approvedAt: -1, updatedAt: -1 })
-      .limit(20);
+      .limit(historyLimit);
     if (isDev) console.log(`[History] Found ${history.length} historical transactions`);
     res.json({ transactions: history });
   } catch (err) {
