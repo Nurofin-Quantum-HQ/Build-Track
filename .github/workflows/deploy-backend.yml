@@ -1,0 +1,49 @@
+name: Deploy Backend to AWS Elastic Beanstalk
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'backend/**'
+      - '.github/workflows/deploy-backend.yml'
+  workflow_dispatch: # Allows you to manually trigger the deployment from GitHub UI
+
+jobs:
+  deploy:
+    name: Deploy to Elastic Beanstalk
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Create Production Deployment Package
+        run: |
+          cd backend
+          # Build a clean zip of backend excluding dev, test, scratch files, and secrets
+          zip -r ../backend-deploy.zip . \
+            -x "node_modules/*" \
+            -x ".env*" \
+            -x "tests/*" \
+            -x "*.log" \
+            -x "*.txt" \
+            -x "airpay_*" \
+            -x "check_*" \
+            -x "test_*" \
+            -x "fix*" \
+            -x "backups/*" \
+            -x "graphify-out/*"
+
+      - name: Deploy to Elastic Beanstalk
+        uses: einaregilsson/beanstalk-deploy@v22
+        with:
+          aws_access_key: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws_secret_key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          application_name: buildtrack-backend
+          environment_name: Buildtrack-backend-env-v2
+          version_label: "backend-${{ github.sha }}-${{ github.run_number }}"
+          region: ap-south-1
+          deployment_package: backend-deploy.zip
+          use_existing_version_if_available: true
+          wait_for_deployment: true
