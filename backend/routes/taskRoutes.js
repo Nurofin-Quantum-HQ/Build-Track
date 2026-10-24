@@ -189,8 +189,16 @@ router.put("/:id", async (req, res) => {
     // Changing what the task is / who it is for = assigning work: Admin, or the
     // assigner while they still hold assign_tasks. The assignee may only move
     // the status (same as PUT /:id/status).
-    const editsDetails = [title, description, time, floorId, floorName, phaseId, phaseName,
-      activityId, activityName, assignedTo].some((v) => v !== undefined);
+    // Compare values, not presence: older apps re-send title/description with a
+    // status change, which must still work for the assignee.
+    const norm = (v) => (v === undefined || v === null ? "" : String(v).trim());
+    const changes = (incoming, current) => incoming !== undefined && norm(incoming) !== norm(current);
+    const editsDetails =
+      changes(title, task.title) || changes(description, task.description) || changes(time, task.time) ||
+      changes(floorId, task.floorId) || changes(floorName, task.floorName) ||
+      changes(phaseId, task.phaseId) || changes(phaseName, task.phaseName) ||
+      changes(activityId, task.activityId) || changes(activityName, task.activityName) ||
+      changes(assignedTo, task.assignedTo);
     const perms = Array.isArray(req.user.permissions) ? req.user.permissions : [];
     if (editsDetails && !isAdmin && !(isCreator && perms.includes("assign_tasks"))) {
       return res.status(403).json({ message: "Access denied — requires permission: assign_tasks" });

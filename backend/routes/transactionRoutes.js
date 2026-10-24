@@ -876,13 +876,19 @@ router.put("/:id", requirePermission(["manage_expenses", "add_entries"]), async 
     // Changing the payment list is recording/editing payments: same permission
     // as paidAmount / Paid (approve_payments or mark_paid; Admin passes).
     if (Array.isArray(paymentHistory) && !canMarkPaid) {
+      // Payments = amount, mode and day. Stored dates are Date objects while apps
+      // send strings, so compare the calendar day (IST), not the raw text; notes and
+      // receipt file names are not "recording a payment".
+      const day = (v) => {
+        if (!v) return "";
+        const d = new Date(v);
+        return isNaN(d.getTime()) ? String(v).slice(0, 10)
+          : new Date(d.getTime() + 5.5 * 3600e3).toISOString().slice(0, 10);
+      };
       const sig = (list) => JSON.stringify((list || []).map((p) => [
         parseAmount(p && p.amount),
         normalizePaymentMode((p && (p.method || p.paymentMode)) || ""),
-        String((p && (p.date || p.paymentDate)) || ""),
-        String((p && p.note) || ""),
-        typeof (p && (p.receiptDataUri || p.receipt)) === "string" && (p.receiptDataUri || p.receipt).startsWith("data:")
-          ? "new-receipt" : String((p && p.receipt) || ""),
+        day(p && (p.date || p.paymentDate)),
       ]));
       if (sig(paymentHistory) !== sig(tx.paymentHistory)) {
         await session.abortTransaction();
