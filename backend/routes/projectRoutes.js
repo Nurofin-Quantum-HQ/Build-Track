@@ -791,6 +791,101 @@ router.put("/:id", protect, async (req, res) => {
     res.status(500).json({ message: "Failed to update project" });
   }
 });
+// Daily progress for ONE activity. Replaces sending the whole project (every
+// activity's photos as base64, both ways) on each update: new photos are uploaded
+// to file storage and only this activity + the new progress come back.
+// Body: { phaseId?, completed, completedAt?, notes?, photos?: [url | data URI], progress? }
+const PROGRESS_EDIT_PERMS = ["edit_project", "manage_team", "add_entry", "submit_daily_update", "approve_updates"];
+const uploadActivityPhoto = async (dataUri) => {
+  try {
+    const cloudinary = require("../config/cloudinary");
+    const r = await cloudinary.uploader.upload(dataUri, { folder: "buildtrack/activity-photos" });
+    return r.secure_url;
+  } catch (err) {
+    // Keep the photo rather than lose it; it can be moved to storage later.
+    console.error("Activity photo upload error:", err.message || err);
+    return dataUri;
+  }
+};
+router.put("/:id/activities/:activityId", protect, async (req, res) => {
+  try {
+    const { id, activityId } = req.params;
+    const body = req.body || {};
+    const existing = await Project.findOne(canAccessProjectFilter(req, id))
+      .select("_id selectedPhases.id selectedPhases.activities.id selectedPhases.activities.completed")
+      .lean();
+    if (!existing) return res.status(404).json({ message: "Project not found" });
+    const perms = Array.isArray(req.user.permissions) ? req.user.permissions : [];
+    if (req.user.role !== "Admin" && !PROGRESS_EDIT_PERMS.some((p) => perms.includes(p))) {
+      const Task = require("../models/Task");
+      const hasTask = await Task.exists({ project: existing._id, assignedTo: req.user._id });
+      if (!hasTask) return res.status(403).json({ message: "Access denied" });
+    }
+    const phases = existing.selectedPhases || [];
+    const phase = phases.find((ph) =>
+      (!body.phaseId || ph.id === String(body.phaseId)) &&
+      (ph.activities || []).some((a) => a.id === activityId));
+    if (!phase) return res.status(404).json({ message: "Activity not found in this project" });
+
+    const completed = body.completed === undefined ? true : body.completed === true || body.completed === "true";
+    const base = "selectedPhases.$[ph].activities.$[act]";
+    const set = { [`${base}.completed`]: completed };
+    const unset = {};
+    if (completed) {
+      const at = body.completedAt ? new Date(body.completedAt) : new Date();
+      set[`${base}.completedAt`] = isNaN(at.getTime()) ? new Date() : at;
+    } else {
+      // Un-ticking clears the evidence (same as the app's confirm says).
+      unset[`${base}.completedAt`] = "";
+      unset[`${base}.notes`] = "";
+      unset[`${base}.photo`] = "";
+      set[`${base}.photos`] = [];
+    }
+    if (completed && body.notes !== undefined) set[`${base}.notes`] = String(body.notes || "");
+    if (completed && Array.isArray(body.photos)) {
+      const photos = [];
+      for (const ph of body.photos.slice(0, 10)) {
+        if (typeof ph !== "string" || !ph) continue;
+        photos.push(ph.startsWith("data:") ? await uploadActivityPhoto(ph) : ph);
+      }
+      set[`${base}.photos`] = photos;
+      set[`${base}.photo`] = photos[0] || null;
+    }
+    const update = { $set: set };
+    if (Object.keys(unset).length) update.$unset = unset;
+    update[completed ? "$addToSet" : "$pull"] = { completedActivityKeys: activityId };
+
+    let project = await Project.findOneAndUpdate(
+      canAccessProjectFilter(req, id),
+      update,
+      { new: true, arrayFilters: [{ "ph.id": phase.id }, { "act.id": activityId }] }
+    ).select("selectedPhases completedActivityKeys progress").lean();
+    if (!project) return res.status(404).json({ message: "Project not found" });
+
+    // Progress: the user's slider value if sent, else completed / total.
+    let progress;
+    if (body.progress !== undefined && body.progress !== null && !isNaN(Number(body.progress))) {
+      progress = Math.min(1, Math.max(0, Number(body.progress)));
+    } else {
+      const all = (project.selectedPhases || []).flatMap((ph) => ph.activities || []);
+      progress = all.length ? Number((all.filter((a) => a.completed).length / all.length).toFixed(4)) : project.progress || 0;
+    }
+    await Project.updateOne({ _id: existing._id }, { $set: { progress } });
+
+    const updatedPhase = (project.selectedPhases || []).find((ph) => ph.id === phase.id);
+    const activity = (updatedPhase?.activities || []).find((a) => a.id === activityId) || null;
+    res.json({
+      message: "Activity updated",
+      phaseId: phase.id,
+      activity,
+      progress,
+      completedActivityKeys: project.completedActivityKeys || [],
+    });
+  } catch (err) {
+    console.error("UPDATE activity error:", err);
+    res.status(500).json({ message: "Failed to update activity" });
+  }
+});
 router.delete("/:id", requirePermission(["delete_project", "manage_team"]), async (req, res) => {
   try {
     const project = await Project.findOneAndDelete(canManageProjectFilter(req, req.params.id));
