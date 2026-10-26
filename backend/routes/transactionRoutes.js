@@ -1705,6 +1705,116 @@ router.post("/:id/request-esign", requirePermission(["approve_payments", "manage
 });
 
 // --- Added backup routes ---
+// ── Rename entries (names only) ─────────────────────────────────────────────
+// Changes the name (or contractor / supplier) on many entries WITHOUT touching
+// amounts, payments, dates or approval — unlike PUT /:id, which recalculates the
+// amount. Title renames keep the first old name in `originalTitle` so they can be
+// seen and undone (POST /rename/restore). Inventory stock moves with the name,
+// exactly as PUT /:id does on a name change. Admin only.
+const RENAME_FIELDS = new Set(["title", "category", "supplier", "contractor"]);
+const tidyName = (s) => String(s || "").replace(/\s+/g, " ").trim();
+// Move one entry's quantity from one stock row to another (a rename, not a
+// purchase or usage): purchases move purchased + closing stock, usage entries
+// move used. An emptied old row is removed.
+async function moveStock(adminId, project, fromName, toName, unit, qty, type, usage, session) {
+  const q = Number(qty) || 0;
+  if (!q || !fromName || !toName || fromName === toName) return;
+  const invCategory = type === "Wages" ? "labour" : type === "Expense" ? "equipment" : "material";
+  const delta = usage ? { used: q, closingStock: -q } : { purchased: q, closingStock: q };
+  const neg = Object.fromEntries(Object.entries(delta).map(([k, v]) => [k, -v]));
+  const from = { createdBy: adminId, project, materialName: fromName };
+  const old = await Inventory.findOne(from, null, { session });
+  if (old) {
+    await Inventory.updateOne(from, { $inc: neg }, { session });
+    const after = await Inventory.findOne(from, null, { session });
+    if (after && Math.abs(after.purchased || 0) < 1e-9 && Math.abs(after.used || 0) < 1e-9) {
+      await Inventory.deleteOne({ _id: after._id }, { session });
+    }
+  }
+  await Inventory.updateOne(
+    { createdBy: adminId, project, materialName: toName },
+    { $inc: delta, $setOnInsert: { unit: unit || "", category: invCategory } },
+    { upsert: true, session },
+  );
+}
+async function renameEntries(req, items) {
+  // items: [{ id, field, to }]
+  const adminId = req.user._id;
+  const projectIds = (await Project.find({ createdBy: adminId }).select("_id").lean()).map((p) => String(p._id));
+  const allowedProjects = new Set(projectIds);
+  const ids = [...new Set(items.map((i) => String(i.id)))].filter((id) => mongoose.Types.ObjectId.isValid(id));
+  const txs = await Transaction.find({ _id: { $in: ids } });
+  const byId = new Map(txs.map((t) => [String(t._id), t]));
+  const updated = [], skipped = [];
+  const session = await mongoose.startSession();
+  try {
+    session.startTransaction();
+    for (const item of items) {
+      const tx = byId.get(String(item.id));
+      const owned = tx && ((tx.project && allowedProjects.has(String(tx.project))) || String(tx.createdBy) === String(adminId));
+      if (!owned) { skipped.push(String(item.id)); continue; }
+      const field = item.field;
+      const to = item.restore ? tidyName(tx.originalTitle) : tidyName(item.to);
+      if (!to || (field === "title" && item.restore && !tx.originalTitle)) { skipped.push(String(item.id)); continue; }
+      const oldInvName = tx.category || tx.title;
+      const set = {}, unset = {};
+      if (field === "title") {
+        const original = tx.originalTitle || tx.title;
+        set.title = to;
+        if (original === to) unset.originalTitle = ""; else set.originalTitle = original;
+      } else {
+        set[field] = to;
+      }
+      const newCategory = field === "category" ? to : tx.category;
+      const newTitle = field === "title" ? to : tx.title;
+      const newInvName = newCategory || newTitle;
+      // Inventory: same as PUT /:id on a name change (approved entries with a quantity).
+      if (oldInvName !== newInvName && ["Materials", "Wages", "Expense"].includes(tx.type) && tx.quantity > 0 && tx.approvalStatus === "Approved" && tx.project) {
+        const usage = tx.type === "Materials" && normalizeMaterialType(tx.materialType, tx.subType) === "usage";
+        await moveStock(adminId, tx.project, oldInvName, newInvName, tx.unit, tx.quantity, tx.type, usage, session);
+      }
+      const update = {};
+      if (Object.keys(set).length) update.$set = set;
+      if (Object.keys(unset).length) update.$unset = unset;
+      // updateOne (not save): no pre-save hook, so the amount is never recalculated.
+      await Transaction.updateOne({ _id: tx._id }, update, { session });
+      updated.push(String(tx._id));
+    }
+    await session.commitTransaction();
+  } catch (e) {
+    await session.abortTransaction();
+    throw e;
+  } finally {
+    session.endSession();
+  }
+  return { updated, skipped };
+}
+router.post("/rename", async (req, res) => {
+  try {
+    if (req.user.role !== "Admin") return res.status(403).json({ message: "Only an admin can rename entries" });
+    const { ids, field = "title", to } = req.body || {};
+    if (!Array.isArray(ids) || !ids.length || ids.length > 5000) return res.status(400).json({ message: "ids must be a non-empty list" });
+    if (!RENAME_FIELDS.has(field)) return res.status(400).json({ message: "field must be title, category, supplier or contractor" });
+    if (!tidyName(to)) return res.status(400).json({ message: "New name is required" });
+    const r = await renameEntries(req, ids.map((id) => ({ id, field, to })));
+    res.json({ updated: r.updated.length, skipped: r.skipped });
+  } catch (err) {
+    console.error("Rename error:", err);
+    res.status(500).json({ message: "Failed to rename entries" });
+  }
+});
+router.post("/rename/restore", async (req, res) => {
+  try {
+    if (req.user.role !== "Admin") return res.status(403).json({ message: "Only an admin can rename entries" });
+    const { ids } = req.body || {};
+    if (!Array.isArray(ids) || !ids.length || ids.length > 5000) return res.status(400).json({ message: "ids must be a non-empty list" });
+    const r = await renameEntries(req, ids.map((id) => ({ id, field: "title", restore: true })));
+    res.json({ restored: r.updated.length, skipped: r.skipped });
+  } catch (err) {
+    console.error("Rename restore error:", err);
+    res.status(500).json({ message: "Failed to restore names" });
+  }
+});
 router.post("/backup-csv", requirePermission(["manage_expenses", "add_entries"]), async (req, res) => {
   try {
     const transactions = await Transaction.find({ createdBy: req.user._id }).lean();
