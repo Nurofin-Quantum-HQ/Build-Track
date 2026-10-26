@@ -31,6 +31,9 @@ const EMAIL = arg("--email");
 const APPLY = args.includes("--apply");
 const RESTORE = arg("--restore");
 const SKIP_INV = args.includes("--skip-inventory");
+// Default: spelling fixes only (same as the app). --simple-names also renames well-known materials
+// to one simple name (M sand → M-Sand, Cement OPC 53 → Cement).
+const SIMPLE_NAMES = args.includes("--simple-names");
 
 const key = (s) => String(s || "").toLowerCase().replace(/[^a-z0-9]/g, "");
 const tidy = (s) => String(s || "").replace(/\s+/g, " ").trim();
@@ -151,7 +154,7 @@ const EXPLICIT = {
     const current = String(tx.title || tx.materialName || "");
     const name = tidy(current); if (!name) continue;
     let to = EXPLICIT[kind][key(name)] || null;
-    if (!to && kind === "material") {
+    if (!to && kind === "material" && SIMPLE_NAMES) {
       const r = materialRule(name);
       // Fixed child (M-Sand, Cement, …) → that name; keep-own-name kinds (Doors & Windows, Wood, …) and
       // Miscellaneous fall through to spelling unification only.
@@ -201,7 +204,7 @@ const EXPLICIT = {
     const kind = invKind(row.category);
     const name = tidy(row.materialName); if (!name) return row.materialName;
     let to = EXPLICIT[kind][key(name)];
-    if (!to && kind === "material") to = materialRule(name).child;
+    if (!to && kind === "material" && SIMPLE_NAMES) to = materialRule(name).child;
     return to || commonSpelling(kind, name);
   };
   const invGroups = new Map();
