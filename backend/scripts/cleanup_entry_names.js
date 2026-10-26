@@ -61,7 +61,13 @@ const MATERIAL_RULES = [
 ];
 const materialRule = (name) => {
   const k = key(name);
-  for (const [parent, child, words] of MATERIAL_RULES) if (words.some((w) => k.includes(w))) return { parent, child };
+  // Long needles anywhere ("msand" in "M-Sand"); short ones (< 5) must start a word ("rod" ≠ "product").
+  const tokens = String(name || "").toLowerCase().split(/[^a-z0-9]+/).filter(Boolean);
+  // ≤ 3 letters must be the whole word or its plural ("fan"/"fans", not "fancy").
+  const hit = (w) => (w.length >= 5 ? k.includes(w)
+    : w.length <= 3 ? tokens.some((t) => t === w || t === `${w}s`)
+    : tokens.some((t) => t.startsWith(w)));
+  for (const [parent, child, words] of MATERIAL_RULES) if (words.some(hit)) return { parent, child };
   return { parent: "Miscellaneous", child: null };
 };
 
