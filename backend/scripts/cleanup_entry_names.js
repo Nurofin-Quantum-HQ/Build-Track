@@ -9,9 +9,11 @@
 // What it does (dry run shows all of it):
 //  - Spacing: trims and collapses spaces ("M  sand " → "M sand").
 //  - Same name, different spelling ("M sand", "M-Sand", "Msand"): all entries get the most common spelling.
-//  - Materials: well-known items get one simple name (M-Sand, P-Sand, River Sand, Cement, Steel, Bricks, …) —
-//    same rules as the app's Insights grouping (keep the two in sync). Items that match no rule keep their own
-//    name; the app shows them under "Miscellaneous" (renaming them to "Miscellaneous" would lose what they were).
+//  - Materials: well-known simple items get one name (M-Sand, P-Sand, River Sand, Cement, Steel, Bricks, …) —
+//    same rules as the app's Insights grouping (keep the two in sync). Kinds whose items differ (Doors &
+//    Windows, Wood, Flooring, Paint, Electrical, Plumbing, Hardware, Chemicals, Shuttering) keep each item's
+//    own name — only the spelling is unified. Items that match no rule keep their own name too; the app shows
+//    them under "Miscellaneous" (renaming them to "Miscellaneous" would lose what they were).
 //  - Explicit renames (--labour "Ravi Kumar=Mason") apply to the labour type (title) AND the contractor/team
 //    field (category) — whichever holds that name.
 //  - Inventory rows (stock is kept per name) are renamed the same way; rows that end up with the same name in
@@ -34,33 +36,37 @@ const key = (s) => String(s || "").toLowerCase().replace(/[^a-z0-9]/g, "");
 const tidy = (s) => String(s || "").replace(/\s+/g, " ").trim();
 
 // Keep in sync with lib/common/utils/entry_names.dart in the app (NAME-RULES).
+// [parent, child, words]: child = the fixed simple name every match gets, or null = keep each item's own
+// name (only its spelling is unified) — for kinds whose items differ meaningfully (UPVC door vs Teak door).
+// Order matters (first match wins): Shuttering's own words before Doors & Windows ("shuttering" contains
+// "shutter"); Doors & Windows before Steel/Aggregate/Electrical/Plumbing/Wood; Electrical before Plumbing.
 const MATERIAL_RULES = [
   ["Sand", "M-Sand", ["msand", "manufacturedsand", "robosand"]],
   ["Sand", "P-Sand", ["psand", "plastersand", "plasteringsand"]],
   ["Sand", "River Sand", ["riversand"]],
   ["Sand", "Sand", ["sand"]],
   ["Cement", "Cement", ["cement", "opc", "ppc"]],
+  ["Shuttering", null, ["shuttering", "centering", "centring"]],
+  ["Doors & Windows", null, ["door", "window", "shutter", "grill", "grille"]],
   ["Steel", "Binding Wire", ["bindingwire"]],
   ["Steel", "Steel", ["tmt", "steel", "rebar", "rod"]],
   ["Aggregate", "Aggregate", ["jelly", "jalli", "jally", "aggregate", "bluemetal", "gravel", "stonechip", "metal"]],
   ["Bricks & Blocks", "Bricks", ["brick"]],
   ["Bricks & Blocks", "Blocks", ["block", "aac", "flyash"]],
   ["Concrete", "Ready-Mix Concrete", ["rmc", "readymix", "concrete"]],
-  ["Electrical", "Electrical", ["wire", "cable", "conduit", "switch", "mcb", "electrical", "socket", "light", "fan"]],
-  ["Plumbing", "Plumbing", ["plumbing", "cpvc", "upvc", "pvc", "pipe", "tap", "valve", "fitting", "sanitary"]],
-  ["Flooring", "Tiles", ["tile"]],
-  ["Flooring", "Granite", ["granite"]],
-  ["Flooring", "Marble", ["marble"]],
-  ["Paint", "Putty", ["putty"]],
-  ["Paint", "Paint", ["paint", "primer", "emulsion", "enamel", "distemper"]],
-  ["Wood", "Wood", ["wood", "timber", "plywood", "ply", "teak", "door", "frame"]],
-  ["Chemicals", "Waterproofing", ["waterproof", "admixture", "chemical", "sealant"]],
-  ["Shuttering", "Shuttering", ["shuttering", "centering", "centring", "plate"]],
+  ["Electrical", null, ["wire", "cable", "conduit", "switch", "mcb", "electrical", "socket", "light", "fan"]],
+  ["Plumbing", null, ["plumbing", "cpvc", "upvc", "pvc", "pipe", "tap", "valve", "fitting", "sanitary"]],
+  ["Flooring", null, ["tile", "granite", "marble"]],
+  ["Paint", null, ["putty", "paint", "primer", "emulsion", "enamel", "distemper"]],
+  ["Wood", null, ["wood", "timber", "plywood", "ply", "teak", "frame"]],
+  ["Chemicals", null, ["waterproof", "admixture", "chemical", "sealant"]],
+  ["Shuttering", null, ["plate"]],
   ["Water", "Water", ["water", "tanker"]],
-  ["Hardware", "Hardware", ["nail", "screw", "bolt", "hardware", "hinge"]],
+  ["Hardware", null, ["nail", "screw", "bolt", "hardware", "hinge"]],
 ];
 const materialRule = (name) => {
   const k = key(name);
+  if (!k) return { parent: "Miscellaneous", child: null };
   // Long needles anywhere ("msand" in "M-Sand"); short ones (< 5) must start a word ("rod" ≠ "product").
   const tokens = String(name || "").toLowerCase().split(/[^a-z0-9]+/).filter(Boolean);
   // ≤ 3 letters must be the whole word or its plural ("fan"/"fans", not "fancy").
@@ -147,7 +153,10 @@ const EXPLICIT = {
     let to = EXPLICIT[kind][key(name)] || null;
     if (!to && kind === "material") {
       const r = materialRule(name);
-      if (r.child) to = r.child; else misc.set(commonSpelling(kind, name), (misc.get(commonSpelling(kind, name)) || 0) + 1);
+      // Fixed child (M-Sand, Cement, …) → that name; keep-own-name kinds (Doors & Windows, Wood, …) and
+      // Miscellaneous fall through to spelling unification only.
+      if (r.child) to = r.child;
+      else if (r.parent === "Miscellaneous") misc.set(commonSpelling(kind, name), (misc.get(commonSpelling(kind, name)) || 0) + 1);
     }
     if (!to) to = commonSpelling(kind, name);
     if (to === current) continue;
