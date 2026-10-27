@@ -162,23 +162,26 @@ async function buildPaymentPayload({
   if (buyerPinCode && /^[1-9][0-9]{2}\s?[0-9]{3}$/.test(buyerPinCode.trim()))
     transactionData.buyer_pincode = buyerPinCode.trim();
 
-  // Autopay / Mandate fields
+  // Autopay / Subscription fields for Simple Transaction (v4)
+  // Per Airpay Simple Transaction Documentation: https://docs.airpay.co.in/v4/payments/simple-transaction/
   if (isRecurring) {
-    // Airpay Mandate specification: channel can be 'UPI' for UPI Autopay or 'enach' for Netbanking/Debit card
-    transactionData.channel = 'UPI';
-    // Default to a wide window if dates aren't passed strictly
-    const formatToDDMMYYYY = (dObj) => {
-      const d = dObj ? new Date(dObj) : new Date();
-      return `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}/${d.getFullYear()}`;
-    };
-    transactionData.start_date = startDate ? formatToDDMMYYYY(startDate) : formatToDDMMYYYY(new Date());
+    transactionData.txnsubtype = 'INR-SI';
+    transactionData.sb_isrecurring = 1;
+    transactionData.sb_period = 'M'; // 'M' = Month, 'D' = Day, 'W' = Week, 'Y' = Year
+    transactionData.sb_frequency = 1;
+    transactionData.sb_amount = amountFormatted;
+    transactionData.sb_maxamount = amountFormatted;
+    transactionData.sb_recurringcount = 999; // Never-ending subscription
     
-    // Add 10 years to end date if not provided
-    let defaultEndDate = new Date();
-    defaultEndDate.setFullYear(defaultEndDate.getFullYear() + 10);
-    transactionData.end_date = endDate ? formatToDDMMYYYY(endDate) : formatToDDMMYYYY(defaultEndDate);
+    // Next run date must be T+1 or later (DD/MM/YYYY)
+    const nextRun = new Date();
+    nextRun.setMonth(nextRun.getMonth() + 1);
+    const dd = String(nextRun.getDate()).padStart(2, '0');
+    const mm = String(nextRun.getMonth() + 1).padStart(2, '0');
+    const yyyy = nextRun.getFullYear();
+    transactionData.sb_nextrundate = `${dd}/${mm}/${yyyy}`;
     
-    transactionData.period = recurringPeriod || 'Monthly';
+    transactionData.sb_retryattempts = 3;
   }
 
   const encdata  = encrypt(JSON.stringify(transactionData), encryptionKey);
