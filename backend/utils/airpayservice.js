@@ -164,14 +164,19 @@ async function buildPaymentPayload({
 
   // Autopay / Mandate fields
   if (isRecurring) {
-    transactionData.channel = 'enach'; // Required by Airpay to trigger Mandate/UPI Autopay flow
+    // Airpay Mandate specification: channel can be 'UPI' for UPI Autopay or 'enach' for Netbanking/Debit card
+    transactionData.channel = 'UPI';
     // Default to a wide window if dates aren't passed strictly
-    transactionData.start_date = startDate || new Date().toISOString().split('T')[0];
+    const formatToDDMMYYYY = (dObj) => {
+      const d = dObj ? new Date(dObj) : new Date();
+      return `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}/${d.getFullYear()}`;
+    };
+    transactionData.start_date = startDate ? formatToDDMMYYYY(startDate) : formatToDDMMYYYY(new Date());
     
     // Add 10 years to end date if not provided
     let defaultEndDate = new Date();
     defaultEndDate.setFullYear(defaultEndDate.getFullYear() + 10);
-    transactionData.end_date = endDate || defaultEndDate.toISOString().split('T')[0];
+    transactionData.end_date = endDate ? formatToDDMMYYYY(endDate) : formatToDDMMYYYY(defaultEndDate);
     
     transactionData.period = recurringPeriod || 'Monthly';
   }

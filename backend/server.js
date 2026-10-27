@@ -77,8 +77,6 @@ const ALLOWED_ORIGINS = [
   "http://localhost:3000",
   "http://localhost:5174",
   "https://buildtrack-api.nurofin.com",
-  "https://build-track.onrender.com",
-  "https://build-track-web.onrender.com",
   "https://secure.airpay.co.in",
   "https://buildtrack.nurofin.com",
   ...(process.env.NGROK_URL ? [process.env.NGROK_URL] : []),
