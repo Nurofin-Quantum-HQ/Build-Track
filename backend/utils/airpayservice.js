@@ -173,9 +173,9 @@ async function buildPaymentPayload({
     transactionData.sb_maxamount = amountFormatted;
     transactionData.sb_recurringcount = 999; // Never-ending subscription
     
-    // Next run date must be T+1 or later (DD/MM/YYYY)
+    // Next run date must be T+1 (Tomorrow) per Airpay specification (DD/MM/YYYY)
     const nextRun = new Date();
-    nextRun.setMonth(nextRun.getMonth() + 1);
+    nextRun.setDate(nextRun.getDate() + 1); // T+1
     const dd = String(nextRun.getDate()).padStart(2, '0');
     const mm = String(nextRun.getMonth() + 1).padStart(2, '0');
     const yyyy = nextRun.getFullYear();
