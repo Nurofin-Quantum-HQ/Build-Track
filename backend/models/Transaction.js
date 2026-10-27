@@ -22,6 +22,11 @@ const transactionSchema = new mongoose.Schema(
       required: true,
       trim: true,
     },
+    // Name before the first rename (POST /transactions/rename); cleared when renamed back.
+    originalTitle: {
+      type: String,
+      trim: true,
+    },
     category: {
       type: String,
       trim: true,
