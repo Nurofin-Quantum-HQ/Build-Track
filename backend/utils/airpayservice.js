@@ -181,7 +181,7 @@ async function buildPaymentPayload({
     const yyyy = nextRun.getFullYear();
     transactionData.sb_nextrundate = `${dd}/${mm}/${yyyy}`;
     
-    transactionData.sb_retryattempts = 3;
+    transactionData.sb_retryattempts = 1; // Airpay allows 0 or 1
   }
 
   const encdata  = encrypt(JSON.stringify(transactionData), encryptionKey);
