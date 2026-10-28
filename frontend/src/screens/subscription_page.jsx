@@ -322,8 +322,11 @@ export default function SubscriptionPage() {
    * Submits Airpay payment form.
    * paymentParams contains: airpayUrl + form fields.
    */
-  function submitAirpayForm(paymentParams) {
+  function submitAirpayForm(paymentParams, airpayRequest) {
     const { airpayUrl, ...formFields } = paymentParams;
+    if (airpayRequest) {
+      console.log("[AirPay Request] encrypted payload contents:", JSON.stringify(airpayRequest, null, 2));
+    }
     const form = document.createElement("form");
     form.method = "POST";
     form.action = airpayUrl;
@@ -360,7 +363,7 @@ export default function SubscriptionPage() {
       const { data } = await subscriptionAPI.initiate(payload);
 
       if (data.success && data.paymentParams) {
-        submitAirpayForm(data.paymentParams);
+        submitAirpayForm(data.paymentParams, data.airpayRequest);
       }
     } catch (err) {
       const status = err.response?.status;
@@ -393,7 +396,7 @@ export default function SubscriptionPage() {
 
       if (data.success && data.paymentParams) {
         setPhonePlan(null);
-        submitAirpayForm(data.paymentParams);
+        submitAirpayForm(data.paymentParams, data.airpayRequest);
       }
     } catch (err) {
       const body = err.response?.data;

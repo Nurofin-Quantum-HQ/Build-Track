@@ -145,7 +145,7 @@ router.post('/initiate', protect, async (req, res) => {
     // ── Build Airpay payload ───────────────────────────────────────────────
     const backendUrl = process.env.BACKEND_URL || `${req.protocol}://${req.get('host')}`;
 
-    const { postUrl, formFields } = await buildPaymentPayload({
+    const { postUrl, formFields, requestData } = await buildPaymentPayload({
       orderId,
       amount:          chargeNow,
       recurringAmount: amount,
@@ -175,6 +175,9 @@ router.post('/initiate', protect, async (req, res) => {
         ...formFields,
       },
       orderId,
+      // What went inside encdata (the buyer's own details, no keys) — logged in the browser
+      // console so the request can be checked or shared with AirPay without server access.
+      airpayRequest: requestData,
     });
   } catch (err) {
     console.error('[Subscription] Initiate error:', err.message);
