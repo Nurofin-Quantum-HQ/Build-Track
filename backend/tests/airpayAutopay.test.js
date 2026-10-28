@@ -57,7 +57,9 @@ const BUYER = {
 
 async function build(extra) {
   mockOAuth();
-  const out = await airpay.buildPaymentPayload({ ...BUYER, ...extra });
+  // AutoPay: ₹1.11 mandate token now, plan price (₹999) monthly — as the route sends it
+  const amounts = extra && extra.isRecurring ? { amount: 1.11, recurringAmount: 999 } : {};
+  const out = await airpay.buildPaymentPayload({ ...BUYER, ...amounts, ...extra });
   const sent = JSON.parse(decrypt(out.formFields.encdata, KEY));
   return { out, sent };
 }
@@ -90,6 +92,20 @@ describe('buildPaymentPayload — Simple Transaction doc compliance', () => {
   it('checksum is computed over exactly what is inside encdata', async () => {
     const { out, sent } = await build({ isRecurring: true, chmod: 'upi' });
     expect(out.formFields.checksum).toBe(generateChecksum(sent));
+  });
+
+  it('AutoPay: charges the ₹1.11 mandate token now and the plan price monthly', async () => {
+    const { sent } = await build({ isRecurring: true });
+    expect(sent.amount).toBe('1.11');
+    expect(sent.sb_amount).toBe('999.00');
+    expect(sent.sb_maxamount).toBe('999.00');
+    expect(airpay.MANDATE_TOKEN_AMOUNT).toBe(1.11);
+  });
+
+  it('AutoPay: refuses a down payment that is not less than the monthly amount', async () => {
+    mockOAuth();
+    await expect(airpay.buildPaymentPayload({ ...BUYER, isRecurring: true, amount: 1.11, recurringAmount: 1 }))
+      .rejects.toThrow(/must be less than the monthly amount/);
   });
 
   it('AutoPay: txnsubtype 12 (numeric "INR Subscription") and the sb_* fields', async () => {

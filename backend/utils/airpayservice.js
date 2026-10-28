@@ -27,6 +27,10 @@ const SUBSCRIPTION_TXNSUBTYPE = '12';
 const DEFAULT_RECURRING_COUNT = '12';
 // Days from signup to the first AutoPay debit (sb_nextrundate). AirPay: minimum is T+2.
 const FIRST_DEBIT_DAYS = 2;
+// AutoPay signup charges only this mandate-registration ("down payment") amount; the plan
+// price is debited by AutoPay from sb_nextrundate. Per AirPay's team (28 Oct): ₹1.11 under
+// RBI rules, and it must be less than sb_amount. (Doc examples show 1.00.)
+const MANDATE_TOKEN_AMOUNT = 1.11;
 // chmod values listed in the Simple Transaction doc
 const VALID_CHMODS = new Set([
   'ppc', 'pg', 'nb', 'pgcc', 'pgdc', 'cash', 'emi', 'rtgs', 'upi', 'btqr', 'payltr', 'va', 'enach', 'remit',
@@ -152,6 +156,7 @@ async function buildPaymentPayload({
   buyerPinCode,
   returnUrl,
   isRecurring,
+  recurringAmount,
   chmod,
 }) {
   const cfg           = getConfig();
@@ -159,6 +164,11 @@ async function buildPaymentPayload({
   const encryptionKey = generateEncryptionKeyFromCreds(cfg.username, cfg.password);
   const accessToken   = await getAccessToken();
   const amountFormatted = Number(amount).toFixed(2);
+  // AutoPay: `amount` is charged now (down payment), `recurringAmount` every month after.
+  const recurringFormatted = Number(recurringAmount ?? amount).toFixed(2);
+  if (isRecurring && !(Number(recurringFormatted) > Number(amountFormatted))) {
+    throw new Error(`AutoPay down payment (${amountFormatted}) must be less than the monthly amount (${recurringFormatted})`);
+  }
 
   // Validate required fields in production
   if (!isSandbox) {
@@ -218,8 +228,8 @@ async function buildPaymentPayload({
     transactionData.sb_isrecurring    = '1';
     transactionData.sb_period         = 'M';
     transactionData.sb_frequency      = '1';
-    transactionData.sb_amount         = amountFormatted;
-    transactionData.sb_maxamount      = amountFormatted;
+    transactionData.sb_amount         = recurringFormatted;
+    transactionData.sb_maxamount      = recurringFormatted;
     // First AutoPay debit date (IST, AirPay's clock). The doc says T+1, but AirPay's team
     // confirmed (28 Oct) the minimum is T+2 — T+1 and +1 month both got "Invalid Trial
     // Period", and omitting it gets "Invalid request".
@@ -490,4 +500,6 @@ module.exports = {
   formatDDMMYYYY,
   normaliseChmod,
   SUBSCRIPTION_TXNSUBTYPE,
+  FIRST_DEBIT_DAYS,
+  MANDATE_TOKEN_AMOUNT,
 };

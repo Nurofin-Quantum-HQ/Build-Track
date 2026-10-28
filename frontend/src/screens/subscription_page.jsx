@@ -679,7 +679,7 @@ export default function SubscriptionPage() {
           <div style={{ fontSize: 12, color: "#666", textAlign: "center" }}>
             {!isAutoRenew
               ? "⚡ Pay once for 30 days. No automatic renewals or recurring charges."
-              : "🔄 Automatically renews every month via UPI AutoPay. Cancel anytime."}
+              : "🔄 Pay ₹1.11 now to approve AutoPay. Your plan price is then debited automatically every month, starting in 2 days. Cancel anytime."}
           </div>
         </div>
 

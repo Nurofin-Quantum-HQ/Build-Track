@@ -14,7 +14,10 @@ const Subscription = require('../models/Subscription');
 const Payment      = require('../models/Payment');
 const User         = require('../models/User');
 const { protect }  = require('../middleware/auth');
-const { buildPaymentPayload, verifyAndDecryptCallbackData, manageSubscription, subscriptionHmac, PRIVATE_KEY } = require('../utils/airpayservice');
+const {
+  buildPaymentPayload, verifyAndDecryptCallbackData, manageSubscription, subscriptionHmac, PRIVATE_KEY,
+  FIRST_DEBIT_DAYS, MANDATE_TOKEN_AMOUNT,
+} = require('../utils/airpayservice');
 const { applyRenewal, syncRenewalsFromAirpay } = require('../services/subscriptionRenewal');
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -110,6 +113,13 @@ router.post('/initiate', protect, async (req, res) => {
     const orderId = `BT${Date.now().toString().slice(-8)}${String(Math.floor(Math.random() * 99)).padStart(2, '0')}`;
     const amount  = PLAN_PRICES[plan];
     const wantsAutoPay = isRecurring === true || isRecurring === 'true' || isRecurring === 1 || isRecurring === '1';
+    // AutoPay charges only the mandate token now; AutoPay debits the plan price from T+2.
+    const chargeNow = wantsAutoPay ? MANDATE_TOKEN_AMOUNT : amount;
+    if (wantsAutoPay && !(amount > MANDATE_TOKEN_AMOUNT)) {
+      return res.status(400).json({
+        message: `AutoPay isn't available for the ${plan} plan. Please choose One-Time Payment.`,
+      });
+    }
 
     // Create Subscription (status: pending — NOT active)
     const sub = await Subscription.create({
@@ -127,7 +137,7 @@ router.post('/initiate', protect, async (req, res) => {
       userId:         user._id,
       subscriptionId: sub._id,
       plan,
-      amount,
+      amount:         chargeNow,
       currency:       'INR',
       status:         'PENDING',
     });
@@ -137,7 +147,8 @@ router.post('/initiate', protect, async (req, res) => {
 
     const { postUrl, formFields } = await buildPaymentPayload({
       orderId,
-      amount,
+      amount:          chargeNow,
+      recurringAmount: amount,
       buyerEmail:     user.email,
       buyerPhone,
       buyerFirstName,
@@ -273,7 +284,14 @@ router.post('/callback', async (req, res) => {
     if (isSuccess) {
       const now     = new Date();
       const endDate = new Date(now);
-      endDate.setDate(endDate.getDate() + (PLAN_DURATION_DAYS[payment.plan] || 30));
+      const subDoc  = await Subscription.findOne({ airpayOrderId: orderId });
+      if (subDoc?.isRecurring) {
+        // AutoPay: only the mandate token was paid. Access runs until the first AutoPay debit
+        // (T+2) plus one grace day; each successful debit then extends it by a month.
+        endDate.setDate(endDate.getDate() + FIRST_DEBIT_DAYS + 1);
+      } else {
+        endDate.setDate(endDate.getDate() + (PLAN_DURATION_DAYS[payment.plan] || 30));
+      }
 
       // Mark payment PAID
       await Payment.findByIdAndUpdate(payment._id, {
@@ -308,8 +326,10 @@ router.post('/callback', async (req, res) => {
       try {
         const NotificationService = require("../services/NotificationService");
         await NotificationService.send(payment.userId, {
-          title: "Payment Received",
-          message: `Your ${payment.plan} plan payment of Rs. ${payment.amount} was successful. Subscription activated.`,
+          title: subDoc?.isRecurring ? "AutoPay Set Up" : "Payment Received",
+          message: subDoc?.isRecurring
+            ? `AutoPay is set up for your ${payment.plan} plan. Rs. ${subDoc.amount} will be debited every month, starting in ${FIRST_DEBIT_DAYS} days.`
+            : `Your ${payment.plan} plan payment of Rs. ${payment.amount} was successful. Subscription activated.`,
           type: "payment",
           priority: "high",
           relatedId: payment._id,
