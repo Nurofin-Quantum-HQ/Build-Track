@@ -148,7 +148,7 @@ router.post('/initiate', protect, async (req, res) => {
       // Browser return URL (separate from IPN callback)
       returnUrl: `${backendUrl}/api/subscriptions/browser-return`,
       // Pass Autopay parameters if the user opted in
-      isRecurring: isRecurring || false,
+      isRecurring: isRecurring === true || isRecurring === 'true' || isRecurring === 1 || isRecurring === '1',
       recurringPeriod: 'Monthly',
       chmod,
     });

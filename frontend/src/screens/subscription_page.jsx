@@ -257,6 +257,7 @@ export default function SubscriptionPage() {
   // Phone modal state
   const [phonePlan, setPhonePlan]     = useState(null); // which plan triggered modal
   const [phoneLoading, setPhoneLoading] = useState(false);
+  const [isAutoRenew, setIsAutoRenew]   = useState(false); // false = One-Time Payment, true = Monthly AutoPay
 
 
   const tourSteps = [
@@ -350,7 +351,7 @@ export default function SubscriptionPage() {
       setProcessing(planId);
       setError("");
 
-      const payload = { plan: planId };
+      const payload = { plan: planId, isRecurring: isAutoRenew };
       if (phoneData) {
         payload.phone     = phoneData.phone;
         payload.savePhone = phoneData.savePhone;
@@ -386,6 +387,7 @@ export default function SubscriptionPage() {
         plan: phonePlan,
         phone,
         savePhone,
+        isRecurring: isAutoRenew,
 
       });
 
@@ -616,6 +618,71 @@ export default function SubscriptionPage() {
           </div>
         )}
 
+        {/* Billing Option Selector: User Choice between One-Time & AutoPay */}
+        <div style={{
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          gap: 10,
+          margin: "4px 0 16px",
+        }}>
+          <div style={{
+            display: "inline-flex",
+            background: "#ebebeb",
+            padding: 4,
+            borderRadius: 12,
+            gap: 4,
+          }}>
+            <button
+              type="button"
+              onClick={() => setIsAutoRenew(false)}
+              style={{
+                border: "none",
+                background: !isAutoRenew ? "#fff" : "transparent",
+                color: !isAutoRenew ? "var(--color-primary-hover, #EA580C)" : "#666",
+                fontWeight: !isAutoRenew ? 700 : 500,
+                padding: "8px 20px",
+                borderRadius: 8,
+                fontSize: 13,
+                cursor: "pointer",
+                boxShadow: !isAutoRenew ? "0 2px 6px rgba(0,0,0,0.08)" : "none",
+                display: "flex",
+                alignItems: "center",
+                gap: 6,
+                transition: "all 0.2s ease",
+              }}
+            >
+              <span>⚡</span> One-Time Payment (UPI / QR / Cards)
+            </button>
+            <button
+              type="button"
+              onClick={() => setIsAutoRenew(true)}
+              style={{
+                border: "none",
+                background: isAutoRenew ? "#fff" : "transparent",
+                color: isAutoRenew ? "var(--color-primary-hover, #EA580C)" : "#666",
+                fontWeight: isAutoRenew ? 700 : 500,
+                padding: "8px 20px",
+                borderRadius: 8,
+                fontSize: 13,
+                cursor: "pointer",
+                boxShadow: isAutoRenew ? "0 2px 6px rgba(0,0,0,0.08)" : "none",
+                display: "flex",
+                alignItems: "center",
+                gap: 6,
+                transition: "all 0.2s ease",
+              }}
+            >
+              <span>🔄</span> AutoPay (Monthly Auto-Debit)
+            </button>
+          </div>
+          <div style={{ fontSize: 12, color: "#666", textAlign: "center" }}>
+            {!isAutoRenew
+              ? "⚡ Pay once for 30 days. No automatic renewals or recurring charges."
+              : "🔄 Automatically renews every month via UPI AutoPay. Cancel anytime."}
+          </div>
+        </div>
+
         {/* Plans grid */}
         <div className="tour-plans" style={{
           display: "grid",
@@ -752,7 +819,9 @@ export default function SubscriptionPage() {
                         ? "Processing…"
                         : plan.price === 0
                           ? "Get Started"
-                          : `Subscribe to ${plan.title}`}
+                          : isAutoRenew
+                          ? `Subscribe with AutoPay (₹${plan.price}/mo)`
+                          : `Pay ₹${plan.price} (One-Time)`}
                   </button>
                 )}
               </div>

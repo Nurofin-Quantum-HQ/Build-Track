@@ -179,7 +179,21 @@ async function buildPaymentPayload({
   const encdata  = encrypt(JSON.stringify(transactionData), encryptionKey);
   const checksum = generateChecksum(transactionData);
 
-  console.log(`[AirPay] Payment payload built for order ${orderId} (sandbox=${isSandbox})`);
+  const selectedChmod = chmod !== undefined ? chmod : (isRecurring ? 'upi' : '');
+
+  if (isRecurring) {
+    console.log(`[AirPay Request] ── RECURRING SUBSCRIPTION (AutoPay Mandate: INR-SI) ──`);
+    console.log(`[AirPay Request] Order ID: ${orderId} | Amount: Rs.${amountFormatted}/month | Mode: INR-SI`);
+    console.log(`[AirPay Request] Mandate Parameters: txnsubtype='INR-SI', sb_isrecurring=1, sb_period='M', sb_frequency=1, sb_amount=${amountFormatted}, sb_maxamount=${amountFormatted}, sb_recurringcount=999, sb_retryattempts=1`);
+    console.log(`[AirPay Request] Channel Mode (chmod): "${selectedChmod}"`);
+  } else {
+    console.log(`[AirPay Request] ── SIMPLE TRANSACTION (One-Time Payment) ──`);
+    console.log(`[AirPay Request] Order ID: ${orderId} | Amount: Rs.${amountFormatted} | Mode: One-Time (Simple Transaction)`);
+    console.log(`[AirPay Request] Conforms strictly to Simple Transaction API (https://docs.airpay.co.in/v4/payments/simple-transaction/)`);
+    console.log(`[AirPay Request] Channel Mode (chmod): "${selectedChmod || 'ALL (UPI QR, Cards, Netbanking, Wallets)'}"`);
+  }
+  console.log(`[AirPay Request] Buyer: ${buyerFirstName} ${buyerLastName} | Phone: ${buyerPhone.slice(0, 2)}******${buyerPhone.slice(-2)} | Email: ${buyerEmail.slice(0, 3)}***@***`);
+  console.log(`[AirPay Request] Form fields sent: privatekey, orderid, merchant_id, encdata (len=${encdata.length}), checksum, chmod="${selectedChmod}"`);
 
   return {
     postUrl: `${AIRPAY_PAYMENT_BASE_URL}?token=${accessToken}`,
@@ -189,7 +203,7 @@ async function buildPaymentPayload({
       merchant_id: cfg.merchantId,
       encdata,
       checksum,
-      chmod: chmod !== undefined ? chmod : (isRecurring ? 'upi' : ''),
+      chmod: selectedChmod,
     },
   };
 }
