@@ -14,7 +14,8 @@ const Subscription = require('../models/Subscription');
 const Payment      = require('../models/Payment');
 const User         = require('../models/User');
 const { protect }  = require('../middleware/auth');
-const { buildPaymentPayload, verifyAndDecryptCallbackData } = require('../utils/airpayservice');
+const { buildPaymentPayload, verifyAndDecryptCallbackData, manageSubscription, subscriptionHmac, PRIVATE_KEY } = require('../utils/airpayservice');
+const { applyRenewal, syncRenewalsFromAirpay } = require('../services/subscriptionRenewal');
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -108,6 +109,7 @@ router.post('/initiate', protect, async (req, res) => {
     // ── Create order ID and records ────────────────────────────────────────
     const orderId = `BT${Date.now().toString().slice(-8)}${String(Math.floor(Math.random() * 99)).padStart(2, '0')}`;
     const amount  = PLAN_PRICES[plan];
+    const wantsAutoPay = isRecurring === true || isRecurring === 'true' || isRecurring === 1 || isRecurring === '1';
 
     // Create Subscription (status: pending — NOT active)
     const sub = await Subscription.create({
@@ -116,6 +118,7 @@ router.post('/initiate', protect, async (req, res) => {
       status: 'pending',
       amount,
       airpayOrderId: orderId,
+      isRecurring: wantsAutoPay,
     });
 
     // Create Payment record (source of truth)
@@ -147,13 +150,12 @@ router.post('/initiate', protect, async (req, res) => {
       buyerPinCode:   user.pincode   || undefined,
       // Browser return URL (separate from IPN callback)
       returnUrl: `${backendUrl}/api/subscriptions/browser-return`,
-      // Pass Autopay parameters if the user opted in
-      isRecurring: isRecurring === true || isRecurring === 'true' || isRecurring === 1 || isRecurring === '1',
-      recurringPeriod: 'Monthly',
+      // AutoPay → txnsubtype 12 + sb_* fields (Simple Transaction doc)
+      isRecurring: wantsAutoPay,
       chmod,
     });
 
-    console.log(`[Subscription] Initiate OK — orderId=${orderId} plan=${plan} userId=${user._id} isRecurring=${isRecurring}`);
+    console.log(`[Subscription] Initiate OK — orderId=${orderId} plan=${plan} userId=${user._id} isRecurring=${wantsAutoPay}`);
 
     return res.json({
       success: true,
@@ -207,6 +209,26 @@ router.post('/callback', async (req, res) => {
 
     // ── 3. Find payment record ─────────────────────────────────────────────
     const payment = await Payment.findOne({ orderId });
+
+    // ── 3b. AutoPay renewal debit ──────────────────────────────────────────
+    // A monthly debit carries the AirPay subscription_id but is a NEW ap_transactionid —
+    // either for an orderid we don't know, or for the original (already processed) order.
+    const airpaySubId = String(txnData.subscription_id || txnData.SUBSCRIPTION_ID || '').trim();
+    const isRenewalDebit = airpaySubId && airpayTxnId && (
+      !payment || (payment.callbackProcessed && String(payment.airpayTxnId || '') !== String(airpayTxnId))
+    );
+    if (isRenewalDebit) {
+      const recurringSub = await Subscription.findOne({ airpaySubscriptionId: airpaySubId });
+      if (recurringSub) {
+        if (paymentStatus === 'SUCCESS' || paymentStatus === '200') {
+          const applied = await applyRenewal(recurringSub, { airpayTxnId, amount: receivedAmt });
+          return res.status(200).send(applied ? 'RENEWAL_APPLIED' : 'RENEWAL_ALREADY_PROCESSED');
+        }
+        console.warn(`[AirPay IPN] AutoPay debit not successful sub=${recurringSub._id} txn=${airpayTxnId} status=${paymentStatus}`);
+        return res.status(200).send('RENEWAL_NOT_SUCCESSFUL');
+      }
+    }
+
     if (!payment) {
       console.error(`[AirPay IPN] No Payment record for orderId=${orderId}`);
       return res.status(200).send('ORDER_NOT_FOUND');
@@ -272,6 +294,9 @@ router.post('/callback', async (req, res) => {
           transactionId:       airpayTxnId, // legacy compat
           startDate:           now,
           endDate,
+          // AutoPay: AirPay returns these on a subscription transaction
+          ...(airpaySubId ? { airpaySubscriptionId: airpaySubId } : {}),
+          ...(txnData.subscription_next_rundate ? { nextRunDate: String(txnData.subscription_next_rundate) } : {}),
           callbackProcessed:   true,
           callbackReceivedAt:  now,
           callbackStatus:      paymentStatus,
@@ -410,8 +435,47 @@ router.get('/browser-return', async (req, res) => {
   }
 });
 
-// ─── GET /api/subscriptions/status ────────────────────────────────────────────
+// ─── POST /api/subscriptions/subscription-approval ────────────────────────────
+// AirPay "Subscription Callback": called 1–2 days before each AutoPay debit and
+// asks us to Approve (200) or Reject (400). Register this URL with AirPay.
+// Safety net for cancel: if the unsubscribe call failed, the debit is rejected here.
+// Read-only — it never changes our data, so an unverified caller can't do harm.
 
+router.post('/subscription-approval', async (req, res) => {
+  const approve = { status: '200', message: 'Approve' };
+  const reject  = { status: '400', message: 'Reject' };
+  try {
+    const { subscription_id: subId, sb_amount: sbAmount, checksum } = req.body || {};
+    if (!subId) return res.status(200).json(reject);
+
+    const mid = (process.env.AIRPAY_MERCHANT_ID || '').trim();
+    const expected = subscriptionHmac([subId, PRIVATE_KEY, mid, sbAmount]);
+    if (String(checksum || '') !== expected) {
+      console.warn(`[AutoPay] subscription-approval checksum did not match for sub=${subId} (deciding from our records only)`);
+    }
+
+    const sub = await Subscription.findOne({ airpaySubscriptionId: String(subId) }).sort({ createdAt: -1 });
+    if (!sub) {
+      // Unknown to us — AirPay's default with no callback is Approve; keep that behaviour.
+      console.warn(`[AutoPay] subscription-approval for unknown sub=${subId} — approving (AirPay default)`);
+      return res.status(200).json(approve);
+    }
+    if (sub.status === 'cancelled') {
+      console.log(`[AutoPay] Rejecting debit for cancelled sub=${sub._id}`);
+      return res.status(200).json(reject);
+    }
+    if (Number(sbAmount) - sub.amount > 0.01) {
+      console.warn(`[AutoPay] Rejecting debit sub=${sub._id}: amount ${sbAmount} > plan ${sub.amount}`);
+      return res.status(200).json(reject);
+    }
+    return res.status(200).json(approve);
+  } catch (err) {
+    console.error('[AutoPay] subscription-approval error:', err.message);
+    return res.status(200).json(approve);
+  }
+});
+
+// ─── GET /api/subscriptions/status ────────────────────────────────────────────
 
 
 router.post('/cancel', protect, async (req, res) => {
@@ -428,13 +492,36 @@ router.post('/cancel', protect, async (req, res) => {
     if (!sub) {
       return res.status(404).json({ success: false, message: 'No active subscription found to cancel' });
     }
+    // AutoPay: stop the mandate at AirPay, otherwise the customer keeps getting debited.
+    let autopay = null;
+    if (sub.isRecurring) {
+      if (sub.airpaySubscriptionId) {
+        try {
+          autopay = await manageSubscription(sub.airpaySubscriptionId, 'U');
+        } catch (e) {
+          autopay = { ok: false, status: 'ERROR', message: e.message };
+        }
+        if (!autopay.ok) {
+          // Still cancel locally: /subscription-approval will Reject the next debit.
+          console.error(`[Subscription] AirPay unsubscribe FAILED sub=${sub._id} airpaySub=${sub.airpaySubscriptionId} status=${autopay.status} msg=${autopay.message}`);
+        }
+      } else {
+        autopay = { ok: false, status: 'NO_SUBSCRIPTION_ID', message: 'AirPay subscription_id was never received' };
+        console.error(`[Subscription] AutoPay sub=${sub._id} has no AirPay subscription_id — stop it manually in the AirPay dashboard`);
+      }
+    }
+
     await Subscription.findByIdAndUpdate(sub._id, {
       status: 'cancelled',
+      ...(autopay ? { airpayUnsubscribe: { status: autopay.status, message: autopay.message, at: new Date() } } : {}),
     });
     res.json({
       success: true,
-      message: 'Subscription has been cancelled successfully.',
+      message: autopay && !autopay.ok
+        ? 'Subscription cancelled. We could not confirm AutoPay was stopped at the bank yet — our team will make sure you are not charged again.'
+        : 'Subscription has been cancelled successfully.',
       endDate: sub.endDate,
+      autopayStopped: autopay ? autopay.ok : undefined,
     });
   } catch (err) {
     console.error('Cancel error:', err.message);
@@ -447,11 +534,30 @@ router.get('/status', protect, async (req, res) => {
     const isAdmin       = (req.user.role || '').toLowerCase() === 'admin';
     const billingUserId = isAdmin ? req.user._id : (req.user.createdBy || req.user._id);
 
-    const sub = await Subscription.findOne({
+    let sub = await Subscription.findOne({
       userId:  billingUserId,
       status:  'active',
       endDate: { $gt: new Date() },
     }).sort({ createdAt: -1 });
+
+    // AutoPay period ran out locally — a renewal debit may have succeeded without its
+    // IPN reaching us. Ask AirPay (Subscription Status Check) before reporting expiry.
+    if (!sub) {
+      const lapsed = await Subscription.findOne({
+        userId: billingUserId, status: 'active', isRecurring: true,
+        airpaySubscriptionId: { $exists: true, $ne: null },
+      }).sort({ createdAt: -1 });
+      if (lapsed) {
+        try {
+          if (await syncRenewalsFromAirpay(lapsed)) {
+            sub = await Subscription.findById(lapsed._id);
+            if (!(sub?.endDate > new Date())) sub = null;
+          }
+        } catch (e) {
+          console.error(`[Subscription] AutoPay renewal sync failed sub=${lapsed._id}: ${e.message}`);
+        }
+      }
+    }
 
     if (!sub) return res.json({ hasSubscription: false, plan: null });
 
@@ -462,6 +568,8 @@ router.get('/status', protect, async (req, res) => {
       startDate:       sub.startDate,
       endDate:         sub.endDate,
       transactionId:   sub.airpayTxnId || sub.transactionId,
+      isRecurring:     !!sub.isRecurring,
+      nextRunDate:     sub.nextRunDate,
     });
   } catch (err) {
     console.error('[Subscription] Status error:', err.message);

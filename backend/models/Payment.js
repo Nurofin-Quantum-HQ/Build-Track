@@ -20,7 +20,8 @@ const paymentSchema = new mongoose.Schema({
   },
 
   // Airpay identifiers (set after callback)
-  airpayTxnId:  { type: String },
+  airpayTxnId:  { type: String, index: true },
+  isRenewal:    { type: Boolean, default: false }, // AutoPay debit after the first payment
   secureHash:   { type: String },
 
   // Idempotency
