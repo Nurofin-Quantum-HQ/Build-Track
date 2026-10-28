@@ -112,6 +112,7 @@ async function buildPaymentPayload({
   startDate,
   endDate,
   recurringPeriod,
+  chmod,
 }) {
   const cfg           = getConfig();
   const isSandbox     = (process.env.AIRPAY_ENV || '').toLowerCase() === 'sandbox';
@@ -188,7 +189,7 @@ async function buildPaymentPayload({
       merchant_id: cfg.merchantId,
       encdata,
       checksum,
-      chmod: isRecurring ? 'upi' : '',
+      chmod: chmod !== undefined ? chmod : (isRecurring ? 'upi' : ''),
     },
   };
 }

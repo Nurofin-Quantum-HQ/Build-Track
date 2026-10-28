@@ -48,7 +48,7 @@ function sanitiseName(str) {
 
 router.post('/initiate', protect, async (req, res) => {
   try {
-    const { plan, phone: bodyPhone, savePhone, isRecurring } = req.body;
+    const { plan, phone: bodyPhone, savePhone, isRecurring, chmod } = req.body;
 
     if (!PLAN_PRICES[plan]) {
       return res.status(400).json({ message: 'Invalid plan selected.' });
@@ -149,7 +149,8 @@ router.post('/initiate', protect, async (req, res) => {
       returnUrl: `${backendUrl}/api/subscriptions/browser-return`,
       // Pass Autopay parameters if the user opted in
       isRecurring: isRecurring || false,
-      recurringPeriod: 'Monthly'
+      recurringPeriod: 'Monthly',
+      chmod,
     });
 
     console.log(`[Subscription] Initiate OK — orderId=${orderId} plan=${plan} userId=${user._id} isRecurring=${isRecurring}`);
