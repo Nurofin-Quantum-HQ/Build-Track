@@ -98,9 +98,11 @@ describe('buildPaymentPayload — Simple Transaction doc compliance', () => {
     expect(sent).toMatchObject({
       sb_isrecurring: '1', sb_period: 'M', sb_frequency: '1',
       sb_amount: '999.00', sb_maxamount: '999.00', sb_recurringcount: '12',
+      // AirPay UAT: "Invalid Retry attempt, should be 0, 1" when this is missing
+      sb_retryattempts: '1',
     });
     // none of the Create-Mandate-API fields that were wrongly sent at 3728ef9
-    for (const k of ['channel', 'start_date', 'end_date', 'period', 'merchant_id', 'sb_retryattempts']) {
+    for (const k of ['channel', 'start_date', 'end_date', 'period', 'merchant_id']) {
       expect(sent).not.toHaveProperty(k);
     }
   });

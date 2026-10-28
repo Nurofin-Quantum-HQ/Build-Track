@@ -229,6 +229,9 @@ async function buildPaymentPayload({
     transactionData.sb_nextrundate    = formatDDMMYYYY(addMonthsIST(new Date(), 1));
     // Doc: 999 = never-ending, but only "applicable for eNACH transactions".
     transactionData.sb_recurringcount = selectedChmod === 'enach' ? '999' : DEFAULT_RECURRING_COUNT;
+    // Retries of a failed monthly debit. The doc marks this optional (example `3`), but
+    // AirPay UAT rejects a subscription without it: "Invalid Retry attempt, should be 0, 1".
+    transactionData.sb_retryattempts  = '1';
   }
 
   const encdata  = encrypt(JSON.stringify(transactionData), encryptionKey);
