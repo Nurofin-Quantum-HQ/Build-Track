@@ -257,6 +257,7 @@ export default function SubscriptionPage() {
   // Phone modal state
   const [phonePlan, setPhonePlan]     = useState(null); // which plan triggered modal
   const [phoneLoading, setPhoneLoading] = useState(false);
+  const [isAutoRenew, setIsAutoRenew] = useState(false); // false = One-time payment (UPI QR/Cards), true = Autopay
 
   const tourSteps = [
     { target: '.tour-current-plan', content: 'Here is your current active subscription and its status.', disableBeacon: true },
@@ -349,7 +350,7 @@ export default function SubscriptionPage() {
       setProcessing(planId);
       setError("");
 
-      const payload = { plan: planId, isRecurring: true };
+      const payload = { plan: planId, isRecurring: isAutoRenew };
       if (phoneData) {
         payload.phone     = phoneData.phone;
         payload.savePhone = phoneData.savePhone;
@@ -385,7 +386,7 @@ export default function SubscriptionPage() {
         plan: phonePlan,
         phone,
         savePhone,
-        isRecurring: true,
+        isRecurring: isAutoRenew,
       });
 
       if (data.success && data.paymentParams) {
@@ -614,6 +615,65 @@ export default function SubscriptionPage() {
             <span>Your subscription is managed by your administrator.</span>
           </div>
         )}
+
+        {/* Payment Mode Selector */}
+        <div style={{
+          display: "flex",
+          justifyContent: "center",
+          alignItems: "center",
+          margin: "4px 0 12px",
+        }}>
+          <div style={{
+            display: "inline-flex",
+            background: "#ebebeb",
+            padding: 4,
+            borderRadius: 12,
+            gap: 4,
+          }}>
+            <button
+              type="button"
+              onClick={() => setIsAutoRenew(false)}
+              style={{
+                border: "none",
+                background: !isAutoRenew ? "#fff" : "transparent",
+                color: !isAutoRenew ? "var(--color-primary-hover, #EA580C)" : "#666",
+                fontWeight: !isAutoRenew ? 700 : 500,
+                padding: "8px 18px",
+                borderRadius: 8,
+                fontSize: 13,
+                cursor: "pointer",
+                boxShadow: !isAutoRenew ? "0 2px 6px rgba(0,0,0,0.08)" : "none",
+                display: "flex",
+                alignItems: "center",
+                gap: 6,
+                transition: "all 0.2s",
+              }}
+            >
+              <span>⚡</span> One-Time Payment (UPI / QR / Cards)
+            </button>
+            <button
+              type="button"
+              onClick={() => setIsAutoRenew(true)}
+              style={{
+                border: "none",
+                background: isAutoRenew ? "#fff" : "transparent",
+                color: isAutoRenew ? "var(--color-primary-hover, #EA580C)" : "#666",
+                fontWeight: isAutoRenew ? 700 : 500,
+                padding: "8px 18px",
+                borderRadius: 8,
+                fontSize: 13,
+                cursor: "pointer",
+                boxShadow: isAutoRenew ? "0 2px 6px rgba(0,0,0,0.08)" : "none",
+                display: "flex",
+                alignItems: "center",
+                gap: 6,
+                transition: "all 0.2s",
+              }}
+            >
+              <span>🔄</span> Auto-renew (UPI AutoPay)
+            </button>
+          </div>
+        </div>
 
         {/* Plans grid */}
         <div className="tour-plans" style={{
