@@ -25,6 +25,8 @@ const AIRPAY_SUBSCRIPTION_STATUS_URL = 'https://kraken.airpay.co.in/airpay/order
 const SUBSCRIPTION_TXNSUBTYPE = '12';
 // Doc example value; 999 (never-ending) is documented for eNACH only.
 const DEFAULT_RECURRING_COUNT = '12';
+// Days from the first payment to the first AutoPay debit (sb_nextrundate)
+const FIRST_DEBIT_DAYS = 30;
 // chmod values listed in the Simple Transaction doc
 const VALID_CHMODS = new Set([
   'ppc', 'pg', 'nb', 'pgcc', 'pgdc', 'cash', 'emi', 'rtgs', 'upi', 'btqr', 'payltr', 'va', 'enach', 'remit',
@@ -42,14 +44,6 @@ function istParts(date) {
     timeZone: 'Asia/Kolkata', year: 'numeric', month: '2-digit', day: '2-digit',
   }).format(date).split('-').map(Number);
   return { y, m, d };
-}
-
-/** Same IST day-of-month `months` later, clamped to the month's last day (31 Jan → 28/29 Feb) */
-function addMonthsIST(date, months) {
-  const { y, m, d } = istParts(date);
-  const target   = new Date(Date.UTC(y, m - 1 + months, 1));
-  const lastDay  = new Date(Date.UTC(target.getUTCFullYear(), target.getUTCMonth() + 1, 0)).getUTCDate();
-  return new Date(Date.UTC(target.getUTCFullYear(), target.getUTCMonth(), Math.min(d, lastDay), 6, 30));
 }
 
 function formatDDMMYYYY(date, sep = '/') {
@@ -225,8 +219,9 @@ async function buildPaymentPayload({
     transactionData.sb_frequency      = '1';
     transactionData.sb_amount         = amountFormatted;
     transactionData.sb_maxamount      = amountFormatted;
-    // Doc: next run date must be at least T+1 — first renewal is one month out.
-    transactionData.sb_nextrundate    = formatDDMMYYYY(addMonthsIST(new Date(), 1));
+    // Doc: next run date must be at least T+1. AirPay UAT returned "Invalid Trial Period"
+    // for today + 1 calendar month (31 days); trying exactly 30 days (one-attempt test).
+    transactionData.sb_nextrundate    = formatDDMMYYYY(new Date(Date.now() + FIRST_DEBIT_DAYS * 24 * 60 * 60 * 1000));
     // Doc: 999 = never-ending, but only "applicable for eNACH transactions".
     transactionData.sb_recurringcount = selectedChmod === 'enach' ? '999' : DEFAULT_RECURRING_COUNT;
     // Retries of a failed monthly debit. The doc marks this optional (example `3`), but
@@ -490,7 +485,6 @@ module.exports = {
   subscriptionHmac,
   PRIVATE_KEY,
   // exported for tests
-  addMonthsIST,
   formatDDMMYYYY,
   normaliseChmod,
   SUBSCRIPTION_TXNSUBTYPE,

@@ -107,6 +107,11 @@ describe('buildPaymentPayload — Simple Transaction doc compliance', () => {
     }
   });
 
+  it('AutoPay: first debit is exactly 30 days after today (IST)', async () => {
+    const { sent } = await build({ isRecurring: true });
+    expect(sent.sb_nextrundate).toBe(airpay.formatDDMMYYYY(new Date(Date.now() + 30 * 864e5)));
+  });
+
   it('AutoPay: sb_nextrundate is DD/MM/YYYY and at least T+1', async () => {
     const { sent } = await build({ isRecurring: true });
     expect(sent.sb_nextrundate).toMatch(/^\d{2}\/\d{2}\/\d{4}$/);
@@ -152,11 +157,6 @@ describe('IST dates', () => {
     expect(checksumcal({ a: 'x' }, at).debugString).toBe('x2026-10-28');
   });
 
-  it('addMonthsIST clamps to the end of shorter months', () => {
-    expect(airpay.formatDDMMYYYY(airpay.addMonthsIST(new Date('2027-01-31T06:00:00Z'), 1))).toBe('28/02/2027');
-    expect(airpay.formatDDMMYYYY(airpay.addMonthsIST(new Date('2026-10-28T06:00:00Z'), 1))).toBe('28/11/2026');
-    expect(airpay.formatDDMMYYYY(airpay.addMonthsIST(new Date('2026-12-15T06:00:00Z'), 1))).toBe('15/01/2027');
-  });
 });
 
 // ── Manage Subscription (cancel) ──────────────────────────────────────────────
