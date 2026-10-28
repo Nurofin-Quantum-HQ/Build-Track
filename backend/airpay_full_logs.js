@@ -55,7 +55,7 @@ const axios = require('axios');
       buyerFirstName: 'Test',
       buyerLastName: 'User',
       returnUrl: 'http://localhost/return',
-      isRecurring: false // testing standard first
+      isRecurring: true // testing standard first
     });
 
     console.log(`POST URL: ${paymentPayload.postUrl}`);
