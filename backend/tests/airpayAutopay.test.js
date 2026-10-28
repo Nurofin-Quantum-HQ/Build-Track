@@ -132,9 +132,9 @@ describe('buildPaymentPayload — Simple Transaction doc compliance', () => {
     expect(out.formFields).not.toHaveProperty('chmod');
   });
 
-  it('AutoPay defaults to UPI (chmod "upi" inside encdata)', async () => {
+  it('AutoPay sends no chmod by default (AirPay shows every enabled mode)', async () => {
     const { sent } = await build({ isRecurring: true });
-    expect(sent.chmod).toBe('upi');
+    expect(sent).not.toHaveProperty('chmod');
   });
 
   it('one-time payment leaves chmod blank ("leave blank to show all enabled modes")', async () => {

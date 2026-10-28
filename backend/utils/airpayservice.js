@@ -204,9 +204,10 @@ async function buildPaymentPayload({
     transactionData.buyer_pincode = buyerPinCode.trim();
 
   // chmod is a request parameter like any other, so it lives INSIDE encdata.
-  // AutoPay runs on UPI (business decision, Oct 2026 — not eNACH). One-time payments
-  // leave it blank = "show all enabled modes" (doc).
-  const selectedChmod = normaliseChmod(chmod) || (isRecurring ? 'upi' : '');
+  // Blank = "show all enabled modes" (doc). AutoPay is blank too for now: with chmod "upi"
+  // inside encdata AirPay UAT rejects the subscription ("Invalid Trial Period"); this
+  // isolates whether that check is specific to the UPI AutoPay path.
+  const selectedChmod = normaliseChmod(chmod);
   if (selectedChmod) transactionData.chmod = selectedChmod;
 
   // Subscription (AutoPay) fields — Simple Transaction doc, txnsubtype 12 = "INR Subscription".
