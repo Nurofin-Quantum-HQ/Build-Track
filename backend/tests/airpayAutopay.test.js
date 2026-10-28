@@ -107,15 +107,15 @@ describe('buildPaymentPayload — Simple Transaction doc compliance', () => {
     }
   });
 
-  it('AutoPay: sb_nextrundate is T+1 — tomorrow in IST, DD/MM/YYYY', async () => {
+  it('AutoPay: sb_nextrundate is T+2 (AirPay minimum) in IST, DD/MM/YYYY', async () => {
     const { sent } = await build({ isRecurring: true });
-    expect(sent.sb_nextrundate).toBe(airpay.formatDDMMYYYY(new Date(Date.now() + 864e5)));
+    expect(sent.sb_nextrundate).toBe(airpay.formatDDMMYYYY(new Date(Date.now() + 2 * 864e5)));
     expect(sent.sb_nextrundate).toMatch(/^\d{2}\/\d{2}\/\d{4}$/);
   });
 
-  it('AutoPay: T+1 uses the IST date even when the server clock is still on the previous UTC day', () => {
-    // 28 Oct 23:30 UTC = 29 Oct 05:00 IST → tomorrow in IST is 30/10
-    expect(airpay.formatDDMMYYYY(new Date(Date.parse('2026-10-28T23:30:00Z') + 864e5))).toBe('30/10/2026');
+  it('AutoPay: T+2 uses the IST date even when the server clock is still on the previous UTC day', () => {
+    // 28 Oct 23:30 UTC = 29 Oct 05:00 IST → T+2 in IST is 31/10
+    expect(airpay.formatDDMMYYYY(new Date(Date.parse('2026-10-28T23:30:00Z') + 2 * 864e5))).toBe('31/10/2026');
   });
 
   it('AutoPay: sends all eight sb_* fields the doc and AirPay\'s v4 kit use for subscriptions', async () => {
