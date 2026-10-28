@@ -25,8 +25,6 @@ const AIRPAY_SUBSCRIPTION_STATUS_URL = 'https://kraken.airpay.co.in/airpay/order
 const SUBSCRIPTION_TXNSUBTYPE = '12';
 // Doc example value; 999 (never-ending) is documented for eNACH only.
 const DEFAULT_RECURRING_COUNT = '12';
-// Days from the first payment to the first AutoPay debit (sb_nextrundate)
-const FIRST_DEBIT_DAYS = 30;
 // chmod values listed in the Simple Transaction doc
 const VALID_CHMODS = new Set([
   'ppc', 'pg', 'nb', 'pgcc', 'pgdc', 'cash', 'emi', 'rtgs', 'upi', 'btqr', 'payltr', 'va', 'enach', 'remit',
@@ -219,9 +217,9 @@ async function buildPaymentPayload({
     transactionData.sb_frequency      = '1';
     transactionData.sb_amount         = amountFormatted;
     transactionData.sb_maxamount      = amountFormatted;
-    // Doc: next run date must be at least T+1. AirPay UAT returned "Invalid Trial Period"
-    // for today + 1 calendar month (31 days); trying exactly 30 days (one-attempt test).
-    transactionData.sb_nextrundate    = formatDDMMYYYY(new Date(Date.now() + FIRST_DEBIT_DAYS * 24 * 60 * 60 * 1000));
+    // sb_nextrundate is deliberately NOT sent: AirPay UAT answered "Invalid Trial Period" for
+    // both today+1 day and today+1 month. Without it AirPay schedules the
+    // first debit from sb_period/sb_frequency (Muneesha's 27 Oct fix, 18c8668).
     // Doc: 999 = never-ending, but only "applicable for eNACH transactions".
     transactionData.sb_recurringcount = selectedChmod === 'enach' ? '999' : DEFAULT_RECURRING_COUNT;
     // Retries of a failed monthly debit. The doc marks this optional (example `3`), but

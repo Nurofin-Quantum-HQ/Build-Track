@@ -107,18 +107,9 @@ describe('buildPaymentPayload — Simple Transaction doc compliance', () => {
     }
   });
 
-  it('AutoPay: first debit is exactly 30 days after today (IST)', async () => {
+  it('AutoPay: sb_nextrundate is NOT sent (UAT rejects it with "Invalid Trial Period")', async () => {
     const { sent } = await build({ isRecurring: true });
-    expect(sent.sb_nextrundate).toBe(airpay.formatDDMMYYYY(new Date(Date.now() + 30 * 864e5)));
-  });
-
-  it('AutoPay: sb_nextrundate is DD/MM/YYYY and at least T+1', async () => {
-    const { sent } = await build({ isRecurring: true });
-    expect(sent.sb_nextrundate).toMatch(/^\d{2}\/\d{2}\/\d{4}$/);
-    const [d, m, y] = sent.sb_nextrundate.split('/').map(Number);
-    const next = Date.UTC(y, m - 1, d);
-    const [ty, tm, td] = istDateYMD().split('-').map(Number);
-    expect(next).toBeGreaterThan(Date.UTC(ty, tm - 1, td));
+    expect(sent).not.toHaveProperty('sb_nextrundate');
   });
 
   it('chmod goes INSIDE encdata (not as a loose form field)', async () => {
