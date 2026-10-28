@@ -176,10 +176,17 @@ async function buildPaymentPayload({
     transactionData.sb_retryattempts = 1; // Airpay allows 0 or 1
   }
 
+  // Payment channel mode (chmod):
+  // Per Airpay docs: "chmod (optional): Defines channel/payment modes available for user.
+  // If left blank, all enabled payment modes are displayed."
+  const selectedChmod = (typeof chmod === 'string') ? chmod.trim() : '';
+  if (selectedChmod) {
+    transactionData.chmod = selectedChmod;
+  }
+
   const encdata  = encrypt(JSON.stringify(transactionData), encryptionKey);
   const checksum = generateChecksum(transactionData);
-
-  const selectedChmod = chmod !== undefined ? chmod : (isRecurring ? 'upi' : '');
+  console.log('[AirPay Request Decrypted JSON]:\n' + JSON.stringify(transactionData, null, 2));
 
   if (isRecurring) {
     console.log(`[AirPay Request] ── RECURRING SUBSCRIPTION (AutoPay Mandate: INR-SI) ──`);
