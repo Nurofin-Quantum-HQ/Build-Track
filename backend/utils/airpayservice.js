@@ -217,9 +217,10 @@ async function buildPaymentPayload({
     transactionData.sb_frequency      = '1';
     transactionData.sb_amount         = amountFormatted;
     transactionData.sb_maxamount      = amountFormatted;
-    // sb_nextrundate is deliberately NOT sent: AirPay UAT answered "Invalid Trial Period" for
-    // both today+1 day and today+1 month. Without it AirPay schedules the
-    // first debit from sb_period/sb_frequency (Muneesha's 27 Oct fix, 18c8668).
+    // Doc: "Next subscription date for txnsubtype = INR-SI … Date must be current date +1 (T+1)".
+    // Tomorrow in IST (AirPay's clock). Omitting it gets "Invalid request" on UAT; a later
+    // date (+1 month) got "Invalid Trial Period".
+    transactionData.sb_nextrundate    = formatDDMMYYYY(new Date(Date.now() + 24 * 60 * 60 * 1000));
     // Doc: 999 = never-ending, but only "applicable for eNACH transactions".
     transactionData.sb_recurringcount = selectedChmod === 'enach' ? '999' : DEFAULT_RECURRING_COUNT;
     // Retries of a failed monthly debit. The doc marks this optional (example `3`), but
