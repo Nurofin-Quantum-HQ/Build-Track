@@ -188,7 +188,7 @@ async function buildPaymentPayload({
       merchant_id: cfg.merchantId,
       encdata,
       checksum,
-      chmod: '',
+      chmod: isRecurring ? 'upi' : '',
     },
   };
 }
