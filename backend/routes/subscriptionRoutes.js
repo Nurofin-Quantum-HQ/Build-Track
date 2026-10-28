@@ -149,6 +149,8 @@ router.post('/initiate', protect, async (req, res) => {
       orderId,
       amount:          chargeNow,
       recurringAmount: amount,
+      // Ceiling = highest plan price, so upgrades fit inside the same mandate
+      maxRecurringAmount: Math.max(...Object.values(PLAN_PRICES)),
       buyerEmail:     user.email,
       buyerPhone,
       buyerFirstName,

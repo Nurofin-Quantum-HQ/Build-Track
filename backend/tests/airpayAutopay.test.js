@@ -98,8 +98,14 @@ describe('buildPaymentPayload — Simple Transaction doc compliance', () => {
     const { sent } = await build({ isRecurring: true });
     expect(sent.amount).toBe('1.11');
     expect(sent.sb_amount).toBe('999.00');
-    expect(sent.sb_maxamount).toBe('999.00');
+    expect(sent.sb_maxamount).toBe('999.00'); // no ceiling passed → plan price
     expect(airpay.MANDATE_TOKEN_AMOUNT).toBe(1.11);
+  });
+
+  it('AutoPay: sb_maxamount can be a higher ceiling than the monthly amount', async () => {
+    const { sent } = await build({ isRecurring: true, maxRecurringAmount: 4999 });
+    expect(sent.sb_amount).toBe('999.00');
+    expect(sent.sb_maxamount).toBe('4999.00');
   });
 
   it('AutoPay: refuses a down payment that is not less than the monthly amount', async () => {

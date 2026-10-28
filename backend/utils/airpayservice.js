@@ -157,6 +157,7 @@ async function buildPaymentPayload({
   returnUrl,
   isRecurring,
   recurringAmount,
+  maxRecurringAmount,
   chmod,
 }) {
   const cfg           = getConfig();
@@ -229,7 +230,8 @@ async function buildPaymentPayload({
     transactionData.sb_period         = 'M';
     transactionData.sb_frequency      = '1';
     transactionData.sb_amount         = recurringFormatted;
-    transactionData.sb_maxamount      = recurringFormatted;
+    // Mandate ceiling: AutoPay can later debit up to this (Update the Amount API) without a new mandate
+    transactionData.sb_maxamount      = Number(Math.max(Number(maxRecurringAmount) || 0, Number(recurringFormatted))).toFixed(2);
     // First AutoPay debit date (IST, AirPay's clock). The doc says T+1, but AirPay's team
     // confirmed (28 Oct) the minimum is T+2 — T+1 and +1 month both got "Invalid Trial
     // Period", and omitting it gets "Invalid request".
