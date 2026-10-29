@@ -220,7 +220,8 @@ async function buildPaymentPayload({
   // Blank = "show all enabled modes" (doc). AutoPay is blank too for now: with chmod "upi"
   // inside encdata AirPay UAT rejects the subscription ("Invalid Trial Period"); this
   // isolates whether that check is specific to the UPI AutoPay path.
-  const selectedChmod = normaliseChmod(chmod);
+  // AutoPay = UPI: AirPay's own working subscription test (29 Oct) sends chmod "upi".
+  const selectedChmod = normaliseChmod(chmod) || (isRecurring ? 'upi' : '');
   if (selectedChmod) transactionData.chmod = selectedChmod;
 
   // Subscription (AutoPay) fields — Simple Transaction doc, txnsubtype 12 = "INR Subscription".
