@@ -32,6 +32,20 @@ const transactionSchema = new mongoose.Schema(
       trim: true,
       default: "",
     },
+    // Money-in / money-out label for the Reports ledger. Optional: when unset,
+    // services/ledger.js derives it from type + text. Never affects amounts.
+    ledgerCategory: {
+      type: String,
+      enum: [
+        "client_payment",
+        "loan_received",
+        "loan_repayment",
+        "material",
+        "labour",
+        "equipment",
+        "other",
+      ],
+    },
     brand: {
       type: String,
       trim: true,
