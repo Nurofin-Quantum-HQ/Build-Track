@@ -81,8 +81,8 @@ describe('withRunningBalance', () => {
 
 describe('buildBaseStages', () => {
   const scope = { x: 1 };
-  test('scope is always the first stage', () => {
-    expect(buildBaseStages(scope, {})[0]).toEqual({ $match: scope });
+  test('scope (minus rejected entries) is always the first stage', () => {
+    expect(buildBaseStages(scope, {})[0]).toEqual({ $match: { $and: [scope, { approvalStatus: { $ne: 'Rejected' } }] } });
   });
   test('filters become one $match on the derived fields', () => {
     const st = buildBaseStages(scope, { from: '2026-01-01', to: '2026-01-31', direction: 'out', categories: ['material'] });

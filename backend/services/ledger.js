@@ -156,7 +156,8 @@ const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
  */
 function buildBaseStages(scope, opts = {}) {
   const stages = [
-    { $match: scope },
+    // Rejected entries never moved money, so they stay out of the ledger.
+    { $match: { $and: [scope, { approvalStatus: { $ne: "Rejected" } }] } },
     {
       $addFields: {
         _d: dateExpr(),
