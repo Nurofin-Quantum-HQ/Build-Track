@@ -129,9 +129,9 @@ describe('buildPaymentPayload — Simple Transaction doc compliance', () => {
     }
   });
 
-  it('AutoPay: sb_nextrundate is T+2 (AirPay minimum) in IST, DD/MM/YYYY', async () => {
+  it('AutoPay: sb_nextrundate is the fixed UAT test date (temporary)', async () => {
     const { sent } = await build({ isRecurring: true });
-    expect(sent.sb_nextrundate).toBe(airpay.formatDDMMYYYY(new Date(Date.now() + 2 * 864e5)));
+    expect(sent.sb_nextrundate).toBe('04/11/2026');
     expect(sent.sb_nextrundate).toMatch(/^\d{2}\/\d{2}\/\d{4}$/);
   });
 

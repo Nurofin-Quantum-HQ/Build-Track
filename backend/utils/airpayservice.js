@@ -235,7 +235,9 @@ async function buildPaymentPayload({
     // First AutoPay debit date (IST, AirPay's clock). The doc says T+1, but AirPay's team
     // confirmed (28 Oct) the minimum is T+2 — T+1 and +1 month both got "Invalid Trial
     // Period", and omitting it gets "Invalid request".
-    transactionData.sb_nextrundate    = formatDDMMYYYY(new Date(Date.now() + FIRST_DEBIT_DAYS * 24 * 60 * 60 * 1000));
+    // TEMP UAT TEST (29 Oct): fixed date requested by Pranesh. Revert to the T+2 line below.
+    transactionData.sb_nextrundate    = '04/11/2026';
+    // transactionData.sb_nextrundate = formatDDMMYYYY(new Date(Date.now() + FIRST_DEBIT_DAYS * 24 * 60 * 60 * 1000));
     // Doc: 999 = never-ending, but only "applicable for eNACH transactions".
     transactionData.sb_recurringcount = selectedChmod === 'enach' ? '999' : DEFAULT_RECURRING_COUNT;
     // Retries of a failed monthly debit. The doc marks this optional (example `3`), but
