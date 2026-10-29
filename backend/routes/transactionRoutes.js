@@ -493,7 +493,7 @@ router.patch("/:id/ledger-category", requirePermission(["view_finances"]), async
     }
     if (!allowed) return res.status(403).json({ message: "Access denied to this transaction" });
 
-    await Transaction.updateOne({ _id: tx._id }, { $set: { ledgerCategory } });
+    await Transaction.updateOne({ _id: tx._id }, { $set: { ledgerCategory } }, { timestamps: false });
     res.json({ id: String(tx._id), ledgerCategory });
   } catch (err) {
     console.error("Ledger category update error:", err);

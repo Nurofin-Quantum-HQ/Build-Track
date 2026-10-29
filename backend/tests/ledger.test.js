@@ -232,7 +232,7 @@ describe('PATCH /api/transactions/:id/ledger-category', () => {
     global.__user = admin;
     const r = await call(txApp(), 'PATCH', `/api/transactions/${tx._id}/ledger-category`, { ledgerCategory: 'loan_repayment', amount: 1, title: 'hack' });
     expect(r.status).toBe(200);
-    expect(Transaction.updateOne).toHaveBeenCalledWith({ _id: tx._id }, { $set: { ledgerCategory: 'loan_repayment' } });
+    expect(Transaction.updateOne).toHaveBeenCalledWith({ _id: tx._id }, { $set: { ledgerCategory: 'loan_repayment' } }, { timestamps: false });
   });
 
   test('403 for a transaction of another company', async () => {
