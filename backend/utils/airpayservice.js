@@ -25,12 +25,10 @@ const AIRPAY_SUBSCRIPTION_STATUS_URL = 'https://kraken.airpay.co.in/airpay/order
 const SUBSCRIPTION_TXNSUBTYPE = '12';
 // Doc example value; 999 (never-ending) is documented for eNACH only.
 const DEFAULT_RECURRING_COUNT = '12';
-// Days from signup to the first AutoPay debit (sb_nextrundate). AirPay: minimum is T+2.
-const FIRST_DEBIT_DAYS = 2;
-// AutoPay signup charges only this mandate-registration ("down payment") amount; the plan
-// price is debited by AutoPay from sb_nextrundate. Per AirPay's team (28 Oct): ₹1.11 under
-// RBI rules, and it must be less than sb_amount. (Doc examples show 1.00.)
-const MANDATE_TOKEN_AMOUNT = 1.11;
+// AutoPay pricing (agreed with AirPay, 30 Oct): the first month is charged at signup
+// (`amount` = plan price), the mandate debits the same plan price (`sb_amount`) every month,
+// first on the same date next month (`sb_nextrundate`). UAT rejects that date with
+// "Invalid Trial Period"; AirPay says production accepts it.
 // chmod values listed in the Simple Transaction doc
 const VALID_CHMODS = new Set([
   'ppc', 'pg', 'nb', 'pgcc', 'pgdc', 'cash', 'emi', 'rtgs', 'upi', 'btqr', 'payltr', 'va', 'enach', 'remit',
@@ -48,6 +46,17 @@ function istParts(date) {
     timeZone: 'Asia/Kolkata', year: 'numeric', month: '2-digit', day: '2-digit',
   }).format(date).split('-').map(Number);
   return { y, m, d };
+}
+
+/**
+ * Same IST calendar day `months` later; a day the target month doesn't have becomes its last
+ * day (31 Jan → 28/29 Feb, 31 Mar → 30 Apr). Returned at 12:00 IST on that day.
+ */
+function addMonthsIST(date, months) {
+  const { y, m, d } = istParts(date);
+  const first   = new Date(Date.UTC(y, m - 1 + months, 1));
+  const lastDay = new Date(Date.UTC(first.getUTCFullYear(), first.getUTCMonth() + 1, 0)).getUTCDate();
+  return new Date(Date.UTC(first.getUTCFullYear(), first.getUTCMonth(), Math.min(d, lastDay), 6, 30));
 }
 
 function formatDDMMYYYY(date, sep = '/') {
@@ -167,9 +176,6 @@ async function buildPaymentPayload({
   const amountFormatted = Number(amount).toFixed(2);
   // AutoPay: `amount` is charged now (down payment), `recurringAmount` every month after.
   const recurringFormatted = Number(recurringAmount ?? amount).toFixed(2);
-  if (isRecurring && !(Number(recurringFormatted) > Number(amountFormatted))) {
-    throw new Error(`AutoPay down payment (${amountFormatted}) must be less than the monthly amount (${recurringFormatted})`);
-  }
 
   // Validate required fields in production
   if (!isSandbox) {
@@ -236,9 +242,8 @@ async function buildPaymentPayload({
     // First AutoPay debit date (IST, AirPay's clock). The doc says T+1, but AirPay's team
     // confirmed (28 Oct) the minimum is T+2 — T+1 and +1 month both got "Invalid Trial
     // Period", and omitting it gets "Invalid request".
-    // TEMP UAT TEST (29 Oct): fixed date requested by Pranesh. Revert to the T+2 line below.
-    transactionData.sb_nextrundate    = '04/11/2026';
-    // transactionData.sb_nextrundate = formatDDMMYYYY(new Date(Date.now() + FIRST_DEBIT_DAYS * 24 * 60 * 60 * 1000));
+    // First AutoPay debit: same date next month (the first month was paid at signup).
+    transactionData.sb_nextrundate    = formatDDMMYYYY(addMonthsIST(new Date(), 1));
     // Doc: 999 = never-ending, but only "applicable for eNACH transactions".
     transactionData.sb_recurringcount = selectedChmod === 'enach' ? '999' : DEFAULT_RECURRING_COUNT;
     // Retries of a failed monthly debit. The doc marks this optional (example `3`), but
@@ -505,6 +510,5 @@ module.exports = {
   formatDDMMYYYY,
   normaliseChmod,
   SUBSCRIPTION_TXNSUBTYPE,
-  FIRST_DEBIT_DAYS,
-  MANDATE_TOKEN_AMOUNT,
+  addMonthsIST,
 };

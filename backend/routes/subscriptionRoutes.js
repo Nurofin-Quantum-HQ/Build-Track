@@ -16,7 +16,7 @@ const User         = require('../models/User');
 const { protect }  = require('../middleware/auth');
 const {
   buildPaymentPayload, verifyAndDecryptCallbackData, manageSubscription, subscriptionHmac, PRIVATE_KEY,
-  FIRST_DEBIT_DAYS, MANDATE_TOKEN_AMOUNT,
+  addMonthsIST,
 } = require('../utils/airpayservice');
 const { applyRenewal, syncRenewalsFromAirpay } = require('../services/subscriptionRenewal');
 
@@ -113,13 +113,8 @@ router.post('/initiate', protect, async (req, res) => {
     const orderId = `BT${Date.now().toString().slice(-8)}${String(Math.floor(Math.random() * 99)).padStart(2, '0')}`;
     const amount  = PLAN_PRICES[plan];
     const wantsAutoPay = isRecurring === true || isRecurring === 'true' || isRecurring === 1 || isRecurring === '1';
-    // AutoPay charges only the mandate token now; AutoPay debits the plan price from T+2.
-    const chargeNow = wantsAutoPay ? MANDATE_TOKEN_AMOUNT : amount;
-    if (wantsAutoPay && !(amount > MANDATE_TOKEN_AMOUNT)) {
-      return res.status(400).json({
-        message: `AutoPay isn't available for the ${plan} plan. Please choose One-Time Payment.`,
-      });
-    }
+    // AutoPay and one-time both charge the plan price now; AutoPay then debits it monthly.
+    const chargeNow = amount;
 
     // Create Subscription (status: pending — NOT active)
     const sub = await Subscription.create({
@@ -291,9 +286,9 @@ router.post('/callback', async (req, res) => {
       const endDate = new Date(now);
       const subDoc  = await Subscription.findOne({ airpayOrderId: orderId });
       if (subDoc?.isRecurring) {
-        // AutoPay: only the mandate token was paid. Access runs until the first AutoPay debit
-        // (T+2) plus one grace day; each successful debit then extends it by a month.
-        endDate.setDate(endDate.getDate() + FIRST_DEBIT_DAYS + 1);
+        // AutoPay: first month paid now. Access runs to the first AutoPay debit (same date next
+        // month, as sent in sb_nextrundate) plus one grace day; each debit extends it a month.
+        endDate.setTime(addMonthsIST(subDoc.createdAt || now, 1).getTime() + 24 * 60 * 60 * 1000);
       } else {
         endDate.setDate(endDate.getDate() + (PLAN_DURATION_DAYS[payment.plan] || 30));
       }
@@ -333,7 +328,7 @@ router.post('/callback', async (req, res) => {
         await NotificationService.send(payment.userId, {
           title: subDoc?.isRecurring ? "AutoPay Set Up" : "Payment Received",
           message: subDoc?.isRecurring
-            ? `AutoPay is set up for your ${payment.plan} plan. Rs. ${subDoc.amount} will be debited every month, starting in ${FIRST_DEBIT_DAYS} days.`
+            ? `Your ${payment.plan} plan payment of Rs. ${payment.amount} was successful and AutoPay is set up. Rs. ${subDoc.amount} will be debited automatically every month.`
             : `Your ${payment.plan} plan payment of Rs. ${payment.amount} was successful. Subscription activated.`,
           type: "payment",
           priority: "high",

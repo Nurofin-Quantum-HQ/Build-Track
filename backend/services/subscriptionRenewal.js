@@ -6,9 +6,7 @@
  */
 const Subscription = require('../models/Subscription');
 const Payment      = require('../models/Payment');
-const { getSubscriptionStatus, successfulDebits } = require('../utils/airpayservice');
-
-const RENEWAL_DAYS = 30;
+const { getSubscriptionStatus, successfulDebits, addMonthsIST } = require('../utils/airpayservice');
 
 /**
  * Records one successful AutoPay debit against `sub` and extends its end date.
@@ -46,9 +44,11 @@ async function applyRenewal(sub, { airpayTxnId, amount }) {
     throw err;
   }
 
+  // One calendar month per debit (AirPay debits on the same date each month), from the
+  // current end if still running, so access stays aligned with the debit dates.
   const now  = new Date();
-  const base = sub.endDate && sub.endDate > now ? new Date(sub.endDate) : now;
-  base.setDate(base.getDate() + RENEWAL_DAYS);
+  const from = sub.endDate && sub.endDate > now ? new Date(sub.endDate) : now;
+  const base = addMonthsIST(from, 1);
 
   const update = { endDate: base };
   if (sub.status === 'cancelled') {
@@ -81,4 +81,4 @@ async function syncRenewalsFromAirpay(sub) {
   return applied;
 }
 
-module.exports = { applyRenewal, syncRenewalsFromAirpay, RENEWAL_DAYS };
+module.exports = { applyRenewal, syncRenewalsFromAirpay };

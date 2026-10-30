@@ -20,7 +20,7 @@ const {
   encrypt, decrypt, generateChecksum, generateEncryptionKeyFromCreds, generatePrivateKey, istDateYMD, checksumcal,
 } = require('../utils/airpayCrypto');
 const airpay = require('../utils/airpayservice');
-const { applyRenewal, RENEWAL_DAYS } = require('../services/subscriptionRenewal');
+const { applyRenewal } = require('../services/subscriptionRenewal');
 
 const ENV = {
   AIRPAY_MERCHANT_ID: '12345',
@@ -57,8 +57,8 @@ const BUYER = {
 
 async function build(extra) {
   mockOAuth();
-  // AutoPay: ₹1.11 mandate token now, plan price (₹999) monthly — as the route sends it
-  const amounts = extra && extra.isRecurring ? { amount: 1.11, recurringAmount: 999 } : {};
+  // AutoPay: plan price (₹999) now and monthly — as the route sends it
+  const amounts = extra && extra.isRecurring ? { amount: 999, recurringAmount: 999 } : {};
   const out = await airpay.buildPaymentPayload({ ...BUYER, ...amounts, ...extra });
   const sent = JSON.parse(decrypt(out.formFields.encdata, KEY));
   return { out, sent };
@@ -94,12 +94,11 @@ describe('buildPaymentPayload — Simple Transaction doc compliance', () => {
     expect(out.formFields.checksum).toBe(generateChecksum(sent));
   });
 
-  it('AutoPay: charges the ₹1.11 mandate token now and the plan price monthly', async () => {
+  it('AutoPay: charges the plan price now and the same plan price monthly', async () => {
     const { sent } = await build({ isRecurring: true });
-    expect(sent.amount).toBe('1.11');
+    expect(sent.amount).toBe('999.00');
     expect(sent.sb_amount).toBe('999.00');
     expect(sent.sb_maxamount).toBe('999.00'); // no ceiling passed → plan price
-    expect(airpay.MANDATE_TOKEN_AMOUNT).toBe(1.11);
   });
 
   it('AutoPay: sb_maxamount can be a higher ceiling than the monthly amount', async () => {
@@ -108,10 +107,10 @@ describe('buildPaymentPayload — Simple Transaction doc compliance', () => {
     expect(sent.sb_maxamount).toBe('4999.00');
   });
 
-  it('AutoPay: refuses a down payment that is not less than the monthly amount', async () => {
-    mockOAuth();
-    await expect(airpay.buildPaymentPayload({ ...BUYER, isRecurring: true, amount: 1.11, recurringAmount: 1 }))
-      .rejects.toThrow(/must be less than the monthly amount/);
+  it('AutoPay works for the ₹1 plan too (amount = sb_amount is allowed)', async () => {
+    const { sent } = await build({ isRecurring: true, amount: 1, recurringAmount: 1 });
+    expect(sent.amount).toBe('1.00');
+    expect(sent.sb_amount).toBe('1.00');
   });
 
   it('AutoPay: txnsubtype 12 (numeric "INR Subscription") and the sb_* fields', async () => {
@@ -129,9 +128,9 @@ describe('buildPaymentPayload — Simple Transaction doc compliance', () => {
     }
   });
 
-  it('AutoPay: sb_nextrundate is the fixed UAT test date (temporary)', async () => {
+  it('AutoPay: sb_nextrundate is the same date next month (IST)', async () => {
     const { sent } = await build({ isRecurring: true });
-    expect(sent.sb_nextrundate).toBe('04/11/2026');
+    expect(sent.sb_nextrundate).toBe(airpay.formatDDMMYYYY(airpay.addMonthsIST(new Date(), 1)));
     expect(sent.sb_nextrundate).toMatch(/^\d{2}\/\d{2}\/\d{4}$/);
   });
 
@@ -176,6 +175,26 @@ describe('buildPaymentPayload — Simple Transaction doc compliance', () => {
 });
 
 // ── Dates ─────────────────────────────────────────────────────────────────────
+
+describe('next-month dates (sb_nextrundate)', () => {
+  const next = (iso) => airpay.formatDDMMYYYY(airpay.addMonthsIST(new Date(iso), 1));
+  it.each([
+    ['2026-10-30T06:00:00Z', '30/11/2026'], // 30-day month next
+    ['2026-10-31T06:00:00Z', '30/11/2026'], // 31st → November has 30 days
+    ['2026-12-15T06:00:00Z', '15/01/2027'], // across the year end
+    ['2027-01-31T06:00:00Z', '28/02/2027'], // 31 Jan → end of February
+    ['2028-01-31T06:00:00Z', '29/02/2028'], // leap year
+    ['2027-01-29T06:00:00Z', '28/02/2027'], // 29 Jan in a non-leap year
+    ['2027-02-28T06:00:00Z', '28/03/2027'], // February → March keeps the day
+    ['2026-03-31T06:00:00Z', '30/04/2026'], // 31 Mar → 30 Apr
+  ])('signup %s → first debit %s', (iso, expected) => {
+    expect(next(iso)).toBe(expected);
+  });
+
+  it('uses the India date: 31 Oct 00:30 IST is still 30 Oct in UTC', () => {
+    expect(next('2026-10-30T19:00:00Z')).toBe('30/11/2026'); // = 31 Oct 00:30 IST → 30 Nov
+  });
+});
 
 describe('IST dates', () => {
   it('checksum date is the IST date, not UTC (01:30 IST on 28 Oct is still 27 Oct in UTC)', () => {
@@ -252,7 +271,8 @@ describe('applyRenewal', () => {
     }));
     const update = Subscription.findByIdAndUpdate.mock.calls[0][1];
     expect(update.status).toBe('active');
-    expect(update.endDate.getTime() - oldEnd).toBe(RENEWAL_DAYS * 864e5);
+    // one calendar month after the old end date (IST)
+    expect(airpay.formatDDMMYYYY(update.endDate)).toBe(airpay.formatDDMMYYYY(airpay.addMonthsIST(new Date(oldEnd), 1)));
   });
 
   it('is idempotent: a debit already recorded is ignored', async () => {
