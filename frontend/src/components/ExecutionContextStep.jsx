@@ -36,13 +36,13 @@ export default function ExecutionContextStep({ projects, onComplete, onCancel })
           width: 64,
           height: 64,
           borderRadius: 16,
-          background: 'linear-gradient(135deg, #FFF5F0 0%, #FFF7F0 100%)',
+          background: 'var(--surface-subtle, #F8FAFC)', border: '1px solid var(--border, #E2E8F0)',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
           margin: '0 auto 16px',
         }}>
-          <Building size={28} color="var(--color-primary, #F97316)" />
+          <Building size={28} color="var(--ink, #111317)" />
         </div>
         <h2 style={{
           fontSize: 20,
@@ -84,7 +84,7 @@ export default function ExecutionContextStep({ projects, onComplete, onCancel })
                   onClick={() => { setSelectedProject(p); setFloor(''); setShowProjectDropdown(false); }}
                   style={{
                     ...dropdownItemStyle,
-                    background: selectedProject?._id === p._id ? '#FFF5F0' : 'transparent',
+                    background: selectedProject?._id === p._id ? '#F1F5F9' : 'transparent',
                   }}
                 >
                   <div style={{ fontWeight: 600, fontSize: 13, color: '#1F2937' }}>
@@ -265,8 +265,9 @@ export default function ExecutionContextStep({ projects, onComplete, onCancel })
             borderRadius: 12,
             border: 'none',
             background: selectedProject
-              ? 'linear-gradient(135deg, var(--color-primary, #F97316) 0%, var(--color-primary-hover, #EA580C) 100%)'
+              ? 'var(--ink, #111317)'
               : '#E5E7EB',
+            boxShadow: selectedProject ? '0 4px 12px rgba(0,0,0,0.2)' : 'none',
             color: selectedProject ? '#FFFFFF' : '#9CA3AF',
             fontSize: 14,
             fontWeight: 600,

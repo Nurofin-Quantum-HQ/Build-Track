@@ -5,6 +5,11 @@ import { resolveImageUrl } from "../utils/imageUrl";
 import useProjectStore from "../stores/projectStore";
 import { buildDefaultPhases, addCustomPhase, addActivityToPhase, mergePhasesWithDefaults } from "../utils/constructionPhases";
 import { Badge, Button } from "../components/ui";
+import BtHero from "../components/ui/BtHero";
+import BtSheet from "../components/ui/BtSheet";
+import BtCard from "../components/ui/BtCard";
+import BtPressable from "../components/ui/BtPressable";
+import BtButton from "../components/ui/BtButton";
 import ModuleTour from "../components/ModuleTour";
 import {
   ChevronDown, Plus, Minus, X, Check, Camera, MapPin, Calendar, User, Phone,
@@ -52,7 +57,7 @@ function Accordion({ title, icon, defaultOpen, children, count, subtitle }) {
   return (
     <div style={{ marginBottom: 14, background: "#fff", borderRadius: 12, border: "1px solid #E5E7EB", overflow: "hidden" }}>
       <div onClick={() => setOpen(!open)} style={{ padding: "14px 18px", display: "flex", alignItems: "center", gap: 10, cursor: "pointer", userSelect: "none" }}>
-        <span style={{ fontSize: 16, flexShrink: 0, color: 'var(--color-primary, #F97316)', display: 'flex' }}>{icon}</span>
+        <span style={{ fontSize: 16, flexShrink: 0, color: 'var(--ink, #111317)', display: 'flex' }}>{icon}</span>
         <div style={{ flex: 1 }}>
           <span style={{ fontSize: 14, fontWeight: 600, color: "#111827" }}>{title}</span>
           {(count !== undefined || subtitle) && (
@@ -85,9 +90,9 @@ function ChipSelect({ options, selected, onChange, multi }) {
             style={{
               padding: "6px 14px", borderRadius: 6, fontSize: 13, fontWeight: 500,
               cursor: "pointer", transition: "all 0.15s",
-              background: isOn ? "var(--color-primary, #F97316)" : "#F8FAFC",
-              color: isOn ? "#fff" : "#475569",
-              border: `1px solid ${isOn ? "var(--color-primary, #F97316)" : "#E5E7EB"}`,
+              background: isOn ? "var(--ink, #111317)" : "#FFFFFF",
+              color: isOn ? "var(--bone, #F2F0EB)" : "var(--ink, #111317)",
+              border: `1px solid ${isOn ? "var(--ink, #111317)" : "var(--border, #E6E3DC)"}`,
               fontFamily: 'inherit',
             }}>
             {opt}
@@ -142,7 +147,7 @@ function CheckboxGroup({ items, selected, onChange, columns = 2 }) {
         return (
           <label key={item} onClick={() => onChange(isOn ? selected.filter(s => s !== item) : [...selected, item])}
             style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 10px", borderRadius: 6, cursor: "pointer", fontSize: 13, color: "#475569", userSelect: "none", background: isOn ? "#FFF5F0" : "transparent", transition: "background 0.15s" }}>
-            <div style={{ width: 16, height: 16, borderRadius: 4, border: `2px solid ${isOn ? "var(--color-primary, #F97316)" : "#CBD5E1"}`, background: isOn ? "var(--color-primary, #F97316)" : "transparent", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, transition: "all 0.15s" }}>
+            <div style={{ width: 16, height: 16, borderRadius: 4, border: `2px solid ${isOn ? "var(--ink, #111317)" : "#CBD5E1"}`, background: isOn ? "var(--ink, #111317)" : "transparent", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, transition: "all 0.15s" }}>
               {isOn && <Check size={10} color="#fff" strokeWidth={3} />}
             </div>
             {item}
@@ -755,51 +760,95 @@ export default function NewProjectPage() {
     <div style={{ display: "flex", flexDirection: "column", width: "100%", minHeight: "100vh", fontFamily: "Inter, 'Segoe UI', sans-serif", background: "#F8FAFC" }}>
       <input ref={csvFileInputRef} type="file" accept=".csv" style={{ display: "none" }} onChange={handlePhaseCsvUpload} />
 
-      <div style={{ height: TOPBAR_H, flexShrink: 0, background: "#fff", borderBottom: "1px solid #E5E7EB", padding: "0 24px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
-        <ModuleTour steps={tourSteps} run={runTour} setRun={setRunTour} moduleName="AddNewProject" />
-        <div style={{ display: "flex", alignItems: "center", gap: 12, minWidth: 0 }}>
-          <button
-            onClick={() => navigate("/projects")}
-            title="Back to Projects"
-            style={{
-              display: "inline-flex",
-              alignItems: "center",
-              gap: 6,
-              padding: "7px 14px",
-              background: "#F8FAFC",
-              border: "1px solid #E2E8F0",
-              borderRadius: 8,
-              fontSize: 13,
-              fontWeight: 600,
-              color: "#334155",
-              cursor: "pointer",
-              transition: "all 0.15s ease",
-              fontFamily: "inherit",
-              flexShrink: 0,
-              boxShadow: "0 1px 2px rgba(0,0,0,0.04)"
-            }}
-            onMouseEnter={e => { e.currentTarget.style.background = "#F1F5F9"; e.currentTarget.style.color = "#0F172A"; }}
-            onMouseLeave={e => { e.currentTarget.style.background = "#F8FAFC"; e.currentTarget.style.color = "#334155"; }}
-          >
-            <ArrowLeft size={16} />
-            <span>Back</span>
-          </button>
-          <div style={{ minWidth: 0 }}>
-            <h1 style={{ margin: 0, fontSize: 20, fontWeight: 700, color: "#111827", letterSpacing: "-0.03em" }}>{isEditMode ? "Edit Project" : "New Project"}</h1>
-            <p style={{ margin: "2px 0 0", fontSize: 12, color: "#64748B" }}>{isEditMode ? "Edit project configuration" : "Create a new construction project"}</p>
-          </div>
-        </div>
-        <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
-          <button onClick={() => setRunTour(true)} title="Help" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 36, height: 36, background: '#fff', border: '1px solid #E5E7EB', borderRadius: 8, cursor: 'pointer', flexShrink: 0 }}>
-            <HelpCircle size={16} color="#64748B" />
-          </button>
-          <button onClick={() => navigate("/projects")} style={{ padding: "8px 16px", background: "#fff", color: "#475569", border: "1px solid #E5E7EB", borderRadius: 8, fontWeight: 600, fontSize: 13, cursor: "pointer", display: "flex", alignItems: "center", gap: 6, whiteSpace: "nowrap", flexShrink: 0, fontFamily: "inherit" }}>
-            <ArrowLeft size={14} /> Back
-          </button>
-        </div>
-      </div>
+      {/* ── HERO BANNER (Blueprint Noir) ── */}
+      <BtHero>
+        <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 16 }}>
+          <div>
+            <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 12 }}>
+              <BtPressable
+                onClick={() => navigate("/projects")}
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: 6,
+                  color: "rgba(255, 255, 255, 0.72)",
+                  fontSize: 13,
+                  fontWeight: 600,
+                  cursor: "pointer",
+                  background: "none",
+                  border: "none",
+                  padding: 0,
+                }}
+              >
+                <ArrowLeft size={16} />
+                <span>Projects</span>
+              </BtPressable>
+              <span style={{ color: "rgba(255, 255, 255, 0.25)" }}>/</span>
+              <span
+                style={{
+                  fontFamily: "var(--font-mono)",
+                  fontSize: 11,
+                  letterSpacing: "0.12em",
+                  textTransform: "uppercase",
+                  color: "var(--gold-brass)",
+                  fontWeight: 700,
+                }}
+              >
+                PORTFOLIO · NEW PROJECT
+              </span>
+            </div>
 
-      <div style={{ flex: 1, overflowY: "auto", overflowX: "hidden", padding: "20px 24px 60px", boxSizing: "border-box" }}>
+            <h1
+              style={{
+                fontFamily: "var(--font-serif)",
+                fontSize: 32,
+                fontWeight: 700,
+                color: "var(--bone)",
+                margin: "0 0 6px",
+                letterSpacing: "-0.02em",
+              }}
+            >
+              {isEditMode ? "Edit Project" : "Create Project"}
+            </h1>
+            <p
+              style={{
+                color: "rgba(255, 255, 255, 0.65)",
+                margin: 0,
+                fontSize: 14,
+                maxWidth: 580,
+                lineHeight: 1.5,
+              }}
+            >
+              {isEditMode
+                ? "Update project configurations, timelines, and budget breakdown."
+                : "Configure project scope, budget allocation, floor breakdown, and construction phases."}
+            </p>
+          </div>
+
+          <button
+            onClick={() => setRunTour(true)}
+            title="Help Tour"
+            style={{
+              width: 38,
+              height: 38,
+              borderRadius: "var(--r-btn, 12px)",
+              background: "rgba(255, 255, 255, 0.08)",
+              border: "1px solid rgba(255, 255, 255, 0.12)",
+              color: "var(--bone)",
+              display: "grid",
+              placeItems: "center",
+              cursor: "pointer",
+              flexShrink: 0,
+            }}
+          >
+            <HelpCircle size={17} />
+          </button>
+        </div>
+      </BtHero>
+
+      {/* ── MAIN CONTENT (Overlapping BtSheet) ── */}
+      <BtSheet overlap={26} padding="24px 32px 64px">
+        <div style={{ maxWidth: 860, margin: "0 auto" }}>
         <div className="tour-budget-config" style={{ background: "#fff", borderRadius: 12, border: "1px solid #E5E7EB", padding: "16px 20px", marginBottom: 16, boxShadow: "0 1px 3px rgba(0,0,0,0.04)", maxWidth: 800, margin: "0 auto 16px" }}>
           <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 14 }}>
             <div style={{ width: 36, height: 36, borderRadius: 10, background: "#10B9811A", display: "flex", alignItems: "center", justifyContent: "center", color: "#10B981" }}>
@@ -811,10 +860,10 @@ export default function NewProjectPage() {
             </div>
           </div>
           <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-            <button onClick={downloadPhaseTemplate} style={{ flex: 1, padding: "9px 14px", background: "#fff", border: "1.5px solid #E5E7EB", borderRadius: 8, fontSize: 13, fontWeight: 700, color: "var(--color-primary, #F97316)", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 6, fontFamily: "inherit" }}>
+            <button onClick={downloadPhaseTemplate} style={{ flex: 1, padding: "9px 14px", background: "#fff", border: "1.5px solid #E5E7EB", borderRadius: 8, fontSize: 13, fontWeight: 700, color: "var(--ink, #111317)", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 6, fontFamily: "inherit" }}>
               <Upload size={14} style={{ transform: "rotate(180deg)" }} /> Download Template
             </button>
-            <button onClick={() => csvFileInputRef.current?.click()} disabled={isUploadingCsv} style={{ flex: 1, padding: "9px 14px", background: "var(--color-primary, #F97316)", border: "none", borderRadius: 8, fontSize: 13, fontWeight: 700, color: "#fff", cursor: isUploadingCsv ? "not-allowed" : "pointer", opacity: isUploadingCsv ? 0.7 : 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 6, fontFamily: "inherit" }}>
+            <button onClick={() => csvFileInputRef.current?.click()} disabled={isUploadingCsv} style={{ flex: 1, padding: "9px 14px", background: "var(--ink, #111317)", border: "none", borderRadius: 8, fontSize: 13, fontWeight: 700, color: "#fff", cursor: isUploadingCsv ? "not-allowed" : "pointer", opacity: isUploadingCsv ? 0.7 : 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 6, fontFamily: "inherit" }}>
               <Upload size={14} /> {isUploadingCsv ? "Uploading..." : "Upload Phase CSV"}
             </button>
             <button onClick={exportCurrentPhasesCsv} style={{ padding: "9px 14px", background: "#F1F5F9", border: "1px solid #E5E7EB", borderRadius: 8, fontSize: 13, fontWeight: 600, color: "#475569", cursor: "pointer", fontFamily: "inherit" }}>
@@ -837,7 +886,7 @@ export default function NewProjectPage() {
         <div style={{ maxWidth: 800, margin: "0 auto" }}>
           {!isEditMode && limitMaxProjects !== -1 && (
             <div style={{ padding: '12px', background: '#FFF5F0', borderRadius: 8, border: '1px solid #FDE8D8', display: 'flex', gap: 8, marginBottom: 20 }}>
-              <div style={{ flexShrink: 0, color: 'var(--color-primary, #F97316)' }}>
+              <div style={{ flexShrink: 0, color: 'var(--ink, #111317)' }}>
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>
               </div>
               <div style={{ fontSize: 13, color: '#111827' }}>
@@ -871,7 +920,7 @@ export default function NewProjectPage() {
             <div style={{ marginBottom: 14 }}>
               <label style={labelStyle}>Project Code</label>
               <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 14px", background: "#F8FAFC", borderRadius: 8, border: "1px solid #E5E7EB" }}>
-                <Hash size={14} color="var(--color-primary, #F97316)" />
+                <Hash size={14} color="var(--ink, #111317)" />
                 <span style={{ fontSize: 14, fontWeight: 700, color: "#111827", fontFamily: "monospace" }}>{projectCode}</span>
               </div>
             </div>
@@ -886,7 +935,7 @@ export default function NewProjectPage() {
 
             <div className="tour-client" style={{ marginBottom: 14 }}>
               <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 10 }}>
-                <User size={14} color="var(--color-primary, #F97316)" />
+                <User size={14} color="var(--ink, #111317)" />
                 <span style={{ fontSize: 13, fontWeight: 600, color: "#111827" }}>Client Details</span>
               </div>
               <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: 10 }}>
@@ -897,7 +946,7 @@ export default function NewProjectPage() {
 
             <div className="tour-manager">
               <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 10 }}>
-                <HardHat size={14} color="var(--color-primary, #F97316)" />
+                <HardHat size={14} color="var(--ink, #111317)" />
                 <span style={{ fontSize: 13, fontWeight: 600, color: "#111827" }}>Site Team</span>
               </div>
               <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: 10 }}>
@@ -1027,7 +1076,7 @@ export default function NewProjectPage() {
                 <div>
                   <label style={labelStyle}>Materials</label>
                   <div style={{ display: "flex", alignItems: "center", gap: 6, background: "#fff", border: "1px solid #E5E7EB", borderRadius: 8, padding: "10px 12px" }}>
-                    <IndianRupee size={14} color="var(--color-primary, #F97316)" />
+                    <IndianRupee size={14} color="var(--ink, #111317)" />
                     <input value={budgetMaterial} onChange={e => setBudgetMaterial(e.target.value)} placeholder="0" type="number" style={{ flex: 1, border: "none", background: "transparent", outline: "none", fontSize: 14, color: "#111827", fontFamily: "inherit" }} />
                   </div>
                 </div>
@@ -1041,7 +1090,7 @@ export default function NewProjectPage() {
                 <div>
                   <label style={labelStyle}>Equipment</label>
                   <div style={{ display: "flex", alignItems: "center", gap: 6, background: "#fff", border: "1px solid #E5E7EB", borderRadius: 8, padding: "10px 12px" }}>
-                    <IndianRupee size={14} color="var(--color-primary-hover, #EA580C)" />
+                    <IndianRupee size={14} color="var(--ink, #111317)" />
                     <input value={budgetEquipment} onChange={e => setBudgetEquipment(e.target.value)} placeholder="0" type="number" style={{ flex: 1, border: "none", background: "transparent", outline: "none", fontSize: 14, color: "#111827", fontFamily: "inherit" }} />
                   </div>
                 </div>
@@ -1070,12 +1119,12 @@ export default function NewProjectPage() {
             <div style={{ background: "#F8FAFC", borderRadius: 8, border: "1px solid #E5E7EB", padding: "12px 14px", marginBottom: 10 }}>
               <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
                 <span style={{ fontSize: 13, fontWeight: 700, color: "#111827" }}>CONSTRUCTION PHASES</span>
-                <span style={{ fontSize: 12, fontWeight: 600, color: "var(--color-primary, #F97316)", cursor: "pointer" }} onClick={selectAllPhases}>Select All</span>
+                <span style={{ fontSize: 12, fontWeight: 600, color: "var(--ink, #111317)", cursor: "pointer" }} onClick={selectAllPhases}>Select All</span>
                 <span style={{ fontSize: 12, color: "#CBD5E1" }}>|</span>
                 <span style={{ fontSize: 12, fontWeight: 600, color: "#94A3B8", cursor: "pointer" }} onClick={clearAllPhases}>Clear</span>
               </div>
               <div style={{ fontSize: 12, color: "#64748B", marginTop: 2 }}>Select phases and activities required.</div>
-              <div style={{ fontSize: 13, fontWeight: 700, color: "var(--color-primary, #F97316)", marginTop: 6 }}>{selectedCount} of {totalCount} activities selected</div>
+              <div style={{ fontSize: 13, fontWeight: 700, color: "var(--ink, #111317)", marginTop: 6 }}>{selectedCount} of {totalCount} activities selected</div>
             </div>
             <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
               {phases.map((phase, idx) => {
@@ -1087,7 +1136,7 @@ export default function NewProjectPage() {
                   <div key={phase.id} style={{ background: "#fff", borderRadius: 8, border: "1px solid #E5E7EB", overflow: "hidden" }}>
                     <div style={{ display: "flex", alignItems: "center", padding: "10px 14px", gap: 10 }}>
                       <div onClick={() => togglePhaseSelection(phase.id)}
-                        style={{ width: 20, height: 20, borderRadius: 5, border: `1.5px solid ${allSel ? "var(--color-primary, #F97316)" : "#CBD5E1"}`, background: allSel ? "var(--color-primary, #F97316)" : "transparent", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, cursor: "pointer", transition: "all 0.15s" }}>
+                        style={{ width: 20, height: 20, borderRadius: 5, border: `1.5px solid ${allSel ? "var(--ink, #111317)" : "#CBD5E1"}`, background: allSel ? "var(--ink, #111317)" : "transparent", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, cursor: "pointer", transition: "all 0.15s" }}>
                         {allSel && <Check size={11} color="#fff" strokeWidth={3} />}
                       </div>
                       <div style={{ flex: 1, minWidth: 0 }}>
@@ -1109,7 +1158,7 @@ export default function NewProjectPage() {
                           return (
                             <div key={act.id} onClick={() => toggleActivitySelection(act.id)}
                               style={{ display: "flex", alignItems: "center", padding: "8px 14px 8px 18px", gap: 8, cursor: "pointer", borderTop: "1px solid #F8FAFC" }}>
-                              <div style={{ width: 18, height: 18, borderRadius: 4, border: `1.5px solid ${isSel ? "var(--color-primary, #F97316)" : "#CBD5E1"}`, background: isSel ? "var(--color-primary, #F97316)" : "transparent", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, transition: "all 0.15s" }}>
+                              <div style={{ width: 18, height: 18, borderRadius: 4, border: `1.5px solid ${isSel ? "var(--ink, #111317)" : "#CBD5E1"}`, background: isSel ? "var(--ink, #111317)" : "transparent", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, transition: "all 0.15s" }}>
                                 {isSel && <Check size={10} color="#fff" strokeWidth={3} />}
                               </div>
                               <span style={{ flex: 1, fontSize: 13, fontWeight: isSel ? 500 : 400, color: isSel ? "#111827" : "#64748B" }}>{act.name}</span>
@@ -1117,7 +1166,7 @@ export default function NewProjectPage() {
                           );
                         })}
                         <div onClick={() => handleAddCustomActivity(phase.id)} style={{ padding: "6px 14px 10px 18px", cursor: "pointer" }}>
-                          <span style={{ fontSize: 13, fontWeight: 600, color: "var(--color-primary, #F97316)" }}>+ Add Custom Activity</span>
+                          <span style={{ fontSize: 13, fontWeight: 600, color: "var(--ink, #111317)" }}>+ Add Custom Activity</span>
                         </div>
                       </div>
                     )}
@@ -1126,14 +1175,14 @@ export default function NewProjectPage() {
               })}
             </div>
             <div onClick={handleAddCustomPhase} style={{ marginTop: 10, cursor: "pointer", padding: "4px 0" }}>
-              <span style={{ fontSize: 14, fontWeight: 600, color: "var(--color-primary, #F97316)" }}>+ Add Custom Phase</span>
+              <span style={{ fontSize: 14, fontWeight: 600, color: "var(--ink, #111317)" }}>+ Add Custom Phase</span>
             </div>
           </Accordion>
 
           <Accordion title="Site Photo" icon={<Camera size={16} />}>
             <div className="tour-site-photos">
               <input ref={fileInputRef} type="file" accept="image/png, image/jpeg, image/gif, image/webp" style={{ display: "none" }} onChange={e => handlePhotoFile(e.target.files[0])} />
-            <div onClick={() => fileInputRef.current.click()} style={{ border: `2px dashed ${photoPreview ? "var(--color-primary, #F97316)" : "#E5E7EB"}`, borderRadius: 8, padding: photoPreview ? 0 : "24px 20px", background: photoPreview ? "transparent" : "#F8FAFC", display: "flex", flexDirection: "column", alignItems: "center", gap: 10, cursor: "pointer", transition: "all 0.2s", overflow: "hidden", minHeight: 100, justifyContent: "center" }}>
+            <div onClick={() => fileInputRef.current.click()} style={{ border: `2px dashed ${photoPreview ? "var(--ink, #111317)" : "#E5E7EB"}`, borderRadius: 8, padding: photoPreview ? 0 : "24px 20px", background: photoPreview ? "transparent" : "#F8FAFC", display: "flex", flexDirection: "column", alignItems: "center", gap: 10, cursor: "pointer", transition: "all 0.2s", overflow: "hidden", minHeight: 100, justifyContent: "center" }}>
               {photoPreview ? (
                 <div style={{ position: "relative", width: "100%" }}>
                   <img src={photoPreview} alt="preview" style={{ width: "100%", maxHeight: 180, objectFit: "cover", display: "block", borderRadius: 8 }} />
@@ -1144,7 +1193,7 @@ export default function NewProjectPage() {
               ) : (
                 <>
                   <div style={{ width: 40, height: 40, borderRadius: "50%", background: "#FFF5F0", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                    <Upload size={18} color="var(--color-primary, #F97316)" />
+                    <Upload size={18} color="var(--ink, #111317)" />
                   </div>
                   <div style={{ textAlign: "center" }}>
                     <div style={{ fontSize: 14, fontWeight: 600, color: "#475569" }}>Click to upload site photo</div>
@@ -1159,8 +1208,8 @@ export default function NewProjectPage() {
           <Accordion title="Project Documents & Blueprints" icon={<FileText size={16} />} count={documentFiles.length + documents.length}>
             <input type="file" multiple accept=".pdf,image/*,.doc,.docx" onChange={handleDocumentFiles} style={{ display: "none" }} id="doc-upload-input" />
             <label htmlFor="doc-upload-input" style={{ border: "2px dashed #E5E7EB", borderRadius: 8, padding: "16px", background: "#F8FAFC", display: "flex", alignItems: "center", justifyContent: "center", gap: 8, cursor: "pointer", marginBottom: 12 }}>
-              <Upload size={16} color="var(--color-primary, #F97316)" />
-              <span style={{ fontSize: 13, fontWeight: 600, color: "var(--color-primary, #F97316)" }}>Upload Documents / Blueprints (PDF, Images)</span>
+              <Upload size={16} color="var(--ink, #111317)" />
+              <span style={{ fontSize: 13, fontWeight: 600, color: "var(--ink, #111317)" }}>Upload Documents / Blueprints (PDF, Images)</span>
             </label>
 
             {(documents.length > 0 || documentFiles.length > 0) && (
@@ -1173,7 +1222,7 @@ export default function NewProjectPage() {
                 ))}
                 {documentFiles.map((file, idx) => (
                   <div key={idx} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", background: "#FFF5F0", padding: "8px 12px", borderRadius: 6, fontSize: 13 }}>
-                    <span style={{ color: "var(--color-primary, #F97316)", fontWeight: 500, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{file.name} (New)</span>
+                    <span style={{ color: "var(--ink, #111317)", fontWeight: 500, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{file.name} (New)</span>
                     <button onClick={() => removeDocumentFile(idx)} style={{ border: "none", background: "none", color: "#DC2626", cursor: "pointer" }}><X size={14} /></button>
                   </div>
                 ))}
@@ -1200,7 +1249,7 @@ export default function NewProjectPage() {
 
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginTop: 12 }}>
             <button className="tour-save-btn" onClick={handleSubmit} disabled={saving}
-              style={{ minHeight: 46, padding: "12px 0", background: "var(--color-primary, #F97316)", color: "#fff", border: "none", borderRadius: 8, fontWeight: 700, fontSize: 14, cursor: saving ? "not-allowed" : "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 8, opacity: saving ? 0.6 : 1, transition: "background 0.2s", fontFamily: 'inherit' }}>
+              style={{ minHeight: 46, padding: "12px 0", background: "var(--ink, #111317)", color: "#fff", border: "none", borderRadius: 8, fontWeight: 700, fontSize: 14, cursor: saving ? "not-allowed" : "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 8, opacity: saving ? 0.6 : 1, transition: "background 0.2s", fontFamily: 'inherit' }}>
               {saving ? <><SpinnerIcon /> Saving...</> : isEditMode ? <><Check size={16} /> Update Project</> : <><Plus size={16} /> Create Project</>}
             </button>
             <button onClick={() => navigate("/projects")} disabled={saving}
@@ -1208,8 +1257,9 @@ export default function NewProjectPage() {
               Cancel
             </button>
           </div>
+          </div>
         </div>
-      </div>
+      </BtSheet>
     </div>
   );
 }

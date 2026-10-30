@@ -111,7 +111,7 @@ export default function ModuleTour({ steps, run, setRun, moduleName }) {
             locale={{ skip: 'Skip', next: 'Next', back: 'Back', last: 'Finish' }}
             callback={handleJoyrideCallback}
             styles={{ options: {
-                primaryColor: '#0066cc',
+                primaryColor: '#111317',
                 zIndex: 10000,
             } }}
           />

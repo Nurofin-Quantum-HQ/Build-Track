@@ -463,7 +463,7 @@ function CustomizeTemplateSheet({ initialColumns, initialVisibility, onSave, onC
             }} />
           <button onClick={addColumn} style={{
             padding: '10px 16px', borderRadius: radius.sm, border: 'none',
-            background: colors.primaryBlue, color: '#FFF', fontWeight: 700, fontSize: 12, cursor: 'pointer',
+            background: 'var(--ink, #111317)', color: '#F6F4EF', fontWeight: 700, fontSize: 12, cursor: 'pointer',
           }}>Add</button>
         </div>
 
@@ -501,7 +501,7 @@ function CustomizeTemplateSheet({ initialColumns, initialVisibility, onSave, onC
         <button onClick={() => onSave({ columns, visibility })}
           style={{
             width: '100%', padding: '14px', borderRadius: radius.md, border: 'none',
-            background: gradients.primaryButton, color: '#FFF',
+            background: 'var(--ink, #111317)', color: '#F6F4EF',
             fontWeight: 800, fontSize: 15, cursor: 'pointer',
           }}>
           Apply Customization
@@ -838,9 +838,9 @@ export default function CsvImport({ onComplete }) {
           ].map(t => (
             <button key={t.key} onClick={() => setSelectedTemplate(t.key)}
               style={{
-                padding: "8px 16px", borderRadius: 8, border: `1px solid ${selectedTemplate === t.key ? "var(--color-primary, #F97316)" : "#e5e5e5"}`,
-                background: selectedTemplate === t.key ? "#FFF5F0" : "#fafafa",
-                color: selectedTemplate === t.key ? "var(--color-primary, #F97316)" : "#555",
+                padding: "8px 16px", borderRadius: 8, border: `1px solid ${selectedTemplate === t.key ? "var(--ink, #111317)" : "#e5e5e5"}`,
+                background: selectedTemplate === t.key ? "var(--ink, #111317)" : "#fafafa",
+                color: selectedTemplate === t.key ? "#F6F4EF" : "#555",
                 fontWeight: 600, fontSize: 12, cursor: "pointer",
                 transition: "all 0.2s",
               }}>
@@ -853,8 +853,8 @@ export default function CsvImport({ onComplete }) {
       <div style={{ display: "flex", gap: 8, marginBottom: 8 }}>
         <button onClick={() => downloadTemplate(selectedTemplate)}
           style={{
-            flex: 1, padding: "12px", borderRadius: 12, border: `1.5px solid ${colors.primaryBlue}`,
-            background: "transparent", fontSize: 13, fontWeight: 700, color: colors.primaryBlue,
+            flex: 1, padding: "12px", borderRadius: 12, border: "1px solid var(--border, #E2E8F0)",
+            background: "#fff", fontSize: 13, fontWeight: 700, color: "var(--ink, #111317)",
             cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
           }}>
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -930,9 +930,10 @@ export default function CsvImport({ onComplete }) {
             <button onClick={doImport} disabled={importing || !canProceedWithImport}
               style={{
                 padding: "8px 20px",
-                background: importing ? "var(--color-primary-light, #FB923C)" : !canProceedWithImport ? "#ccc" : gradients.primaryButton,
-                color: "#fff",
-                border: "none", borderRadius: 8, fontWeight: 600, fontSize: 13,
+                background: importing ? "#64748B" : !canProceedWithImport ? "#ccc" : "var(--ink, #111317)",
+                color: "#F6F4EF",
+                border: "none", borderRadius: 8, fontWeight: 700, fontSize: 13,
+                boxShadow: !canProceedWithImport ? "none" : "0 2px 8px rgba(0,0,0,0.2)",
                 cursor: importing || !canProceedWithImport ? "not-allowed" : "pointer",
               }}>
               {importing ? `Importing ${importProgress.current}/${importProgress.total}…` : `Import ${resolvedRows.filter(r => !r.skipped).length} Entries`}

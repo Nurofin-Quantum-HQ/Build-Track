@@ -3,6 +3,9 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { aiDashboardAPI, aiChatAPI } from '../api';
 import { colors, radius, shadows, gradients, typography } from '../styles/designTokens';
 import { Card, Spinner } from '../components/ui';
+import BtHero from '../components/ui/BtHero';
+import BtSheet from '../components/ui/BtSheet';
+import BtBrickLoader from '../components/ui/BtBrickLoader';
 import { Toast } from '../components/Toast';
 import {
   Sparkles,
@@ -301,37 +304,61 @@ export default function AiChatReportPage() {
   };
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', minHeight: '100vh', background: colors.bgBase4, fontFamily: typography.fontFamily }}>
+    <div style={{ display: 'flex', flexDirection: 'column', minHeight: '100vh', background: 'var(--bg, #0B0D10)' }}>
       <Toast message={toast.msg} type={toast.type} onClose={clearToast} />
 
-      <div style={{ background: colors.cardBg, borderBottom: `1px solid ${colors.cardBorder}`, padding: '16px 24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexShrink: 0 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-          <button
-            onClick={() => navigate(-1)}
-            style={{ border: 'none', background: colors.bgBase4, cursor: 'pointer', width: 36, height: 36, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: colors.textPrimary }}
-          >
-            <ArrowLeft size={16} />
-          </button>
-          <div>
-            <h2 style={{ fontSize: 18, fontWeight: 800, color: colors.textPrimary, margin: 0 }}>
-              Construction Intelligence
-            </h2>
-            <p style={{ fontSize: 12, color: colors.textLight, margin: 0 }}>
-              AI insights report dashboard
-            </p>
+      <BtHero
+        eyebrow="INTELLIGENCE · ASSISTANT"
+        title="Construction Intelligence"
+        subtitle="AI insights & analytics report generator"
+        actions={
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+            <button
+              onClick={() => navigate(-1)}
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 6,
+                padding: '8px 14px',
+                borderRadius: 10,
+                background: 'rgba(255, 255, 255, 0.08)',
+                border: '1px solid rgba(255, 255, 255, 0.15)',
+                color: '#F6F4EF',
+                fontSize: 13,
+                fontWeight: 600,
+                cursor: 'pointer',
+              }}
+            >
+              <ArrowLeft size={15} />
+              <span>Back</span>
+            </button>
+            {state === 'results' && (
+              <button
+                onClick={handleReset}
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 6,
+                  padding: '8px 16px',
+                  borderRadius: 10,
+                  background: 'var(--ink, #111317)',
+                  border: '1px solid rgba(255, 255, 255, 0.2)',
+                  color: '#F6F4EF',
+                  fontSize: 13,
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                  boxShadow: '0 2px 8px rgba(0,0,0,0.3)',
+                }}
+              >
+                <RotateCcw size={13} />
+                <span>Reset AI</span>
+              </button>
+            )}
           </div>
-        </div>
+        }
+      />
 
-        {state === 'results' && (
-          <button
-            onClick={handleReset}
-            style={{ padding: "8px 14px", borderRadius: radius.md, border: `1px solid ${colors.cardBorder}`, background: '#FFF', color: colors.textMedium, fontWeight: "700", fontSize: 12, cursor: "pointer", display: 'flex', alignItems: 'center', gap: 6 }}
-          >
-            <RotateCcw size={13} />
-            Reset AI
-          </button>
-        )}
-      </div>
+      <BtSheet overlap={26}>
 
       <div style={{ padding: '16px 24px 8px', maxWidth: 840, width: '100%', margin: '0 auto', boxSizing: 'border-box' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, background: '#FFF', border: `1.2px solid #E2E4FA`, borderRadius: 16, padding: '10px 16px', boxShadow: shadows.sm }}>
@@ -349,7 +376,7 @@ export default function AiChatReportPage() {
           <button
             disabled={!queryInput.trim() || state === 'loading'}
             onClick={() => submitSearch(queryInput)}
-            style={{ border: 'none', background: gradients.primaryButton, color: '#FFF', fontWeight: '700', padding: '6px 14px', borderRadius: 8, fontSize: 12.5, cursor: (!queryInput.trim() || state === 'loading') ? 'not-allowed' : 'pointer' }}
+            style={{ border: 'none', background: (!queryInput.trim() || state === 'loading') ? '#E2E8F0' : 'var(--ink, #111317)', color: (!queryInput.trim() || state === 'loading') ? '#94A3B8' : '#F6F4EF', fontWeight: '700', padding: '8px 18px', borderRadius: 10, fontSize: 13, cursor: (!queryInput.trim() || state === 'loading') ? 'not-allowed' : 'pointer', transition: 'all 0.15s' }}
           >
             Search
           </button>
@@ -414,8 +441,7 @@ export default function AiChatReportPage() {
               <div style={{ background: '#E2E8F0', height: 180, borderRadius: 16, animation: 'pulse 1.5s infinite' }} />
 
               <div style={{ textAlign: 'center', padding: '24px 0' }}>
-                <Spinner size={32} color={colors.primaryBlue} style={{ marginBottom: 12 }} />
-                <div style={{ fontSize: 13, fontWeight: '700', color: colors.textLight }}>Generating analytics report...</div>
+                <BtBrickLoader label="Generating analytics report..." />
               </div>
 
             </div>
@@ -462,7 +488,7 @@ export default function AiChatReportPage() {
                 );
               })}
 
-              <div style={{ background: 'linear-gradient(135deg, #FFF5F0 0%, #FDE8D8 100%)', border: '2.5px solid #FFF', borderRadius: 20, padding: 20, boxShadow: shadows.md }}>
+              <div style={{ background: 'var(--card-bg, #FFFFFF)', border: '1px solid var(--border, #E2E8F0)', borderRadius: 20, padding: 22, boxShadow: '0 2px 10px rgba(0,0,0,0.04)' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12, color: colors.primaryBlue }}>
                   <Sparkles size={16} />
                   <span style={{ fontSize: 12, fontWeight: '800', letterSpacing: '0.5px', textTransform: 'uppercase' }}>Executive Summary</span>
@@ -670,6 +696,7 @@ export default function AiChatReportPage() {
 
         </div>
       </div>
+      </BtSheet>
 
       {showCustomizeModal && result && (
         <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}>
@@ -742,7 +769,6 @@ export default function AiChatReportPage() {
           </div>
         </div>
       )}
-
     </div>
   );
 }

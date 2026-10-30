@@ -1,13 +1,14 @@
 import { Navigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
+import BtBrickLoader from "./ui/BtBrickLoader";
 
 export default function RequireRole({ permission, route, children }) {
   const { user, loading, isAuthenticated, can } = useAuth();
 
   if (loading) {
     return (
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100vh", color: "#888" }}>
-        Loading...
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "center", minHeight: "100vh", background: "var(--bg, #0B0D10)" }}>
+        <BtBrickLoader label="Authenticating session..." />
       </div>
     );
   }

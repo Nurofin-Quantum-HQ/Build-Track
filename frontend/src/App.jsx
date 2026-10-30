@@ -4,6 +4,8 @@ import DashboardLayout from "./layout/DashboardLayout";
 import AppProviders from "./contexts/AppProviders";
 import { useAuth } from "./contexts/AuthContext";
 import RequireRole from "./components/RequireRole";
+import { applyAccent } from "./styles/designTokens";
+import ErrorBoundary from "./components/ErrorBoundary";
 
 import LoginPage       from "./pages/login_page";
 import SignUpPage      from "./pages/signup_page";
@@ -17,6 +19,7 @@ const Reports          = lazy(() => import("./screens/financial_report"));
 const Settings         = lazy(() => import("./screens/settings_page"));
 const NewProject       = lazy(() => import("./screens/add_new_project"));
 const AddEntry         = lazy(() => import("./screens/add_entry_page"));
+const ChooseEntryMode  = lazy(() => import("./screens/choose_entry_mode"));
 const EntryDetail      = lazy(() => import("./screens/entry_detail_page"));
 const Approvals        = lazy(() => import("./screens/approvals_page"));
 const AdminOverview    = lazy(() => import("./screens/admin_overview_page"));
@@ -27,7 +30,6 @@ const Notifications    = lazy(() => import("./screens/notifications_page"));
 const ManageSite       = lazy(() => import("./screens/managesite_dashboard"));
 const ManualEntryPage  = lazy(() => import("./screens/manual_entry"));
 const UpdateProgressPage = lazy(() => import("./screens/update_progress_page"));
-const InventoryPage    = lazy(() => import("./screens/inventory_page"));
 const SubscriptionPage = lazy(() => import("./screens/subscription_page"));
 const AuditLogsPage     = lazy(() => import("./screens/audit_logs_page"));
 const ProjectReport    = lazy(() => import("./screens/project_report_page"));
@@ -36,6 +38,7 @@ const ProjectInsights  = lazy(() => import("./screens/insights/ProjectInsightsPa
 export const routePreloaders = {
   "/": () => import("./screens/dashboard_page"),
   "/add-entry": () => import("./screens/add_entry_page"),
+  "/choose-entry-mode": () => import("./screens/choose_entry_mode"),
   "/update-progress": () => import("./screens/update_progress_page"),
   "/manualentry": () => import("./screens/manual_entry"),
   "/entry-detail": () => import("./screens/entry_detail_page"),
@@ -43,7 +46,6 @@ export const routePreloaders = {
   "/transaction": () => import("./screens/transaction_log"),
   "/projects": () => import("./screens/project_management"),
   "/newproject": () => import("./screens/add_new_project"),
-  "/inventory": () => import("./screens/inventory_page"),
   "/reports": () => import("./screens/financial_report"),
   "/settings": () => import("./screens/settings_page"),
   "/managesite": () => import("./screens/managesite_dashboard"),
@@ -56,6 +58,8 @@ export const routePreloaders = {
   "/subscription": () => import("./screens/subscription_page"),
   "/audit-logs": () => import("./screens/audit_logs_page"),
   "/project-report": () => import("./screens/project_report_page"),
+  "/project-insights": () => import("./screens/insights/ProjectInsightsPage"),
+  "/insights": () => import("./screens/insights/ProjectInsightsPage"),
 };
 
 export function preloadRoute(path) {
@@ -112,6 +116,11 @@ function AppRoutes() {
               <AddEntry />
             </RequireRole>
           } />
+          <Route path="/choose-entry-mode" element={
+            <RequireRole permission="add_entries" route="/choose-entry-mode">
+              <ChooseEntryMode />
+            </RequireRole>
+          } />
           <Route path="/update-progress" element={
             <RequireRole permission="add_entries" route="/update-progress">
               <UpdateProgressPage />
@@ -135,11 +144,7 @@ function AppRoutes() {
               <NewProject />
             </RequireRole>
           } />
-          <Route path="/inventory"   element={
-            <RequireRole permission="manage_inventory" route="/inventory">
-              <InventoryPage />
-            </RequireRole>
-          } />
+          <Route path="/inventory"   element={<Navigate to="/" replace />} />
 
           <Route path="/reports"     element={
             <RequireRole permission="view_reports" route="/reports">
@@ -148,9 +153,12 @@ function AppRoutes() {
           } />
 
           <Route path="/settings"    element={<Settings />} />
+          <Route path="/profile"     element={<Settings />} />
           <Route path="/managesite"  element={<ManageSite />} />
           <Route path="/project-report/:id" element={<ProjectReport />} />
           <Route path="/project-insights/:id" element={<ProjectInsights />} />
+          <Route path="/project-insights" element={<ProjectInsights />} />
+          <Route path="/insights" element={<ProjectInsights />} />
           <Route path="/reports/:id" element={<ProjectReport />} />
 
           <Route path="/approvals"  element={
@@ -198,38 +206,16 @@ function AppRoutes() {
 
 // Initialize Theme before React renders to avoid flash
 (function initTheme() {
-  const saved = localStorage.getItem('bt_theme_color');
-  if (saved) {
-    const hexToRgb = (hex) => {
-      let r = 0, g = 0, b = 0;
-      if (hex.length === 4) { r = parseInt(hex[1]+hex[1],16); g = parseInt(hex[2]+hex[2],16); b = parseInt(hex[3]+hex[3],16); }
-      else if (hex.length === 7) { r = parseInt(hex[1]+hex[2],16); g = parseInt(hex[3]+hex[4],16); b = parseInt(hex[5]+hex[6],16); }
-      return r + ", " + g + ", " + b;
-    };
-    const adjustColor = (hex, amount) => {
-      let usePound = false;
-      if (hex[0] == "#") { hex = hex.slice(1); usePound = true; }
-      let num = parseInt(hex, 16);
-      let r = (num >> 16) + amount; if (r > 255) r = 255; else if (r < 0) r = 0;
-      let g = ((num >> 8) & 0x00FF) + amount; if (g > 255) g = 255; else if (g < 0) g = 0;
-      let b = (num & 0x0000FF) + amount; if (b > 255) b = 255; else if (b < 0) b = 0;
-      return (usePound ? "#" : "") + (g | (b << 8) | (r << 16)).toString(16).padStart(6, '0');
-    };
-    const hover = adjustColor(saved, -20);
-    const light = adjustColor(saved, 30);
-    const rgb = hexToRgb(saved);
-
-    document.documentElement.style.setProperty('--color-primary', saved);
-    document.documentElement.style.setProperty('--color-primary-hover', hover);
-    document.documentElement.style.setProperty('--color-primary-light', light);
-    document.documentElement.style.setProperty('--color-primary-rgb', rgb);
-  }
+  const saved = localStorage.getItem('bt_theme_color') || 'brass';
+  applyAccent(saved);
 })();
 
 export default function App() {
   return (
-    <AppProviders>
+    <ErrorBoundary>
+      <AppProviders>
       <AppRoutes />
-    </AppProviders>
+      </AppProviders>
+    </ErrorBoundary>
   );
 }

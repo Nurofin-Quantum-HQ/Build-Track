@@ -1,146 +1,189 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import api from '../api';
-import { Palette } from 'lucide-react';
-import { colors } from '../styles/designTokens';
+import { Palette, Check } from 'lucide-react';
+import { applyAccent, ACCENT_PRESETS } from '../styles/designTokens';
 
-// Utility to convert HEX to RGB
-const hexToRgb = (hex) => {
-  let r = 0, g = 0, b = 0;
-  if (hex.length === 4) {
-    r = parseInt(hex[1] + hex[1], 16);
-    g = parseInt(hex[2] + hex[2], 16);
-    b = parseInt(hex[3] + hex[3], 16);
-  } else if (hex.length === 7) {
-    r = parseInt(hex[1] + hex[2], 16);
-    g = parseInt(hex[3] + hex[4], 16);
-    b = parseInt(hex[5] + hex[6], 16);
-  }
-  return r + ", " + g + ", " + b;
-};
+const PRESETS = [
+  { id: 'brass', name: 'Brass', hex: ACCENT_PRESETS.brass },
+  { id: 'ember', name: 'Ember', hex: ACCENT_PRESETS.ember },
+  { id: 'cobalt', name: 'Cobalt', hex: ACCENT_PRESETS.cobalt },
+  { id: 'jade', name: 'Jade', hex: ACCENT_PRESETS.jade },
+];
 
-// Utility to lighten/darken HEX
-const adjustColor = (hex, amount) => {
-  let usePound = false;
-  if (hex[0] == "#") {
-      hex = hex.slice(1);
-      usePound = true;
-  }
-  let num = parseInt(hex, 16);
-  let r = (num >> 16) + amount;
-  if (r > 255) r = 255;
-  else if  (r < 0) r = 0;
-  let g = ((num >> 8) & 0x00FF) + amount;
-  if (g > 255) g = 255;
-  else if (g < 0) g = 0;
-  let b = (num & 0x0000FF) + amount;
-  if (b > 255) b = 255;
-  else if (b < 0) b = 0;
-  return (usePound ? "#" : "") + (g | (b << 8) | (r << 16)).toString(16).padStart(6, '0');
-};
-
-export function ThemePicker() {
+export function ThemePicker({ inline = false }) {
   const { user, updateUser } = useAuth();
   const [isOpen, setIsOpen] = useState(false);
-  const [themeColor, setThemeColor] = useState('var(--color-primary, #F97316)');
+  const [currentHex, setCurrentHex] = useState(ACCENT_PRESETS.brass);
 
   useEffect(() => {
-    if (user?.themePreference) {
-      setThemeColor(user.themePreference);
-      applyTheme(user.themePreference, false);
-    } else {
-      const saved = localStorage.getItem('bt_theme_color');
-      if (saved) {
-        setThemeColor(saved);
-        applyTheme(saved, false);
-      }
-    }
+    const pref = user?.themePreference || localStorage.getItem('bt_theme_color') || 'brass';
+    const hex = ACCENT_PRESETS[pref.toLowerCase()] || (pref.startsWith('#') ? pref : `#${pref}`);
+    setCurrentHex(hex);
+    applyAccent(hex);
   }, [user?.themePreference]);
 
-  const applyTheme = (color, saveToBackend = false) => {
-    const hover = adjustColor(color, -20); // darken
-    const light = adjustColor(color, 30);  // lighten
-    const rgb = hexToRgb(color);
+  const handleSelectColor = (colorHex) => {
+    setCurrentHex(colorHex);
+    applyAccent(colorHex);
+    localStorage.setItem('bt_theme_color', colorHex);
 
-    document.documentElement.style.setProperty('--color-primary', color);
-    document.documentElement.style.setProperty('--color-primary-hover', hover);
-    document.documentElement.style.setProperty('--color-primary-light', light);
-    document.documentElement.style.setProperty('--color-primary-rgb', rgb);
-    localStorage.setItem('bt_theme_color', color);
-    
-    if (saveToBackend && user) {
-      api.put('/auth/profile', { themePreference: color })
-        .then(res => {
-          if (updateUser) updateUser(res.data.user);
+    if (user) {
+      api
+        .put('/auth/profile', { themePreference: colorHex })
+        .then((res) => {
+          if (updateUser) updateUser(res.data?.user || { ...user, themePreference: colorHex });
         })
-        .catch(err => console.error("Failed to sync theme", err));
+        .catch((err) => console.error('Failed to sync theme preference:', err));
     }
   };
 
-  const handleChange = (e) => {
-    const c = e.target.value;
-    setThemeColor(c);
-    applyTheme(c, true);
-  };
+  const isPresetSelected = (hex) => currentHex.toLowerCase() === hex.toLowerCase();
+
+  const content = (
+    <div
+      style={{
+        background: '#FFFFFF',
+        borderRadius: '20px',
+        padding: '16px',
+        border: '1px solid var(--line)',
+        boxShadow: 'var(--shadow-raised)',
+        display: 'flex',
+        flexDirection: 'column',
+        gap: '14px',
+        minWidth: '220px',
+      }}
+    >
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <span style={{ fontSize: '11px', fontFamily: 'var(--font-mono)', letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--ink-3)' }}>
+          ACCENT THEME
+        </span>
+      </div>
+
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '8px' }}>
+        {PRESETS.map((p) => {
+          const selected = isPresetSelected(p.hex);
+          return (
+            <button
+              key={p.id}
+              onClick={() => handleSelectColor(p.hex)}
+              title={p.name}
+              style={{
+                height: '42px',
+                borderRadius: '12px',
+                background: p.hex,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                cursor: 'pointer',
+                border: selected ? '2px solid var(--ink)' : '2px solid transparent',
+                outline: selected ? '2px solid var(--ground)' : 'none',
+                transition: 'transform 120ms ease',
+                transform: selected ? 'scale(1.04)' : 'scale(1)',
+              }}
+            >
+              {selected && <Check size={18} color="#FFFFFF" strokeWidth={3} />}
+            </button>
+          );
+        })}
+      </div>
+
+      <div style={{ display: 'flex', alignItems: 'center', gap: '10px', paddingTop: '4px', borderTop: '1px solid var(--line)' }}>
+        <span style={{ fontSize: '12px', color: 'var(--ink-2)', flex: 1, fontFamily: 'var(--font-ui)' }}>Custom color</span>
+        <label
+          style={{
+            width: '28px',
+            height: '28px',
+            borderRadius: '50%',
+            background: currentHex,
+            cursor: 'pointer',
+            border: '2px solid #FFFFFF',
+            boxShadow: '0 0 0 1px var(--input-border)',
+            display: 'inline-block',
+            position: 'relative',
+            overflow: 'hidden',
+          }}
+        >
+          <input
+            type="color"
+            value={currentHex}
+            onChange={(e) => handleSelectColor(e.target.value)}
+            style={{
+              position: 'absolute',
+              top: '-10px',
+              left: '-10px',
+              width: '50px',
+              height: '50px',
+              opacity: 0,
+              cursor: 'pointer',
+            }}
+          />
+        </label>
+      </div>
+    </div>
+  );
+
+  if (inline) {
+    return content;
+  }
 
   return (
-    <div style={{ position: 'relative', marginTop: 8 }}>
+    <div style={{ position: 'relative' }}>
       <button
         onClick={() => setIsOpen(!isOpen)}
         style={{
           width: '100%',
-          padding: '10px 12px',
-          borderRadius: '10px',
-          fontSize: 13,
+          height: '40px',
+          padding: '0 14px',
+          borderRadius: '12px',
+          background: 'var(--fill)',
+          color: 'var(--ink)',
+          fontSize: '13px',
           fontWeight: 600,
-          color: colors.textSecondary,
+          fontFamily: 'var(--font-ui)',
           display: 'flex',
           alignItems: 'center',
-          justifyContent: 'center',
-          gap: 8,
+          justifyContent: 'space-between',
           cursor: 'pointer',
-          border: '1px solid ' + colors.border,
-          background: 'transparent',
+          border: '1px solid transparent',
+          transition: 'background 150ms ease',
         }}
       >
-        <Palette size={14} />
-        Theme Color
-      </button>
-      
-      {isOpen && (
-        <div style={{
-          position: 'absolute',
-          bottom: '110%',
-          left: 0,
-          right: 0,
-          background: 'white',
-          padding: 12,
-          borderRadius: 8,
-          boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
-          border: '1px solid #e5e5e5',
-          zIndex: 100,
-          display: 'flex',
-          flexDirection: 'column',
-          gap: 8
-        }}>
-          <div style={{ fontSize: 12, fontWeight: 600, color: '#666' }}>Pick a Color</div>
-          <input 
-            type="color" 
-            value={themeColor} 
-            onChange={handleChange}
-            style={{ width: '100%', height: 40, border: 'none', cursor: 'pointer', padding: 0 }}
-          />
-          <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginTop: 4 }}>
-            {['var(--color-primary, #F97316)', '#2563EB', '#16A34A', '#9333EA', '#E11D48'].map(c => (
-              <div 
-                key={c}
-                onClick={() => { setThemeColor(c); applyTheme(c, true); setIsOpen(false); }}
-                style={{ width: 24, height: 24, borderRadius: '50%', background: c, cursor: 'pointer', border: '2px solid white', boxShadow: '0 1px 3px rgba(0,0,0,0.2)' }}
-              />
-            ))}
-          </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <Palette size={16} color="var(--ink-2)" />
+          <span>Theme Color</span>
         </div>
+        <div
+          style={{
+            width: '14px',
+            height: '14px',
+            borderRadius: '50%',
+            background: currentHex,
+            border: '1px solid rgba(0,0,0,0.1)',
+          }}
+        />
+      </button>
+
+      {isOpen && (
+        <>
+          <div
+            onClick={() => setIsOpen(false)}
+            style={{ position: 'fixed', inset: 0, zIndex: 90 }}
+          />
+          <div
+            style={{
+              position: 'absolute',
+              bottom: 'calc(100% + 8px)',
+              left: 0,
+              zIndex: 95,
+            }}
+          >
+            {content}
+          </div>
+        </>
       )}
     </div>
   );
 }
+
+export default ThemePicker;

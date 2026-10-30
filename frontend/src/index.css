@@ -1,11 +1,15 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap');
+@import './styles/designTokens.css';
 
 :root {
-  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  --bone: #F6F4EF;
+  --bone-soft: #ECEAE4;
+  --bone-pure: #FFFFFF;
+  --bone-border: rgba(246, 244, 239, 0.25);
+  font-family: var(--font-ui);
   line-height: 1.5;
   font-weight: 400;
-  color: #1F2937;
-  background-color: #F5F6FA;
+  color: var(--ink);
+  background-color: var(--ground);
 
   font-synthesis: none;
   text-rendering: optimizeLegibility;
@@ -13,21 +17,13 @@
   -moz-osx-font-smoothing: grayscale;
 }
 
-a {
-  color: var(--color-primary, #F97316);
-  text-decoration: none;
-}
-a:hover {
-  color: var(--color-primary-hover, #EA580C);
-  text-decoration: none;
-}
-
 body {
   margin: 0;
   padding: 0;
-  font-family: 'Inter', system-ui, -apple-system, sans-serif;
-  background: #F5F6FA;
-  color: #1F2937;
+  font-family: var(--font-ui);
+  background-color: var(--ground);
+  color: var(--ink);
+  min-height: 100vh;
 }
 
 *,
@@ -36,8 +32,18 @@ body {
   box-sizing: border-box;
 }
 
+a {
+  color: var(--accent-ink);
+  text-decoration: none;
+  transition: opacity 150ms ease;
+}
+a:hover {
+  opacity: 0.85;
+}
+
 button {
   all: unset;
   cursor: pointer;
   box-sizing: border-box;
+  font-family: inherit;
 }

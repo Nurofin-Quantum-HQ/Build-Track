@@ -13,20 +13,23 @@ import {
   Settings2, Edit, CreditCard
 } from "lucide-react";
 import ModuleTour from "../components/ModuleTour";
+import BtHero from "../components/ui/BtHero";
+import BtSheet from "../components/ui/BtSheet";
+import BtBrickLoader from "../components/ui/BtBrickLoader";
 
 const TYPE_COLORS = {
-  Materials: { bg: "#FFF5F0", color: "var(--color-primary, #F97316)" },
-  Wages: { bg: "#F0FDF4", color: "#22C55E" },
-  Expense: { bg: "#FFF7F0", color: "var(--color-primary-hover, #EA580C)" },
-  Income: { bg: "#ECFDF5", color: "#10B981" },
-  Equipment: { bg: "#FFF7F0", color: "var(--color-primary-hover, #EA580C)" },
+  Materials: { bg: "rgba(42, 120, 214, 0.12)", color: "#2A78D6" },
+  Wages: { bg: "rgba(235, 104, 52, 0.12)", color: "#EB6834" },
+  Expense: { bg: "rgba(25, 158, 112, 0.12)", color: "#199E70" },
+  Income: { bg: "rgba(16, 185, 129, 0.12)", color: "#10B981" },
+  Equipment: { bg: "rgba(25, 158, 112, 0.12)", color: "#199E70" },
 };
 
 const PAYMENT_COLORS = {
-  Paid: { bg: "#F0FDF4", color: "#166534" },
-  Partial: { bg: "#FFFBEB", color: "#B45309" },
-  Pending: { bg: "#FEF2F2", color: "#DC2626" },
-  Advance: { bg: "#FFF5F0", color: "var(--color-primary, #F97316)" },
+  Paid: { bg: "rgba(16, 185, 129, 0.12)", color: "#166534" },
+  Partial: { bg: "rgba(224, 169, 59, 0.12)", color: "#B45309" },
+  Pending: { bg: "rgba(220, 38, 38, 0.12)", color: "#DC2626" },
+  Advance: { bg: "rgba(42, 120, 214, 0.12)", color: "#2A78D6" },
 };
 
 const DATE_PRESETS = [
@@ -253,29 +256,67 @@ export default function ReportsPage() {
 
   if (loading) {
     return (
-      <div style={{ display: "flex", flexDirection: "column", width: "100%", minHeight: "100vh", fontFamily: "Inter, 'Segoe UI', sans-serif", background: "transparent" }}>
-        <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", color: "#94A3B8", fontSize: 14 }}>Loading reports&hellip;</div>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "center", minHeight: "100vh", background: "var(--bg, #0B0D10)" }}>
+        <BtBrickLoader label="Loading reports..." />
       </div>
     );
   }
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", width: "100%", minHeight: "100vh", fontFamily: "Inter, 'Segoe UI', sans-serif", background: "transparent" }}>
+    <div style={{ display: "flex", flexDirection: "column", width: "100%", minHeight: "100vh", background: "var(--bg, #0B0D10)" }}>
       <ModuleTour steps={tourSteps} run={runTour} setRun={setRunTour} moduleName="ReportDashboard" />
-      <div className="tour-header" style={{ padding: "14px 24px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexShrink: 0, flexWrap: "wrap" }}>
-        <div>
-          <h1 style={{ margin: 0, fontSize: 20, fontWeight: 800, color: "#111827", letterSpacing: "-0.03em" }}>Reports & Analytics</h1>
-          <p style={{ margin: "2px 0 0", fontSize: 12, color: "#64748B" }}>{filtered.length} entries found</p>
-        </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <button onClick={() => setRunTour(true)} title="Help" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 36, height: 36, background: '#fff', border: '1px solid #E5E7EB', borderRadius: 8, cursor: 'pointer' }}>
-            <HelpCircle size={16} color="#64748B" />
-          </button>
-          <Button variant="primary" size="md" onClick={() => navigate("/ai-chat")} style={{ background: "linear-gradient(135deg, var(--color-primary, #F97316), var(--color-primary-light, #FB923C))", border: "none" }}>
-            <Sparkles size={14} /> Ask AI
-          </Button>
-        </div>
+      <div className="tour-header">
+        <BtHero
+          eyebrow="AUDIT & ANALYTICS · REPORTS"
+          title="Reports & Analytics"
+          subtitle={`${filtered.length} entries found across projects`}
+          actions={
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <button
+                onClick={() => setRunTour(true)}
+                title="Help"
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  width: 36,
+                  height: 36,
+                  background: 'rgba(255, 255, 255, 0.08)',
+                  border: '1px solid rgba(255, 255, 255, 0.15)',
+                  borderRadius: 10,
+                  cursor: 'pointer',
+                  color: '#F6F4EF',
+                }}
+              >
+                <HelpCircle size={16} />
+              </button>
+              <button
+                onClick={() => navigate("/ai-chat")}
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: 8,
+                  padding: "8px 18px",
+                  borderRadius: 10,
+                  background: "var(--ink, #111317)",
+                  border: "1px solid rgba(255, 255, 255, 0.2)",
+                  color: "#F6F4EF",
+                  fontSize: 13,
+                  fontWeight: 700,
+                  cursor: "pointer",
+                  boxShadow: "0 2px 8px rgba(0,0,0,0.3)",
+                  fontFamily: "inherit",
+                }}
+              >
+                <Sparkles size={15} color="#E0A93B" />
+                <span>Ask AI</span>
+              </button>
+            </div>
+          }
+        />
       </div>
+
+      <BtSheet overlap={26}>
 
       {error && (
         <div style={{ margin: "14px 24px 0", background: "#FEF2F2", border: "1px solid #FECACA", borderRadius: 8, padding: "10px 14px", color: "#DC2626", fontSize: 13, display: "flex", alignItems: "center", gap: 6 }}>
@@ -324,7 +365,7 @@ export default function ReportsPage() {
           <div style={{ display: "flex", gap: 6, marginTop: 14, flexWrap: "wrap" }}>
             {TYPES.map(t => (
               <button key={t.value} onClick={() => setSelectedType(t.value)}
-                style={{ padding: "6px 14px", borderRadius: 6, border: `1px solid ${selectedType === t.value ? "var(--color-primary, #F97316)" : "#E5E7EB"}`, background: selectedType === t.value ? "var(--color-primary, #F97316)" : "#fff", color: selectedType === t.value ? "#fff" : "#475569", fontSize: 13, fontWeight: 600, cursor: "pointer", transition: "all 0.15s", fontFamily: "inherit" }}>
+                style={{ padding: "6px 14px", borderRadius: 8, border: `1px solid ${selectedType === t.value ? "var(--ink, #111317)" : "#E5E7EB"}`, background: selectedType === t.value ? "var(--ink, #111317)" : "#fff", color: selectedType === t.value ? "#fff" : "#475569", fontSize: 13, fontWeight: 600, cursor: "pointer", transition: "all 0.15s", fontFamily: "inherit" }}>
                 {t.label}
               </button>
             ))}
@@ -333,10 +374,10 @@ export default function ReportsPage() {
         </div>
 
         <div className="tour-metrics" style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr 1fr" : "repeat(4, 1fr)", gap: 14, marginBottom: 16 }}>
-          <MetricCard icon={<BarChart3 size={16} />} label="Total Cost" value={stats.total} budget={projects.find(p => (p._id || p.id) === selectedProject)?.budget?.["total"] || projects.find(p => (p._id || p.id) === selectedProject)?.totalBudget || 0} color="var(--color-primary, #F97316)" />
-          <MetricCard icon={<Layers size={16} />} label="Material" value={stats.material} budget={projects.find(p => (p._id || p.id) === selectedProject)?.budgetMaterial || 0} color="var(--color-primary, #F97316)" />
-          <MetricCard icon={<Users size={16} />} label="Labour" value={stats.labour} budget={projects.find(p => (p._id || p.id) === selectedProject)?.budgetLabour || 0} color="var(--color-primary-hover, #EA580C)" />
-          <MetricCard icon={<Wrench size={16} />} label="Equipment" value={stats.equipment} budget={projects.find(p => (p._id || p.id) === selectedProject)?.budgetEquipment || 0} color="#06B6D4" />
+          <MetricCard icon={<BarChart3 size={16} />} label="Total Cost" value={stats.total} budget={projects.find(p => (p._id || p.id) === selectedProject)?.budget?.["total"] || projects.find(p => (p._id || p.id) === selectedProject)?.totalBudget || 0} color="var(--ink, #111317)" />
+          <MetricCard icon={<Layers size={16} />} label="Material" value={stats.material} budget={projects.find(p => (p._id || p.id) === selectedProject)?.budgetMaterial || 0} color="#2A78D6" />
+          <MetricCard icon={<Users size={16} />} label="Labour" value={stats.labour} budget={projects.find(p => (p._id || p.id) === selectedProject)?.budgetLabour || 0} color="#EB6834" />
+          <MetricCard icon={<Wrench size={16} />} label="Equipment" value={stats.equipment} budget={projects.find(p => (p._id || p.id) === selectedProject)?.budgetEquipment || 0} color="#199E70" />
         </div>
 
         <div className="tour-charts" style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1.5fr 1fr", gap: 14, marginBottom: 16 }}>
@@ -346,8 +387,8 @@ export default function ReportsPage() {
           </Card>
           <Card padding="20px">
             <div style={{ fontSize: 15, fontWeight: 700, color: "#111827", marginBottom: 14 }}>Category Breakdown</div>
-            <CategoryBudgetBar name="Material" spent={stats.material} budget={projects.find(p => (p._id || p.id) === selectedProject)?.budgetMaterial || 0} color="var(--color-primary, #F97316)" />
-            <CategoryBudgetBar name="Labour" spent={stats.labour} budget={projects.find(p => (p._id || p.id) === selectedProject)?.budgetLabour || 0} color="var(--color-primary-hover, #EA580C)" />
+            <CategoryBudgetBar name="Material" spent={stats.material} budget={projects.find(p => (p._id || p.id) === selectedProject)?.budgetMaterial || 0} color="#2A78D6" />
+            <CategoryBudgetBar name="Labour" spent={stats.labour} budget={projects.find(p => (p._id || p.id) === selectedProject)?.budgetLabour || 0} color="#EB6834" />
             <CategoryBudgetBar name="Equipment" spent={stats.equipment} budget={projects.find(p => (p._id || p.id) === selectedProject)?.budgetEquipment || 0} color="#06B6D4" />
           </Card>
         </div>
@@ -508,6 +549,7 @@ export default function ReportsPage() {
           </div>
         </div>
       )}
+      </BtSheet>
     </div>
   );
 }

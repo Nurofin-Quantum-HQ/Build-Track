@@ -1,10 +1,55 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
-import { Card, Badge, Button, SkeletonCard } from '../../components/ui';
+import {
+  BtButton,
+  BtCard,
+  BtGroup,
+  BtRow,
+  BtBadge,
+  BtHero,
+  BtSheet,
+  BtEmpty,
+  BtTypeTile,
+  BtSectionHeader,
+  BtPageLoader,
+  btToast,
+} from '../../components/ui';
 import { taskAPI, transactionAPI } from '../../api';
-import { Clock, PlusCircle, CheckCircle, Package, Briefcase, Edit2 } from 'lucide-react';
-import { colors, gradients } from '../../styles/designTokens';
+import {
+  Clock,
+  PlusCircle,
+  CheckCircle2,
+  Package,
+  Briefcase,
+  ChevronRight,
+  ArrowRight,
+  Sparkles,
+  Calendar,
+} from 'lucide-react';
+
+function formatCurrency(amount) {
+  return '₹' + Number(amount || 0).toLocaleString('en-IN', {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 2,
+  });
+}
+
+function relativeTime(dateStr) {
+  if (!dateStr) return '';
+  const now = new Date();
+  const d = new Date(dateStr);
+  const diff = now - d;
+  const mins = Math.floor(diff / 60000);
+  if (mins < 1) return 'Just now';
+  if (mins < 60) return `${mins}m ago`;
+  const hrs = Math.floor(mins / 60);
+  if (hrs < 24) return `${hrs}h ago`;
+  const days = Math.floor(hrs / 24);
+  if (days === 1) return 'Yesterday';
+  if (days < 7) return `${days}d ago`;
+  return d.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
+}
 
 export default function MasonDashboard() {
   const navigate = useNavigate();
@@ -14,193 +59,400 @@ export default function MasonDashboard() {
   const [tasks, setTasks] = useState([]);
   const [entries, setEntries] = useState([]);
 
-  useEffect(() => {
-    const loadData = async () => {
-      try {
-        const [taskRes, entryRes] = await Promise.all([
-          taskAPI.getDaily().catch(() => ({ data: [] })),
-          transactionAPI.getMine({ limit: 5 }).catch(() => ({ data: [] }))
-        ]);
-        const tData = taskRes.data?.data || taskRes.data?.tasks || taskRes.data;
-        setTasks(Array.isArray(tData) ? tData : []);
+  const loadData = async () => {
+    setLoading(true);
+    try {
+      const [taskRes, entryRes] = await Promise.all([
+        taskAPI.getDaily().catch(() => ({ data: [] })),
+        transactionAPI.getMine({ limit: 5 }).catch(() => ({ data: [] })),
+      ]);
 
-        const entriesData = entryRes.data?.data || entryRes.data?.transactions || entryRes.data;
-        setEntries(Array.isArray(entriesData) ? entriesData : []);
-      } catch (e) {
-        console.error(e);
-      } finally {
-        setLoading(false);
-      }
-    };
+      const tData = taskRes.data?.data || taskRes.data?.tasks || taskRes.data;
+      setTasks(Array.isArray(tData) ? tData : []);
+
+      const entriesData =
+        entryRes.data?.data || entryRes.data?.transactions || entryRes.data;
+      setEntries(Array.isArray(entriesData) ? entriesData : []);
+    } catch (e) {
+      console.error(e);
+      btToast.error('Failed to load dashboard data');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
     loadData();
   }, []);
 
   const handleTaskStatusChange = async (taskId, newStatus) => {
     try {
       await taskAPI.updateStatus(taskId, newStatus);
-      setTasks(prev => prev.map(t => t._id === taskId ? { ...t, status: newStatus } : t));
+      setTasks((prev) =>
+        prev.map((t) => (t._id === taskId ? { ...t, status: newStatus } : t))
+      );
+      btToast.success(`Status updated to ${newStatus}`);
     } catch (e) {
-      alert('Failed to update task status');
+      btToast.error('Failed to update task status');
     }
   };
 
-  const getStatusColor = (status) => {
-    if (status === 'Completed') return '#10B981'; // success
-    if (status === 'In Progress') return '#3B82F6'; // info
-    return '#F59E0B'; // warning
-  };
-
-  if (loading) {
-    return (
-      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '60vh', color: colors.textSecondary }}>
-        <div style={{ width: 40, height: 40, border: `3px solid ${colors.border}`, borderTopColor: colors.primary, borderRadius: '50%', animation: 'spin 1s linear infinite', marginBottom: 16 }} />
-        <div style={{ fontSize: 16, fontWeight: 600 }}>Loading Dashboard...</div>
-      </div>
-    );
-  }
+  const openTasks = useMemo(() => {
+    return tasks.filter((t) => t.status !== 'Completed').length;
+  }, [tasks]);
 
   const firstName = user?.name ? user.name.split(' ')[0] : 'Mason';
 
+  const todayLabel = new Intl.DateTimeFormat('en-IN', {
+    weekday: 'short',
+    day: 'numeric',
+    month: 'short',
+  }).format(new Date());
+
+  if (loading) {
+    return <BtPageLoader message="Loading dashboard…" />;
+  }
+
   return (
-    <div style={{ padding: '24px', maxWidth: 800, margin: '0 auto', width: '100%', display: 'flex', flexDirection: 'column', gap: 24, animation: 'fadeUp 300ms cubic-bezier(0.16, 1, 0.3, 1)' }}>
-
-      <div style={{
-        background: gradients.primaryGradient,
-        padding: 24,
-        borderRadius: 16,
-        color: '#fff',
-        boxShadow: '0 10px 25px rgba(249,115,22,0.2)'
-      }}>
-        <h1 style={{ fontSize: 28, margin: 0, fontWeight: 800, letterSpacing: '-0.02em' }}>
-          Good Morning, {firstName} 👋
-        </h1>
-        <p style={{ margin: '8px 0 0', opacity: 0.9, fontSize: 15 }}>
-          Ready for today's work? View your tasks and log updates below.
-        </p>
-      </div>
-
-      {/* Quick Actions */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
-        <Button
-          variant="primary"
-          size="lg"
-          icon={<PlusCircle size={20} />}
-          style={{ width: '100%', height: 60, fontSize: 16 }}
-          onClick={() => navigate('/update-progress')}
-        >
-          Add Daily Update
-        </Button>
-        <Button
-          variant="outline"
-          size="lg"
-          icon={<Package size={20} />}
-          style={{ width: '100%', height: 60, fontSize: 16 }}
-          onClick={() => navigate('/manualentry?type=material')}
-        >
-          Add Material Entry
-        </Button>
-      </div>
-
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: 24 }}>
-        {/* Assigned Tasks */}
-        <Card padding={24}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16 }}>
-            <Briefcase size={20} color={colors.primary} />
-            <h3 style={{ margin: 0, fontSize: 18, color: colors.textPrimary }}>Assigned Tasks</h3>
+    <div style={{ width: '100%', minHeight: '100%', display: 'flex', flexDirection: 'column' }}>
+      {/* ══════════════════════════════════════════════════════════
+          HERO (Blueprint Noir Surface)
+         ══════════════════════════════════════════════════════════ */}
+      <BtHero padding="32px 32px 56px">
+        <div style={{ maxWidth: 960, margin: '0 auto', width: '100%' }}>
+          <div
+            style={{
+              fontFamily: 'var(--font-mono)',
+              fontSize: '11px',
+              letterSpacing: '0.09em',
+              textTransform: 'uppercase',
+              color: 'var(--on-noir-3)',
+              marginBottom: '6px',
+            }}
+          >
+            DAILY LOG • {todayLabel}
           </div>
 
-          {tasks.length === 0 ? (
-            <div style={{ padding: 24, textAlign: 'center', color: colors.textSecondary, background: colors.background, borderRadius: 12 }}>
-              No specific tasks assigned for today.
-            </div>
-          ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-              {tasks.map(t => (
-                <div key={t._id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: 16, border: `1px solid ${colors.border}`, borderRadius: 12 }}>
-                  <div>
-                    <div style={{ fontWeight: 600, fontSize: 15, color: colors.textPrimary }}>{t.title}</div>
-                    {t.description && <div style={{ fontSize: 13, color: colors.textSecondary, marginTop: 4 }}>{t.description}</div>}
-                  </div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                    <select
-                      value={t.status || 'Pending'}
-                      onChange={(e) => handleTaskStatusChange(t._id, e.target.value)}
-                      style={{
-                        padding: '6px 12px',
-                        borderRadius: '20px',
-                        border: `1px solid ${getStatusColor(t.status || 'Pending')}`,
-                        backgroundColor: `${getStatusColor(t.status || 'Pending')}15`,
-                        color: getStatusColor(t.status || 'Pending'),
-                        fontWeight: 600,
-                        fontSize: 13,
-                        cursor: 'pointer',
-                        outline: 'none',
-                        appearance: 'none',
-                        textAlign: 'center'
-                      }}
-                    >
-                      <option value="Pending">Pending</option>
-                      <option value="In Progress">In Progress</option>
-                      <option value="Completed">Completed</option>
-                    </select>
-                    <button 
-                      onClick={() => navigate('/update-progress', { state: { taskId: t._id, projectId: t.project } })}
-                      style={{
-                        display: 'flex', alignItems: 'center', justifyContent: 'center',
-                        width: 32, height: 32, borderRadius: '50%',
-                        background: '#f8fafc', border: '1px solid #e2e8f0', cursor: 'pointer',
-                        color: colors.primary
-                      }}
-                      title="Update Progress"
-                    >
-                      <Edit2 size={14} />
-                    </button>
-                  </div>
+          <h1
+            style={{
+              margin: 0,
+              fontFamily: 'var(--font-display)',
+              fontSize: 'clamp(28px, 4vw, 42px)',
+              fontWeight: 800,
+              letterSpacing: '-0.03em',
+              color: 'var(--bone)',
+            }}
+          >
+            What did you do today?
+          </h1>
+
+          <p
+            style={{
+              margin: '8px 0 0',
+              fontFamily: 'var(--font-ui)',
+              fontSize: '15px',
+              color: 'var(--on-noir-2)',
+            }}
+          >
+            Ready for today's work, {firstName} 👋 • Log progress, photos, and material deliveries.
+          </p>
+        </div>
+      </BtHero>
+
+      {/* ══════════════════════════════════════════════════════════
+          SHEET (Bone Surface)
+         ══════════════════════════════════════════════════════════ */}
+      <BtSheet overlap={26} padding="28px 32px 64px">
+        <div
+          style={{
+            maxWidth: 960,
+            margin: '0 auto',
+            width: '100%',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '28px',
+          }}
+        >
+          {/* Big Action Buttons Row (Add Daily Update + Add Material Entry) */}
+          <div
+            style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
+              gap: '16px',
+            }}
+          >
+            {/* Primary Dark Ink Action Card */}
+            <div
+              onClick={() => navigate('/update-progress')}
+              style={{
+                background: 'var(--ink)',
+                borderRadius: 'var(--r-card)',
+                padding: '24px 22px',
+                color: 'var(--bone)',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '16px',
+                boxShadow: 'var(--shadow-card)',
+                transition: 'transform 180ms ease, box-shadow 180ms ease',
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.transform = 'translateY(-2px)';
+                e.currentTarget.style.boxShadow = '0 12px 30px rgba(17, 19, 23, 0.2)';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.transform = 'translateY(0)';
+                e.currentTarget.style.boxShadow = 'var(--shadow-card)';
+              }}
+            >
+              <div
+                style={{
+                  width: '48px',
+                  height: '48px',
+                  borderRadius: 'var(--r-tile)',
+                  background: 'var(--accent)',
+                  color: 'var(--on-accent, #111317)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  flexShrink: 0,
+                  boxShadow: '0 0 16px var(--accent-glow)',
+                }}
+              >
+                <PlusCircle size={24} strokeWidth={2.2} />
+              </div>
+
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div
+                  style={{
+                    fontFamily: 'var(--font-display)',
+                    fontSize: '18px',
+                    fontWeight: 700,
+                    color: 'var(--bone)',
+                  }}
+                >
+                  Add Daily Update
                 </div>
-              ))}
-            </div>
-          )}
-        </Card>
+                <div
+                  style={{
+                    fontFamily: 'var(--font-ui)',
+                    fontSize: '13px',
+                    color: 'var(--on-noir-2)',
+                    marginTop: '2px',
+                  }}
+                >
+                  Work done, photos, and site notes
+                </div>
+              </div>
 
-        {/* My Recent Entries */}
-        <Card padding={24}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16 }}>
-            <Clock size={20} color={colors.primary} />
-            <h3 style={{ margin: 0, fontSize: 18, color: colors.textPrimary }}>My Recent Entries</h3>
+              <ChevronRight size={18} color="var(--on-noir-3)" />
+            </div>
+
+            {/* Secondary White Card */}
+            <BtCard
+              onClick={() => navigate('/manualentry?type=material')}
+              padding="24px 22px"
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '16px',
+              }}
+            >
+              <div
+                style={{
+                  width: '48px',
+                  height: '48px',
+                  borderRadius: 'var(--r-tile)',
+                  background: 'var(--fill)',
+                  color: 'var(--ink)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  flexShrink: 0,
+                }}
+              >
+                <Package size={24} strokeWidth={1.8} />
+              </div>
+
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div
+                  style={{
+                    fontFamily: 'var(--font-display)',
+                    fontSize: '18px',
+                    fontWeight: 700,
+                    color: 'var(--ink)',
+                  }}
+                >
+                  Add Material Entry
+                </div>
+                <div
+                  style={{
+                    fontFamily: 'var(--font-ui)',
+                    fontSize: '13px',
+                    color: 'var(--ink-3)',
+                    marginTop: '2px',
+                  }}
+                >
+                  Cement bags, steel, bricks, sand…
+                </div>
+              </div>
+
+              <ChevronRight size={18} color="var(--ink-3)" />
+            </BtCard>
           </div>
 
-          {entries.length === 0 ? (
-            <div style={{ padding: 24, textAlign: 'center', color: colors.textSecondary, background: colors.background, borderRadius: 12 }}>
-              You haven't logged any entries yet.
-            </div>
-          ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-              {entries.map(e => {
-                const status = (e.approvalStatus || 'Pending').toLowerCase();
-                let badgeVariant = 'warning';
-                if (status === 'approved') badgeVariant = 'success';
-                if (status === 'rejected') badgeVariant = 'danger';
+          {/* Assigned Daily Tasks Section */}
+          <div>
+            <BtSectionHeader
+              title="Tasks Assigned"
+              action={openTasks > 0 ? `${openTasks} open` : undefined}
+            />
 
-                return (
-                  <div key={e._id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: 16, border: `1px solid ${colors.border}`, borderRadius: 12, cursor: 'pointer' }} onClick={() => navigate('/entry-detail', { state: { entry: e } })}>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                      <div style={{ fontWeight: 600, fontSize: 15, color: colors.textPrimary }}>{e.title || 'Entry'}</div>
-                      <div style={{ fontSize: 13, color: colors.textSecondary }}>Amount: ₹{e.amount}</div>
-                    </div>
-                    <Badge variant={badgeVariant}>
-                      {e.approvalStatus || 'Pending'}
-                    </Badge>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-          <Button variant="outline" style={{ width: '100%', marginTop: 16 }} onClick={() => navigate('/transaction')}>
-            View All Logs
-          </Button>
-        </Card>
-      </div>
+            {tasks.length === 0 ? (
+              <BtCard>
+                <BtEmpty
+                  icon={Briefcase}
+                  title="No tasks currently active."
+                  message="Tasks assigned by your site supervisor will appear here."
+                />
+              </BtCard>
+            ) : (
+              <BtGroup>
+                {tasks.map((task, idx) => {
+                  const isCompleted = task.status === 'Completed';
+                  const isInProgress = task.status === 'In Progress';
 
+                  return (
+                    <BtRow
+                      key={task._id || idx}
+                      icon={Briefcase}
+                      iconBg={
+                        isCompleted
+                          ? 'var(--tone-green-bg)'
+                          : isInProgress
+                          ? 'var(--tone-brand-bg)'
+                          : 'var(--fill)'
+                      }
+                      iconColor={
+                        isCompleted
+                          ? 'var(--tone-green)'
+                          : isInProgress
+                          ? 'var(--tone-brand)'
+                          : 'var(--ink)'
+                      }
+                      title={task.title}
+                      subtitle={task.description || 'Assigned task for today'}
+                      showChevron={false}
+                      rightContent={
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                          <select
+                            value={task.status || 'Pending'}
+                            onChange={(e) => handleTaskStatusChange(task._id, e.target.value)}
+                            style={{
+                              padding: '6px 12px',
+                              borderRadius: '16px',
+                              border: '1px solid var(--line)',
+                              background: isCompleted
+                                ? 'var(--tone-green-bg)'
+                                : isInProgress
+                                ? 'var(--tone-brand-bg)'
+                                : 'var(--fill)',
+                              color: isCompleted
+                                ? 'var(--tone-green)'
+                                : isInProgress
+                                ? 'var(--tone-brand)'
+                                : 'var(--ink)',
+                              fontFamily: 'var(--font-ui)',
+                              fontSize: '12px',
+                              fontWeight: 700,
+                              cursor: 'pointer',
+                              outline: 'none',
+                            }}
+                          >
+                            <option value="Pending">Pending</option>
+                            <option value="In Progress">In Progress</option>
+                            <option value="Completed">Completed</option>
+                          </select>
+
+                          <button
+                            type="button"
+                            onClick={() =>
+                              navigate('/update-progress', {
+                                state: { taskId: task._id, projectId: task.project },
+                              })
+                            }
+                            style={{
+                              background: 'none',
+                              border: 'none',
+                              color: 'var(--ink-2)',
+                              cursor: 'pointer',
+                              padding: '6px',
+                              borderRadius: '8px',
+                              display: 'flex',
+                              alignItems: 'center',
+                            }}
+                            title="Update progress"
+                          >
+                            <ChevronRight size={18} />
+                          </button>
+                        </div>
+                      }
+                    />
+                  );
+                })}
+              </BtGroup>
+            )}
+          </div>
+
+          {/* Recent Entries Section */}
+          <div>
+            <BtSectionHeader
+              title="Recent entries"
+              action="View all"
+              onAction={() => navigate('/transaction')}
+            />
+
+            {entries.length === 0 ? (
+              <BtCard>
+                <BtEmpty
+                  icon={Package}
+                  title="No entries yet"
+                  message="Daily logs and material receipts you record will appear here."
+                />
+              </BtCard>
+            ) : (
+              <BtGroup>
+                {entries.map((entry, idx) => {
+                  const amt = Number(entry.amount || entry.totalAmount || 0);
+
+                  return (
+                    <BtRow
+                      key={entry._id || entry.id || idx}
+                      icon={<BtTypeTile type={entry.type} size={38} />}
+                      title={entry.title || entry.name || entry.type || 'Entry'}
+                      subtitle={relativeTime(entry.date || entry.createdAt)}
+                      tag={
+                        <BtBadge
+                          label={entry.approvalStatus || 'Recorded'}
+                          tone={
+                            (entry.approvalStatus || '').toLowerCase() === 'approved'
+                              ? 'green'
+                              : (entry.approvalStatus || '').toLowerCase() === 'rejected'
+                              ? 'red'
+                              : 'amber'
+                          }
+                        />
+                      }
+                      amount={amt > 0 ? amt : undefined}
+                      onClick={() => navigate('/transaction')}
+                    />
+                  );
+                })}
+              </BtGroup>
+            )}
+          </div>
+        </div>
+      </BtSheet>
     </div>
   );
 }

@@ -1,34 +1,60 @@
+import React from "react";
+import { Package, Users, Wrench, TrendingUp } from "lucide-react";
+
 const TYPES = [
-  { key: "Materials", label: "Materials", icon: "🧱", desc: "Cement, steel, sand, bricks & more", color: "var(--color-primary, #F97316)", bg: "#FFF5F0" },
-  { key: "Wages",     label: "Labour",     icon: "👷", desc: "Worker wages & daily payments",   color: "#166534", bg: "#f0fdf4" },
-  { key: "Expense",   label: "Equipment",  icon: "🚜", desc: "Machinery, rentals & transport",  color: "var(--color-primary-hover, #EA580C)", bg: "#FFF7F0" },
-  { key: "Income",    label: "Income",     icon: "💰", desc: "Client payments & advances",      color: "#047857", bg: "#ecfdf5" },
+  { key: "Materials", label: "Materials", Icon: Package, desc: "Cement, steel, sand, bricks & more", color: "#2A78D6", bg: "rgba(42, 120, 214, 0.08)" },
+  { key: "Wages",     label: "Labour",     Icon: Users,   desc: "Worker wages & daily payments",   color: "#EB6834", bg: "rgba(235, 104, 52, 0.08)" },
+  { key: "Expense",   label: "Equipment",  Icon: Wrench,  desc: "Machinery, rentals & transport",  color: "#199E70", bg: "rgba(25, 158, 112, 0.08)" },
+  { key: "Income",    label: "Income",     Icon: TrendingUp, desc: "Client payments & advances",   color: "#10B981", bg: "rgba(16, 185, 129, 0.08)" },
 ];
 
 export default function EntryTypeSelector({ value, onChange }) {
   return (
     <div>
-      <div style={{ fontSize: 13, fontWeight: 600, color: "#444", marginBottom: 12 }}>Select Entry Type</div>
+      <div style={{ fontSize: 11, fontWeight: 800, color: "var(--ink, #111317)", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 12, fontFamily: "JetBrains Mono, monospace" }}>
+        SELECT ENTRY TYPE
+      </div>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: 12 }}>
         {TYPES.map(t => {
           const isActive = value === t.key;
+          const Icon = t.Icon;
           return (
             <div
               key={t.key}
               onClick={() => onChange(t.key)}
               style={{
-                padding: "18px 16px", borderRadius: 14, cursor: "pointer",
-                border: `2px solid ${isActive ? t.color : "#e5e5e5"}`,
-                background: isActive ? t.bg : "#fff",
-                transition: "all 0.15s",
-                boxShadow: isActive ? `0 2px 8px ${t.color}20` : "none",
+                padding: "16px 18px",
+                borderRadius: 14,
+                cursor: "pointer",
+                border: `1.5px solid ${isActive ? t.color : "var(--border, #E2E8F0)"}`,
+                background: isActive ? t.bg : "var(--card-bg, #FFFFFF)",
+                transition: "all 0.15s cubic-bezier(0.16, 1, 0.3, 1)",
+                boxShadow: isActive ? `0 4px 16px ${t.color}25` : "0 1px 3px rgba(0,0,0,0.02)",
               }}
             >
               <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 6 }}>
-                <span style={{ fontSize: 24 }}>{t.icon}</span>
-                <span style={{ fontSize: 15, fontWeight: 700, color: isActive ? t.color : "#1a1a1a" }}>{t.label}</span>
+                <div
+                  style={{
+                    width: 32,
+                    height: 32,
+                    borderRadius: 8,
+                    background: isActive ? t.color : "rgba(0,0,0,0.04)",
+                    color: isActive ? "#FFF" : t.color,
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    transition: "all 0.15s ease",
+                  }}
+                >
+                  <Icon size={17} />
+                </div>
+                <span style={{ fontSize: 14, fontWeight: 700, color: isActive ? t.color : "var(--ink, #111317)" }}>
+                  {t.label}
+                </span>
               </div>
-              <div style={{ fontSize: 12, color: "#888", lineHeight: 1.4 }}>{t.desc}</div>
+              <div style={{ fontSize: 12, color: "#64748B", lineHeight: 1.4 }}>
+                {t.desc}
+              </div>
             </div>
           );
         })}

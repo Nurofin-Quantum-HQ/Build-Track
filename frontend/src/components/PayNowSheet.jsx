@@ -12,7 +12,7 @@ import {
   X,
 } from "lucide-react";
 
-const primaryBlue = "var(--color-primary, #F97316)";
+const primaryBlue = "var(--ink, #111317)";
 
 const PAYMENT_METHODS = [
   { value: "UPI", icon: Smartphone },
@@ -185,7 +185,7 @@ export default function PayNowSheet({
       note: notes.trim(),
       requestEsign,
       clientEmail: clientEmail.trim(),
-      paymentDate: new Date(paymentDate).toISOString(),
+      paymentDate: paymentDate && !isNaN(new Date(paymentDate).getTime()) ? new Date(paymentDate).toISOString() : new Date().toISOString(),
       status: statusStr,
       receiptFile: receiptFile || null,
     });
@@ -259,7 +259,7 @@ export default function PayNowSheet({
               width: "100%",
               padding: 18,
               borderRadius: 18,
-              background: "linear-gradient(135deg, var(--color-primary, #F97316) 0%, var(--color-primary-hover, #EA580C) 100%)",
+              background: "var(--ink, #111317)", border: "1px solid rgba(255,255,255,0.12)", boxShadow: "0 4px 16px rgba(0,0,0,0.2)",
               marginBottom: 20,
             }}
           >
@@ -669,17 +669,17 @@ export default function PayNowSheet({
               flex: 5,
               height: 46,
               borderRadius: 11,
-              background: "linear-gradient(135deg, var(--color-primary, #F97316), var(--color-primary-hover, #EA580C))",
-              border: "none",
-              fontSize: 12,
+              background: "var(--ink, #111317)",
+              border: "1px solid rgba(255,255,255,0.2)",
+              fontSize: 13,
               fontWeight: 800,
-              color: "#FFF",
+              color: "#F6F4EF",
               cursor: "pointer",
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
               gap: 6,
-              boxShadow: "0 3px 8px rgba(249,115,22,0.25)",
+              boxShadow: "0 4px 12px rgba(0,0,0,0.25)",
             }}
           >
             <CheckCircle size={16} />

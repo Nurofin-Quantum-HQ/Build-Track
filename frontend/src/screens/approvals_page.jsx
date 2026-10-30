@@ -1,10 +1,34 @@
-import { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { colors, radius, typography } from '../styles/designTokens';
-import { Card, Badge, Button, Spinner, EmptyState, ErrorState, Toast, ConfirmDialog } from '../components/ui';
-import { approvalAPI, transactionAPI } from '../api';
-import { CheckCircle, ClipboardCheck, User, Building2, Package, HelpCircle, Image as ImageIcon, X } from 'lucide-react';
+import { approvalAPI } from '../api';
+import {
+  CheckCircle,
+  ClipboardCheck,
+  User,
+  Building2,
+  Package,
+  HelpCircle,
+  Image as ImageIcon,
+  X,
+  ArrowLeft,
+  Clock,
+  AlertCircle,
+  Check,
+  XCircle,
+  Eye,
+} from 'lucide-react';
 import ModuleTour from '../components/ModuleTour';
+import { Toast } from '../components/Toast';
+import ConfirmDialog from '../components/ui/ConfirmDialog';
+import BtHero from '../components/ui/BtHero';
+import BtSheet from '../components/ui/BtSheet';
+import BtCard from '../components/ui/BtCard';
+import BtBadge from '../components/ui/BtBadge';
+import BtButton from '../components/ui/BtButton';
+import BtPressable from '../components/ui/BtPressable';
+import BtEmpty from '../components/ui/BtEmpty';
+import BtSegmented from '../components/ui/BtSegmented';
+import BtCountUp from '../components/ui/BtCountUp';
 
 function formatCurrency(amount) {
   return '₹' + Number(amount || 0).toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 2 });
@@ -14,19 +38,14 @@ function formatDate(dateStr) {
   if (!dateStr) return '—';
   try {
     return new Date(dateStr).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
-  } catch { return dateStr; }
+  } catch {
+    return dateStr;
+  }
 }
-
-const typeStyles = {
-  Materials: { bg: '#FFF5F0', color: 'var(--color-primary, #F97316)' },
-  Wages: { bg: '#E8F5E9', color: '#2E7D32' },
-  Expense: { bg: '#FFF3E0', color: '#E65100' },
-  Income: { bg: '#FFF7F0', color: 'var(--color-primary-hover, #EA580C)' },
-};
 
 export default function ApprovalsPage() {
   const navigate = useNavigate();
-  const [tab, setTab] = useState('pending');
+  const [tab, setTab] = useState('pending'); // 'pending' | 'history'
   const [entries, setEntries] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -35,23 +54,22 @@ export default function ApprovalsPage() {
   const [toast, setToast] = useState({ message: '', type: 'info', key: 0 });
   const [confirmDlg, setConfirmDlg] = useState(null);
   const [lightbox, setLightbox] = useState(null);
-
   const [runTour, setRunTour] = useState(false);
-
 
   const tourSteps = [
     { target: '.tour-header', content: 'Review and approve project entries submitted by your team.', disableBeacon: true },
     { target: '.tour-tabs', content: 'Toggle between pending approvals and your history.' },
-    { target: '.tour-list', content: 'Approve or reject entries from this list.' }
+    { target: '.tour-list', content: 'Approve or reject entries directly with one click.' },
   ];
 
   const fetchEntries = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      const res = tab === 'pending'
-        ? await approvalAPI.getPending()
-        : await approvalAPI.getHistory();
+      const res =
+        tab === 'pending'
+          ? await approvalAPI.getPending()
+          : await approvalAPI.getHistory();
       const data = res.data?.entries || res.data?.transactions || res.data || [];
       setEntries(Array.isArray(data) ? data : []);
     } catch (err) {
@@ -62,7 +80,9 @@ export default function ApprovalsPage() {
     }
   }, [tab]);
 
-  useEffect(() => { fetchEntries(); }, [fetchEntries]);
+  useEffect(() => {
+    fetchEntries();
+  }, [fetchEntries]);
 
   const handleApprove = async (id) => {
     setApproving(id);
@@ -78,9 +98,11 @@ export default function ApprovalsPage() {
   };
 
   const handleReject = async (id) => {
+    const reason = window.prompt('Enter rejection reason:');
+    if (reason === null) return;
     setRejecting(id);
     try {
-      await approvalAPI.reject(id, 'Rejected by manager');
+      await approvalAPI.reject(id, reason || 'Rejected by manager');
       setToast({ message: 'Entry rejected', type: 'info', key: Date.now() });
       setEntries((prev) => prev.filter((e) => (e._id || e.id) !== id));
     } catch (err) {
@@ -90,12 +112,15 @@ export default function ApprovalsPage() {
     }
   };
 
-  const showNotify = (msg, type) => {
-    setToast({ message: msg, type, key: Date.now() });
-  };
+  const pendingTotal = entries.reduce((sum, e) => sum + (e.amount || 0), 0);
+
+  const segmentedTabs = [
+    { label: tab === 'pending' && entries.length > 0 ? `To Approve (${entries.length})` : 'To Approve', value: 'pending' },
+    { label: 'History', value: 'history' },
+  ];
 
   return (
-    <div style={{ padding: '24px 28px', maxWidth: 900, margin: '0 auto' }}>
+    <div style={{ minHeight: '100vh', background: 'var(--ground)' }}>
       <ModuleTour steps={tourSteps} run={runTour} setRun={setRunTour} moduleName="ApprovalDashboard" />
       <Toast
         key={toast.key}
@@ -112,142 +137,408 @@ export default function ApprovalsPage() {
         confirmLabel={confirmDlg?.confirmLabel}
       />
 
-      <div className="tour-header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 24 }}>
-        <h2 style={{ fontSize: 22, fontWeight: 800, color: colors.textPrimary, margin: 0 }}>
-          Approvals
-        </h2>
-        <button onClick={() => setRunTour(true)} title="Help" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 36, height: 36, background: '#fff', border: '1px solid #E5E7EB', borderRadius: 8, cursor: 'pointer' }}>
-          <HelpCircle size={16} color={colors.textLight} />
-        </button>
-      </div>
+      {/* ── TOP HERO (Deep Noir with blueprint grid) ── */}
+      <BtHero padding="24px 32px 48px">
+        <div
+          className="tour-header"
+          style={{
+            display: 'flex',
+            alignItems: 'flex-start',
+            justifyContent: 'space-between',
+            gap: 16,
+            flexWrap: 'wrap',
+            marginBottom: 20,
+          }}
+        >
+          <div>
+            <div
+              style={{
+                fontFamily: 'var(--font-mono)',
+                fontSize: 11,
+                letterSpacing: '0.08em',
+                color: 'var(--on-noir-2)',
+                textTransform: 'uppercase',
+                fontWeight: 600,
+                marginBottom: 4,
+              }}
+            >
+              Inbox &amp; Sign-Offs
+            </div>
+            <h1
+              style={{
+                fontFamily: 'var(--font-display)',
+                fontSize: 34,
+                fontWeight: 700,
+                letterSpacing: '-0.02em',
+                color: 'var(--bone)',
+                margin: 0,
+                lineHeight: 1.15,
+              }}
+            >
+              Approvals
+            </h1>
+            <p style={{ fontSize: 13, color: 'var(--on-noir-2)', margin: '4px 0 0' }}>
+              Review and verify submitted expenses, materials, and daily site updates
+            </p>
+          </div>
 
-      <div className="tour-tabs" style={{ display: 'flex', gap: 8, marginBottom: 20 }}>
-        {['pending', 'history'].map((t) => (
-          <button
-            key={t}
-            onClick={() => setTab(t)}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <button
+              onClick={() => setRunTour(true)}
+              title="Help Tour"
+              style={{
+                width: 38,
+                height: 38,
+                borderRadius: 'var(--r-btn, 12px)',
+                background: 'rgba(255, 255, 255, 0.08)',
+                border: '1px solid rgba(255, 255, 255, 0.12)',
+                color: 'var(--bone)',
+                display: 'grid',
+                placeItems: 'center',
+                cursor: 'pointer',
+              }}
+            >
+              <HelpCircle size={17} />
+            </button>
+          </div>
+        </div>
+
+        {/* Hero Segmented Switcher & Total Waiting Banner */}
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            flexWrap: 'wrap',
+            gap: 16,
+            marginTop: 8,
+          }}
+        >
+          <div className="tour-tabs">
+            <BtSegmented
+              options={segmentedTabs}
+              value={tab}
+              onChange={(val) => setTab(val)}
+            />
+          </div>
+
+          {tab === 'pending' && entries.length > 0 && (
+            <div style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
+              <span style={{ fontSize: 12.5, color: 'var(--on-noir-2)', fontFamily: 'var(--font-ui)' }}>
+                Waiting for sign-off:
+              </span>
+              <span
+                style={{
+                  fontFamily: 'var(--font-display)',
+                  fontSize: 22,
+                  fontWeight: 700,
+                  color: 'var(--bone)',
+                  fontVariantNumeric: 'tabular-nums',
+                }}
+              >
+                <BtCountUp value={pendingTotal} format={formatCurrency} />
+              </span>
+            </div>
+          )}
+        </div>
+      </BtHero>
+
+      {/* ── MAIN CONTENT (Overlapping BtSheet) ── */}
+      <BtSheet overlap={26} padding="28px 32px 64px">
+        {loading ? (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+            {[1, 2, 3].map((i) => (
+              <div
+                key={i}
+                style={{
+                  height: 110,
+                  borderRadius: 'var(--r-card)',
+                  background: 'var(--fill)',
+                  animation: 'pulse 1.4s ease-in-out infinite',
+                }}
+              />
+            ))}
+          </div>
+        ) : error ? (
+          <div
             style={{
-              padding: '8px 20px',
-              borderRadius: radius.sm,
-              background: tab === t ? colors.primaryBlue : colors.cardBg,
-              color: tab === t ? '#FFF' : colors.textSecondary,
-              fontWeight: 600,
-              fontSize: 14,
-              cursor: 'pointer',
-              transition: 'all 0.15s',
-              border: tab === t ? 'none' : `1px solid ${colors.cardBorder}`,
+              padding: 24,
+              borderRadius: 'var(--r-card)',
+              background: '#FEE2E2',
+              color: '#991B1B',
+              textAlign: 'center',
             }}
           >
-            {t === 'pending' ? 'Pending' : 'History'}
-          </button>
-        ))}
-      </div>
+            <AlertCircle size={24} style={{ margin: '0 auto 8px' }} />
+            <div style={{ fontWeight: 600 }}>{error}</div>
+            <button
+              onClick={fetchEntries}
+              style={{
+                marginTop: 12,
+                padding: '6px 14px',
+                borderRadius: 8,
+                background: '#991B1B',
+                color: '#FFF',
+                border: 'none',
+                fontWeight: 600,
+                cursor: 'pointer',
+              }}
+            >
+              Retry
+            </button>
+          </div>
+        ) : entries.length === 0 ? (
+          <BtEmpty
+            title={tab === 'pending' ? 'All caught up!' : 'No approval history yet'}
+            message={
+              tab === 'pending'
+                ? 'No items are currently waiting for your review. Team submissions will appear here.'
+                : 'Items that you approve or reject will be archived here for record keeping.'
+            }
+          />
+        ) : (
+          <div className="tour-list" style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+            {entries.map((entry) => {
+              const id = entry._id || entry.id;
+              const projectName =
+                entry.project?.name || entry.projectName || (typeof entry.project === 'string' ? entry.project : 'Project');
+              const creatorName =
+                entry.createdBy?.name || entry.userName || (typeof entry.user === 'string' ? entry.user : 'Team Member');
+              const type = entry.type || entry.category || 'Materials';
+              const isPending = (entry.approvalStatus || 'pending').toLowerCase() === 'pending';
 
-      {loading ? (
-        <Spinner style={{ padding: 60 }} />
-      ) : error ? (
-        <ErrorState message={error} onRetry={fetchEntries} />
-      ) : entries.length === 0 ? (
-        <EmptyState
-          icon={tab === 'pending' ? <CheckCircle size={48} /> : <ClipboardCheck size={48} />}
-          title={tab === 'pending' ? 'No Pending Approvals' : 'No Approval History'}
-          description={tab === 'pending'
-            ? 'All entries have been reviewed. Great job!'
-            : 'No approval history found.'}
-        />
-      ) : (
-        <div className="tour-list" style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-          {entries.map((entry) => {
-            const id = entry._id || entry.id;
-            const type = typeStyles[entry.type] || typeStyles.Materials;
-            const amount = Number(entry.amount || entry.totalAmount || 0);
-            const isPending = tab === 'pending';
-            const photos = Array.isArray(entry.photos) ? entry.photos : (entry.photo ? [entry.photo] : (entry.images || []));
-            const hasPhotos = photos.length > 0;
+              const typeTones = {
+                material: 'info',
+                labour: 'warn',
+                equipment: 'good',
+                wages: 'warn',
+                expense: 'muted',
+              };
 
-            return (
-              <Card key={id} hoverable onClick={() => navigate('/entry-detail', { state: { entry, isPending } })}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
-                  <div style={{
-                    width: 44, height: 44, borderRadius: 12,
-                    backgroundColor: type.bg, display: 'flex',
-                    alignItems: 'center', justifyContent: 'center',
-                    fontSize: 20, flexShrink: 0,
-                  }}>
-                    {entry.type === 'Wages' ? <User size={18} /> : entry.type === 'Expense' ? <Building2 size={18} /> : <Package size={18} />}
-                  </div>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
-                      <span style={{ fontSize: 15, fontWeight: 700, color: colors.textPrimary, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                        {entry.title || entry.name || 'Untitled'}
+              return (
+                <BtCard
+                  key={id}
+                  padding="20px 24px"
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    flexWrap: 'wrap',
+                    gap: 16,
+                  }}
+                >
+                  {/* Left: Info */}
+                  <div style={{ flex: '1 1 300px', minWidth: 0 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
+                      <BtBadge tone={typeTones[type.toLowerCase()] || 'muted'}>
+                        {type.toUpperCase()}
+                      </BtBadge>
+                      <span style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--ink-soft)' }}>
+                        {projectName}
                       </span>
-                      <Badge variant={entry.type === 'Wages' ? 'success' : entry.type === 'Expense' ? 'warning' : 'info'} style={{ fontSize: 10 }}>
-                        {entry.type === 'Wages' ? 'Labour' : entry.type === 'Expense' ? 'Equipment' : entry.type || 'N/A'}
-                      </Badge>
+                      <span style={{ fontSize: 12.5, color: 'var(--ink-soft)' }}>·</span>
+                      <span style={{ fontSize: 12.5, color: 'var(--ink-soft)' }}>
+                        {formatDate(entry.date || entry.createdAt)}
+                      </span>
                     </div>
-                    <div style={{ display: 'flex', gap: 16, fontSize: 13, color: colors.textSecondary }}>
-                      <span>{formatDate(entry.date || entry.createdAt)}</span>
-                      <span>{entry.projectName || entry.project || '—'}</span>
-                      {hasPhotos && (
-                        <span onClick={(e) => { e.stopPropagation(); setLightbox({ photos, index: 0 }); }} style={{ color: 'var(--color-primary, #F97316)', display: 'flex', alignItems: 'center', gap: 4, cursor: 'pointer', fontWeight: 600 }}>
-                          <ImageIcon size={14} /> View Proof
-                        </span>
+
+                    <div
+                      style={{
+                        fontSize: 16,
+                        fontWeight: 700,
+                        color: 'var(--ink)',
+                        marginBottom: 4,
+                        fontFamily: 'var(--font-ui)',
+                      }}
+                    >
+                      {entry.description || entry.title || 'Expense entry'}
+                    </div>
+
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 12, fontSize: 12.5, color: 'var(--ink-soft)' }}>
+                      <span>Submitted by: <strong style={{ color: 'var(--ink)' }}>{creatorName}</strong></span>
+                      {entry.billPhoto && (
+                        <button
+                          onClick={() => setLightbox(entry.billPhoto)}
+                          style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: 4,
+                            background: 'none',
+                            border: 'none',
+                            color: 'var(--accent-ink)',
+                            fontWeight: 600,
+                            cursor: 'pointer',
+                            padding: 0,
+                          }}
+                        >
+                          <ImageIcon size={13} />
+                          <span>View Receipt</span>
+                        </button>
                       )}
                     </div>
                   </div>
-                  <div style={{ textAlign: 'right', flexShrink: 0 }}>
-                    <div style={{ fontSize: 16, fontWeight: 800, color: colors.textPrimary }}>
-                      {formatCurrency(amount)}
+
+                  {/* Right: Amount & Actions */}
+                  <div
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 16,
+                      flexWrap: 'wrap',
+                      marginLeft: 'auto',
+                    }}
+                  >
+                    <div style={{ textAlign: 'right' }}>
+                      <div
+                        style={{
+                          fontSize: 11,
+                          fontFamily: 'var(--font-mono)',
+                          color: 'var(--ink-soft)',
+                          textTransform: 'uppercase',
+                        }}
+                      >
+                        Amount
+                      </div>
+                      <div
+                        style={{
+                          fontFamily: 'var(--font-display)',
+                          fontSize: 22,
+                          fontWeight: 700,
+                          color: 'var(--ink)',
+                          fontVariantNumeric: 'tabular-nums',
+                        }}
+                      >
+                        {formatCurrency(entry.amount)}
+                      </div>
                     </div>
-                    {isPending && (
-                      <div style={{ display: 'flex', gap: 6, marginTop: 8 }}>
+
+                    {tab === 'pending' && (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                         <button
-                          onClick={(e) => { e.stopPropagation(); handleApprove(id); }}
-                          disabled={approving === id}
+                          onClick={() => handleReject(id)}
+                          disabled={rejecting === id || approving === id}
                           style={{
-                            padding: '4px 12px', borderRadius: 6, border: 'none',
-                            background: colors.success, color: '#FFF',
-                            fontSize: 12, fontWeight: 600, cursor: 'pointer',
-                            opacity: approving === id ? 0.5 : 1,
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: 6,
+                            height: 38,
+                            padding: '0 14px',
+                            borderRadius: 'var(--r-btn, 12px)',
+                            background: '#FFFFFF',
+                            border: '1px solid var(--line)',
+                            color: 'var(--danger)',
+                            fontWeight: 600,
+                            fontSize: 13,
+                            cursor: 'pointer',
+                            transition: 'background 150ms ease',
                           }}
+                          onMouseEnter={(e) => (e.currentTarget.style.background = '#FEE2E2')}
+                          onMouseLeave={(e) => (e.currentTarget.style.background = '#FFFFFF')}
                         >
-                          {approving === id ? '...' : 'Approve'}
+                          <X size={15} />
+                          <span>Reject</span>
                         </button>
+
                         <button
-                          onClick={(e) => { e.stopPropagation(); handleReject(id); }}
-                          disabled={rejecting === id}
+                          onClick={() => handleApprove(id)}
+                          disabled={approving === id || rejecting === id}
                           style={{
-                            padding: '4px 12px', borderRadius: 6, border: 'none',
-                            background: colors.error, color: '#FFF',
-                            fontSize: 12, fontWeight: 600, cursor: 'pointer',
-                            opacity: rejecting === id ? 0.5 : 1,
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: 6,
+                            height: 38,
+                            padding: '0 18px',
+                            borderRadius: 'var(--r-btn, 12px)',
+                            background: 'var(--ink)',
+                            border: 'none',
+                            color: '#FFFFFF',
+                            fontWeight: 700,
+                            fontSize: 13,
+                            cursor: 'pointer',
+                            boxShadow: '0 1px 3px rgba(12, 14, 18, 0.1)',
+                            transition: 'transform 150ms ease',
                           }}
+                          onMouseEnter={(e) => (e.currentTarget.style.transform = 'scale(1.02)')}
+                          onMouseLeave={(e) => (e.currentTarget.style.transform = 'scale(1)')}
                         >
-                          {rejecting === id ? '...' : 'Reject'}
+                          <Check size={15} />
+                          <span>Approve</span>
                         </button>
                       </div>
                     )}
-                  </div>
-                </div>
-              </Card>
-            );
-          })}
-        </div>
-      )}
 
-      {lightbox && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.85)', zIndex: 9999, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: 24 }} onClick={() => setLightbox(null)}>
-          <div style={{ position: 'absolute', top: 20, right: 20, cursor: 'pointer', background: 'rgba(255,255,255,0.2)', padding: 8, borderRadius: '50%' }} onClick={() => setLightbox(null)}>
-            <X color="#FFF" size={24} />
+                    {tab === 'history' && (
+                      <BtBadge
+                        tone={
+                          (entry.approvalStatus || '').toLowerCase() === 'approved'
+                            ? 'good'
+                            : 'bad'
+                        }
+                      >
+                        {entry.approvalStatus || 'Resolved'}
+                      </BtBadge>
+                    )}
+                  </div>
+                </BtCard>
+              );
+            })}
           </div>
-          <img src={lightbox.photos[lightbox.index]} alt="Proof" style={{ maxWidth: '100%', maxHeight: '80vh', objectFit: 'contain', borderRadius: 8 }} onClick={e => e.stopPropagation()} />
-          {lightbox.photos.length > 1 && (
-            <div style={{ display: 'flex', gap: 12, marginTop: 16 }} onClick={e => e.stopPropagation()}>
-              {lightbox.photos.map((p, i) => (
-                <div key={i} onClick={() => setLightbox({ ...lightbox, index: i })} style={{ width: 60, height: 60, borderRadius: 8, border: lightbox.index === i ? '2px solid var(--color-primary, #F97316)' : '2px solid transparent', cursor: 'pointer', backgroundImage: `url(${p})`, backgroundSize: 'cover', backgroundPosition: 'center' }} />
-              ))}
-            </div>
-          )}
+        )}
+      </BtSheet>
+
+      {/* Lightbox for Receipt / Bill Photo */}
+      {lightbox && (
+        <div
+          onClick={() => setLightbox(null)}
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(12, 14, 18, 0.75)',
+            backdropFilter: 'blur(4px)',
+            zIndex: 1100,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: 24,
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              maxWidth: '90vw',
+              maxHeight: '90vh',
+              background: '#FFFFFF',
+              borderRadius: 'var(--r-card)',
+              overflow: 'hidden',
+              position: 'relative',
+              boxShadow: '0 25px 50px rgba(0,0,0,0.3)',
+            }}
+          >
+            <button
+              onClick={() => setLightbox(null)}
+              style={{
+                position: 'absolute',
+                top: 12,
+                right: 12,
+                background: 'rgba(0,0,0,0.6)',
+                color: '#FFF',
+                border: 'none',
+                width: 32,
+                height: 32,
+                borderRadius: '50%',
+                display: 'grid',
+                placeItems: 'center',
+                cursor: 'pointer',
+              }}
+            >
+              <X size={18} />
+            </button>
+            <img
+              src={lightbox}
+              alt="Receipt attachment"
+              style={{ maxWidth: '100%', maxHeight: '85vh', objectFit: 'contain', display: 'block' }}
+            />
+          </div>
         </div>
       )}
     </div>

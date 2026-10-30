@@ -14,6 +14,8 @@ import ModuleTour from '../components/ModuleTour';
 import VoiceReviewSheet from '../components/VoiceReviewSheet';
 import Button from '../components/ui/Button';
 import Badge from '../components/ui/Badge';
+import BtHero from '../components/ui/BtHero';
+import BtSheet from '../components/ui/BtSheet';
 import { useAuth } from '../contexts/AuthContext';
 
 const STATUS = {
@@ -30,9 +32,9 @@ const STATUS = {
 };
 
 const ENTRY_TYPES = [
-  { id: 'material', label: 'Material', icon: 'material', color: 'var(--color-primary, #F97316)' },
-  { id: 'labor', label: 'Labor', icon: 'labor', color: 'var(--color-primary-hover, #EA580C)' },
-  { id: 'equipment', label: 'Equipment', icon: 'equipment', color: 'var(--color-primary-light, #FB923C)' },
+  { id: 'material', label: 'Material', icon: 'material', color: '#2A78D6' },
+  { id: 'labor', label: 'Labor', icon: 'labor', color: '#EB6834' },
+  { id: 'equipment', label: 'Equipment', icon: 'equipment', color: '#199E70' },
 ];
 
 const typeIcons = {
@@ -428,50 +430,77 @@ export default function VoiceAssistantPage() {
 
       <ModuleTour steps={tourSteps} run={runTour} setRun={setRunTour} moduleName="VoiceEntry" />
 
-      <div className="tour-header" style={{
-        padding: '14px 24px', display: 'flex', alignItems: 'center',
-        gap: 16, flexShrink: 0, zIndex: 10,
-      }}>
-        <button onClick={() => navigate(-1)}
-          className="premium-topbar-btn"
-          style={{
-            width: 38, height: 38, borderRadius: 10,
-          }}
-          aria-label="Go Back"
-        >
-          <ArrowLeft size={16} />
-        </button>
-        <div style={{ flex: 1 }}>
-          <div style={{ fontSize: 16, fontWeight: 700, color: colors.textPrimary, letterSpacing: '-0.02em' }}>
-            {isContext ? 'Set Entry Context' : isCompleted ? 'Success' : 'BuildTrack AI'}
-          </div>
-          <div style={{ fontSize: 13, color: colors.textSecondary, marginTop: 2 }}>
-            {isContext
-              ? 'Specify project location, floor, phase & construction activity'
+      <div className="tour-header">
+        <BtHero
+          eyebrow="FIELD OPERATIONS · AI FOREMAN"
+          title={isContext ? "Set Entry Context" : isCompleted ? "Success" : "Voice Assistant"}
+          subtitle={
+            isContext
+              ? "Specify project location, floor, phase & construction activity"
               : isListening
               ? `Listening... ${formatTime(sessionElapsed)}`
               : isProcessing
-              ? 'Analyzing voice input...'
+              ? "Analyzing voice input..."
               : isCompleted
-              ? 'Entry saved successfully'
-              : 'AI Voice Entry'}
-          </div>
-        </div>
-        <button onClick={() => setRunTour(true)} title="Help" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 36, height: 36, background: '#fff', border: '1px solid #E5E7EB', borderRadius: 8, cursor: 'pointer', flexShrink: 0 }}>
-          <HelpCircle size={16} color={colors.textLight} />
-        </button>
-        {isListening && (
-          <div style={{
-            display: 'flex', alignItems: 'center', gap: 6,
-            padding: '6px 14px', borderRadius: 20,
-            background: '#FEE2E2', border: '1px solid #FCA5A5',
-            fontSize: 12, fontWeight: 700, color: '#DC2626',
-          }}>
-            <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#EF4444', animation: 'orbPulse 1.5s ease-in-out infinite' }} />
-            REC {formatTime(sessionElapsed)}
-          </div>
-        )}
+              ? "Entry saved successfully"
+              : "Hands-free construction daily entries powered by voice recognition."
+          }
+          actions={
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <button
+                onClick={() => navigate(-1)}
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: 6,
+                  padding: "8px 14px",
+                  borderRadius: 10,
+                  background: "rgba(255, 255, 255, 0.08)",
+                  border: "1px solid rgba(255, 255, 255, 0.15)",
+                  color: "#F6F4EF",
+                  fontSize: 13,
+                  fontWeight: 600,
+                  cursor: "pointer",
+                }}
+              >
+                <ArrowLeft size={15} />
+                <span>Back</span>
+              </button>
+              <button
+                onClick={() => setRunTour(true)}
+                title="Help"
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  width: 36,
+                  height: 36,
+                  background: "rgba(255, 255, 255, 0.08)",
+                  border: "1px solid rgba(255, 255, 255, 0.15)",
+                  borderRadius: 10,
+                  color: "#F6F4EF",
+                  cursor: "pointer",
+                }}
+              >
+                <HelpCircle size={16} />
+              </button>
+              {isListening && (
+                <div style={{
+                  display: "flex", alignItems: "center", gap: 6,
+                  padding: "6px 14px", borderRadius: 20,
+                  background: "#FEE2E2", border: "1px solid #FCA5A5",
+                  fontSize: 12, fontWeight: 700, color: "#DC2626",
+                }}>
+                  <span style={{ width: 6, height: 6, borderRadius: "50%", background: "#EF4444", animation: "orbPulse 1.5s ease-in-out infinite" }} />
+                  REC {formatTime(sessionElapsed)}
+                </div>
+              )}
+            </div>
+          }
+        />
       </div>
+
+      <BtSheet overlap={26}>
 
       <div style={{
         flex: 1, overflowY: 'auto', padding: '32px 24px',
@@ -502,7 +531,7 @@ export default function VoiceAssistantPage() {
                     fontWeight: 700, fontSize: 13, cursor: isListening ? 'not-allowed' : 'pointer',
                     textTransform: 'capitalize', opacity: isListening ? 0.6 : 1,
                     background: entryType === t.id
-                      ? gradients.primaryGradient
+                      ? (t.id === 'material' ? '#2A78D6' : t.id === 'labor' ? '#EB6834' : '#199E70')
                       : 'transparent',
                     color: entryType === t.id ? '#FFF' : colors.textSecondary,
                     display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
@@ -596,10 +625,11 @@ export default function VoiceAssistantPage() {
                     onClick={handleStartListening}
                     style={{
                       width: 90, height: 90, borderRadius: '50%', margin: '0 auto 20px',
-                      background: gradients.primaryGradient,
+                      background: 'var(--ink, #111317)',
+                      border: '2px solid rgba(224, 169, 59, 0.4)',
                       display: 'flex', alignItems: 'center', justifyContent: 'center',
                       cursor: 'pointer',
-                      boxShadow: '0 10px 24px rgba(249, 115, 22, 0.25)',
+                      boxShadow: '0 10px 24px rgba(0, 0, 0, 0.3)',
                       transition: 'all 200ms cubic-bezier(0.16, 1, 0.3, 1)',
                     }}
                     className="hover-scale"
@@ -893,15 +923,16 @@ export default function VoiceAssistantPage() {
             style={{
               width: isListening ? 68 : 76,
               height: isListening ? 68 : 76,
-              borderRadius: '50%', border: 'none',
+              borderRadius: '50%',
               background: isListening
                 ? 'linear-gradient(135deg, #EF4444, #DC2626)'
-                : gradients.primaryGradient,
+                : 'var(--ink, #111317)',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
               cursor: 'pointer',
+              border: '2px solid rgba(224, 169, 59, 0.4)',
               boxShadow: isListening
                 ? '0 6px 20px rgba(239,68,68,0.4)'
-                : '0 8px 30px rgba(249, 115, 22, 0.3)',
+                : '0 8px 30px rgba(0, 0, 0, 0.3)',
               transition: 'all 200ms cubic-bezier(0.16, 1, 0.3, 1)',
             }}
             className="hover-scale"
@@ -916,6 +947,8 @@ export default function VoiceAssistantPage() {
           </button>
         </div>
       )}
+
+      </BtSheet>
 
       <VoiceReviewSheet
         key={showReview ? 'review-open' : 'review-closed'}

@@ -57,14 +57,22 @@ export function AuthProvider({ children }) {
     }
   }, []);
 
-  const login = useCallback(async (email, password) => {
-    const res = await authAPI.login({ email, password });
-    const data = res.data;
-    const t = data.token || data.accessToken;
-    let u = data.user || data;
+  const login = useCallback(async (emailOrToken, passwordOrUser) => {
+    let t, u;
+    
+    // Support both login(email, password) and login(token, user)
+    if (typeof passwordOrUser === 'string') {
+      const res = await authAPI.login({ email: emailOrToken, password: passwordOrUser });
+      const data = res.data;
+      t = data.token || data.accessToken;
+      u = data.user || data;
+    } else {
+      t = emailOrToken;
+      u = passwordOrUser;
+    }
     
     // Set token immediately so subsequent API calls use the new token
-    localStorage.setItem('bt_token', t);
+    if (t) localStorage.setItem('bt_token', t);
 
     if (u && (!u.onboarding || !u.onboarding.visitedModules || u.onboarding.visitedModules.length === 0)) {
       try {
@@ -83,7 +91,7 @@ export function AuthProvider({ children }) {
       } catch (e) {}
     }
 
-    localStorage.setItem('bt_user', JSON.stringify(u));
+    if (u) localStorage.setItem('bt_user', JSON.stringify(u));
     setToken(t);
     setUser(u);
     setLoading(false);

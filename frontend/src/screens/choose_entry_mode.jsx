@@ -1,105 +1,347 @@
-import { useState, useEffect } from "react";
-import { useNavigate, useLocation } from "react-router-dom";
-import { Mic, FileText } from "lucide-react";
+import React, { useState } from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
+import {
+  BtHero,
+  BtSheet,
+  BtButton,
+  BtCard,
+  BtBadge,
+  BtTile,
+  BtSectionHeader,
+} from '../components/ui';
+import {
+  Mic,
+  Keyboard,
+  ArrowLeft,
+  CheckCircle2,
+  Check,
+  Building2,
+  Layers,
+  ChevronRight,
+} from 'lucide-react';
 
 export default function ChooseEntryMode() {
   const navigate = useNavigate();
   const location = useLocation();
-  const project = location.state?.project || null;
-  const [hovered, setHovered] = useState(null);
-  const [selected, setSelected] = useState(null);
-  const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
+  const state = location.state || {};
+  const project = state.project || null;
+  const entryType = state.type || 'material';
 
-  useEffect(() => {
-    const onResize = () => setIsMobile(window.innerWidth < 768);
-    window.addEventListener("resize", onResize);
-    return () => window.removeEventListener("resize", onResize);
-  }, []);
+  const typeLabels = {
+    material: 'Material',
+    labour: 'Labour',
+    equipment: 'Equipment',
+  };
 
-  useEffect(() => {
-    if (!selected) return;
-    const timer = setTimeout(() => {
-      if (selected === "voice") navigate("/voice", { state: { project } });
-      else navigate("/manualentry", { state: { project } });
-    }, 400);
-    return () => clearTimeout(timer);
-  }, [selected, navigate, project]);
+  const typeLabel = typeLabels[entryType] || 'Material';
 
-  const modes = [
-    {
-      key: "voice",
-      icon: <Mic size={28} />,
-      title: "Voice Entry",
-      desc: "Use speech-to-text for quick hands-free data entry",
-      color: "var(--color-primary-hover, #EA580C)",
-      bgColor: "#FFF7F0",
-      features: ["Natural speech input", "AI extracts quantities & costs", "Smart categorization"],
-    },
-    {
-      key: "manual",
-      icon: <FileText size={28} />,
-      title: "Manual Entry",
-      desc: "Fill in transaction details manually with precision",
-      color: "var(--color-primary, #F97316)",
-      bgColor: "#FFF5F0",
-      features: ["Structured form input", "Per-item transaction fields", "Full control over data"],
-    },
+  const handleSelectMode = (mode) => {
+    if (mode === 'voice') {
+      navigate('/voice', { state: { project, type: entryType } });
+    } else {
+      navigate(`/manualentry?type=${entryType}`, { state: { project } });
+    }
+  };
+
+  const contextItems = [
+    { label: 'Project', value: project?.projectName || project?.name || 'Selected Project' },
+    { label: 'Floor', value: state.floor || project?.floors?.[0] || 'Ground Floor' },
+    { label: 'Phase', value: state.phase || 'Active Phase' },
+    { label: 'Activity', value: state.activity || 'General Works' },
   ];
 
   return (
-    <div style={{ minHeight: "100vh", background: "#F8FAFC", fontFamily: "Inter, 'Segoe UI', sans-serif", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: 24 }}>
-      <div style={{ textAlign: "center", marginBottom: 36 }}>
-        <h1 style={{ fontSize: 26, fontWeight: 700, color: "#111827", margin: 0, letterSpacing: "-0.03em" }}>Choose Entry Mode</h1>
-        <p style={{ fontSize: 14, color: "#64748B", marginTop: 6 }}>Select how you'd like to add a new entry</p>
-      </div>
-
-      <div style={{ display: "flex", gap: 20, flexDirection: isMobile ? "column" : "row", width: "100%", maxWidth: 640 }}>
-        {modes.map((mode) => {
-          const isHovered = hovered === mode.key;
-          const isSelected = selected === mode.key;
-          return (
-            <div key={mode.key} onClick={() => setSelected(mode.key)}
-              onMouseEnter={() => setHovered(mode.key)} onMouseLeave={() => setHovered(null)}
+    <div style={{ width: '100%', minHeight: '100%', display: 'flex', flexDirection: 'column' }}>
+      {/* ══════════════════════════════════════════════════════════
+          HERO (Noir Header)
+         ══════════════════════════════════════════════════════════ */}
+      <BtHero padding="28px 32px 56px">
+        <div style={{ maxWidth: 860, margin: '0 auto', width: '100%' }}>
+          <div style={{ marginBottom: '16px' }}>
+            <button
+              type="button"
+              onClick={() => navigate(-1)}
               style={{
-                flex: 1, background: isSelected ? mode.bgColor : "#fff",
-                borderRadius: 12, border: `1.5px solid ${isSelected ? mode.color : isHovered ? mode.color : "#E5E7EB"}`,
-                padding: "28px 24px", cursor: "pointer",
-                transition: "all 0.25s ease", position: "relative",
-                boxShadow: isSelected ? `0 4px 20px ${mode.color}25` : "none",
-                display: "flex", flexDirection: "column", alignItems: "center", textAlign: "center", gap: 14,
-              }}>
-              <div style={{ width: 56, height: 56, borderRadius: "50%", background: mode.bgColor, display: "flex", alignItems: "center", justifyContent: "center", color: mode.color }}>
-                {mode.icon}
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '6px',
+                padding: '6px 12px',
+                borderRadius: '16px',
+                background: 'rgba(255, 255, 255, 0.08)',
+                border: '1px solid rgba(255, 255, 255, 0.14)',
+                color: 'var(--bone)',
+                fontFamily: 'var(--font-ui)',
+                fontSize: '13px',
+                fontWeight: 600,
+                cursor: 'pointer',
+              }}
+            >
+              <ArrowLeft size={14} />
+              <span>Back</span>
+            </button>
+          </div>
+
+          <div
+            style={{
+              fontFamily: 'var(--font-mono)',
+              fontSize: '11px',
+              letterSpacing: '0.09em',
+              textTransform: 'uppercase',
+              color: 'var(--on-noir-3)',
+              marginBottom: '6px',
+            }}
+          >
+            ENTRY MODE • STEP 2 OF 2
+          </div>
+
+          <h1
+            style={{
+              margin: 0,
+              fontFamily: 'var(--font-display)',
+              fontSize: 'clamp(28px, 4vw, 40px)',
+              fontWeight: 800,
+              letterSpacing: '-0.03em',
+              color: 'var(--bone)',
+              lineHeight: 1.15,
+            }}
+          >
+            How do you want
+            <br />
+            to add it?
+          </h1>
+
+          <p
+            style={{
+              margin: '8px 0 0',
+              fontFamily: 'var(--font-ui)',
+              fontSize: '14px',
+              color: 'var(--on-noir-2)',
+            }}
+          >
+            Adding <strong>{typeLabel}</strong> entry to active build.
+          </p>
+        </div>
+      </BtHero>
+
+      {/* ══════════════════════════════════════════════════════════
+          SHEET (Bone Surface)
+         ══════════════════════════════════════════════════════════ */}
+      <BtSheet overlap={26} padding="28px 32px 64px">
+        <div
+          style={{
+            maxWidth: 860,
+            margin: '0 auto',
+            width: '100%',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '28px',
+          }}
+        >
+          {/* Dual Choice Tiles: Speak it vs Type it */}
+          <div
+            style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
+              gap: '16px',
+            }}
+          >
+            {/* Option 1: Speak it (Noir Ink Card) */}
+            <div
+              onClick={() => handleSelectMode('voice')}
+              style={{
+                background: 'var(--ink)',
+                borderRadius: 'var(--r-card)',
+                padding: '28px 24px',
+                color: 'var(--bone)',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '18px',
+                boxShadow: '0 10px 28px rgba(17, 19, 23, 0.16)',
+                transition: 'transform 180ms ease, box-shadow 180ms ease',
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.transform = 'translateY(-2px)';
+                e.currentTarget.style.boxShadow = '0 14px 34px rgba(17, 19, 23, 0.22)';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.transform = 'translateY(0)';
+                e.currentTarget.style.boxShadow = '0 10px 28px rgba(17, 19, 23, 0.16)';
+              }}
+            >
+              <div
+                style={{
+                  width: '54px',
+                  height: '54px',
+                  borderRadius: '50%',
+                  background: 'var(--accent)',
+                  color: 'var(--on-accent, #111317)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  boxShadow: '0 0 20px var(--accent-glow)',
+                  flexShrink: 0,
+                }}
+              >
+                <Mic size={26} strokeWidth={2.2} />
               </div>
-              <div>
-                <div style={{ fontSize: 18, fontWeight: 700, color: "#111827", marginBottom: 4 }}>{mode.title}</div>
-                <div style={{ fontSize: 13, color: "#64748B", lineHeight: 1.5 }}>{mode.desc}</div>
+
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div
+                  style={{
+                    fontFamily: 'var(--font-display)',
+                    fontSize: '20px',
+                    fontWeight: 800,
+                    color: 'var(--bone)',
+                  }}
+                >
+                  Speak it
+                </div>
+                <div
+                  style={{
+                    fontFamily: 'var(--font-ui)',
+                    fontSize: '13px',
+                    color: 'var(--on-noir-2)',
+                    marginTop: '4px',
+                  }}
+                >
+                  Speak naturally — AI extracts amounts, materials, and categories.
+                </div>
               </div>
-              <div style={{ display: "flex", flexDirection: "column", gap: 4, marginTop: 4 }}>
-                {mode.features.map((f, i) => (
-                  <div key={i} style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: "#64748B" }}>
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={mode.color} strokeWidth="2.5"><polyline points="20 6 9 17 4 12" /></svg>
-                    {f}
+
+              <ChevronRight size={20} color="var(--on-noir-3)" />
+            </div>
+
+            {/* Option 2: Type it (White Card) */}
+            <BtCard
+              onClick={() => handleSelectMode('manual')}
+              padding="28px 24px"
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '18px',
+              }}
+            >
+              <div
+                style={{
+                  width: '54px',
+                  height: '54px',
+                  borderRadius: 'var(--r-tile)',
+                  background: 'var(--fill)',
+                  color: 'var(--ink)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  flexShrink: 0,
+                }}
+              >
+                <Keyboard size={26} strokeWidth={1.8} />
+              </div>
+
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div
+                  style={{
+                    fontFamily: 'var(--font-display)',
+                    fontSize: '20px',
+                    fontWeight: 800,
+                    color: 'var(--ink)',
+                  }}
+                >
+                  Type it
+                </div>
+                <div
+                  style={{
+                    fontFamily: 'var(--font-ui)',
+                    fontSize: '13px',
+                    color: 'var(--ink-3)',
+                    marginTop: '4px',
+                  }}
+                >
+                  Fill out transaction fields manually with itemized control.
+                </div>
+              </div>
+
+              <ChevronRight size={20} color="var(--ink-3)" />
+            </BtCard>
+          </div>
+
+          {/* Execution Context Selected Card */}
+          {project && (
+            <div>
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  fontFamily: 'var(--font-mono)',
+                  fontSize: '11px',
+                  fontWeight: 700,
+                  letterSpacing: '0.08em',
+                  textTransform: 'uppercase',
+                  color: 'var(--tone-green)',
+                  marginBottom: '10px',
+                }}
+              >
+                <CheckCircle2 size={14} />
+                <span>Execution Context Selected</span>
+              </div>
+
+              <BtCard padding="0" style={{ overflow: 'hidden' }}>
+                {contextItems.map((item, idx) => (
+                  <div
+                    key={item.label}
+                    style={{
+                      padding: '14px 20px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '14px',
+                      borderBottom: idx < contextItems.length - 1 ? '1px solid var(--line)' : 'none',
+                    }}
+                  >
+                    <span
+                      style={{
+                        fontFamily: 'var(--font-mono)',
+                        fontSize: '11px',
+                        color: 'var(--tone-green)',
+                        width: '24px',
+                      }}
+                    >
+                      0{idx + 1}
+                    </span>
+
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div
+                        style={{
+                          fontFamily: 'var(--font-mono)',
+                          fontSize: '10px',
+                          letterSpacing: '0.06em',
+                          textTransform: 'uppercase',
+                          color: 'var(--ink-3)',
+                        }}
+                      >
+                        {item.label}
+                      </div>
+                      <div
+                        style={{
+                          fontFamily: 'var(--font-ui)',
+                          fontSize: '14px',
+                          fontWeight: 600,
+                          color: 'var(--ink)',
+                          marginTop: '2px',
+                        }}
+                      >
+                        {item.value}
+                      </div>
+                    </div>
+
+                    <Check size={16} color="var(--tone-green)" />
                   </div>
                 ))}
-              </div>
-              {isSelected && (
-                <div style={{
-                  marginTop: 8, padding: "8px 20px", borderRadius: 6, background: mode.color, color: "#fff",
-                  fontSize: 13, fontWeight: 700, display: "flex", alignItems: "center", gap: 6,
-                }}>
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="20 6 9 17 4 12" /></svg>
-                  Selected
-                </div>
-              )}
+              </BtCard>
             </div>
-          );
-        })}
-      </div>
-
-      <button onClick={() => navigate(-1)} style={{ marginTop: 32, padding: "8px 18px", background: "transparent", border: "1px solid #E5E7EB", borderRadius: 8, color: "#64748B", fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>
-        Cancel
-      </button>
+          )}
+        </div>
+      </BtSheet>
     </div>
   );
 }

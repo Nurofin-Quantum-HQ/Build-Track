@@ -245,9 +245,10 @@ export default function VoiceReviewSheet({
           <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
             <div style={{
               width: 44, height: 44, borderRadius: '50%',
-              background: gradients.primaryGradient,
+              background: 'var(--ink, #111317)',
+              border: '1.5px solid rgba(224, 169, 59, 0.4)',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
-              color: '#fff', boxShadow: '0 4px 12px rgba(249, 115, 22, 0.2)',
+              color: '#F6F4EF', boxShadow: '0 4px 12px rgba(0, 0, 0, 0.2)',
             }}>
               <Mic size={18} />
             </div>
@@ -273,7 +274,7 @@ export default function VoiceReviewSheet({
           <div style={{ height: 4, background: '#E6EAF2', borderRadius: 99 }}>
             <div style={{
               height: '100%', width: `${progress}%`, borderRadius: 99,
-              background: gradients.primaryGradient,
+              background: 'var(--ink, #111317)',
               transition: 'width 0.3s cubic-bezier(0.16, 1, 0.3, 1)',
             }} />
           </div>
@@ -1096,9 +1097,10 @@ function renderStep({ step, data, updateField, goNext, customInput, setCustomInp
         <div>
           <div style={{
             padding: '20px 24px', borderRadius: 14, marginBottom: 20,
-            background: gradients.primaryGradient,
-            color: '#fff',
-            boxShadow: '0 8px 20px rgba(249, 115, 22, 0.25)',
+            background: 'var(--ink, #111317)',
+            border: '1px solid rgba(255, 255, 255, 0.12)',
+            color: '#F6F4EF',
+            boxShadow: '0 8px 20px rgba(0, 0, 0, 0.25)',
           }}>
             <div style={{ fontSize: 11, fontWeight: 700, opacity: 0.8, letterSpacing: '0.06em', marginBottom: 6 }}>TOTAL AMOUNT</div>
             <div style={{ fontSize: 32, fontWeight: 800, fontFamily: typography.fontFamily }}>₹{formatINR(totalAmount)}</div>

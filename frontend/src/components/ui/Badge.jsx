@@ -1,33 +1,62 @@
-import { colors, radius, typography } from '../../styles/designTokens';
+import React from 'react';
 
 const variantMap = {
-  default: { bg: colors.subtle, color: colors.textSecondary },
-  success: { bg: colors.successLight, color: '#15803D' },
-  danger: { bg: colors.dangerLight, color: '#DC2626' },
-  warning: { bg: colors.warningLight, color: '#B45309' },
-  info: { bg: colors.primaryLight, color: colors.primary },
-  gradient: { bg: 'linear-gradient(90deg, var(--color-primary, #F97316) 0%, var(--color-primary-light, #FB923C) 100%)', color: '#FFFFFF' },
+  default: { bg: 'var(--fill)', color: 'var(--ink-2)', dot: 'var(--slate)' },
+  success: { bg: 'var(--status-success-soft)', color: 'var(--status-success)', dot: 'var(--status-success-bright)' },
+  paid: { bg: 'var(--status-success-soft)', color: 'var(--status-success)', dot: 'var(--status-success-bright)' },
+  approved: { bg: 'var(--status-success-soft)', color: 'var(--status-success)', dot: 'var(--status-success-bright)' },
+  danger: { bg: 'var(--status-danger-soft)', color: 'var(--status-danger)', dot: 'var(--status-danger-bright)' },
+  rejected: { bg: 'var(--status-danger-soft)', color: 'var(--status-danger)', dot: 'var(--status-danger-bright)' },
+  warning: { bg: 'var(--status-warning-soft)', color: 'var(--status-warning)', dot: 'var(--status-warning-bright)' },
+  pending: { bg: 'var(--status-warning-soft)', color: 'var(--status-warning)', dot: 'var(--status-warning-bright)' },
+  info: { bg: 'var(--accent-soft)', color: 'var(--accent-ink)', dot: 'var(--accent)' },
+  brand: { bg: 'var(--accent-soft)', color: 'var(--accent-ink)', dot: 'var(--accent)' },
 };
 
-export default function Badge({ children, variant = 'default', style, size = 'md' }) {
-  const v = variantMap[variant] || variantMap.default;
-  const s = size === 'sm' ? { padding: '2px 8px', fontSize: 11 } : { padding: '4px 12px', fontSize: 12 };
+export default function Badge({
+  children,
+  variant = 'default',
+  style,
+  size = 'md',
+  showDot = true,
+  className = '',
+  ...props
+}) {
+  const norm = String(variant).toLowerCase().replace(/[\s_-]/g, '');
+  const v = variantMap[norm] || variantMap.default;
+  const s = size === 'sm' ? { height: '22px', padding: '0 8px', fontSize: '11px' } : { height: '24px', padding: '0 10px', fontSize: '12px' };
+
   return (
     <span
+      className={className}
       style={{
         display: 'inline-flex',
         alignItems: 'center',
-        gap: 4,
+        gap: '6px',
         ...s,
         fontWeight: 600,
-        borderRadius: radius.full,
+        fontFamily: 'var(--font-ui)',
+        borderRadius: 'var(--r-full)',
         background: v.bg,
         color: v.color,
         whiteSpace: 'nowrap',
+        boxSizing: 'border-box',
         ...style,
       }}
+      {...props}
     >
-      {children}
+      {showDot && (
+        <span
+          style={{
+            width: '6px',
+            height: '6px',
+            borderRadius: '50%',
+            background: v.dot,
+            flexShrink: 0,
+          }}
+        />
+      )}
+      <span>{children}</span>
     </span>
   );
 }

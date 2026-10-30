@@ -1,13 +1,13 @@
 import { create } from "zustand";
-import { notificationAPI, inventoryAPI, taskAPI } from "../api";
+import { notificationAPI, taskAPI } from "../api";
 
 const useNotificationStore = create((set, get) => ({
   systemNotifications: [],
-  inventoryAlerts: [],
   tasks: [],
   loading: false,
   error: null,
   lastFetched: 0,
+  unreadCount: 0,
 
   get totalAlertCount() {
     return this.systemNotifications ? this.systemNotifications.filter(n => !n.read).length : 0;
@@ -22,52 +22,54 @@ const useNotificationStore = create((set, get) => ({
 
     set({ loading: true, error: null });
 
-    const [notifResult, invResult, taskResult] = await Promise.allSettled([
-      notificationAPI.getAll(),
-      inventoryAPI.getAll(),
-      taskAPI.getDaily(),
-    ]);
+    try {
+      const [notifResult, taskResult] = await Promise.allSettled([
+        notificationAPI.getAll({ limit: 50 }),
+        taskAPI.getDaily(),
+      ]);
 
-    let systemNotifications = state.systemNotifications;
-    if (notifResult.status === "fulfilled" && notifResult.value?.data) {
-      const data = notifResult.value.data;
-      systemNotifications = Array.isArray(data) ? data : data.notifications || data.items || [];
-    }
+      let systemNotifications = state.systemNotifications;
+      let unreadCount = 0;
+      if (notifResult.status === "fulfilled" && notifResult.value?.data) {
+        const data = notifResult.value.data;
+        systemNotifications = Array.isArray(data)
+          ? data
+          : data.items || data.notifications || [];
+        unreadCount = typeof data.unreadCount === "number"
+          ? data.unreadCount
+          : systemNotifications.filter(n => !n.read).length;
+      }
 
-    let inventoryAlerts = state.inventoryAlerts;
-    if (invResult.status === "fulfilled" && invResult.value?.data) {
-      const data = invResult.value.data;
-      const allItems = Array.isArray(data) ? data : data.inventory || data.items || [];
-      inventoryAlerts = allItems.filter((item) => {
-        const stock = Number(item.closingStock ?? 0);
-        const threshold = Number(item.threshold ?? 10);
-        return stock <= threshold;
+      let tasks = state.tasks;
+      if (taskResult.status === "fulfilled" && taskResult.value?.data) {
+        const data = taskResult.value.data;
+        tasks = Array.isArray(data) ? data : data.tasks || [];
+      }
+
+      set({
+        systemNotifications,
+        tasks,
+        unreadCount,
+        loading: false,
+        lastFetched: Date.now(),
       });
+    } catch (err) {
+      set({ loading: false, error: err.message });
     }
-
-    let tasks = state.tasks;
-    if (taskResult.status === "fulfilled" && taskResult.value?.data) {
-      const data = taskResult.value.data;
-      tasks = Array.isArray(data) ? data : data.tasks || [];
-    }
-
-    set({
-      systemNotifications,
-      inventoryAlerts,
-      tasks,
-      loading: false,
-      lastFetched: Date.now(),
-    });
   },
 
   async markAsRead(id) {
     try {
       await notificationAPI.markAsRead(id);
-      set((state) => ({
-        systemNotifications: state.systemNotifications.map((n) =>
+      set((state) => {
+        const updated = state.systemNotifications.map((n) =>
           (n._id || n.id) === id ? { ...n, read: true } : n
-        ),
-      }));
+        );
+        return {
+          systemNotifications: updated,
+          unreadCount: updated.filter(n => !n.read).length,
+        };
+      });
     } catch (err) {
       console.error("Failed to mark notification as read:", err);
     }
@@ -78,6 +80,7 @@ const useNotificationStore = create((set, get) => ({
       await notificationAPI.markAllAsRead();
       set((state) => ({
         systemNotifications: state.systemNotifications.map((n) => ({ ...n, read: true })),
+        unreadCount: 0,
       }));
     } catch (err) {
       console.error("Failed to mark all notifications as read:", err);
@@ -87,7 +90,7 @@ const useNotificationStore = create((set, get) => ({
   async clearAll() {
     try {
       await notificationAPI.clearAll();
-      set({ systemNotifications: [] });
+      set({ systemNotifications: [], unreadCount: 0 });
     } catch (err) {
       console.error("Failed to clear notifications:", err);
     }
