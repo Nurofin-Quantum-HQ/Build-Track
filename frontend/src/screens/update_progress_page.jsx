@@ -5,6 +5,11 @@ import { projectAPI, taskAPI } from '../api';
 import { Toast } from '../components/Toast';
 import { CheckCircle, Upload, Save, ChevronLeft } from 'lucide-react';
 import { colors, radius, shadows, typography } from '../styles/designTokens';
+import BtHero from '../components/ui/BtHero';
+import BtSheet from '../components/ui/BtSheet';
+import BtCard from '../components/ui/BtCard';
+import BtButton from '../components/ui/BtButton';
+import BtPressable from '../components/ui/BtPressable';
 
 export default function UpdateProgressPage() {
   const { user } = useAuth();
@@ -131,17 +136,77 @@ export default function UpdateProgressPage() {
   const floors = projectData?.floors?.length ? projectData.floors : ['Basement', 'Ground Floor', '1st Floor', '2nd Floor', 'Terrace'];
 
   return (
-    <div style={{ padding: '24px', maxWidth: '800px', margin: '0 auto', fontFamily: typography.fontFamily }}>
+    <div style={{ minHeight: '100vh', background: 'var(--surface-ground, #F2F0EB)' }}>
       <Toast message={toast.msg} type={toast.type} onClose={() => setToast({ msg: '', type: 'info' })} />
-      <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 24 }}>
-        <button onClick={() => navigate(-1)} style={{ width: 40, height: 40, borderRadius: 12, background: '#fff', border: '1px solid #e5e7eb', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          <ChevronLeft size={20} />
-        </button>
-        <div>
-          <h1 style={{ margin: 0, fontSize: 24, fontWeight: 700, color: colors.textPrimary }}>Update Progress</h1>
-          <p style={{ margin: 0, color: colors.textSecondary, fontSize: 14 }}>Log daily progress and mark tasks as complete.</p>
+
+      {/* ── HERO BANNER (Blueprint Noir) ── */}
+      <BtHero>
+        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 16 }}>
+          <div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 }}>
+              <BtPressable
+                onClick={() => navigate(-1)}
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 6,
+                  color: 'rgba(255, 255, 255, 0.72)',
+                  fontSize: 13,
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  background: 'none',
+                  border: 'none',
+                  padding: 0,
+                }}
+              >
+                <ChevronLeft size={16} />
+                <span>Back</span>
+              </BtPressable>
+              <span style={{ color: 'rgba(255, 255, 255, 0.25)' }}>/</span>
+              <span
+                style={{
+                  fontFamily: 'var(--font-mono)',
+                  fontSize: 11,
+                  letterSpacing: '0.12em',
+                  textTransform: 'uppercase',
+                  color: 'var(--gold-brass)',
+                  fontWeight: 700,
+                }}
+              >
+                FIELD OPERATIONS · DAILY LOG
+              </span>
+            </div>
+
+            <h1
+              style={{
+                fontFamily: 'var(--font-serif)',
+                fontSize: 32,
+                fontWeight: 700,
+                color: 'var(--bone)',
+                margin: '0 0 6px',
+                letterSpacing: '-0.02em',
+              }}
+            >
+              Update Progress
+            </h1>
+            <p
+              style={{
+                color: 'rgba(255, 255, 255, 0.65)',
+                margin: 0,
+                fontSize: 14,
+                maxWidth: 580,
+                lineHeight: 1.5,
+              }}
+            >
+              Log daily site progress, floor activities, completed task checklists, and site photos.
+            </p>
+          </div>
         </div>
-      </div>
+      </BtHero>
+
+      {/* ── MAIN CONTENT (Overlapping BtSheet) ── */}
+      <BtSheet overlap={26} padding="28px 32px 64px">
+        <div style={{ maxWidth: 760, margin: '0 auto' }}>
 
       <div style={{ background: '#fff', borderRadius: radius.lg, padding: 24, boxShadow: shadows.sm, marginBottom: 24 }}>
         <div style={{ marginBottom: 16 }}>
@@ -204,9 +269,9 @@ export default function UpdateProgressPage() {
                     min="0" max="100" 
                     value={manualProgress} 
                     onChange={(e) => setManualProgress(e.target.value)}
-                    style={{ flex: 1, accentColor: colors.primary }}
+                    style={{ flex: 1, accentColor: 'var(--ink, #111317)' }}
                   />
-                  <span style={{ fontWeight: 600, color: colors.primary, width: 40 }}>{Number(manualProgress).toFixed(0)}%</span>
+                  <span style={{ fontWeight: 600, color: 'var(--ink, #111317)', width: 40 }}>{Number(manualProgress).toFixed(0)}%</span>
                 </div>
               </div>
             )}
@@ -226,12 +291,12 @@ export default function UpdateProgressPage() {
                 onClick={() => handleToggleTask(t._id)}
                 style={{ 
                   display: 'flex', alignItems: 'center', gap: 12, padding: 16, 
-                  border: `1px solid ${completedTaskIds.has(t._id) ? colors.primary : '#e5e7eb'}`, 
+                  border: `1px solid ${completedTaskIds.has(t._id) ? 'var(--ink, #111317)' : '#e5e7eb'}`, 
                   borderRadius: 12, cursor: 'pointer',
-                  background: completedTaskIds.has(t._id) ? `${colors.primary}10` : '#fff'
+                  background: completedTaskIds.has(t._id) ? `${'var(--ink, #111317)'}10` : '#fff'
                 }}
               >
-                <div style={{ color: completedTaskIds.has(t._id) ? colors.primary : '#cbd5e1' }}>
+                <div style={{ color: completedTaskIds.has(t._id) ? 'var(--ink, #111317)' : '#cbd5e1' }}>
                   <CheckCircle size={24} fill={completedTaskIds.has(t._id) ? "currentColor" : "none"} color={completedTaskIds.has(t._id) ? "#fff" : "currentColor"} />
                 </div>
                 <div>
@@ -273,14 +338,21 @@ export default function UpdateProgressPage() {
         </div>
       </div>
 
-      <button 
-        onClick={handleSubmit} 
-        disabled={isSubmitting}
-        style={{ width: '100%', padding: '16px', borderRadius: 12, background: colors.primary, color: '#fff', fontSize: 16, fontWeight: 600, border: 'none', cursor: isSubmitting ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}
-      >
-        <Save size={20} />
-        {isSubmitting ? 'Saving...' : (selectedActivityId ? 'Mark as Done & Submit' : 'Submit Progress Update')}
-      </button>
-    </div>
+      <div style={{ marginTop: 24 }}>
+          <BtButton
+            variant="primary"
+            size="lg"
+            loading={isSubmitting}
+            onClick={handleSubmit}
+            disabled={isSubmitting}
+            style={{ width: '100%', height: 48 }}
+          >
+            <Save size={18} />
+            <span>{isSubmitting ? 'Saving...' : (selectedActivityId ? 'Mark as Done & Submit' : 'Submit Progress Update')}</span>
+          </BtButton>
+        </div>
+      </div>
+    </BtSheet>
+  </div>
   );
 }

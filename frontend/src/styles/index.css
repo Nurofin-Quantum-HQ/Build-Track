@@ -1,3 +1,4 @@
+@import './designTokens.css';
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
 
 :root {
@@ -54,22 +55,14 @@ body {
   line-height: 1.5;
   font-weight: 400;
   color: var(--text-primary);
-  background: radial-gradient(circle at top right, #fff1e8, #ffffff);
-  background-attachment: fixed;
+  background: var(--ground);
+  background-attachment: scroll;
   min-height: 100vh;
   position: relative;
 }
 
 body::before {
-  content: "";
-  position: fixed;
-  inset: 0;
-  z-index: -10;
-  pointer-events: none;
-  background:
-    radial-gradient(circle at 15% 15%, rgba(249, 115, 22, 0.08) 0%, transparent 50%),
-    radial-gradient(circle at 85% 15%, rgba(251, 146, 60, 0.08) 0%, transparent 50%),
-    radial-gradient(circle at 50% 85%, rgba(249, 115, 22, 0.05) 0%, transparent 50%);
+  display: none;
 }
 
 

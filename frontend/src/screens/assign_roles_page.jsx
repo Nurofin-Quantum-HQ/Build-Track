@@ -1,12 +1,32 @@
-import { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { colors, radius, typography } from '../styles/designTokens';
-import { Card, Badge, Button, Input, Spinner, EmptyState, Toast } from '../components/ui';
-import ConfirmDialog from '../components/ui/ConfirmDialog';
 import { authAPI, projectAPI, subscriptionAPI } from '../api';
-import { Users, User, Info, HelpCircle } from 'lucide-react';
+import {
+  Users,
+  User,
+  Info,
+  HelpCircle,
+  Plus,
+  ShieldCheck,
+  Building2,
+  Trash2,
+  Edit2,
+  ArrowLeft,
+  X,
+  Check,
+  CheckCircle2,
+} from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import ModuleTour from '../components/ModuleTour';
+import { Toast } from '../components/Toast';
+import ConfirmDialog from '../components/ui/ConfirmDialog';
+import BtHero from '../components/ui/BtHero';
+import BtSheet from '../components/ui/BtSheet';
+import BtCard from '../components/ui/BtCard';
+import BtBadge from '../components/ui/BtBadge';
+import BtButton from '../components/ui/BtButton';
+import BtPressable from '../components/ui/BtPressable';
+import BtEmpty from '../components/ui/BtEmpty';
 
 const _featureRows = [
   { section: 'Project' },
@@ -70,24 +90,32 @@ export default function AssignRolesPage() {
   const [selectedProjects, setSelectedProjects] = useState([]);
   const [selectedOverseesRoles, setSelectedOverseesRoles] = useState([]);
   const [customOverseesInput, setCustomOverseesInput] = useState('');
-
   const [runTour, setRunTour] = useState(false);
 
-  const tourSteps = showForm ? [
-    { target: '.tour-user-details', content: 'Enter the full name, email, and a temporary password for the new team member.', disableBeacon: true },
-    { target: '.tour-role-select', content: 'Select their role: Supervisors can oversee projects and approve entries. Labour/Masons can submit daily progress and expenses. Custom Role lets you build from scratch.' },
-    { target: '.tour-oversees-roles', content: 'Specify which roles this user is allowed to oversee or approve.' },
-    { target: '.tour-permissions', content: 'Fine-tune the exact features and actions they can access.' },
-    { target: '.tour-project-access', content: 'Restrict their access to specific projects, or leave blank for all.' }
-  ] : [
-    { target: '.tour-header', content: 'Manage team access and roles.', disableBeacon: true },
-    { target: '.tour-add-btn', content: 'Click here to add a new team member and assign their role.' },
-    { target: '.tour-admin-alert', content: 'See your current plan limits and info.' },
-    { target: '.tour-user-list', content: 'Click on any user to edit their permissions and project access.' }
-  ];
+  const tourSteps = showForm
+    ? [
+        { target: '.tour-user-details', content: 'Enter the full name, email, and a temporary password for the new team member.', disableBeacon: true },
+        { target: '.tour-role-select', content: 'Select their role: Supervisors can oversee projects and approve entries. Labour/Masons can submit daily progress and expenses.' },
+        { target: '.tour-permissions', content: 'Fine-tune the exact features and actions they can access.' },
+        { target: '.tour-project-access', content: 'Restrict their access to specific projects, or leave blank for all.' },
+      ]
+    : [
+        { target: '.tour-header', content: 'Manage team access, permissions, and roles.', disableBeacon: true },
+        { target: '.tour-add-btn', content: 'Click here to add a new team member and assign their role.' },
+        { target: '.tour-user-list', content: 'Click on any user to edit their permissions and project access.' },
+      ];
 
   const currentPlan = subscription?.plan?.toLowerCase() || 'free';
-  const limitMaxUsers = subscription?.maxUsers !== undefined ? subscription.maxUsers : (currentPlan.includes('free') ? 2 : currentPlan.includes('starter') ? 5 : currentPlan.includes('growth') ? 8 : -1);
+  const limitMaxUsers =
+    subscription?.maxUsers !== undefined
+      ? subscription.maxUsers
+      : currentPlan.includes('free')
+        ? 2
+        : currentPlan.includes('starter')
+          ? 5
+          : currentPlan.includes('growth')
+            ? 8
+            : -1;
 
   const isCustomRole = selectedRole === '__custom_role__';
 
@@ -124,9 +152,20 @@ export default function AssignRolesPage() {
   const applyDefaultPermissions = (role) => {
     const newPerms = { ...DEFAULT_PERMS };
     if (role === 'Supervisor') {
-      ['view_assigned_project', 'manage_expenses', 'manage_equipment_master', 'submit_daily_update', 'approve_payments', 'approve_updates', 'view_reports', 'view_payment_reports'].forEach(k => newPerms[k] = true);
+      [
+        'view_assigned_project',
+        'manage_expenses',
+        'manage_equipment_master',
+        'submit_daily_update',
+        'approve_payments',
+        'approve_updates',
+        'view_reports',
+        'view_payment_reports',
+      ].forEach((k) => (newPerms[k] = true));
     } else if (role === 'Mason') {
-      ['view_assigned_project', 'manage_expenses', 'submit_daily_update'].forEach(k => newPerms[k] = true);
+      ['view_assigned_project', 'manage_expenses', 'submit_daily_update'].forEach(
+        (k) => (newPerms[k] = true)
+      );
     }
     setPermissions(newPerms);
   };
@@ -169,7 +208,9 @@ export default function AssignRolesPage() {
 
     const perms = userToEdit.permissions || [];
     const newPerms = { ...DEFAULT_PERMS };
-    perms.forEach(p => { if (newPerms[p] !== undefined) newPerms[p] = true; });
+    perms.forEach((p) => {
+      if (newPerms[p] !== undefined) newPerms[p] = true;
+    });
     setPermissions(newPerms);
 
     setSelectedProjects(userToEdit.projectIds || userToEdit.projects || []);
@@ -193,14 +234,17 @@ export default function AssignRolesPage() {
         setConfirmDlg({
           message: `Your ${subscription?.plan || 'Free'} plan allows up to ${limitMaxUsers} users. Upgrade to add more team members.`,
           confirmLabel: 'Upgrade Plan',
-          onConfirm: () => { setConfirmDlg(null); navigate('/subscription'); }
+          onConfirm: () => {
+            setConfirmDlg(null);
+            navigate('/subscription');
+          },
         });
         return;
       }
     }
 
     setSaving(true);
-    const selectedPerms = Object.keys(permissions).filter(k => permissions[k]);
+    const selectedPerms = Object.keys(permissions).filter((k) => permissions[k]);
 
     try {
       if (isEditMode) {
@@ -231,7 +275,13 @@ export default function AssignRolesPage() {
       setShowForm(false);
       fetchAll();
     } catch (err) {
-      setToast({ message: err.friendlyMessage || (isEditMode ? 'Failed to update user' : 'Failed to create user'), type: 'error', key: Date.now() });
+      setToast({
+        message:
+          err.friendlyMessage ||
+          (isEditMode ? 'Failed to update user' : 'Failed to create user'),
+        type: 'error',
+        key: Date.now(),
+      });
     } finally {
       setSaving(false);
     }
@@ -239,243 +289,654 @@ export default function AssignRolesPage() {
 
   const toggleProject = (projectId) => {
     if (!isAdmin) return;
-    setSelectedProjects(prev =>
-      prev.includes(projectId) ? prev.filter(id => id !== projectId) : [...prev, projectId]
+    setSelectedProjects((prev) =>
+      prev.includes(projectId)
+        ? prev.filter((id) => id !== projectId)
+        : [...prev, projectId]
     );
-  };
-
-  const addCustomOverseesRole = () => {
-    const val = customOverseesInput.trim();
-    if (!val) return;
-    if (!selectedOverseesRoles.some(r => r.toLowerCase() === val.toLowerCase())) {
-      setSelectedOverseesRoles([...selectedOverseesRoles, val]);
-    }
-    setCustomOverseesInput('');
   };
 
   const toggleOverseesRole = (role) => {
-    setSelectedOverseesRoles(prev =>
-      prev.includes(role) ? prev.filter(r => r !== role) : [...prev, role]
+    setSelectedOverseesRoles((prev) =>
+      prev.includes(role) ? prev.filter((r) => r !== role) : [...prev, role]
     );
   };
 
-  const renderPermissionsTable = () => (
-    <div style={{ border: `1px solid ${colors.cardBorder}`, borderRadius: radius.md, overflow: 'hidden', marginBottom: 16 }}>
-      <div style={{ display: 'flex', background: '#F8F9FF', padding: '10px 14px', borderBottom: `1px solid ${colors.cardBorder}` }}>
-        <div style={{ flex: 5, fontSize: 11, fontWeight: 800, color: colors.textLight, letterSpacing: 0.6, textTransform: 'uppercase' }}>Feature</div>
-        <div style={{ width: 52, textAlign: 'center', fontSize: 10, fontWeight: 800, color: colors.textLight, letterSpacing: 0.5, textTransform: 'uppercase' }}>View</div>
-        <div style={{ width: 52, textAlign: 'center', fontSize: 10, fontWeight: 800, color: colors.textLight, letterSpacing: 0.5, textTransform: 'uppercase' }}>Edit</div>
-        <div style={{ width: 52, textAlign: 'center', fontSize: 10, fontWeight: 800, color: colors.textLight, letterSpacing: 0.5, textTransform: 'uppercase' }}>Delete</div>
-      </div>
-      {_featureRows.map((row, idx) => {
-        if (row.section) {
-          return (
-            <div key={idx} style={{ background: '#F8F9FF', padding: '10px 14px 4px', fontSize: 10, fontWeight: 800, color: colors.textLight, letterSpacing: 0.8, textTransform: 'uppercase' }}>
-              {row.section}
-            </div>
-          );
-        }
-
-        const renderCheckbox = (key) => {
-          if (!key) return <div style={{ width: 52, textAlign: 'center', color: colors.textLight, fontSize: 14, fontWeight: 600 }}>—</div>;
-          return (
-            <div style={{ width: 52, display: 'flex', justifyContent: 'center' }}>
-              <input type="checkbox" checked={permissions[key] || false} onChange={e => isAdmin && setPermissions({...permissions, [key]: e.target.checked})} disabled={!isAdmin} style={{ width: 16, height: 16, cursor: isAdmin ? 'pointer' : 'default' }} />
-            </div>
-          );
-        };
-
-        if (row.type === 'table') {
-          return (
-            <div key={idx} style={{ display: 'flex', alignItems: 'center', padding: '12px 14px', borderBottom: idx < _featureRows.length - 1 ? `1px solid #F0EEF8` : 'none' }}>
-              <div style={{ flex: 5 }}>
-                <div style={{ fontSize: 13.5, fontWeight: 700, color: colors.textDark }}>{row.label}</div>
-                <div style={{ fontSize: 11.5, color: colors.textLight, marginTop: 2 }}>{row.desc}</div>
-              </div>
-              {renderCheckbox(row.view)}
-              {renderCheckbox(row.edit)}
-              {renderCheckbox(row.delete)}
-            </div>
-          );
-        }
-
-        if (row.type === 'toggle') {
-          return (
-            <div key={idx} style={{ display: 'flex', alignItems: 'center', padding: '12px 14px', borderBottom: idx < _featureRows.length - 1 ? `1px solid #F0EEF8` : 'none' }}>
-              <div style={{ flex: 1 }}>
-                <div style={{ fontSize: 13.5, fontWeight: 700, color: colors.textDark }}>{row.label}</div>
-                <div style={{ fontSize: 11.5, color: colors.textLight, marginTop: 2 }}>{row.desc}</div>
-              </div>
-              <div style={{ marginLeft: 8 }}>
-                <input type="checkbox" checked={permissions[row.key] || false} onChange={e => isAdmin && setPermissions({...permissions, [row.key]: e.target.checked})} disabled={!isAdmin} style={{ width: 18, height: 18, cursor: isAdmin ? 'pointer' : 'default' }} />
-              </div>
-            </div>
-          );
-        }
-        return null;
-      })}
-    </div>
-  );
-
   return (
-    <div style={{ padding: '24px 28px', maxWidth: 800, margin: '0 auto' }}>
-      <ModuleTour steps={tourSteps} run={runTour} setRun={setRunTour} moduleName="AssignRole" />
-      <Toast key={toast.key} message={toast.message} type={toast.type} onClose={() => setToast((prev) => ({ ...prev, message: '' }))} />
-      {confirmDlg && (
-        <ConfirmDialog message={confirmDlg.message} onConfirm={confirmDlg.onConfirm} onCancel={() => setConfirmDlg(null)} danger={confirmDlg.danger} confirmLabel={confirmDlg.confirmLabel} />
-      )}
+    <div style={{ minHeight: '100vh', background: 'var(--ground)' }}>
+      <ModuleTour steps={tourSteps} run={runTour} setRun={setRunTour} moduleName="AssignRolesPage" />
+      <Toast
+        key={toast.key}
+        message={toast.message}
+        type={toast.type}
+        onClose={() => setToast((prev) => ({ ...prev, message: '' }))}
+      />
+      <ConfirmDialog
+        open={!!confirmDlg}
+        message={confirmDlg?.message || ''}
+        onConfirm={confirmDlg?.onConfirm}
+        onCancel={() => setConfirmDlg(null)}
+        danger={confirmDlg?.danger}
+        confirmLabel={confirmDlg?.confirmLabel}
+      />
 
-      <div className="tour-header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 24 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-          <button onClick={() => showForm ? setShowForm(false) : navigate(-1)} style={{ border: 'none', background: colors.iconBg, cursor: 'pointer', width: 36, height: 36, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16, color: colors.textPrimary }}>
-            ←
-          </button>
-          <h2 style={{ fontSize: 22, fontWeight: 800, color: colors.textPrimary, margin: 0 }}>
-            {showForm ? (isEditMode ? 'Edit User' : 'Assign Role') : 'Team Access'}
-          </h2>
-        </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <button onClick={() => setRunTour(true)} title="Help" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 36, height: 36, background: '#fff', border: '1px solid #E5E7EB', borderRadius: 8, cursor: 'pointer' }}>
-            <HelpCircle size={16} color={colors.textLight} />
-          </button>
-          {!showForm && isAdmin && <span className="tour-add-btn"><Button onClick={handleCreateClick}>+ Add User</Button></span>}
-        </div>
-      </div>
+      {/* ── TOP HERO (Deep Noir with blueprint grid & glow) ── */}
+      <BtHero padding="24px 32px 48px">
+        <div
+          className="tour-header"
+          style={{
+            display: 'flex',
+            alignItems: 'flex-start',
+            justifyContent: 'space-between',
+            gap: 16,
+            flexWrap: 'wrap',
+            marginBottom: 20,
+          }}
+        >
+          <div>
+            <div
+              style={{
+                fontFamily: 'var(--font-mono)',
+                fontSize: 11,
+                letterSpacing: '0.08em',
+                color: 'var(--on-noir-2)',
+                textTransform: 'uppercase',
+                fontWeight: 600,
+                marginBottom: 4,
+              }}
+            >
+              Access Control &amp; Roles
+            </div>
+            <h1
+              style={{
+                fontFamily: 'var(--font-display)',
+                fontSize: 34,
+                fontWeight: 700,
+                letterSpacing: '-0.02em',
+                color: 'var(--bone)',
+                margin: 0,
+                lineHeight: 1.15,
+              }}
+            >
+              Assign Roles
+            </h1>
+            <p style={{ fontSize: 13, color: 'var(--on-noir-2)', margin: '4px 0 0' }}>
+              Configure member credentials, granular permissions, and project access scopes
+            </p>
+          </div>
 
-      {!showForm && isAdmin && (
-        <div className="tour-admin-alert" style={{ padding: '12px', background: colors.primary + '15', borderRadius: radius.md, border: `1px solid ${colors.primary}40`, display: 'flex', gap: 8, marginBottom: 20 }}>
-          <Info size={20} color={colors.primary} style={{ flexShrink: 0 }} />
-          <div style={{ fontSize: 13, color: colors.textDark }}>
-            <strong>Admin Access Only:</strong> Only Admins can assign roles and manage team access.
-            {limitMaxUsers !== -1 && (
-               <div style={{ marginTop: 4 }}>
-                 You have created <strong>{users.length}</strong> out of <strong>{limitMaxUsers}</strong> users.
-                 {users.length >= limitMaxUsers && (
-                   <span style={{ marginLeft: 8, color: '#DC2626', fontWeight: 700, cursor: 'pointer', textDecoration: 'underline' }} onClick={() => navigate('/subscription')}>
-                     Upgrade Plan
-                   </span>
-                 )}
-               </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <button
+              onClick={() => setRunTour(true)}
+              title="Help Tour"
+              style={{
+                width: 38,
+                height: 38,
+                borderRadius: 'var(--r-btn, 12px)',
+                background: 'rgba(255, 255, 255, 0.08)',
+                border: '1px solid rgba(255, 255, 255, 0.12)',
+                color: 'var(--bone)',
+                display: 'grid',
+                placeItems: 'center',
+                cursor: 'pointer',
+              }}
+            >
+              <HelpCircle size={17} />
+            </button>
+
+            {!showForm && (
+              <button
+                className="tour-add-btn"
+                onClick={handleCreateClick}
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 7,
+                  height: 38,
+                  padding: '0 16px',
+                  borderRadius: 'var(--r-btn, 12px)',
+                  background: '#FFFFFF',
+                  border: 'none',
+                  color: 'var(--ink)',
+                  fontSize: 13,
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                  boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
+                }}
+              >
+                <Plus size={16} />
+                <span>Add Member</span>
+              </button>
             )}
           </div>
         </div>
-      )}
+      </BtHero>
 
-      {showForm ? (
-        <Card style={{ marginBottom: 24, padding: 20 }}>
-          <div className="tour-user-details">
-            <Input label="Full Name" value={newName} onChange={e => setNewName(e.target.value)} placeholder="Enter full name" />
-            <Input label="Email Address" type="email" value={newEmail} onChange={e => setNewEmail(e.target.value)} placeholder="Enter email address" />
-            <Input label={isEditMode ? "New Password (optional)" : "Temporary Password"} type="password" value={newPassword} onChange={e => setNewPassword(e.target.value)} placeholder="Enter password" />
-          </div>
-
-          <div className="tour-role-select" style={{ marginBottom: 16 }}>
-            <label style={{ fontSize: 12, fontWeight: 600, color: colors.textSecondary, marginBottom: 6, display: 'block', textTransform: 'uppercase' }}>Role</label>
-            <div style={{ display: 'flex', gap: 8 }}>
-              {roleOptions.map((r) => (
-                <button key={r} onClick={() => handleRoleChange(r)}
-                  style={{ flex: 1, padding: '10px', borderRadius: radius.sm, border: selectedRole === r ? `2px solid ${colors.primaryBlue}` : `1px solid ${colors.cardBorder}`, background: selectedRole === r ? '#FFF5F0' : colors.cardBg, cursor: 'pointer', textAlign: 'center' }}>
-                  <div style={{ fontSize: 14, fontWeight: 700, color: colors.textPrimary }}>{r === '__custom_role__' ? 'Custom Role' : r}</div>
-                </button>
-              ))}
+      {/* ── MAIN CONTENT (Overlapping BtSheet) ── */}
+      <BtSheet overlap={26} padding="28px 32px 64px">
+        {showForm ? (
+          /* ── FORM VIEW: ADD / EDIT MEMBER ── */
+          <div style={{ maxWidth: 840, margin: '0 auto' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 20 }}>
+              <button
+                onClick={() => setShowForm(false)}
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 6,
+                  background: 'none',
+                  border: 'none',
+                  color: 'var(--ink)',
+                  fontSize: 14,
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                }}
+              >
+                <ArrowLeft size={16} />
+                <span>Back to Team</span>
+              </button>
+              <span style={{ fontSize: 13, color: 'var(--ink-soft)' }}>/</span>
+              <span style={{ fontSize: 15, fontWeight: 700, color: 'var(--ink)' }}>
+                {isEditMode ? 'Edit Team Member' : 'New Member Provisioning'}
+              </span>
             </div>
-          </div>
 
-          {isCustomRole && (
-            <div className="tour-custom-role" style={{ marginBottom: 16 }}>
-              <Input label="Custom Role Name" value={customRoleName} onChange={e => setCustomRoleName(e.target.value)} placeholder="Type new role name" />
-            </div>
-          )}
-
-          {(selectedRole === 'Supervisor' || isCustomRole) && (
-            <div className="tour-oversees-roles" style={{ marginBottom: 20 }}>
-              <label style={{ fontSize: 12, fontWeight: 600, color: colors.textSecondary, marginBottom: 6, display: 'block', textTransform: 'uppercase' }}>Roles to Oversee</label>
-              <div style={{ fontSize: 11, color: colors.textLight, marginBottom: 10 }}>Select the roles this user can approve entries for.</div>
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 10 }}>
-                {[...new Set([...availableRolesToOversee, ...selectedOverseesRoles])].map(role => {
-                  const isSelected = selectedOverseesRoles.includes(role);
-                  return (
-                    <div key={role} onClick={() => isAdmin && toggleOverseesRole(role)}
-                      style={{ padding: '6px 12px', borderRadius: 20, border: `1px solid ${isSelected ? colors.primary : colors.cardBorder}`, background: isSelected ? colors.primary + '15' : 'transparent', color: isSelected ? colors.primary : colors.textDark, fontSize: 13, cursor: isAdmin ? 'pointer' : 'default', fontWeight: isSelected ? 600 : 400 }}>
-                      {role}
-                    </div>
-                  );
-                })}
-              </div>
-              {isAdmin && (
-                <div style={{ display: 'flex', gap: 8 }}>
-                  <input value={customOverseesInput} onChange={e => setCustomOverseesInput(e.target.value)} onKeyDown={e => e.key === 'Enter' && addCustomOverseesRole()} placeholder="Add custom role to oversee" style={{ flex: 1, padding: '8px 12px', borderRadius: radius.sm, border: `1px solid ${colors.cardBorder}`, fontSize: 13 }} />
-                  <Button variant="secondary" onClick={addCustomOverseesRole}>Add</Button>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
+              {/* Card 1: User Account Details */}
+              <BtCard padding="24px" className="tour-user-details">
+                <h3 style={{ margin: '0 0 16px', fontSize: 16, fontWeight: 700, color: 'var(--ink)' }}>
+                  1. Member Credentials
+                </h3>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 16 }}>
+                  <div>
+                    <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: 'var(--ink-soft)', marginBottom: 6 }}>
+                      Full Name *
+                    </label>
+                    <input
+                      type="text"
+                      value={newName}
+                      onChange={(e) => setNewName(e.target.value)}
+                      placeholder="e.g. Ramesh Kumar"
+                      style={{
+                        width: '100%',
+                        padding: '10px 14px',
+                        borderRadius: 'var(--r-btn, 12px)',
+                        border: '1px solid var(--line)',
+                        background: 'var(--fill)',
+                        fontSize: 13,
+                        color: 'var(--ink)',
+                        outline: 'none',
+                      }}
+                    />
+                  </div>
+                  <div>
+                    <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: 'var(--ink-soft)', marginBottom: 6 }}>
+                      Email Address *
+                    </label>
+                    <input
+                      type="email"
+                      value={newEmail}
+                      onChange={(e) => setNewEmail(e.target.value)}
+                      placeholder="ramesh@example.com"
+                      disabled={isEditMode}
+                      style={{
+                        width: '100%',
+                        padding: '10px 14px',
+                        borderRadius: 'var(--r-btn, 12px)',
+                        border: '1px solid var(--line)',
+                        background: isEditMode ? 'var(--fill)' : '#FFFFFF',
+                        fontSize: 13,
+                        color: isEditMode ? 'var(--ink-soft)' : 'var(--ink)',
+                        outline: 'none',
+                      }}
+                    />
+                  </div>
+                  <div>
+                    <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: 'var(--ink-soft)', marginBottom: 6 }}>
+                      {isEditMode ? 'Reset Password (optional)' : 'Temporary Password *'}
+                    </label>
+                    <input
+                      type="password"
+                      value={newPassword}
+                      onChange={(e) => setNewPassword(e.target.value)}
+                      placeholder="••••••••"
+                      style={{
+                        width: '100%',
+                        padding: '10px 14px',
+                        borderRadius: 'var(--r-btn, 12px)',
+                        border: '1px solid var(--line)',
+                        background: '#FFFFFF',
+                        fontSize: 13,
+                        color: 'var(--ink)',
+                        outline: 'none',
+                      }}
+                    />
+                  </div>
                 </div>
+              </BtCard>
+
+              {/* Card 2: Role Selection */}
+              <BtCard padding="24px" className="tour-role-select">
+                <h3 style={{ margin: '0 0 16px', fontSize: 16, fontWeight: 700, color: 'var(--ink)' }}>
+                  2. Role Assignment
+                </h3>
+                <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginBottom: 14 }}>
+                  {['Supervisor', 'Mason', '__custom_role__'].map((roleKey) => {
+                    const label = roleKey === '__custom_role__' ? 'Custom Role' : roleKey;
+                    const isSelected = selectedRole === roleKey;
+                    return (
+                      <button
+                        key={roleKey}
+                        type="button"
+                        onClick={() => handleRoleChange(roleKey)}
+                        style={{
+                          padding: '10px 18px',
+                          borderRadius: 'var(--r-btn, 12px)',
+                          border: isSelected ? '1px solid var(--ink)' : '1px solid var(--line)',
+                          background: isSelected ? 'var(--ink)' : '#FFFFFF',
+                          color: isSelected ? '#FFFFFF' : 'var(--ink)',
+                          fontSize: 13,
+                          fontWeight: 600,
+                          cursor: 'pointer',
+                        }}
+                      >
+                        {label}
+                      </button>
+                    );
+                  })}
+                </div>
+
+                {isCustomRole && (
+                  <div style={{ marginTop: 12 }}>
+                    <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: 'var(--ink-soft)', marginBottom: 6 }}>
+                      Custom Role Title *
+                    </label>
+                    <input
+                      type="text"
+                      value={customRoleName}
+                      onChange={(e) => setCustomRoleName(e.target.value)}
+                      placeholder="e.g. Site Engineer, Billing Specialist"
+                      style={{
+                        width: '100%',
+                        maxWidth: 360,
+                        padding: '10px 14px',
+                        borderRadius: 'var(--r-btn, 12px)',
+                        border: '1px solid var(--line)',
+                        fontSize: 13,
+                        color: 'var(--ink)',
+                        outline: 'none',
+                      }}
+                    />
+                  </div>
+                )}
+              </BtCard>
+
+              {/* Card 3: Overseeing Roles (if Supervisor) */}
+              {selectedRole === 'Supervisor' && (
+                <BtCard padding="24px">
+                  <h3 style={{ margin: '0 0 12px', fontSize: 16, fontWeight: 700, color: 'var(--ink)' }}>
+                    3. Roles to Oversee
+                  </h3>
+                  <p style={{ margin: '0 0 14px', fontSize: 13, color: 'var(--ink-soft)' }}>
+                    Select which roles this supervisor can review, dispatch tasks to, or approve entries for.
+                  </p>
+                  <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+                    {availableRolesToOversee.map((r) => {
+                      const isSelected = selectedOverseesRoles.includes(r);
+                      return (
+                        <button
+                          key={r}
+                          type="button"
+                          onClick={() => toggleOverseesRole(r)}
+                          style={{
+                            padding: '8px 16px',
+                            borderRadius: 'var(--r-chip)',
+                            border: isSelected ? '1px solid var(--accent)' : '1px solid var(--line)',
+                            background: isSelected ? 'var(--accent-soft)' : '#FFFFFF',
+                            color: isSelected ? 'var(--accent-ink)' : 'var(--ink)',
+                            fontSize: 13,
+                            fontWeight: 600,
+                            cursor: 'pointer',
+                          }}
+                        >
+                          {isSelected ? `✓ ${r}` : `+ ${r}`}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </BtCard>
               )}
+
+              {/* Card 4: Fine-Grained Permissions Matrix */}
+              <BtCard padding="24px" className="tour-permissions">
+                <h3 style={{ margin: '0 0 12px', fontSize: 16, fontWeight: 700, color: 'var(--ink)' }}>
+                  4. Fine-Grained Permission Matrix
+                </h3>
+                <div style={{ border: '1px solid var(--line)', borderRadius: 'var(--r-card)', overflow: 'hidden' }}>
+                  <div style={{ display: 'flex', background: 'var(--fill)', padding: '10px 16px', borderBottom: '1px solid var(--line)' }}>
+                    <div style={{ flex: 5, fontSize: 11, fontWeight: 700, fontFamily: 'var(--font-mono)', color: 'var(--ink-soft)', textTransform: 'uppercase' }}>Feature</div>
+                    <div style={{ width: 56, textAlign: 'center', fontSize: 11, fontWeight: 700, fontFamily: 'var(--font-mono)', color: 'var(--ink-soft)', textTransform: 'uppercase' }}>View</div>
+                    <div style={{ width: 56, textAlign: 'center', fontSize: 11, fontWeight: 700, fontFamily: 'var(--font-mono)', color: 'var(--ink-soft)', textTransform: 'uppercase' }}>Edit</div>
+                    <div style={{ width: 56, textAlign: 'center', fontSize: 11, fontWeight: 700, fontFamily: 'var(--font-mono)', color: 'var(--ink-soft)', textTransform: 'uppercase' }}>Delete</div>
+                  </div>
+
+                  {_featureRows.map((row, idx) => {
+                    if (row.section) {
+                      return (
+                        <div key={idx} style={{ background: 'var(--fill)', padding: '8px 16px', fontSize: 11, fontWeight: 700, fontFamily: 'var(--font-mono)', color: 'var(--ink-soft)', textTransform: 'uppercase' }}>
+                          {row.section}
+                        </div>
+                      );
+                    }
+
+                    const renderCheckbox = (key) => {
+                      if (!key) return <div style={{ width: 56, textAlign: 'center', color: 'var(--ink-soft)' }}>—</div>;
+                      return (
+                        <div style={{ width: 56, display: 'flex', justifyContent: 'center' }}>
+                          <input
+                            type="checkbox"
+                            checked={permissions[key] || false}
+                            onChange={(e) => setPermissions({ ...permissions, [key]: e.target.checked })}
+                            style={{ width: 16, height: 16, accentColor: 'var(--ink)', cursor: 'pointer' }}
+                          />
+                        </div>
+                      );
+                    };
+
+                    if (row.type === 'table') {
+                      return (
+                        <div key={idx} style={{ display: 'flex', alignItems: 'center', padding: '12px 16px', borderBottom: '1px solid var(--fill)' }}>
+                          <div style={{ flex: 5 }}>
+                            <div style={{ fontSize: 13.5, fontWeight: 600, color: 'var(--ink)' }}>{row.label}</div>
+                            <div style={{ fontSize: 12, color: 'var(--ink-soft)' }}>{row.desc}</div>
+                          </div>
+                          {renderCheckbox(row.view)}
+                          {renderCheckbox(row.edit)}
+                          {renderCheckbox(row.delete)}
+                        </div>
+                      );
+                    }
+
+                    if (row.type === 'toggle') {
+                      return (
+                        <div key={idx} style={{ display: 'flex', alignItems: 'center', padding: '12px 16px', borderBottom: '1px solid var(--fill)' }}>
+                          <div style={{ flex: 1 }}>
+                            <div style={{ fontSize: 13.5, fontWeight: 600, color: 'var(--ink)' }}>{row.label}</div>
+                            <div style={{ fontSize: 12, color: 'var(--ink-soft)' }}>{row.desc}</div>
+                          </div>
+                          <div style={{ marginLeft: 8 }}>
+                            <input
+                              type="checkbox"
+                              checked={permissions[row.key] || false}
+                              onChange={(e) => setPermissions({ ...permissions, [row.key]: e.target.checked })}
+                              style={{ width: 18, height: 18, accentColor: 'var(--ink)', cursor: 'pointer' }}
+                            />
+                          </div>
+                        </div>
+                      );
+                    }
+                    return null;
+                  })}
+                </div>
+              </BtCard>
+
+              {/* Card 5: Project Access */}
+              <BtCard padding="24px" className="tour-project-access">
+                <h3 style={{ margin: '0 0 12px', fontSize: 16, fontWeight: 700, color: 'var(--ink)' }}>
+                  5. Project Scoping
+                </h3>
+                <p style={{ margin: '0 0 14px', fontSize: 13, color: 'var(--ink-soft)' }}>
+                  Select which projects this user can see and work on. If none are selected, they have access to all projects.
+                </p>
+                <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+                  {projects.map((p) => {
+                    const pid = p._id || p.id;
+                    const isSelected = selectedProjects.includes(pid);
+                    return (
+                      <button
+                        key={pid}
+                        type="button"
+                        onClick={() => toggleProject(pid)}
+                        style={{
+                          padding: '8px 14px',
+                          borderRadius: 'var(--r-chip)',
+                          border: isSelected ? '1px solid var(--ink)' : '1px solid var(--line)',
+                          background: isSelected ? 'var(--ink)' : '#FFFFFF',
+                          color: isSelected ? '#FFFFFF' : 'var(--ink)',
+                          fontSize: 13,
+                          fontWeight: 600,
+                          cursor: 'pointer',
+                        }}
+                      >
+                        {isSelected ? `✓ ${p.projectName || p.name}` : p.projectName || p.name}
+                      </button>
+                    );
+                  })}
+                </div>
+              </BtCard>
+
+              {/* Action Buttons */}
+              <div style={{ display: 'flex', gap: 12, justifyContent: 'flex-end', marginTop: 12 }}>
+                <button
+                  type="button"
+                  onClick={() => setShowForm(false)}
+                  style={{
+                    height: 42,
+                    padding: '0 20px',
+                    borderRadius: 'var(--r-btn, 12px)',
+                    border: '1px solid var(--line)',
+                    background: '#FFFFFF',
+                    color: 'var(--ink)',
+                    fontSize: 13.5,
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                  }}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={handleProvision}
+                  disabled={saving}
+                  style={{
+                    height: 42,
+                    padding: '0 24px',
+                    borderRadius: 'var(--r-btn, 12px)',
+                    border: 'none',
+                    background: 'var(--ink)',
+                    color: '#FFFFFF',
+                    fontSize: 13.5,
+                    fontWeight: 700,
+                    cursor: saving ? 'not-allowed' : 'pointer',
+                    boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
+                  }}
+                >
+                  {saving ? 'Saving…' : isEditMode ? 'Save Changes' : 'Provision User'}
+                </button>
+              </div>
             </div>
-          )}
-
-          <div className="tour-permissions" style={{ marginBottom: 20 }}>
-            <label style={{ fontSize: 14, fontWeight: 700, color: colors.textDark, display: 'block' }}>Permissions</label>
-            <div style={{ fontSize: 12, color: colors.textLight, marginBottom: 12 }}>Configure what this user can see and do.</div>
-            {renderPermissionsTable()}
           </div>
+        ) : (
+          /* ── LIST VIEW: TEAM MEMBERS ── */
+          <div className="tour-user-list">
+            {/* Plan limit alert banner */}
+            {limitMaxUsers !== -1 && (
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  padding: '14px 20px',
+                  borderRadius: 'var(--r-card)',
+                  background: 'var(--card)',
+                  border: '1px solid var(--line)',
+                  marginBottom: 20,
+                  boxShadow: 'var(--shadow-card)',
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <Info size={18} color="var(--accent-ink)" />
+                  <span style={{ fontSize: 13, color: 'var(--ink-soft)' }}>
+                    Your <b>{subscription?.plan || 'Free'}</b> plan allows up to <b>{limitMaxUsers} users</b>. You currently have <b>{users.length} members</b>.
+                  </span>
+                </div>
+                {users.length >= limitMaxUsers && (
+                  <button
+                    onClick={() => navigate('/subscription')}
+                    style={{
+                      border: 'none',
+                      background: 'var(--accent-soft)',
+                      color: 'var(--accent-ink)',
+                      padding: '6px 14px',
+                      borderRadius: 8,
+                      fontSize: 12.5,
+                      fontWeight: 700,
+                      cursor: 'pointer',
+                    }}
+                  >
+                    Upgrade
+                  </button>
+                )}
+              </div>
+            )}
 
-          <div className="tour-project-access" style={{ marginBottom: 24 }}>
-            <label style={{ fontSize: 14, fontWeight: 700, color: colors.textDark, display: 'block' }}>Project Access <span style={{fontSize: 12, fontWeight: 400, color: colors.textLight}}>(Optional)</span></label>
-            <div style={{ fontSize: 12, color: colors.textLight, marginBottom: 10 }}>Select one or more projects. Leave all unchecked for org-wide access.</div>
-            {projects.length === 0 ? (
-              <div style={{ fontSize: 13, color: colors.textLight }}>No projects found.</div>
+            {loading ? (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                {[1, 2, 3].map((i) => (
+                  <div
+                    key={i}
+                    style={{
+                      height: 84,
+                      borderRadius: 'var(--r-card)',
+                      background: 'var(--fill)',
+                    }}
+                  />
+                ))}
+              </div>
+            ) : users.length === 0 ? (
+              <BtEmpty
+                title="No members provisioned yet"
+                message="Start building your workforce team by adding members and configuring their permissions."
+                actionLabel="Add Member"
+                onAction={handleCreateClick}
+              />
             ) : (
-              <div style={{ border: `1px solid ${colors.cardBorder}`, borderRadius: radius.md, overflow: 'hidden' }}>
-                {projects.map((p, idx) => {
-                  const pid = p._id || p.id;
-                  const isChecked = selectedProjects.includes(pid);
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                {users.map((member) => {
+                  const roleName = member.role || 'Member';
+                  const roleTone =
+                    roleName.toLowerCase() === 'admin'
+                      ? 'accent'
+                      : roleName.toLowerCase() === 'supervisor'
+                        ? 'info'
+                        : roleName.toLowerCase() === 'mason'
+                          ? 'warn'
+                          : 'muted';
+
                   return (
-                    <div key={pid} onClick={() => toggleProject(pid)} style={{ display: 'flex', alignItems: 'center', padding: '10px 14px', borderBottom: idx < projects.length - 1 ? `1px solid ${colors.cardBorder}` : 'none', cursor: isAdmin ? 'pointer' : 'default' }}>
-                      <input type="checkbox" checked={isChecked} onChange={() => {}} style={{ width: 16, height: 16, marginRight: 12, pointerEvents: 'none' }} />
-                      <div style={{ fontSize: 14, fontWeight: isChecked ? 700 : 500, color: isChecked ? colors.primary : colors.textDark }}>{p.projectName || p.name}</div>
-                    </div>
+                    <BtCard
+                      key={member._id || member.id}
+                      padding="18px 24px"
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        flexWrap: 'wrap',
+                        gap: 16,
+                      }}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+                        <div
+                          style={{
+                            width: 44,
+                            height: 44,
+                            borderRadius: '50%',
+                            background: 'var(--fill)',
+                            border: '1px solid var(--line)',
+                            display: 'grid',
+                            placeItems: 'center',
+                            fontSize: 16,
+                            fontWeight: 700,
+                            color: 'var(--ink)',
+                          }}
+                        >
+                          {member.name ? member.name.charAt(0).toUpperCase() : 'U'}
+                        </div>
+                        <div>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                            <span style={{ fontSize: 15, fontWeight: 700, color: 'var(--ink)' }}>
+                              {member.name || 'Unnamed User'}
+                            </span>
+                            <BtBadge tone={roleTone}>{roleName}</BtBadge>
+                          </div>
+                          <div style={{ fontSize: 12.5, color: 'var(--ink-soft)', marginTop: 2 }}>
+                            {member.email} · {(member.permissions || []).length} permissions active
+                          </div>
+                        </div>
+                      </div>
+
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <button
+                          onClick={() => handleEditClick(member)}
+                          style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: 6,
+                            padding: '6px 14px',
+                            borderRadius: 'var(--r-btn, 12px)',
+                            background: '#FFFFFF',
+                            border: '1px solid var(--line)',
+                            fontSize: 12.5,
+                            fontWeight: 600,
+                            color: 'var(--ink)',
+                            cursor: 'pointer',
+                          }}
+                        >
+                          <Edit2 size={13} />
+                          <span>Edit</span>
+                        </button>
+
+                        {member.role?.toLowerCase() !== 'admin' && (
+                          <button
+                            onClick={() => {
+                              if (window.confirm(`Are you sure you want to deactivate ${member.name}?`)) {
+                                authAPI
+                                  .deleteUser(member._id || member.id)
+                                  .then(() => {
+                                    setToast({ message: 'User deactivated successfully', type: 'info', key: Date.now() });
+                                    fetchAll();
+                                  })
+                                  .catch((err) =>
+                                    setToast({ message: err.friendlyMessage || 'Failed to delete user', type: 'error', key: Date.now() })
+                                  );
+                              }
+                            }}
+                            style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: 6,
+                              padding: '6px 12px',
+                              borderRadius: 'var(--r-btn, 12px)',
+                              background: '#FFFFFF',
+                              border: '1px solid var(--line)',
+                              fontSize: 12.5,
+                              fontWeight: 600,
+                              color: 'var(--danger)',
+                              cursor: 'pointer',
+                            }}
+                          >
+                            <Trash2 size={13} />
+                          </button>
+                        )}
+                      </div>
+                    </BtCard>
                   );
                 })}
               </div>
             )}
           </div>
-
-          <div style={{ display: 'flex', gap: 12 }}>
-            <Button variant="ghost" onClick={() => setShowForm(false)} style={{ flex: 1 }}>Cancel</Button>
-            {isAdmin && <Button onClick={handleProvision} loading={saving} style={{ flex: 2 }}>{isEditMode ? 'Update User' : 'Assign Role'}</Button>}
-          </div>
-        </Card>
-      ) : loading ? (
-        <Spinner style={{ padding: 60 }} />
-      ) : error ? (
-        <div style={{ color: colors.error, padding: 20, textAlign: 'center' }}>
-          <p>{error}</p>
-          <Button variant="ghost" onClick={fetchAll}>Retry</Button>
-        </div>
-      ) : users.length === 0 ? (
-        <EmptyState icon={<Users size={48} />} title="No Users" description="Create your first team member to get started." />
-      ) : (
-        <div className="tour-user-list" style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-          {users.map((user) => {
-            const uid = user._id || user.id;
-            const currentRole = user.role || 'user';
-            return (
-              <Card key={uid} padding="16px 20px" hoverable onClick={() => handleEditClick(user)}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
-                  <div style={{ width: 42, height: 42, borderRadius: '50%', background: colors.iconBg, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18, flexShrink: 0 }}>
-                    {user.profilePhoto ? <img src={user.profilePhoto} alt="" style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover' }} /> : <User size={18} />}
-                  </div>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontSize: 15, fontWeight: 600, color: colors.textPrimary }}>{user.name || 'Unknown'}</div>
-                    <div style={{ fontSize: 13, color: colors.textSecondary }}>{user.email}</div>
-                  </div>
-                  <Badge variant={currentRole === 'admin' ? 'info' : currentRole === 'supervisor' ? 'success' : 'neutral'}>
-                    {currentRole}
-                  </Badge>
-                </div>
-              </Card>
-            );
-          })}
-        </div>
-      )}
+        )}
+      </BtSheet>
     </div>
   );
 }

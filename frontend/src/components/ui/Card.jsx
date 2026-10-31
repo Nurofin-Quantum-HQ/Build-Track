@@ -1,40 +1,43 @@
-import { colors, radius, shadows, glass } from '../../styles/designTokens';
+import React, { useState } from 'react';
 
-export default function Card({ children, style, onClick, hoverable, padding, className }) {
-  const isInteractive = hoverable || onClick;
+export default function Card({
+  children,
+  style,
+  onClick,
+  hoverable,
+  padding = 20,
+  className = '',
+  bordered = true,
+  ...props
+}) {
+  const [pressed, setPressed] = useState(false);
+  const isInteractive = Boolean(hoverable || onClick);
 
   return (
     <div
       className={className}
       onClick={onClick}
+      onPointerDown={() => isInteractive && setPressed(true)}
+      onPointerUp={() => isInteractive && setPressed(false)}
+      onPointerLeave={() => isInteractive && setPressed(false)}
       style={{
-        background: glass.background,
-        backdropFilter: glass.backdropFilter,
-        WebkitBackdropFilter: glass.WebkitBackdropFilter,
-        borderRadius: "14px",
-        border: glass.border,
-        boxShadow: "var(--shadow-sm)",
-        padding: padding !== undefined ? padding : 24,
-        transition: "all 300ms cubic-bezier(0.4, 0, 0.2, 1)",
+        background: 'var(--card)',
+        borderRadius: 'var(--r-card)',
+        border: bordered ? '1px solid var(--line)' : 'none',
+        boxShadow: 'var(--shadow-card)',
+        padding,
         cursor: onClick ? 'pointer' : undefined,
+        transform: pressed ? 'scale(0.985)' : 'scale(1)',
+        transition: isInteractive
+          ? pressed
+            ? 'transform 90ms var(--ease)'
+            : 'transform 380ms var(--spring), box-shadow 200ms ease, border-color 200ms ease'
+          : 'none',
+        boxSizing: 'border-box',
+        position: 'relative',
         ...style,
       }}
-      onMouseEnter={(e) => {
-        if (isInteractive) {
-          e.currentTarget.style.boxShadow = "var(--shadow-lg)";
-          e.currentTarget.style.transform = 'translateY(-4px)';
-          e.currentTarget.style.borderColor = "rgba(255, 255, 255, 0.75)";
-          e.currentTarget.style.background = "rgba(255, 255, 255, 0.82)";
-        }
-      }}
-      onMouseLeave={(e) => {
-        if (isInteractive) {
-          e.currentTarget.style.boxShadow = "var(--shadow-sm)";
-          e.currentTarget.style.transform = 'translateY(0)';
-          e.currentTarget.style.borderColor = "rgba(255, 255, 255, 0.55)";
-          e.currentTarget.style.background = "var(--glass-bg)";
-        }
-      }}
+      {...props}
     >
       {children}
     </div>

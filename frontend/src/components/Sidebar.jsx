@@ -1,25 +1,13 @@
-import { useState, useEffect } from "react";
-import { NavLink, useLocation } from "react-router-dom";
+import React, { useState, useEffect } from "react";
+import { NavLink, useLocation, useNavigate } from "react-router-dom";
 import { navItems, adminNavItems } from "../navItems";
 import { resolveImageUrl } from "../utils/imageUrl";
-import { LogOut, HelpCircle } from "lucide-react";
-import { colors, gradients, radius, typography } from "../styles/designTokens";
+import { LogOut, HelpCircle, Plus, Download } from "lucide-react";
 import { useAuth } from "../contexts/AuthContext";
 import { preloadRoute } from "../App";
 import perfLogger from "../utils/performanceLogger";
 import useNotificationStore from "../stores/notificationStore";
-
-const linkStyle = {
-  display: "flex",
-  alignItems: "center",
-  gap: 12,
-  padding: "10px 16px",
-  borderRadius: "12px",
-  textDecoration: "none",
-  fontSize: "14px",
-  fontWeight: 500,
-  marginBottom: 4,
-};
+import { approvalAPI } from "../api";
 
 const FONT_FAMILY_MAP = {
   "Inter": "'Inter', sans-serif",
@@ -34,9 +22,14 @@ const FONT_FAMILY_MAP = {
 
 export default function Sidebar() {
   const location = useLocation();
+  const navigate = useNavigate();
   const { user: authUser, logout } = useAuth();
   const [user, setUser] = useState(authUser);
-  const totalAlertCount = useNotificationStore((state) => state.systemNotifications.filter(n => !n.read).length);
+  const [pendingApprovalsCount, setPendingApprovalsCount] = useState(0);
+
+  const totalAlertCount = useNotificationStore((state) =>
+    state.systemNotifications ? state.systemNotifications.filter((n) => !n.read).length : 0
+  );
 
   useEffect(() => {
     setUser(authUser);
@@ -53,9 +46,36 @@ export default function Sidebar() {
     return () => window.removeEventListener("userUpdated", syncUser);
   }, []);
 
-  const photoUrl = user?.profilePhoto ? resolveImageUrl(user.profilePhoto) : null;
+  // Fetch pending approvals count for supervisors/admins
   const r = (user?.role || "").toLowerCase();
   const isAdminOrSupervisor = r === "admin" || r === "supervisor";
+
+  useEffect(() => {
+    if (!isAdminOrSupervisor) return;
+
+    let mounted = true;
+    const fetchPending = async () => {
+      try {
+        const res = await approvalAPI.getPending();
+        let list = [];
+        if (Array.isArray(res?.data)) list = res.data;
+        else if (Array.isArray(res?.data?.data)) list = res.data.data;
+        else if (Array.isArray(res?.data?.transactions)) list = res.data.transactions;
+        if (mounted) setPendingApprovalsCount(list.length);
+      } catch {
+        // Silently catch error
+      }
+    };
+
+    fetchPending();
+    const interval = setInterval(fetchPending, 30000);
+    return () => {
+      mounted = false;
+      clearInterval(interval);
+    };
+  }, [isAdminOrSupervisor, location.pathname]);
+
+  const photoUrl = user?.profilePhoto ? resolveImageUrl(user.profilePhoto) : null;
 
   const handleLogout = () => {
     if (logout) logout();
@@ -66,16 +86,30 @@ export default function Sidebar() {
     }
   };
 
+  const isRouteActive = (itemPath) => {
+    if (itemPath === "/") return location.pathname === "/";
+    if (itemPath === "/projects") {
+      return (
+        location.pathname.startsWith("/projects") ||
+        location.pathname === "/managesite" ||
+        location.pathname === "/newproject" ||
+        location.pathname.startsWith("/project-detail") ||
+        location.pathname.startsWith("/project-report") ||
+        location.pathname.startsWith("/project-insights")
+      );
+    }
+    return location.pathname.startsWith(itemPath);
+  };
+
   return (
     <aside
       style={{
-        width: 250,
-        minWidth: 250,
-        background: "rgba(255, 255, 255, 0.45)",
-        backdropFilter: "blur(24px)",
-        WebkitBackdropFilter: "blur(24px)",
-        border: "1px solid rgba(255, 255, 255, 0.45)",
-        borderRadius: "20px",
+        width: 240,
+        minWidth: 240,
+        background: "var(--card)",
+        border: "1px solid var(--line)",
+        borderRadius: "var(--r-card)",
+        boxShadow: "var(--shadow-card)",
         display: "flex",
         flexDirection: "column",
         height: "calc(100vh - 32px)",
@@ -83,201 +117,331 @@ export default function Sidebar() {
         top: 16,
         margin: "16px 0 16px 16px",
         zIndex: 30,
-        boxShadow: "var(--shadow-lg)",
+        overflow: "hidden",
+        boxSizing: "border-box",
       }}
     >
-      {user?.companyLogo ? (
-        <div style={{ display: "flex", alignItems: "center", gap: 12, padding: "24px 20px 20px", minWidth: 0 }}>
+      {/* ── Brand Header ── */}
+      <div
+        onClick={() => navigate("/")}
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: 10,
+          padding: "20px 18px 14px",
+          minWidth: 0,
+          cursor: "pointer",
+        }}
+      >
+        {user?.companyLogo ? (
           <img
             src={resolveImageUrl(user.companyLogo)}
-            alt={user?.companyName || "Company Logo"}
+            alt={user?.companyName || "Logo"}
             style={{
-              width: 38,
-              height: 38,
-              borderRadius: "10px",
+              width: 32,
+              height: 32,
+              borderRadius: "8px",
               objectFit: "contain",
               flexShrink: 0,
-              background: "rgba(255, 255, 255, 0.8)",
-              border: "1px solid rgba(0, 0, 0, 0.06)",
-              boxShadow: "0 2px 8px rgba(0,0,0,0.04)",
+              background: "var(--fill)",
+              border: "1px solid var(--line)",
             }}
           />
-          <span
+        ) : (
+          <div
             style={{
-              fontSize: 19,
+              width: 32,
+              height: 32,
+              borderRadius: "10px",
+              background: "var(--ink)",
+              color: "#FFFFFF",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              fontFamily: "var(--font-display)",
               fontWeight: 800,
-              color: colors.textPrimary,
-              letterSpacing: "-0.02em",
-              fontFamily: FONT_FAMILY_MAP[user?.companyFontStyle] || user?.companyFontStyle || typography.fontFamily,
-              whiteSpace: "nowrap",
-              overflow: "hidden",
-              textOverflow: "ellipsis",
+              fontSize: 16,
+              flexShrink: 0,
             }}
-            title={user?.companyName}
           >
-            {user?.companyName || "BuildTrack"}
-          </span>
-        </div>
-      ) : (
-        <div style={{ display: "flex", alignItems: "center", padding: "24px 20px 20px", minWidth: 0 }}>
-          <span
-            style={{
-              fontSize: 20,
-              fontWeight: 800,
-              color: colors.textPrimary,
-              letterSpacing: "-0.02em",
-              fontFamily: FONT_FAMILY_MAP[user?.companyFontStyle] || user?.companyFontStyle || typography.fontFamily,
-              whiteSpace: "nowrap",
-              overflow: "hidden",
-              textOverflow: "ellipsis",
-            }}
-            title={user?.companyName}
-          >
-            {user?.companyName || "BuildTrack"}
-          </span>
-        </div>
-      )}
+            B
+          </div>
+        )}
 
-      <nav style={{ flex: 1, overflowY: "auto", padding: "0 16px", display: "flex", flexDirection: "column", gap: 2 }}>
-        <div style={{ fontSize: 11, fontWeight: 700, color: colors.textTertiary, letterSpacing: "0.08em", padding: "12px 8px 6px", textTransform: "uppercase" }}>
+        <div style={{ minWidth: 0, flex: 1 }}>
+          <div
+            style={{
+              fontSize: 17,
+              fontWeight: 700,
+              color: "var(--ink)",
+              letterSpacing: "-0.5px",
+              fontFamily: FONT_FAMILY_MAP[user?.companyFontStyle] || "var(--font-display)",
+              whiteSpace: "nowrap",
+              overflow: "hidden",
+              textOverflow: "ellipsis",
+            }}
+            title={user?.companyName || "BuildTrack"}
+          >
+            {user?.companyName || "BuildTrack"}
+          </div>
+          <div
+            style={{
+              fontSize: 11,
+              color: "var(--ink-3)",
+              fontFamily: "var(--font-ui)",
+              lineHeight: 1.1,
+            }}
+          >
+            Powered by Nurofin
+          </div>
+        </div>
+      </div>
+
+      {/* ── Prominent '+ New entry' Ink Button (Section 5) ── */}
+      <div style={{ padding: "0 14px 14px" }}>
+        <button
+          type="button"
+          onClick={() => {
+            preloadRoute("/add-entry");
+            navigate("/add-entry");
+          }}
+          className="tour-add-entry"
+          style={{
+            width: "100%",
+            height: "46px",
+            borderRadius: "14px",
+            background: "var(--ink)",
+            color: "#FFFFFF",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            gap: "8px",
+            fontSize: "14px",
+            fontWeight: 600,
+            fontFamily: "var(--font-ui)",
+            cursor: "pointer",
+            border: "none",
+            boxShadow: "0 2px 6px rgba(12, 14, 18, 0.15)",
+            transition: "transform 90ms ease, opacity 150ms ease",
+          }}
+          onMouseDown={(e) => (e.currentTarget.style.transform = "scale(0.97)")}
+          onMouseUp={(e) => (e.currentTarget.style.transform = "scale(1)")}
+          onMouseLeave={(e) => (e.currentTarget.style.transform = "scale(1)")}
+        >
+          <Plus size={18} strokeWidth={2.5} />
+          <span>New entry</span>
+        </button>
+      </div>
+
+      {/* ── Navigation Items ── */}
+      <nav
+        style={{
+          flex: 1,
+          overflowY: "auto",
+          padding: "0 12px",
+          display: "flex",
+          flexDirection: "column",
+          gap: 2,
+        }}
+      >
+        <div
+          style={{
+            fontSize: 10.5,
+            fontWeight: 600,
+            fontFamily: "var(--font-mono)",
+            color: "var(--ink-3)",
+            letterSpacing: "0.09em",
+            padding: "8px 10px 4px",
+            textTransform: "uppercase",
+          }}
+        >
           Main
         </div>
-        {navItems.filter((item) => {
-          if (item.label === "Dashboard") return true;
-          if (item.label === "Projects") return isAdminOrSupervisor || user?.permissions?.includes('create_project') || user?.permissions?.includes('view_assigned_project') || user?.permissions?.includes('view_projects');
-          if (item.label === "Add Entry" || item.label === "Voice") return isAdminOrSupervisor || user?.permissions?.includes('add_entries');
-          if (item.label === "Log") return true;
-          
-          if (item.label === "Assign Task") return isAdminOrSupervisor || user?.permissions?.includes('assign_tasks');
-          if (item.label === "Notifications") return true;
-          if (item.label === "Reports") return isAdminOrSupervisor || user?.permissions?.includes('view_reports');
-          if (item.label === "Subscription" || item.label === "Settings") return isAdminOrSupervisor;
-          return true;
-        }).map((item) => {
-          const tourClassMap = {
-            'Dashboard': 'tour-dashboard',
-            'Projects': 'tour-create-project',
-            'Add Entry': 'tour-add-entry',
-            'Voice': 'tour-voice',
-            'Log': 'tour-log',
-            'Inventory': 'tour-inventory',
-            'Reports': 'tour-reports',
-            'Subscription': 'tour-subscription',
-            'Settings': 'tour-settings'
-          };
-          return (
-          <NavLink
-            key={item.label}
-            to={item.path}
-            end={item.path === "/"}
-            className={`sidebar-link ${tourClassMap[item.label] || ''}`}
-            onMouseEnter={() => preloadRoute(item.path)}
-            onPointerDown={() => preloadRoute(item.path)}
-            onClick={() => perfLogger.startRoute(item.path)}
-            style={({ isActive }) => {
-              const active = isActive || (item.path === "/projects" && (
-                location.pathname.startsWith("/projects") ||
-                location.pathname === "/managesite" ||
-                location.pathname === "/newproject" ||
-                location.pathname.startsWith("/project-detail") ||
-                location.pathname.startsWith("/project-report") ||
-                location.pathname.startsWith("/project-insights")
-              ));
-              return {
-                ...linkStyle,
-                color: active ? "#FFFFFF" : colors.textSecondary,
-                background: active ? gradients.primaryGradient : "transparent",
-                boxShadow: active ? "0 8px 16px -4px rgba(249, 115, 22, 0.4)" : "none",
-                fontWeight: active ? 600 : 500,
-              };
-            }}
-          >
-            {({ isActive }) => {
-              const active = isActive || (item.path === "/projects" && (
-                location.pathname.startsWith("/projects") ||
-                location.pathname === "/managesite" ||
-                location.pathname === "/newproject" ||
-                location.pathname.startsWith("/project-detail") ||
-                location.pathname.startsWith("/project-report") ||
-                location.pathname.startsWith("/project-insights")
-              ));
-              return (
-                <>
-                  <item.icon size={18} color={active ? "#FFFFFF" : colors.textSecondary} />
-                  <span>{item.label}</span>
-                  {item.label === "Notifications" && totalAlertCount > 0 && (
-                    <span
-                      style={{
-                        marginLeft: "auto",
-                        background: active ? "rgba(255, 255, 255, 0.3)" : "#EF4444",
-                        color: "#FFFFFF",
-                        fontSize: 10,
-                        fontWeight: 700,
-                        padding: "1px 6px",
-                        borderRadius: 10,
-                        minWidth: 16,
-                        textAlign: "center",
-                      }}
-                    >
-                      {totalAlertCount > 99 ? "99+" : totalAlertCount}
-                    </span>
-                  )}
-                </>
-              );
-            }}
-          </NavLink>
-        )})}
 
-        {isAdminOrSupervisor && (
-          <>
-            <div style={{ fontSize: 11, fontWeight: 700, color: colors.textTertiary, letterSpacing: "0.08em", padding: "20px 8px 6px", textTransform: "uppercase" }}>
-              Admin
-            </div>
-            {adminNavItems.map((item) => (
+        {navItems
+          .filter((item) => {
+            if (item.label === "Dashboard") return true;
+            if (item.label === "Projects")
+              return (
+                isAdminOrSupervisor ||
+                user?.permissions?.includes("create_project") ||
+                user?.permissions?.includes("view_assigned_project") ||
+                user?.permissions?.includes("view_projects")
+              );
+            if (item.label === "Voice")
+              return isAdminOrSupervisor || user?.permissions?.includes("add_entries");
+            if (item.label === "Log") return true;
+            if (item.label === "Assign Task")
+              return isAdminOrSupervisor || user?.permissions?.includes("assign_tasks");
+            if (item.label === "Notifications") return true;
+            if (item.label === "Reports")
+              return isAdminOrSupervisor || user?.permissions?.includes("view_reports");
+            return true;
+          })
+          .map((item) => {
+            const active = isRouteActive(item.path);
+            const Icon = item.icon;
+
+            return (
               <NavLink
                 key={item.label}
                 to={item.path}
-                className={`sidebar-link ${item.label === 'Subscription & Billing' ? 'tour-subscription' : ''}`}
-                onMouseEnter={() => preloadRoute(item.path)}
+                end={item.path === "/"}
                 onPointerDown={() => preloadRoute(item.path)}
                 onClick={() => perfLogger.startRoute(item.path)}
-                style={({ isActive }) => ({
-                  ...linkStyle,
-                  color: isActive ? "#FFFFFF" : colors.textSecondary,
-                  background: isActive ? gradients.primaryGradient : "transparent",
-                  boxShadow: isActive ? "0 8px 16px -4px rgba(249, 115, 22, 0.4)" : "none",
-                  fontWeight: isActive ? 600 : 500,
-                })}
+                onMouseEnter={(e) => {
+                  preloadRoute(item.path);
+                  if (!active) e.currentTarget.style.background = "var(--fill)";
+                }}
+                onMouseLeave={(e) => {
+                  if (!active) e.currentTarget.style.background = "transparent";
+                }}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "10px",
+                  padding: "9px 12px",
+                  borderRadius: "12px",
+                  textDecoration: "none",
+                  fontSize: "14px",
+                  fontWeight: active ? 600 : 400,
+                  fontFamily: "var(--font-ui)",
+                  color: active ? "#FFFFFF" : "var(--ink-2)",
+                  background: active ? "var(--ink)" : "transparent",
+                  transition: "background 140ms ease, color 140ms ease",
+                  userSelect: "none",
+                }}
               >
-                {({ isActive }) => (
-                  <>
-                    <item.icon size={18} color={isActive ? "#FFFFFF" : colors.textSecondary} />
-                    <span>{item.label}</span>
-                  </>
+                <Icon size={18} strokeWidth={active ? 2.2 : 1.75} style={{ flexShrink: 0 }} />
+                <span style={{ flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                  {item.label}
+                </span>
+
+                {item.label === "Notifications" && totalAlertCount > 0 && (
+                  <span
+                    style={{
+                      marginLeft: "auto",
+                      background: active ? "rgba(255, 255, 255, 0.25)" : "var(--status-danger)",
+                      color: "#FFFFFF",
+                      fontSize: "10px",
+                      fontWeight: 700,
+                      padding: "1px 6px",
+                      borderRadius: "10px",
+                      minWidth: "16px",
+                      textAlign: "center",
+                    }}
+                  >
+                    {totalAlertCount > 99 ? "99+" : totalAlertCount}
+                  </span>
                 )}
               </NavLink>
-            ))}
+            );
+          })}
+
+        {isAdminOrSupervisor && (
+          <>
+            <div
+              style={{
+                fontSize: 10.5,
+                fontWeight: 600,
+                fontFamily: "var(--font-mono)",
+                color: "var(--ink-3)",
+                letterSpacing: "0.09em",
+                padding: "18px 10px 4px",
+                textTransform: "uppercase",
+              }}
+            >
+              Admin & Team
+            </div>
+
+            {adminNavItems.map((item) => {
+              const active = isRouteActive(item.path);
+              const Icon = item.icon;
+
+              return (
+                <NavLink
+                  key={item.label}
+                  to={item.path}
+                  onPointerDown={() => preloadRoute(item.path)}
+                  onClick={() => perfLogger.startRoute(item.path)}
+                  onMouseEnter={(e) => {
+                    preloadRoute(item.path);
+                    if (!active) e.currentTarget.style.background = "var(--fill)";
+                  }}
+                  onMouseLeave={(e) => {
+                    if (!active) e.currentTarget.style.background = "transparent";
+                  }}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "10px",
+                    padding: "9px 12px",
+                    borderRadius: "12px",
+                    textDecoration: "none",
+                    fontSize: "14px",
+                    fontWeight: active ? 600 : 400,
+                    fontFamily: "var(--font-ui)",
+                    color: active ? "#FFFFFF" : "var(--ink-2)",
+                    background: active ? "var(--ink)" : "transparent",
+                    transition: "background 140ms ease, color 140ms ease",
+                    userSelect: "none",
+                  }}
+                >
+                  <Icon size={18} strokeWidth={active ? 2.2 : 1.75} style={{ flexShrink: 0 }} />
+                  <span style={{ flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                    {item.label}
+                  </span>
+
+                  {item.label === "Approvals" && pendingApprovalsCount > 0 && (
+                    <span
+                      style={{
+                        marginLeft: "auto",
+                        background: active ? "rgba(255, 255, 255, 0.25)" : "var(--status-warning-bright)",
+                        color: active ? "#FFFFFF" : "var(--noir)",
+                        fontSize: "11px",
+                        fontWeight: 700,
+                        padding: "1px 7px",
+                        borderRadius: "10px",
+                        textAlign: "center",
+                      }}
+                    >
+                      {pendingApprovalsCount}
+                    </span>
+                  )}
+                </NavLink>
+              );
+            })}
           </>
         )}
       </nav>
 
-      <div style={{ borderTop: `1px solid ${colors.border}`, padding: "16px 20px" }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 12 }}>
+      {/* ── User & Utilities Footer ── */}
+      <div
+        style={{
+          borderTop: "1px solid var(--line)",
+          padding: "14px 14px 12px",
+          background: "var(--card)",
+          display: "flex",
+          flexDirection: "column",
+          gap: "8px",
+        }}
+      >
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
           <div
             style={{
-              width: 38,
-              height: 38,
+              width: 36,
+              height: 36,
               borderRadius: "50%",
-              background: "#F1F5F9",
+              background: "var(--fill)",
               overflow: "hidden",
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
               fontSize: 14,
-              fontWeight: 600,
-              color: colors.textSecondary,
+              fontWeight: 700,
+              color: "var(--ink-2)",
               flexShrink: 0,
-              border: `2px solid ${colors.border}`,
+              border: "1px solid var(--line)",
             }}
           >
             {photoUrl ? (
@@ -286,81 +450,108 @@ export default function Sidebar() {
               user?.name?.charAt(0)?.toUpperCase() || "U"
             )}
           </div>
+
           <div style={{ minWidth: 0, flex: 1 }}>
-            <div style={{ fontSize: 14, fontWeight: 600, color: colors.textPrimary, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+            <div
+              style={{
+                fontSize: 13.5,
+                fontWeight: 600,
+                color: "var(--ink)",
+                overflow: "hidden",
+                textOverflow: "ellipsis",
+                whiteSpace: "nowrap",
+                fontFamily: "var(--font-ui)",
+              }}
+            >
               {user?.name || "User"}
             </div>
-            <div style={{ fontSize: 12, color: colors.textSecondary, textTransform: "capitalize" }}>
-              {user?.role || "Admin"}
+            <div
+              style={{
+                fontSize: 11.5,
+                color: "var(--ink-3)",
+                textTransform: "capitalize",
+                fontFamily: "var(--font-ui)",
+              }}
+            >
+              {user?.role || "Member"}
             </div>
           </div>
         </div>
+
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "6px" }}>
+          <button
+            onClick={() => window.dispatchEvent(new Event("replay-app-tour"))}
+            style={{
+              height: "32px",
+              padding: "0 8px",
+              borderRadius: "8px",
+              fontSize: "12px",
+              fontWeight: 500,
+              color: "var(--ink-2)",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              gap: 5,
+              cursor: "pointer",
+              border: "1px solid var(--line)",
+              background: "var(--fill)",
+              fontFamily: "var(--font-ui)",
+            }}
+          >
+            <HelpCircle size={13} />
+            Tour
+          </button>
+
+          <button
+            onClick={handleLogout}
+            style={{
+              height: "32px",
+              padding: "0 8px",
+              borderRadius: "8px",
+              fontSize: "12px",
+              fontWeight: 500,
+              color: "var(--status-danger)",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              gap: 5,
+              cursor: "pointer",
+              border: "1px solid rgba(190, 42, 48, 0.15)",
+              background: "var(--status-danger-soft)",
+              fontFamily: "var(--font-ui)",
+            }}
+          >
+            <LogOut size={13} />
+            Exit
+          </button>
+        </div>
+
         <button
-          onClick={handleLogout}
-          className="sidebar-signout-btn"
+          onClick={() =>
+            window.open(
+              "https://github.com/Nurofin-Quantum-HQ/Build-Track-App/releases/latest/download/app-release.apk",
+              "_blank"
+            )
+          }
           style={{
-            width: "100%",
-            padding: "10px 12px",
-            borderRadius: "10px",
-            fontSize: 13,
+            height: "32px",
+            padding: "0 8px",
+            borderRadius: "8px",
+            fontSize: "12px",
             fontWeight: 600,
-            color: colors.textSecondary,
+            color: "var(--ink-2)",
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
-            gap: 8,
+            gap: 6,
             cursor: "pointer",
-            border: `1px solid ${colors.border}`,
+            border: "1px solid var(--line)",
             background: "transparent",
+            fontFamily: "var(--font-ui)",
           }}
         >
-          <LogOut size={14} />
-          Sign Out
-        </button>
-        <button
-          onClick={() => window.dispatchEvent(new Event('replay-app-tour'))}
-          className="sidebar-help-btn"
-          style={{
-            width: "100%",
-            padding: "10px 12px",
-            marginTop: 8,
-            borderRadius: "10px",
-            fontSize: 13,
-            fontWeight: 600,
-            color: colors.textSecondary,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            gap: 8,
-            cursor: "pointer",
-            border: `1px solid ${colors.border}`,
-            background: "transparent",
-          }}
-        >
-          <HelpCircle size={14} />
-          App Tour
-        </button>
-        <button
-          onClick={() => window.open('https://github.com/Nurofin-Quantum-HQ/Build-Track-App/releases/latest/download/app-release.apk', '_blank')}
-          style={{
-            width: "100%",
-            padding: "10px 12px",
-            marginTop: 8,
-            borderRadius: "10px",
-            fontSize: 13,
-            fontWeight: 700,
-            color: "#fff",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            gap: 8,
-            cursor: "pointer",
-            border: "none",
-            background: gradients.primaryButton,
-          }}
-        >
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-          Download App
+          <Download size={13} />
+          Get Mobile App
         </button>
       </div>
     </aside>

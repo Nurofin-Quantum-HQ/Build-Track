@@ -10,7 +10,7 @@ import {
 } from "lucide-react";
 import { transactionAPI, esignAPI } from "../api";
 
-const primaryBlue = "var(--color-primary, #F97316)";
+const primaryBlue = "var(--ink, #111317)";
 
 const PAYMENT_METHODS = [
   { value: "UPI", icon: Smartphone },
@@ -337,7 +337,7 @@ export default function AddRevenueModal({ open, projects, onClose, onSaved }) {
           <button 
             onClick={handleSave} 
             disabled={saving || esignPolling}
-            style={{ width: "100%", padding: 16, background: primaryBlue, color: "#FFF", border: "none", borderRadius: 12, fontSize: 16, fontWeight: 700, cursor: saving ? "not-allowed" : "pointer", opacity: saving ? 0.7 : 1, display: "flex", justifyContent: "center", alignItems: "center" }}
+            style={{ width: "100%", padding: 16, background: "var(--ink, #111317)", color: "#F6F4EF", border: "1px solid rgba(255,255,255,0.2)", borderRadius: 12, fontSize: 15, fontWeight: 700, cursor: saving ? "not-allowed" : "pointer", opacity: saving ? 0.7 : 1, display: "flex", justifyContent: "center", alignItems: "center", boxShadow: "0 4px 12px rgba(0,0,0,0.2)" }}
           >
             {saving ? (
               <><div style={{ width: 18, height: 18, marginRight: 8, borderRadius: "50%", border: "2px solid rgba(255,255,255,0.3)", borderTopColor: "#FFF", animation: "spin 0.7s linear infinite" }} /> Saving...</>

@@ -10,13 +10,14 @@ import {
   ArrowRight,
   Building,
   CheckCircle,
-  AlertTriangle
+  AlertTriangle,
+  ArrowLeft,
 } from "lucide-react";
 import LightPremiumInput from "../components/ui/LightPremiumInput";
 import nurofinLogo from "../assets/nurofin-black.svg";
 
 const GoogleIcon = () => (
-  <svg width="17" height="17" viewBox="0 0 24 24" style={{ flexShrink: 0 }}>
+  <svg width="18" height="18" viewBox="0 0 24 24" style={{ flexShrink: 0 }}>
     <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
     <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
     <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z"/>
@@ -79,52 +80,48 @@ export default function LoginPage() {
       setEmailErr("Please enter a valid email address.");
       valid = false;
     }
-    if (password.length < 6) {
-      setPassErr("Password must be at least 6 characters.");
+    if (!password) {
+      setPassErr("Please enter your password.");
       valid = false;
     }
+
     if (!valid) {
       setShake(true);
-      setTimeout(() => setShake(false), 420);
+      setTimeout(() => setShake(false), 400);
       return;
     }
 
     setLoading(true);
     try {
-      await login(email, password);
+      await login(email.trim(), password);
       navigate("/", { replace: true });
     } catch (err) {
       const msg =
         err.friendlyMessage ||
         err.response?.data?.message ||
-        "Something went wrong. Please try again.";
-      if (err.response?.status === 401) {
-        setPassErr(msg);
-        setServerErr(msg);
-      } else {
-        setServerErr(msg);
-      }
+        "Invalid email or password. Please try again.";
+      setServerErr(msg);
       setShake(true);
-      setTimeout(() => setShake(false), 420);
+      setTimeout(() => setShake(false), 400);
     } finally {
       setLoading(false);
     }
   };
 
-  const handleForgotSubmit = async () => {
-    setForgotMsg("");
-    setForgotErr("");
-    if (!forgotEmail.trim()) {
-      setForgotErr("Email is required.");
+  const handleForgotSubmit = async (e) => {
+    if (e?.preventDefault) e.preventDefault();
+    if (!validateEmail(forgotEmail)) {
+      setForgotErr("Please enter a valid email address.");
       return;
     }
     setForgotLoading(true);
+    setForgotErr("");
+    setForgotMsg("");
     try {
-      const { data } = await authAPI.forgotPassword({ email: forgotEmail });
-      setForgotMsg(data.message || "A reset link has been sent to your email.");
-      setShowReset(true);
+      const { data } = await authAPI.forgotPassword({ email: forgotEmail.trim() });
+      setForgotMsg(data.message || "Password reset instructions sent to your email.");
     } catch (err) {
-      setForgotErr(err.response?.data?.message || "Failed to send reset email.");
+      setForgotErr(err.response?.data?.message || "Failed to send reset link. Try again.");
     } finally {
       setForgotLoading(false);
     }
@@ -132,213 +129,245 @@ export default function LoginPage() {
 
   return (
     <div
-      className="animated-orange-bg"
       style={{
+        minHeight: "100vh",
+        width: "100%",
         display: "flex",
-        width: "100vw",
-        height: "100vh",
-        overflow: "hidden",
-        fontFamily: "'Plus Jakarta Sans', system-ui, sans-serif",
         alignItems: "center",
         justifyContent: "center",
+        background: "var(--surface-ground, #F2F0EB)",
+        backgroundImage: "radial-gradient(rgba(17, 19, 23, 0.08) 1px, transparent 1px)",
+        backgroundSize: "22px 22px",
+        fontFamily: "var(--font-ui, 'Instrument Sans', sans-serif)",
         position: "relative",
-        boxSizing: "border-box"
+        padding: "32px 16px",
+        boxSizing: "border-box",
       }}
     >
-      <div className="light-blueprint-grid" />
-      <div className="light-glow-1" />
-      <div className="light-glow-2" />
-      <div className="light-glow-center" />
-
       <div
         style={{
           width: "100%",
-          maxWidth: "1280px",
+          maxWidth: "1200px",
           margin: "0 auto",
-          padding: isDesktop ? "0 80px" : "0 24px",
-          boxSizing: "border-box",
           display: "grid",
-          gridTemplateColumns: isDesktop ? "1.15fr 0.85fr" : "1fr",
-          gap: isDesktop ? "96px" : "32px",
+          gridTemplateColumns: isDesktop ? "1.1fr 0.9fr" : "1fr",
+          gap: isDesktop ? "64px" : "32px",
           alignItems: "center",
+          position: "relative",
           zIndex: 10,
-          position: "relative"
         }}
       >
-
+        {/* Left Column: Brand Hero (Desktop) */}
         {isDesktop && (
           <div style={{ display: "flex", flexDirection: "column", justifyContent: "center" }}>
-
-            <div className="animate-fade-up" style={{ display: "flex", alignItems: "center", gap: 20, animationDelay: "0.1s" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 16, marginBottom: 16 }}>
               <img
                 src="/buildtrack-logo.png"
                 alt="BuildTrack"
                 style={{
-                  width: 72,
-                  height: 72,
-                  borderRadius: 18,
+                  width: 56,
+                  height: 56,
+                  borderRadius: 14,
                   objectFit: "contain",
-                  boxShadow: "0 12px 32px rgba(249, 115, 22, 0.25)"
+                  boxShadow: "0 6px 20px rgba(0, 0, 0, 0.12)",
                 }}
               />
-              <span style={{ fontFamily: "'Outfit', sans-serif", fontSize: 42, fontWeight: "800", color: "#0F172A", letterSpacing: "-1px", lineHeight: 1 }}>
+              <span
+                style={{
+                  fontFamily: "var(--font-serif, 'Bricolage Grotesque', sans-serif)",
+                  fontSize: 36,
+                  fontWeight: 800,
+                  color: "var(--ink, #111317)",
+                  letterSpacing: "-0.02em",
+                  lineHeight: 1,
+                }}
+              >
                 BuildTrack
               </span>
             </div>
 
             <div
-              className="animate-fade-up"
               style={{
                 display: "inline-flex",
                 alignItems: "center",
                 gap: 8,
-                marginTop: 14,
-                padding: "6px 14px",
-                background: "rgba(255, 255, 255, 0.88)",
-                backdropFilter: "blur(16px)",
-                WebkitBackdropFilter: "blur(16px)",
-                border: "1px solid rgba(255, 255, 255, 0.9)",
-                borderRadius: "20px",
-                boxShadow: "0 4px 16px rgba(234, 88, 12, 0.12)",
+                marginBottom: 32,
+                padding: "4px 12px",
+                background: "rgba(255, 255, 255, 0.8)",
+                border: "1px solid var(--border, #E6E3DC)",
+                borderRadius: 20,
                 width: "fit-content",
-                animationDelay: "0.15s"
               }}
             >
-              <span style={{ fontSize: "11px", fontWeight: "700", color: "#64748B", textTransform: "uppercase", letterSpacing: "0.06em", lineHeight: 1 }}>
-                Powered by
+              <span
+                style={{
+                  fontFamily: "var(--font-mono)",
+                  fontSize: 10,
+                  fontWeight: 700,
+                  color: "var(--ink-secondary, #525864)",
+                  textTransform: "uppercase",
+                  letterSpacing: "0.08em",
+                }}
+              >
+                POWERED BY
               </span>
               <img
                 src={nurofinLogo}
                 alt="Nurofin"
-                style={{ height: 18, width: "auto", objectFit: "contain", display: "block" }}
+                style={{ height: 16, width: "auto", objectFit: "contain", display: "block" }}
               />
             </div>
 
-            <div style={{ marginTop: 28 }}>
-              <h1 className="animate-fade-up" style={{ fontFamily: "'Outfit', sans-serif", fontSize: "44px", fontWeight: "900", color: "#0F172A", lineHeight: 1.15, margin: "0 0 16px", letterSpacing: "-1.5px", animationDelay: "0.2s" }}>
-                The Platform for<br />
-                <span style={{ background: "linear-gradient(135deg, var(--color-primary-hover, #EA580C) 0%, var(--color-primary, #F97316) 100%)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>Modern Construction.</span>
-              </h1>
+            <h1
+              style={{
+                fontFamily: "var(--font-serif, 'Bricolage Grotesque', sans-serif)",
+                fontSize: 48,
+                fontWeight: 800,
+                color: "var(--ink, #111317)",
+                lineHeight: 1.12,
+                margin: "0 0 20px",
+                letterSpacing: "-0.03em",
+              }}
+            >
+              Every bag, worker <br />
+              and rupee —{" "}
+              <span style={{ color: "var(--accent, #E0A93B)" }}>on track.</span>
+            </h1>
 
-              <p className="animate-fade-up" style={{ fontSize: "16px", color: "#334155", lineHeight: 1.7, margin: "0 0 44px", animationDelay: "0.3s", fontWeight: "500" }}>
-                From real-time budgets to field inventory tracking — everything your construction team needs to deliver projects on time and under budget.
-              </p>
+            <p
+              style={{
+                fontSize: 16,
+                color: "var(--ink-secondary, #525864)",
+                lineHeight: 1.6,
+                margin: "0 0 36px",
+                maxWidth: 480,
+                fontWeight: 500,
+              }}
+            >
+              From real-time budget forecasting to on-site workforce logs — everything your construction team needs to deliver projects on time and under budget.
+            </p>
 
-              <div className="animate-fade-up" style={{ display: "flex", flexDirection: "column", gap: "24px", animationDelay: "0.4s" }}>
-                {[
-                  { title: "Real-time Budgets", desc: "Track cash flows and expenses live across all project sites." },
-                  { title: "Site Inventory Logs", desc: "Monitor raw materials, labour hours, and heavy equipment allocation." },
-                  { title: "Automated Reports", desc: "Instantly export visual cost reports, invoices, and audit summaries." }
-                ].map((item, idx) => (
-                  <div key={idx} style={{ display: "flex", alignItems: "flex-start", gap: "14px" }}>
-                    <div style={{ width: "24px", height: "24px", borderRadius: "50%", background: "#FFFFFF", border: "1.5px solid rgba(249, 115, 22, 0.4)", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--color-primary-hover, #EA580C)", flexShrink: 0, marginTop: "1px", boxShadow: "0 2px 8px rgba(234, 88, 12, 0.12)" }}>
-                      <CheckCircle size={14} />
-                    </div>
-                    <div>
-                      <h4 style={{ margin: "0 0 2px", fontSize: "14px", fontWeight: "700", color: "#0F172A" }}>{item.title}</h4>
-                      <p style={{ margin: 0, fontSize: "13px", color: "#475569", lineHeight: 1.45, fontWeight: "500" }}>{item.desc}</p>
-                    </div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
+              {[
+                { title: "Real-time Budgets", desc: "Track cash flows and site expenses live across all project sites." },
+                { title: "Site Inventory Logs", desc: "Monitor raw materials, labour hours, and heavy equipment allocation." },
+                { title: "Automated Reports", desc: "Instantly export visual cost reports, invoices, and audit summaries." },
+              ].map((item, idx) => (
+                <div key={idx} style={{ display: "flex", alignItems: "flex-start", gap: 12 }}>
+                  <div
+                    style={{
+                      width: 24,
+                      height: 24,
+                      borderRadius: "50%",
+                      background: "var(--ink, #111317)",
+                      color: "var(--bone, #F2F0EB)",
+                      display: "grid",
+                      placeItems: "center",
+                      flexShrink: 0,
+                      marginTop: 2,
+                    }}
+                  >
+                    <CheckCircle size={14} />
                   </div>
-                ))}
-              </div>
-
+                  <div>
+                    <h4 style={{ margin: "0 0 2px", fontSize: 14, fontWeight: 700, color: "var(--ink, #111317)" }}>
+                      {item.title}
+                    </h4>
+                    <p style={{ margin: 0, fontSize: 13, color: "var(--ink-secondary, #525864)", lineHeight: 1.4 }}>
+                      {item.desc}
+                    </p>
+                  </div>
+                </div>
+              ))}
             </div>
-
           </div>
         )}
 
+        {/* Right Column: Sign In Card */}
         <div style={{ display: "flex", alignItems: "center", justifyContent: "center", width: "100%" }}>
           <div
-            className={`login-glass-card animate-fade-up ${shake ? "shake-trigger" : ""}`}
             style={{
               width: "100%",
               maxWidth: 440,
-              padding: "52px 44px",
+              background: "#FFFFFF",
+              border: "1px solid var(--border, #E6E3DC)",
               borderRadius: 24,
-              animationDelay: "0.15s",
+              padding: isDesktop ? "44px 38px" : "32px 24px",
+              boxShadow: "0 12px 36px rgba(0, 0, 0, 0.05)",
               boxSizing: "border-box",
               position: "relative",
-              zIndex: 20
+              transform: shake ? "translateX(-6px)" : "none",
+              transition: "transform 100ms ease",
             }}
           >
-
+            {/* Mobile Brand Header */}
             {!isDesktop && (
-              <div style={{ display: "flex", flexDirection: "column", alignItems: "center", marginBottom: 28 }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 14, justifyContent: "center" }}>
+              <div style={{ display: "flex", flexDirection: "column", alignItems: "center", marginBottom: 24 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
                   <img
                     src="/buildtrack-logo.png"
                     alt="BuildTrack"
-                    style={{
-                      width: 54,
-                      height: 54,
-                      borderRadius: 14,
-                      objectFit: "contain",
-                      boxShadow: "0 10px 26px rgba(249, 115, 22, 0.22)"
-                    }}
+                    style={{ width: 44, height: 44, borderRadius: 12, objectFit: "contain" }}
                   />
-                  <span style={{ fontFamily: "'Outfit', sans-serif", fontSize: 32, fontWeight: "800", color: "#111827", letterSpacing: "-0.8px", lineHeight: 1 }}>
+                  <span
+                    style={{
+                      fontFamily: "var(--font-serif, 'Bricolage Grotesque', sans-serif)",
+                      fontSize: 26,
+                      fontWeight: 800,
+                      color: "var(--ink, #111317)",
+                    }}
+                  >
                     BuildTrack
                   </span>
-                </div>
-                <div
-                  style={{
-                    display: "inline-flex",
-                    alignItems: "center",
-                    gap: 7,
-                    marginTop: 10,
-                    padding: "5px 12px",
-                    background: "rgba(255, 255, 255, 0.75)",
-                    backdropFilter: "blur(12px)",
-                    WebkitBackdropFilter: "blur(12px)",
-                    border: "1px solid rgba(255, 255, 255, 0.8)",
-                    borderRadius: "20px",
-                    boxShadow: "0 2px 8px rgba(15, 23, 42, 0.04)"
-                  }}
-                >
-                  <span style={{ fontSize: "10.5px", fontWeight: "700", color: "#64748B", textTransform: "uppercase", letterSpacing: "0.06em", lineHeight: 1 }}>
-                    Powered by
-                  </span>
-                  <img
-                    src={nurofinLogo}
-                    alt="Nurofin"
-                    style={{ height: 16, width: "auto", objectFit: "contain", display: "block" }}
-                  />
                 </div>
               </div>
             )}
 
-            <div style={{ marginBottom: 32, textAlign: isDesktop ? "left" : "center" }}>
-              <h2 style={{ fontSize: "24px", fontWeight: "800", color: "#111827", margin: "0 0 6px", letterSpacing: "-0.5px" }}>Welcome back</h2>
-              <p style={{ margin: 0, fontSize: "14px", color: "#64748B", fontWeight: "500" }}>Sign in to your BuildTrack account.</p>
+            <div style={{ marginBottom: 24, textAlign: isDesktop ? "left" : "center" }}>
+              <h2
+                style={{
+                  fontSize: 24,
+                  fontWeight: 800,
+                  fontFamily: "var(--font-serif, 'Bricolage Grotesque', sans-serif)",
+                  color: "var(--ink, #111317)",
+                  margin: "0 0 6px",
+                  letterSpacing: "-0.01em",
+                }}
+              >
+                Welcome back
+              </h2>
+              <p style={{ margin: 0, fontSize: 14, color: "var(--ink-secondary, #525864)" }}>
+                Sign in to your BuildTrack workspace.
+              </p>
             </div>
 
             {serverErr && (
               <div
                 style={{
-                  background: "#FEF2F2",
-                  border: "1.2px solid #FCA5A5",
+                  background: "rgba(239, 68, 68, 0.08)",
+                  border: "1px solid rgba(239, 68, 68, 0.25)",
                   borderRadius: 12,
-                  padding: "12px 14px",
-                  marginBottom: 22,
+                  padding: "10px 14px",
+                  marginBottom: 18,
                   display: "flex",
                   alignItems: "flex-start",
-                  gap: 10,
-                  animation: "slideDown 0.2s ease"
+                  gap: 8,
                 }}
               >
-                <AlertTriangle size={16} color="#EF4444" style={{ marginTop: 2, flexShrink: 0 }} />
-                <span style={{ fontSize: "12.5px", color: "#B91C1C", fontWeight: "600", lineHeight: 1.45 }}>{serverErr}</span>
+                <AlertTriangle size={16} color="var(--rose-ember, #DC2626)" style={{ marginTop: 2, flexShrink: 0 }} />
+                <span style={{ fontSize: 13, color: "var(--rose-ember, #DC2626)", fontWeight: 600, lineHeight: 1.4 }}>
+                  {serverErr}
+                </span>
               </div>
             )}
 
             <form onSubmit={handleLogin}>
-
               <LightPremiumInput
                 type="email"
-                label="Email address"
+                label="Email Address"
                 icon={Mail}
                 value={email}
-                onChange={e => {
+                onChange={(e) => {
                   setEmail(e.target.value);
                   setEmailErr("");
                   setServerErr("");
@@ -352,7 +381,7 @@ export default function LoginPage() {
                 label="Password"
                 icon={Lock}
                 value={password}
-                onChange={e => {
+                onChange={(e) => {
                   setPassword(e.target.value);
                   setPassErr("");
                   setServerErr("");
@@ -366,12 +395,12 @@ export default function LoginPage() {
                     style={{
                       background: "none",
                       border: "none",
-                      color: "#94A3B8",
+                      color: "var(--ink-secondary, #64748B)",
                       cursor: "pointer",
                       padding: 4,
                       display: "flex",
                       alignItems: "center",
-                      justifyContent: "center"
+                      justifyContent: "center",
                     }}
                   >
                     {showPass ? <EyeOff size={16} /> : <Eye size={16} />}
@@ -379,42 +408,49 @@ export default function LoginPage() {
                 }
               />
 
-              <div style={{ textAlign: "right", margin: "-10px 0 26px" }}>
+              <div style={{ textAlign: "right", margin: "-6px 0 20px" }}>
                 <span
                   onClick={() => {
                     setShowForgot(!showForgot);
                     setForgotMsg("");
                     setForgotErr("");
                   }}
-                  className="login-link-btn"
-                        style={{ fontSize: "12.5px", fontWeight: "700", color: "var(--color-primary-hover, #EA580C)", cursor: "pointer" }}
+                  style={{
+                    fontSize: 12.5,
+                    fontWeight: 700,
+                    color: "var(--ink, #111317)",
+                    cursor: "pointer",
+                    textDecoration: "underline",
+                  }}
                 >
                   {showForgot ? "← Back to login" : "Forgot password?"}
                 </span>
               </div>
 
-              <style>{`.login-submit-btn { transition: transform 0.15s ease, box-shadow 0.15s ease; } .login-submit-btn:hover:not(:disabled) { transform: translateY(-1px); box-shadow: 0 6px 20px rgba(249, 115, 22, 0.3); } .login-submit-btn:active:not(:disabled) { transform: translateY(0); }`}</style>
-
+              {/* Collapsible Forgot Password Drawer */}
               {showForgot && (
                 <div
                   style={{
-                    background: "#FFF5F0",
-                    border: "1px solid #FDE8D8",
+                    background: "var(--surface-sunken, #F8FAFC)",
+                    border: "1px solid var(--border, #E2E8F0)",
                     borderRadius: 14,
-                    padding: "18px",
-                    marginBottom: 24,
-                    animation: "slideDown 0.25s cubic-bezier(0.16, 1, 0.3, 1) both"
+                    padding: 16,
+                    marginBottom: 20,
                   }}
                 >
-                  <h4 style={{ margin: "0 0 4px", fontSize: "13.5px", fontWeight: "700", color: "#1F2937" }}>Reset Password</h4>
-                  <p style={{ margin: "0 0 14px", fontSize: "11.5px", color: "#6F7C8F", lineHeight: 1.45 }}>Enter your email to receive a reset link.</p>
+                  <h4 style={{ margin: "0 0 4px", fontSize: 13.5, fontWeight: 700, color: "var(--ink, #111317)" }}>
+                    Reset Password
+                  </h4>
+                  <p style={{ margin: "0 0 12px", fontSize: 12, color: "var(--ink-secondary, #64748B)" }}>
+                    Enter your email to receive a password reset link.
+                  </p>
 
                   <LightPremiumInput
                     type="email"
                     label="Email Address"
                     icon={Mail}
                     value={forgotEmail}
-                    onChange={e => {
+                    onChange={(e) => {
                       setForgotEmail(e.target.value);
                       setForgotErr("");
                     }}
@@ -427,32 +463,29 @@ export default function LoginPage() {
                     onClick={handleForgotSubmit}
                     style={{
                       width: "100%",
-                      padding: "12px",
+                      padding: "11px",
                       borderRadius: 10,
                       border: "none",
-                  background: "linear-gradient(90deg, var(--color-primary, #F97316) 0%, var(--color-primary-light, #FB923C) 100%)",
-                      color: "#FFF",
-                      fontWeight: "700",
-                      fontSize: "13px",
+                      background: "var(--ink, #111317)",
+                      color: "var(--bone, #F2F0EB)",
+                      fontWeight: 700,
+                      fontSize: 13,
                       cursor: forgotLoading ? "not-allowed" : "pointer",
-                      opacity: forgotLoading ? 0.6 : 1,
+                      opacity: forgotLoading ? 0.7 : 1,
                       display: "flex",
                       alignItems: "center",
                       justifyContent: "center",
                       gap: 8,
-                      boxShadow: "0 4px 12px rgba(249, 115, 22, 0.15)"
                     }}
                   >
-                    {forgotLoading && <span className="spinner-spin" style={{ width: 14, height: 14, border: "2px solid rgba(255,255,255,0.3)", borderTopColor: "#FFF", borderRadius: "50%" }} />}
                     {forgotLoading ? "Sending Link..." : "Send Reset Link"}
                   </button>
 
-                  
-                  <div style={{ textAlign: "center", marginTop: 16 }}>
+                  <div style={{ textAlign: "center", marginTop: 12 }}>
                     {!showReset && (
                       <span
                         onClick={() => setShowReset(true)}
-                  style={{ fontSize: "12.5px", fontWeight: "700", color: "var(--color-primary-hover, #EA580C)", cursor: "pointer" }}
+                        style={{ fontSize: 12, fontWeight: 700, color: "var(--ink)", cursor: "pointer", textDecoration: "underline" }}
                       >
                         Already have a token?
                       </span>
@@ -460,32 +493,56 @@ export default function LoginPage() {
                   </div>
 
                   {showReset && (
-
-                    <div style={{ background: "#FFF5F0", border: "1px solid #FDE8D8", borderRadius: 14, padding: "18px", marginBottom: 24, marginTop: 16 }}>
-                      <h4 style={{ margin: "0 0 4px", fontSize: "13.5px", fontWeight: "700", color: "#1F2937" }}>Enter Reset Token</h4>
-                      <LightPremiumInput type="text" label="Reset Token" icon={Lock} value={resetToken} onChange={e => setResetToken(e.target.value)} />
-                      <LightPremiumInput type="password" label="New Password" icon={Lock} value={newPassword} onChange={e => setNewPassword(e.target.value)} />
-                      <button type="button" disabled={resetLoading} onClick={async () => {
-                        setResetLoading(true);
-                        setForgotErr("");
-                        try {
-                          const { data } = await authAPI.resetPassword({ token: resetToken, password: newPassword });
-                          setForgotMsg(data.message || "Password reset successful!");
-                          setShowReset(false);
-                          setShowForgot(false);
-                        } catch(err) { 
-                          setForgotErr(err.response?.data?.message || "Reset failed"); 
-                        } finally { 
-                          setResetLoading(false); 
-                        }
-                      }} style={{ width: "100%", padding: "12px", borderRadius: 10, background: "linear-gradient(90deg, var(--color-primary, #F97316) 0%, var(--color-primary-light, #FB923C) 100%)", color: "#FFF", fontWeight: "700", border: "none", cursor: resetLoading ? "not-allowed" : "pointer", opacity: resetLoading ? 0.6 : 1 }}>
+                    <div style={{ borderTop: "1px solid var(--border)", paddingTop: 12, marginTop: 12 }}>
+                      <LightPremiumInput
+                        type="text"
+                        label="Reset Token"
+                        icon={Lock}
+                        value={resetToken}
+                        onChange={(e) => setResetToken(e.target.value)}
+                      />
+                      <LightPremiumInput
+                        type="password"
+                        label="New Password"
+                        icon={Lock}
+                        value={newPassword}
+                        onChange={(e) => setNewPassword(e.target.value)}
+                      />
+                      <button
+                        type="button"
+                        disabled={resetLoading}
+                        onClick={async () => {
+                          setResetLoading(true);
+                          setForgotErr("");
+                          try {
+                            const { data } = await authAPI.resetPassword({ token: resetToken, password: newPassword });
+                            setForgotMsg(data.message || "Password reset successful!");
+                            setShowReset(false);
+                            setShowForgot(false);
+                          } catch (err) {
+                            setForgotErr(err.response?.data?.message || "Reset failed");
+                          } finally {
+                            setResetLoading(false);
+                          }
+                        }}
+                        style={{
+                          width: "100%",
+                          padding: "11px",
+                          borderRadius: 10,
+                          background: "var(--ink, #111317)",
+                          color: "var(--bone, #F2F0EB)",
+                          fontWeight: 700,
+                          border: "none",
+                          cursor: resetLoading ? "not-allowed" : "pointer",
+                        }}
+                      >
                         {resetLoading ? "Resetting..." : "Reset Password"}
                       </button>
                     </div>
                   )}
 
                   {forgotMsg && (
-                    <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 12, color: "#065F46", fontSize: "12px", fontWeight: "700" }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 10, color: "var(--jade, #059669)", fontSize: 12, fontWeight: 700 }}>
                       <CheckCircle size={14} />
                       <span>{forgotMsg}</span>
                     </div>
@@ -493,103 +550,89 @@ export default function LoginPage() {
                 </div>
               )}
 
+              {/* Primary Ink Sign-in Button */}
               <button
                 type="submit"
                 disabled={loading}
-                className="login-submit-btn"
                 style={{
                   width: "100%",
-                  padding: "14px",
-                  borderRadius: 12,
+                  height: 48,
+                  borderRadius: "var(--r-btn, 12px)",
                   border: "none",
-                  background: "linear-gradient(90deg, var(--color-primary, #F97316) 0%, var(--color-primary-light, #FB923C) 100%)",
-                  color: "#FFF",
-                  fontWeight: "800",
-                  fontSize: "13.5px",
-                  letterSpacing: "0.05em",
+                  background: "var(--ink, #111317)",
+                  color: "var(--bone, #F2F0EB)",
+                  fontWeight: 700,
+                  fontSize: 14,
+                  letterSpacing: "0.02em",
                   cursor: loading ? "not-allowed" : "pointer",
                   opacity: loading ? 0.75 : 1,
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "center",
                   gap: 8,
-                  boxShadow: "0 4px 14px rgba(249, 115, 22, 0.18)",
+                  boxShadow: "0 2px 8px rgba(0, 0, 0, 0.15)",
+                  transition: "transform 120ms ease, box-shadow 120ms ease",
                 }}
               >
-                {loading && <span className="spinner-spin" style={{ width: 14, height: 14, border: "2px solid rgba(255,255,255,0.3)", borderTopColor: "#FFF", borderRadius: "50%" }} />}
-                {loading ? "AUTHENTICATING..." : "SIGN IN"}
-                {!loading && <ArrowRight size={14} />}
+                {loading ? "Authenticating..." : "Sign in"}
+                {!loading && <ArrowRight size={16} />}
               </button>
-
             </form>
 
-            <div style={{ display: "flex", alignItems: "center", gap: 12, margin: "24px 0" }}>
-              <div style={{ flex: 1, height: 1, background: "#E2E8F0" }} />
-              <span style={{ fontSize: "11px", color: "#64748B", fontWeight: "700", textTransform: "uppercase", letterSpacing: "0.06em" }}>or connect</span>
-              <div style={{ flex: 1, height: 1, background: "#E2E8F0" }} />
+            <div style={{ display: "flex", alignItems: "center", gap: 12, margin: "22px 0" }}>
+              <div style={{ flex: 1, height: 1, background: "var(--border, #E2E8F0)" }} />
+              <span style={{ fontSize: 11, color: "var(--ink-secondary, #64748B)", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em", fontFamily: "var(--font-mono)" }}>
+                OR CONNECT WITH
+              </span>
+              <div style={{ flex: 1, height: 1, background: "var(--border, #E2E8F0)" }} />
             </div>
 
+            {/* Google OAuth Button */}
             <button
               type="button"
               onClick={() => {
                 window.location.href = `${API_ORIGIN}/api/auth/google`;
               }}
-              className="login-google-btn"
               style={{
                 width: "100%",
-                padding: "13px",
-                borderRadius: 12,
-                border: "1.2px solid #E2E8F0",
+                height: 44,
+                padding: "0 16px",
+                borderRadius: "var(--r-btn, 12px)",
+                border: "1px solid var(--border, #E2E8F0)",
                 background: "#FFFFFF",
-                color: "#1E293B",
-                fontWeight: "700",
-                fontSize: "13.5px",
-                cursor: "pointer",
+                color: "var(--ink, #111317)",
+                fontWeight: 600,
+                fontSize: 13.5,
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
                 gap: 10,
-                boxShadow: "0 2px 6px rgba(0, 0, 0, 0.03)"
+                cursor: "pointer",
+                transition: "background 140ms ease",
               }}
             >
-              <GoogleIcon /> Continue with Google
+              <GoogleIcon />
+              <span>Continue with Google</span>
             </button>
 
-            <div style={{ textAlign: "center", marginTop: 28 }}>
-              <p style={{ margin: "0 0 20px", fontSize: "13.5px", color: "#64748B", fontWeight: "500" }}>
-                New to BuildTrack?{" "}
-                <button
-                  type="button"
-                  onClick={() => navigate("/signup")}
-                  className="login-link-btn"
-                  style={{
-                    background: "none",
-                    border: "none",
-                    padding: 0,
-                    cursor: "pointer",
-                    color: "var(--color-primary-hover, #EA580C)",
-                    fontWeight: "700",
-                    fontSize: "13.5px"
-                  }}
-                >
-                  Create account free
-                </button>
-              </p>
-
-              <div className="login-footer-links" style={{ display: "flex", justifyItems: "center", justifyContent: "center", gap: 12, fontSize: "11px", color: "#94A3B8", fontWeight: "600" }}>
-                <span className="login-footer-link">Privacy Policy</span>
-                <span>·</span>
-                <span className="login-footer-link">Terms</span>
-                <span>·</span>
-                <span className="login-footer-link">Support</span>
-              </div>
+            {/* Sign Up Redirect */}
+            <div style={{ textAlign: "center", marginTop: 24, fontSize: 13, color: "var(--ink-secondary, #64748B)" }}>
+              Don't have an account?{" "}
+              <span
+                onClick={() => navigate("/signup")}
+                style={{
+                  color: "var(--ink, #111317)",
+                  fontWeight: 700,
+                  cursor: "pointer",
+                  textDecoration: "underline",
+                }}
+              >
+                Sign up
+              </span>
             </div>
-
           </div>
         </div>
-
       </div>
-
     </div>
   );
 }

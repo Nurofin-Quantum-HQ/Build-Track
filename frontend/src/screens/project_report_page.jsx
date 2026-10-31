@@ -5,22 +5,25 @@ import { SpendVsBudgetChart } from "../components/Charts";
 import { CategoryBudgetBar } from "../components/MetricCards";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, FileText, Download } from "lucide-react";
+import BtHero from "../components/ui/BtHero";
+import BtSheet from "../components/ui/BtSheet";
+import BtBrickLoader from "../components/ui/BtBrickLoader";
 
 const TYPE_DOT = {
-  Materials: "var(--color-primary, #F97316)",
-  Wages: "var(--color-primary-hover, #EA580C)",
-  Expense: "var(--color-primary-hover, #EA580C)",
-  Income: "#16a34a",
-  Equipment: "var(--color-primary-hover, #EA580C)",
+  Materials: "#2A78D6",
+  Wages: "#EB6834",
+  Expense: "#199E70",
+  Equipment: "#199E70",
+  Income: "#10B981",
 };
 
 const TYPE_BADGE = {
-  Materials: { bg: "#FFF5F0", color: "var(--color-primary, #F97316)" },
-  Wages: { bg: "#f0fdf4", color: "#166534" },
-  Expense: { bg: "#FFF5F0", color: "var(--color-primary-hover, #EA580C)" },
-  Income: { bg: "#ecfdf5", color: "#047857" },
-  Equipment: { bg: "#FFF5F0", color: "var(--color-primary-hover, #EA580C)" },
+  Materials: { bg: "rgba(42, 120, 214, 0.12)", color: "#2A78D6" },
+  Wages: { bg: "rgba(235, 104, 52, 0.12)", color: "#EB6834" },
+  Expense: { bg: "rgba(25, 158, 112, 0.12)", color: "#199E70" },
+  Equipment: { bg: "rgba(25, 158, 112, 0.12)", color: "#199E70" },
+  Income: { bg: "rgba(16, 185, 129, 0.12)", color: "#10B981" },
 };
 
 export default function ProjectReportPage() {
@@ -62,8 +65,8 @@ export default function ProjectReportPage() {
 
   if (loading) {
     return (
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "center", minHeight: "100vh", color: "#aaa", fontSize: 14, background: "#f7f7f8" }}>
-        Loading report…
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "center", minHeight: "100vh", background: "var(--bg, #0B0D10)" }}>
+        <BtBrickLoader label="Loading project report..." />
       </div>
     );
   }
@@ -87,6 +90,23 @@ export default function ProjectReportPage() {
   };
   const budget = Number(project.budget || project.totalBudget) || 0;
   const remaining = budget - stats.total;
+
+  const statusStyle = {
+    Active: { bg: "#f0fdf4", color: "#166534" },
+    Completed: { bg: "#eff6ff", color: "#1d4ed8" },
+    "On Hold": { bg: "#fefce8", color: "#854d0e" },
+  }[project.status] || { bg: "#f3f4f6", color: "#666" };
+
+  const chartData = [
+    { name: "Material", budget: Number(project.budgetMaterial || project.budget?.material || 0), spent: stats.material },
+    { name: "Labour", budget: Number(project.budgetLabour || project.budget?.labour || 0), spent: stats.labour },
+    { name: "Equipment", budget: Number(project.budgetEquipment || project.budget?.equipment || 0), spent: stats.equipment },
+  ];
+
+  const matEntries = transactions.filter(t => t.type === "Materials").slice(0, 5);
+  const labEntries = transactions.filter(t => t.type === "Wages").slice(0, 5);
+  const eqpEntries = transactions.filter(t => t.type === "Expense" || t.type === "Equipment").slice(0, 5);
+  const recentTx = transactions.slice(0, 10);
 
   const exportPdf = () => {
     const doc = new jsPDF();
@@ -117,7 +137,7 @@ export default function ProjectReportPage() {
   const exportCsv = () => {
     const headers = ["Date", "Description", "Type", "Category", "Amount", "Payment"];
     const rows = transactions.map(t => [
-      t.date ? new Date(t.date).toISOString().split("T")[0] : "",
+      t.date && !isNaN(new Date(t.date).getTime()) ? new Date(t.date).toISOString().split("T")[0] : (t.date || ""),
       t.title || "", t.type || "", t.category || "",
       t.amount || 0, t.paymentStatus || "",
     ]);
@@ -134,47 +154,78 @@ export default function ProjectReportPage() {
   const cardStyle = { background: "#fff", borderRadius: 16, border: "1px solid #ebebeb", padding: 20, boxShadow: "0 1px 6px rgba(0,0,0,0.04)" };
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", width: "100%", minHeight: "100vh", fontFamily: "'Segoe UI', sans-serif", background: "#f7f7f8" }}>
-      <div style={{ background: "#fff", borderBottom: "1px solid #ebebeb", padding: "16px 24px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexShrink: 0 }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-          <button
-            onClick={() => navigate("/projects")}
-            title="Back to Projects"
-            style={{
-              display: "inline-flex",
-              alignItems: "center",
-              gap: 6,
-              padding: "7px 14px",
-              background: "#F8FAFC",
-              border: "1px solid #E2E8F0",
-              borderRadius: 8,
-              fontSize: 13,
-              fontWeight: 600,
-              color: "#334155",
-              cursor: "pointer",
-              transition: "all 0.15s ease",
-              fontFamily: "inherit",
-              flexShrink: 0,
-              boxShadow: "0 1px 2px rgba(0,0,0,0.04)"
-            }}
-            onMouseEnter={e => { e.currentTarget.style.background = "#F1F5F9"; e.currentTarget.style.color = "#0F172A"; }}
-            onMouseLeave={e => { e.currentTarget.style.background = "#F8FAFC"; e.currentTarget.style.color = "#334155"; }}
-          >
-            <ArrowLeft size={16} />
-            <span>Back</span>
-          </button>
-          <div>
-            <h1 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: "#1a1a1a" }}>{project.projectName}</h1>
-            <p style={{ margin: "2px 0 0", fontSize: 12, color: "#888" }}>Project Report</p>
+    <div style={{ display: "flex", flexDirection: "column", width: "100%", minHeight: "100vh", background: "var(--bg, #0B0D10)" }}>
+      <BtHero
+        eyebrow="PORTFOLIO · PROJECT AUDIT"
+        title={project.projectName}
+        subtitle={`Budget: ${fmtINR(budget)} · Spent: ${fmtINR(stats.total)} · Remaining: ${fmtINR(remaining)}`}
+        actions={
+          <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+            <button
+              onClick={() => navigate("/projects")}
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 6,
+                padding: "8px 14px",
+                background: "rgba(255, 255, 255, 0.08)",
+                border: "1px solid rgba(255, 255, 255, 0.15)",
+                borderRadius: 10,
+                fontSize: 13,
+                fontWeight: 600,
+                color: "#F6F4EF",
+                cursor: "pointer",
+                fontFamily: "inherit",
+              }}
+            >
+              <ArrowLeft size={15} />
+              <span>Back</span>
+            </button>
+            <button
+              onClick={exportPdf}
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 6,
+                padding: "8px 16px",
+                background: "var(--ink, #111317)",
+                border: "1px solid rgba(255, 255, 255, 0.2)",
+                borderRadius: 10,
+                fontSize: 13,
+                fontWeight: 700,
+                color: "#F6F4EF",
+                cursor: "pointer",
+                boxShadow: "0 2px 8px rgba(0,0,0,0.3)",
+              }}
+            >
+              <FileText size={15} />
+              <span>Export PDF</span>
+            </button>
+            <button
+              onClick={exportCsv}
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 6,
+                padding: "8px 14px",
+                background: "rgba(255, 255, 255, 0.08)",
+                border: "1px solid rgba(255, 255, 255, 0.15)",
+                borderRadius: 10,
+                fontSize: 13,
+                fontWeight: 600,
+                color: "#F6F4EF",
+                cursor: "pointer",
+              }}
+            >
+              <Download size={15} />
+              <span>Export CSV</span>
+            </button>
           </div>
-        </div>
-        <div style={{ display: "flex", gap: 8 }}>
-          <button onClick={exportPdf} style={{ padding: "8px 14px", background: "var(--color-primary, #F97316)", border: "none", borderRadius: 8, fontSize: 12, fontWeight: 600, color: "#fff", cursor: "pointer" }}>📄 Export PDF</button>
-          <button onClick={exportCsv} style={{ padding: "8px 14px", background: "#f3f4f6", border: "1px solid #e5e5e5", borderRadius: 8, fontSize: 12, fontWeight: 600, color: "#555", cursor: "pointer" }}>📥 Export CSV</button>
-        </div>
-      </div>
+        }
+      />
 
-      <div style={{ flex: 1, padding: "20px 24px" }}>
+      <BtSheet overlap={26}>
+        <div style={{ padding: "24px 28px", display: "flex", flexDirection: "column", gap: 20 }}>
         <div style={{ ...cardStyle, marginBottom: 20 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 16 }}>
             <div>
@@ -217,9 +268,9 @@ export default function ProjectReportPage() {
 
         <div style={{ ...cardStyle, marginBottom: 20 }}>
           <div style={{ fontSize: 15, fontWeight: 700, color: "#1a1a1a", marginBottom: 16 }}>Category Breakdown</div>
-          <CategoryBudgetBar name="Material" spent={stats.material} budget={project.budgetMaterial || project.budget?.material || 0} color="var(--color-primary, #F97316)" />
-          <CategoryBudgetBar name="Labour" spent={stats.labour} budget={project.budgetLabour || project.budget?.labour || 0} color="var(--color-primary-hover, #EA580C)" />
-          <CategoryBudgetBar name="Equipment" spent={stats.equipment} budget={project.budgetEquipment || project.budget?.equipment || 0} color="#0891b2" />
+          <CategoryBudgetBar name="Material" spent={stats.material} budget={project.budgetMaterial || project.budget?.material || 0} color="#2A78D6" />
+          <CategoryBudgetBar name="Labour" spent={stats.labour} budget={project.budgetLabour || project.budget?.labour || 0} color="#EB6834" />
+          <CategoryBudgetBar name="Equipment" spent={stats.equipment} budget={project.budgetEquipment || project.budget?.equipment || 0} color="#199E70" />
         </div>
 
         <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr 1fr", gap: 16, marginBottom: 20 }}>
@@ -272,6 +323,7 @@ export default function ProjectReportPage() {
           </div>
         </div>
       </div>
+      </BtSheet>
     </div>
   );
 }

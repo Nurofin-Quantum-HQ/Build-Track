@@ -1,19 +1,73 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Card, Badge, Button, SkeletonCard } from '../../components/ui';
-import { approvalAPI, taskAPI, projectAPI, transactionAPI } from '../../api';
-import { Users, Clock, AlertTriangle, AlertCircle, CheckCircle, RefreshCw, XCircle, Search, Calendar, FileText, Check, ChevronRight, CheckSquare, Settings, Briefcase, PlusCircle, UserCheck, Shield, Edit2 } from 'lucide-react';
-import { colors, typography } from '../../styles/designTokens';
+import { useAuth } from '../../contexts/AuthContext';
+import {
+  BtButton,
+  BtCard,
+  BtGroup,
+  BtRow,
+  BtBadge,
+  BtHero,
+  BtGlassTile,
+  BtSheet,
+  BtCountUp,
+  formatInr,
+  BtEmpty,
+  BtTypeTile,
+  BtSectionHeader,
+  BtPageLoader,
+  btToast,
+} from '../../components/ui';
+import { approvalAPI, taskAPI, projectAPI } from '../../api';
+import {
+  Clock,
+  CheckCircle2,
+  XCircle,
+  RefreshCw,
+  Briefcase,
+  AlertTriangle,
+  Building2,
+  Calendar,
+  UserCheck,
+  Check,
+  X,
+  ChevronRight,
+} from 'lucide-react';
+
+function formatCurrency(amount) {
+  return '₹' + Number(amount || 0).toLocaleString('en-IN', {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 2,
+  });
+}
+
+function relativeTime(dateStr) {
+  if (!dateStr) return '';
+  const now = new Date();
+  const d = new Date(dateStr);
+  const diff = now - d;
+  const mins = Math.floor(diff / 60000);
+  if (mins < 1) return 'Just now';
+  if (mins < 60) return `${mins}m ago`;
+  const hrs = Math.floor(mins / 60);
+  if (hrs < 24) return `${hrs}h ago`;
+  const days = Math.floor(hrs / 24);
+  if (days === 1) return 'Yesterday';
+  if (days < 7) return `${days}d ago`;
+  return d.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
+}
 
 export default function SupervisorDashboard() {
   const navigate = useNavigate();
+  const { user } = useAuth();
+
   const [activeTab, setActiveTab] = useState('Pending');
   const [loading, setLoading] = useState(true);
-
   const [pending, setPending] = useState([]);
   const [history, setHistory] = useState([]);
   const [tasks, setTasks] = useState([]);
   const [projects, setProjects] = useState([]);
+  const [actionInProgress, setActionInProgress] = useState(null);
 
   const extractArray = (res) => {
     if (!res || !res.data) return [];
@@ -35,7 +89,7 @@ export default function SupervisorDashboard() {
         approvalAPI.getPending().catch(() => ({ data: [] })),
         approvalAPI.getHistory().catch(() => ({ data: [] })),
         taskAPI.getDaily().catch(() => ({ data: [] })),
-        projectAPI.getMine().catch(() => ({ data: { projects: [] } }))
+        projectAPI.getMine().catch(() => ({ data: { projects: [] } })),
       ]);
 
       setPending(extractArray(pendRes));
@@ -44,6 +98,7 @@ export default function SupervisorDashboard() {
       setProjects(projRes.data?.projects || projRes.data || []);
     } catch (e) {
       console.error(e);
+      btToast.error('Failed to load supervisor data');
     } finally {
       setLoading(false);
     }
@@ -54,287 +109,460 @@ export default function SupervisorDashboard() {
   }, []);
 
   const handleApprove = async (id) => {
+    setActionInProgress(id);
     try {
       await approvalAPI.approve(id);
+      btToast.success('Entry approved successfully');
       loadData();
     } catch (e) {
-      alert('Error approving');
+      btToast.error('Error approving entry');
+    } finally {
+      setActionInProgress(null);
     }
   };
 
   const handleReject = async (id) => {
+    const reason = prompt('Reason for rejection:');
+    if (reason === null) return;
+    setActionInProgress(id);
     try {
-      const reason = prompt('Reason for rejection:');
-      if (reason !== null) {
-        await approvalAPI.reject(id, reason);
-        loadData();
-      }
+      await approvalAPI.reject(id, reason);
+      btToast.success('Entry rejected');
+      loadData();
     } catch (e) {
-      alert('Error rejecting');
+      btToast.error('Error rejecting entry');
+    } finally {
+      setActionInProgress(null);
     }
   };
-
-  const approved = history.filter(h => {
-    const status = (h.approvalStatus || '').toLowerCase();
-    return status === 'approved' || status === 'accepted';
-  });
-  const rejected = history.filter(h => {
-    const status = (h.approvalStatus || '').toLowerCase();
-    return status === 'rejected';
-  });
-
-  const tabs = [
-    { name: 'Pending', count: pending.length, icon: Clock, color: colors.warning },
-    { name: 'Approved', count: approved.length, icon: CheckCircle, color: colors.success },
-    { name: 'Rejected', count: rejected.length, icon: XCircle, color: colors.danger }
-  ];
 
   const handleTaskStatusChange = async (taskId, newStatus) => {
     try {
       await taskAPI.updateStatus(taskId, newStatus);
-      setTasks(prev => prev.map(t => t._id === taskId ? { ...t, status: newStatus } : t));
+      setTasks((prev) =>
+        prev.map((t) => (t._id === taskId ? { ...t, status: newStatus } : t))
+      );
+      btToast.success(`Task status updated to ${newStatus}`);
     } catch (e) {
-      alert('Failed to update task status');
+      btToast.error('Failed to update task status');
     }
   };
 
-  const getStatusColor = (status) => {
-    if (status === 'Completed') return '#10B981'; // success
-    if (status === 'In Progress') return '#3B82F6'; // info
-    return '#F59E0B'; // warning
-  };
+  const approved = useMemo(() => {
+    return history.filter((h) => {
+      const status = (h.approvalStatus || '').toLowerCase();
+      return status === 'approved' || status === 'accepted';
+    });
+  }, [history]);
+
+  const rejected = useMemo(() => {
+    return history.filter((h) => {
+      const status = (h.approvalStatus || '').toLowerCase();
+      return status === 'rejected';
+    });
+  }, [history]);
+
+  const pendingCount = pending.length;
+  const approvedCount = approved.length;
+  const rejectedCount = rejected.length;
+
+  const pendingSum = useMemo(() => {
+    return pending.reduce((sum, item) => sum + Number(item.amount || 0), 0);
+  }, [pending]);
+
+  const openTasksCount = useMemo(() => {
+    return tasks.filter((t) => t.status !== 'Completed').length;
+  }, [tasks]);
+
+  const currentList =
+    activeTab === 'Pending' ? pending : activeTab === 'Approved' ? approved : rejected;
+
+  const todayLabel = new Intl.DateTimeFormat('en-IN', {
+    weekday: 'short',
+    day: 'numeric',
+    month: 'short',
+  }).format(new Date());
 
   if (loading) {
-    return (
-      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '60vh', color: colors.textSecondary }}>
-        <div style={{ width: 40, height: 40, border: `3px solid ${colors.border}`, borderTopColor: colors.primary, borderRadius: '50%', animation: 'spin 1s linear infinite', marginBottom: 16 }} />
-        <div style={{ fontSize: 16, fontWeight: 600 }}>Loading Dashboard...</div>
-      </div>
-    );
+    return <BtPageLoader message="Loading supervisor dashboard…" />;
   }
 
   return (
-    <div style={{ padding: '40px 24px', maxWidth: 1280, margin: '0 auto', width: '100%', display: 'flex', flexDirection: 'column', gap: 32, animation: 'fadeUp 300ms cubic-bezier(0.16, 1, 0.3, 1)' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <div>
-          <h1 style={{ fontSize: 36, fontWeight: 800, color: colors.textPrimary, letterSpacing: '-0.03em', margin: 0 }}>
-            Supervisor Dashboard
-          </h1>
-          <p style={{ fontSize: 15, color: colors.textSecondary, margin: '6px 0 0' }}>
-            Manage team approvals and daily tasks
-          </p>
-        </div>
-        <div style={{ display: 'flex', gap: 12 }}>
-          <Button variant="outline" onClick={loadData} icon={<RefreshCw size={16} />}>
-            Refresh
-          </Button>
-          <Button variant="primary" onClick={() => navigate('/assign-task')} icon={<Briefcase size={16} />}>
-            Assign Task
-          </Button>
-        </div>
-      </div>
-
-      <div style={{ display: 'flex', gap: 16 }}>
-        {[
-          { name: 'Pending', count: pending.length, icon: Clock, color: colors.warning },
-          { name: 'Approved', count: approved.length, icon: CheckCircle, color: colors.success },
-          { name: 'Rejected', count: rejected.length, icon: XCircle, color: colors.danger }
-        ].map(btn => {
-          const Icon = btn.icon;
-          const isActive = activeTab === btn.name;
-          return (
-            <button
-              key={btn.name}
-              onClick={() => setActiveTab(btn.name)}
+    <div style={{ width: '100%', minHeight: '100%', display: 'flex', flexDirection: 'column' }}>
+      {/* ══════════════════════════════════════════════════════════
+          HERO (Noir Blueprint Grid)
+         ══════════════════════════════════════════════════════════ */}
+      <BtHero padding="32px 32px 56px">
+        <div style={{ maxWidth: 1200, margin: '0 auto', width: '100%' }}>
+          {/* Header Eyebrow & Title */}
+          <div style={{ marginBottom: '24px' }}>
+            <div
               style={{
-                display: 'flex', alignItems: 'center', gap: 8,
-                padding: '12px 20px', borderRadius: 999,
-                background: isActive ? `${btn.color}15` : colors.card,
-                border: `1px solid ${isActive ? btn.color : colors.border}`,
-                color: isActive ? btn.color : colors.textSecondary,
-                fontWeight: 700, fontSize: 14, cursor: 'pointer',
-                transition: 'all 200ms ease'
+                fontFamily: 'var(--font-mono)',
+                fontSize: '11px',
+                letterSpacing: '0.09em',
+                textTransform: 'uppercase',
+                color: 'var(--on-noir-3)',
+                marginBottom: '4px',
               }}
             >
-              <Icon size={16} />
-              {btn.name}
-              <span style={{
-                background: isActive ? btn.color : colors.background,
-                color: isActive ? '#fff' : colors.textTertiary,
-                padding: '2px 8px', borderRadius: 999, fontSize: 12
-              }}>
-                {btn.count}
-              </span>
-            </button>
-          );
-        })}
-      </div>
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 350px', gap: 24 }}>
+              SUPERVISOR COMMAND • {todayLabel}
+            </div>
+            <h1
+              style={{
+                margin: 0,
+                fontFamily: 'var(--font-display)',
+                fontSize: '28px',
+                fontWeight: 800,
+                letterSpacing: '-0.03em',
+                color: 'var(--bone)',
+              }}
+            >
+              Supervisor Dashboard
+            </h1>
+            <p
+              style={{
+                margin: '4px 0 0',
+                fontFamily: 'var(--font-ui)',
+                fontSize: '14px',
+                color: 'var(--on-noir-2)',
+              }}
+            >
+              Manage site approvals and coordinate daily construction tasks.
+            </p>
+          </div>
 
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
-          <Card padding={24} style={{ minHeight: 400 }}>
-            <h3 style={{ margin: '0 0 20px', fontSize: 18, color: colors.textPrimary }}>
-              {activeTab} Entries
-            </h3>
+          {/* Pending Sign-off Counter */}
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'baseline',
+              gap: '16px',
+              flexWrap: 'wrap',
+              marginBottom: '24px',
+            }}
+          >
+            <div
+              className="tnum"
+              style={{
+                fontFamily: 'var(--font-display)',
+                fontSize: 'clamp(48px, 6vw, 72px)',
+                fontWeight: 800,
+                letterSpacing: '-0.04em',
+                lineHeight: 1,
+                color: 'var(--bone)',
+              }}
+            >
+              <BtCountUp value={pendingCount} format={(v) => `${Math.round(v)}`} />
+            </div>
 
-            {activeTab === 'Pending' && (
-              pending.length === 0 ? (
-                <div style={{ textAlign: 'center', padding: '40px 0', color: colors.textSecondary, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-                  <CheckCircle size={48} color={colors.textSecondary} style={{ opacity: 0.3, marginBottom: 12 }} />
-                  <p style={{ margin: 0, fontWeight: 600, fontSize: 16, color: colors.textSecondary }}>No pending approvals</p>
-                  <p style={{ margin: '8px 0 0', fontSize: 14, opacity: 0.8 }}>You're all caught up!</p>
-                </div>
-              ) : (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-                  {pending.map(p => (
-                    <div key={p._id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: 16, border: `1px solid ${colors.border}`, borderRadius: 12, background: colors.background }}>
-                      <div>
-                        <div style={{ fontWeight: 700, fontSize: 15, color: colors.textPrimary }}>{p.title || 'Untitled Entry'}</div>
-                        <div style={{ fontSize: 13, color: colors.textSecondary, marginTop: 4 }}>
-                          {p.submitter?.name || p.createdBy?.name || 'Unknown'} • Amount: ₹{p.amount}
-                        </div>
-                        <Badge variant="warning" style={{ marginTop: 8 }}>{p.type || 'Transaction'}</Badge>
-                      </div>
-                      <div style={{ display: 'flex', gap: 8 }}>
-                        <Button variant="danger" size="sm" onClick={() => handleReject(p._id)}>Reject</Button>
-                        <Button variant="success" size="sm" onClick={() => handleApprove(p._id)}>Approve</Button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )
-            )}
-
-            {activeTab === 'Approved' && (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-                {approved.map(a => (
-                  <div key={a._id} style={{ padding: 16, border: `1px solid ${colors.border}`, borderRadius: 12, background: colors.background }}>
-                    <div style={{ fontWeight: 700, fontSize: 15, color: colors.textPrimary }}>{a.title || 'Untitled Entry'}</div>
-                    <div style={{ fontSize: 13, color: colors.textSecondary, marginTop: 4 }}>
-                      {a.submitter?.name || a.createdBy?.name || 'Unknown'} • Amount: ₹{a.amount}
-                    </div>
-                  </div>
-                ))}
-                {approved.length === 0 && <p style={{ color: colors.textSecondary, textAlign: 'center' }}>No approved entries.</p>}
+            <div>
+              <div
+                style={{
+                  fontFamily: 'var(--font-display)',
+                  fontSize: '20px',
+                  fontWeight: 700,
+                  color: 'var(--bone)',
+                }}
+              >
+                waiting for your sign-off
               </div>
-            )}
-
-            {activeTab === 'Rejected' && (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-                {rejected.map(r => (
-                  <div key={r._id} style={{ padding: 16, border: `1px solid ${colors.border}`, borderRadius: 12, background: colors.background }}>
-                    <div style={{ fontWeight: 700, fontSize: 15, color: colors.textPrimary }}>{r.title || 'Untitled Entry'}</div>
-                    <div style={{ fontSize: 13, color: colors.textSecondary, marginTop: 4 }}>
-                      {r.submitter?.name || r.createdBy?.name || 'Unknown'} • Amount: ₹{r.amount}
-                    </div>
-                    {r.rejectionReason && (
-                      <div style={{ marginTop: 8, padding: 8, background: colors.dangerLight, color: colors.danger, borderRadius: 6, fontSize: 12 }}>
-                        Reason: {r.rejectionReason}
-                      </div>
-                    )}
-                  </div>
-                ))}
-                {rejected.length === 0 && <p style={{ color: colors.textSecondary, textAlign: 'center' }}>No rejected entries.</p>}
+              <div
+                className="tnum"
+                style={{
+                  fontFamily: 'var(--font-ui)',
+                  fontSize: '14px',
+                  color: 'var(--on-noir-2)',
+                  marginTop: '2px',
+                }}
+              >
+                {formatInr(pendingSum, { compact: false })} across {pendingCount}{' '}
+                {pendingCount === 1 ? 'entry' : 'entries'}
               </div>
-            )}
-          </Card>
+            </div>
+          </div>
 
-          {/* Recent History */}
-          <Card padding={24}>
-            <h3 style={{ margin: '0 0 20px', fontSize: 18, color: colors.textPrimary }}>
-              Recent History
-            </h3>
+          {/* 3 Status Glass Tiles (Tabs) */}
+          <div
+            style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(3, 1fr)',
+              gap: '12px',
+            }}
+          >
+            <BtGlassTile
+              label="Pending"
+              value={`${pendingCount}`}
+              valueColor={activeTab === 'Pending' ? 'var(--accent)' : 'var(--bone)'}
+              icon={Clock}
+              onClick={() => setActiveTab('Pending')}
+              style={{
+                borderColor:
+                  activeTab === 'Pending' ? 'var(--accent)' : 'rgba(255, 255, 255, 0.09)',
+                background:
+                  activeTab === 'Pending'
+                    ? 'rgba(255, 255, 255, 0.12)'
+                    : 'rgba(255, 255, 255, 0.05)',
+              }}
+            />
+            <BtGlassTile
+              label="Approved"
+              value={`${approvedCount}`}
+              valueColor={
+                activeTab === 'Approved' ? 'var(--status-success-bright)' : 'var(--bone)'
+              }
+              icon={CheckCircle2}
+              onClick={() => setActiveTab('Approved')}
+              style={{
+                borderColor:
+                  activeTab === 'Approved' ? 'var(--status-success-bright)' : 'rgba(255, 255, 255, 0.09)',
+                background:
+                  activeTab === 'Approved'
+                    ? 'rgba(255, 255, 255, 0.12)'
+                    : 'rgba(255, 255, 255, 0.05)',
+              }}
+            />
+            <BtGlassTile
+              label="Rejected"
+              value={`${rejectedCount}`}
+              valueColor={
+                activeTab === 'Rejected' ? 'var(--status-danger-bright)' : 'var(--bone)'
+              }
+              icon={XCircle}
+              onClick={() => setActiveTab('Rejected')}
+              style={{
+                borderColor:
+                  activeTab === 'Rejected' ? 'var(--status-danger-bright)' : 'rgba(255, 255, 255, 0.09)',
+                background:
+                  activeTab === 'Rejected'
+                    ? 'rgba(255, 255, 255, 0.12)'
+                    : 'rgba(255, 255, 255, 0.05)',
+              }}
+            />
+          </div>
+        </div>
+      </BtHero>
 
-            {[...approved, ...rejected].length === 0 ? (
-              <p style={{ color: colors.textSecondary, textAlign: 'center', padding: '20px 0' }}>No recent history.</p>
+      {/* ══════════════════════════════════════════════════════════
+          SHEET (Bone Surface)
+         ══════════════════════════════════════════════════════════ */}
+      <BtSheet overlap={26} padding="28px 32px 64px">
+        <div
+          style={{
+            maxWidth: 1200,
+            margin: '0 auto',
+            width: '100%',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '28px',
+          }}
+        >
+          {/* Action Header Row */}
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              flexWrap: 'wrap',
+              gap: '12px',
+            }}
+          >
+            <div style={{ display: 'flex', gap: '10px' }}>
+              <BtButton
+                variant="primary"
+                icon={Briefcase}
+                onPress={() => navigate('/assign-task')}
+              >
+                Assign Task
+              </BtButton>
+              <BtButton
+                variant="secondary"
+                icon={RefreshCw}
+                onPress={loadData}
+              >
+                Refresh
+              </BtButton>
+            </div>
+
+            <div
+              style={{
+                fontFamily: 'var(--font-mono)',
+                fontSize: '11px',
+                letterSpacing: '0.08em',
+                textTransform: 'uppercase',
+                color: 'var(--ink-3)',
+              }}
+            >
+              Showing {activeTab} Records
+            </div>
+          </div>
+
+          {/* Active Tab Records List */}
+          <div>
+            <BtSectionHeader
+              title={`${activeTab} Entries (${currentList.length})`}
+            />
+
+            {currentList.length === 0 ? (
+              <BtCard>
+                <BtEmpty
+                  icon={
+                    activeTab === 'Pending'
+                      ? Clock
+                      : activeTab === 'Approved'
+                      ? CheckCircle2
+                      : XCircle
+                  }
+                  title={`No ${activeTab.toLowerCase()} entries`}
+                  message={
+                    activeTab === 'Pending'
+                      ? 'All team submissions have been processed.'
+                      : `No transactions currently marked as ${activeTab.toLowerCase()}.`
+                  }
+                />
+              </BtCard>
             ) : (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-                {[...approved, ...rejected].map(item => {
-                  const isApproved = (item.approvalStatus || '').toLowerCase() === 'approved';
+              <BtGroup>
+                {currentList.map((item, idx) => {
+                  const amt = Number(item.amount || 0);
+                  const submitter =
+                    item.submitter?.name || item.createdBy?.name || 'Worker';
+                  const pName =
+                    typeof item.project === 'object'
+                      ? item.project?.projectName || item.project?.name || ''
+                      : item.projectName || item.project || '';
+                  const isPending = activeTab === 'Pending';
+                  const isActioning = actionInProgress === item._id;
+
                   return (
-                    <div key={item._id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: 16, border: `1px solid ${colors.border}`, borderRadius: 12, background: colors.background }}>
-                      <div>
-                        <div style={{ fontWeight: 700, fontSize: 15, color: colors.textPrimary }}>{item.title || 'Untitled Entry'}</div>
-                        <div style={{ fontSize: 13, color: colors.textSecondary, marginTop: 4 }}>
-                          {item.submitter?.name || item.createdBy?.name || 'Unknown'}
-                        </div>
-                        <div style={{ fontSize: 12, color: colors.textTertiary, marginTop: 2, display: 'flex', alignItems: 'center', gap: 4 }}>
-                          {isApproved ? <CheckCircle size={12} color={colors.success} /> : <XCircle size={12} color={colors.danger} />}
-                          <span style={{ color: isApproved ? colors.success : colors.danger }}>
-                            {isApproved ? 'Approved' : 'Rejected'}
-                          </span>
-                        </div>
-                      </div>
-                      <div style={{ fontWeight: 700, fontSize: 16, color: colors.textPrimary }}>
-                        ₹{item.amount || 0}
-                      </div>
-                    </div>
+                    <BtRow
+                      key={item._id || idx}
+                      icon={<BtTypeTile type={item.type} size={40} />}
+                      title={item.title || item.name || item.type || 'Entry'}
+                      subtitle={`By ${submitter} • ${pName ? `${pName} • ` : ''}${relativeTime(item.date || item.createdAt)}`}
+                      amount={amt}
+                      showChevron={false}
+                      rightContent={
+                        isPending ? (
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <BtButton
+                              variant="primary"
+                              small
+                              loading={isActioning}
+                              icon={Check}
+                              onPress={() => handleApprove(item._id)}
+                            >
+                              Approve
+                            </BtButton>
+                            <BtButton
+                              variant="destructive"
+                              small
+                              loading={isActioning}
+                              icon={X}
+                              onPress={() => handleReject(item._id)}
+                            >
+                              Reject
+                            </BtButton>
+                          </div>
+                        ) : (
+                          <BtBadge
+                            label={item.approvalStatus || activeTab}
+                            tone={activeTab === 'Approved' ? 'green' : 'red'}
+                          />
+                        )
+                      }
+                    />
                   );
                 })}
-              </div>
+              </BtGroup>
             )}
-          </Card>
-        </div>
+          </div>
 
-        {/* Assigned Tasks */}
-        <Card padding={24} style={{ alignSelf: 'start' }}>
-          <h3 style={{ margin: '0 0 20px', fontSize: 18, color: colors.textPrimary }}>
-            Assigned Tasks
-          </h3>
-          {tasks.length === 0 ? (
-            <p style={{ color: colors.textSecondary, fontSize: 14 }}>No tasks assigned for today.</p>
-          ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-              {tasks.map(t => (
-                <div key={t._id} style={{ padding: 12, border: `1px solid ${colors.border}`, borderRadius: 8, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <div>
-                    <div style={{ fontWeight: 600, fontSize: 15, color: colors.textPrimary }}>{t.title}</div>
-                    <div style={{ fontSize: 13, color: colors.textSecondary }}>Assigned to: {t.assigneeModel === 'Worker' ? t.workerDetails?.name : t.assignedToDetails?.name}</div>
-                  </div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                    <select
-                      value={t.status || 'Pending'}
-                      onChange={(e) => handleTaskStatusChange(t._id, e.target.value)}
-                      style={{
-                        padding: '6px 12px',
-                        borderRadius: '20px',
-                        border: `1px solid ${getStatusColor(t.status || 'Pending')}`,
-                        backgroundColor: `${getStatusColor(t.status || 'Pending')}15`,
-                        color: getStatusColor(t.status || 'Pending'),
-                        fontWeight: 600,
-                        fontSize: 13,
-                        cursor: 'pointer',
-                        outline: 'none',
-                        appearance: 'none',
-                        textAlign: 'center'
-                      }}
-                    >
-                      <option value="Pending">Pending</option>
-                      <option value="In Progress">In Progress</option>
-                      <option value="Completed">Completed</option>
-                    </select>
-                    <button 
-                      onClick={() => navigate('/update-progress', { state: { taskId: t._id, projectId: t.project } })}
-                      style={{
-                        display: 'flex', alignItems: 'center', justifyContent: 'center',
-                        width: 32, height: 32, borderRadius: '50%',
-                        background: '#f8fafc', border: '1px solid #e2e8f0', cursor: 'pointer',
-                        color: colors.primary
-                      }}
-                      title="Update Progress"
-                    >
-                      <Edit2 size={14} />
-                    </button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-          <Button variant="outline" style={{ width: '100%', marginTop: 16 }} onClick={() => navigate('/assign-task')}>
-            Manage Tasks
-          </Button>
-        </Card>
-      </div>
+          {/* Assigned Daily Tasks Section */}
+          <div>
+            <BtSectionHeader
+              title="Daily Tasks Assigned"
+              action={openTasksCount > 0 ? `${openTasksCount} open` : undefined}
+            />
+
+            {tasks.length === 0 ? (
+              <BtCard>
+                <BtEmpty
+                  icon={Briefcase}
+                  title="No active tasks"
+                  message="Assign daily tasks to masons and workers on site."
+                />
+              </BtCard>
+            ) : (
+              <BtGroup>
+                {tasks.map((task, idx) => {
+                  const isCompleted = task.status === 'Completed';
+                  const isInProgress = task.status === 'In Progress';
+
+                  return (
+                    <BtRow
+                      key={task._id || idx}
+                      icon={Briefcase}
+                      iconBg={
+                        isCompleted
+                          ? 'var(--tone-green-bg)'
+                          : isInProgress
+                          ? 'var(--tone-brand-bg)'
+                          : 'var(--fill)'
+                      }
+                      iconColor={
+                        isCompleted
+                          ? 'var(--tone-green)'
+                          : isInProgress
+                          ? 'var(--tone-brand)'
+                          : 'var(--ink)'
+                      }
+                      title={task.title}
+                      subtitle={
+                        task.description ||
+                        `Project task • ${task.assignedTo?.name ? `Assigned to ${task.assignedTo.name}` : 'Unassigned'}`
+                      }
+                      showChevron={false}
+                      rightContent={
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                          <select
+                            value={task.status || 'Pending'}
+                            onChange={(e) => handleTaskStatusChange(task._id, e.target.value)}
+                            style={{
+                              padding: '6px 12px',
+                              borderRadius: '16px',
+                              border: '1px solid var(--line)',
+                              background: isCompleted
+                                ? 'var(--tone-green-bg)'
+                                : isInProgress
+                                ? 'var(--tone-brand-bg)'
+                                : 'var(--fill)',
+                              color: isCompleted
+                                ? 'var(--tone-green)'
+                                : isInProgress
+                                ? 'var(--tone-brand)'
+                                : 'var(--ink)',
+                              fontFamily: 'var(--font-ui)',
+                              fontSize: '12px',
+                              fontWeight: 700,
+                              cursor: 'pointer',
+                              outline: 'none',
+                            }}
+                          >
+                            <option value="Pending">Pending</option>
+                            <option value="In Progress">In Progress</option>
+                            <option value="Completed">Completed</option>
+                          </select>
+                        </div>
+                      }
+                    />
+                  );
+                })}
+              </BtGroup>
+            )}
+          </div>
+        </div>
+      </BtSheet>
     </div>
   );
 }

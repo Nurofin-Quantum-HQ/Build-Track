@@ -5,6 +5,10 @@ import useTransactionStore from "../stores/transactionStore";
 import perfLogger from "../utils/performanceLogger";
 import { Toast, ConfirmDialog } from "../components/Toast";
 import { Card, Badge, Button, EmptyState } from "../components/ui";
+import BtHero from "../components/ui/BtHero";
+import BtSheet from "../components/ui/BtSheet";
+import BtPressable from "../components/ui/BtPressable";
+import BtButton from "../components/ui/BtButton";
 import ModuleTour from "../components/ModuleTour";
 import { colors, radius, shadows, typography, gradients } from "../styles/designTokens";
 import {
@@ -12,6 +16,7 @@ import {
   Plus,
   RefreshCw,
   ArrowUpRight,
+  ArrowLeft,
   ArrowDownRight,
   IndianRupee,
   Trash2,
@@ -31,10 +36,10 @@ import {
 const ITEMS_PER_PAGE = 10;
 
 const TYPE_STYLES = {
-  Materials: { bg: colors.primaryLight, color: colors.primary, label: "Materials", icon: Package },
-  Wages:     { bg: colors.successLight, color: colors.success, label: "Labour", icon: Users },
-  Expense:   { bg: colors.warningLight, color: colors.warning, label: "Equipment", icon: Wrench },
-  Income:    { bg: "#FFF5F0", color: "var(--color-primary-hover, #EA580C)", label: "Income", icon: TrendingUp },
+  Materials: { bg: "rgba(42, 120, 214, 0.1)", color: "#2A78D6", label: "Materials", icon: Package },
+  Wages:     { bg: "rgba(235, 104, 52, 0.1)", color: "#EB6834", label: "Labour", icon: Users },
+  Expense:   { bg: "rgba(25, 158, 112, 0.1)", color: "#199E70", label: "Equipment", icon: Wrench },
+  Income:    { bg: "rgba(16, 185, 129, 0.1)", color: "#10B981", label: "Income", icon: TrendingUp },
 };
 
 const FILTERS = [
@@ -54,6 +59,7 @@ function resolveProjectName(project) {
 function formatDate(d) {
   if (!d) return "";
   const dt = new Date(d);
+  if (isNaN(dt.getTime())) return String(d);
   const months = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
   return `${dt.getDate()} ${months[dt.getMonth()]} ${dt.getFullYear()}`;
 }
@@ -62,7 +68,7 @@ function formatTime(dStr, rawTxId) {
   let d = null;
   if (dStr) {
     d = new Date(dStr);
-    if (d.toISOString().endsWith("T00:00:00.000Z") && rawTxId && rawTxId.length === 24) {
+    if (!isNaN(d.getTime()) && d.toISOString().endsWith("T00:00:00.000Z") && rawTxId && rawTxId.length === 24) {
       d = new Date(parseInt(rawTxId.substring(0,8), 16) * 1000);
     }
   } else if (rawTxId && rawTxId.length === 24) {
@@ -157,38 +163,126 @@ export default function TransactionLog() {
   const expenses = transactions.filter(t => t.type !== "Income").reduce((s, t) => s + (t.amount || 0), 0);
 
   return (
-    <div style={{ padding: '32px 24px', maxWidth: 1200, margin: '0 auto', fontFamily: typography.fontFamily, animation: 'fadeUp 300ms ease' }}>
+    <div style={{ minHeight: '100vh', background: 'var(--surface-ground, #F2F0EB)' }}>
+      {toast && <Toast key={toast.key} message={toast.message} type={toast.type} onClose={clearToast} />}
       <ModuleTour steps={tourSteps} run={runTour} setRun={setRunTour} moduleName="TransactionLog" />
-      <Toast message={toast.msg} type={toast.type} onClose={clearToast} />
       {confirmDlg && <ConfirmDialog message={confirmDlg.message} danger={confirmDlg.danger} confirmLabel={confirmDlg.confirmLabel} onConfirm={confirmDlg.onConfirm} onCancel={() => setConfirmDlg(null)} />}
 
-      <div className="tour-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 28, flexWrap: 'wrap', gap: 16 }}>
-        <div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 6 }}>
-            <h1 style={{ fontSize: 28, fontWeight: 800, color: colors.textPrimary, letterSpacing: '-0.02em', margin: 0 }}>
-              Transaction Log
+      {/* ── HERO BANNER (Blueprint Noir) ── */}
+      <BtHero>
+        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 16 }}>
+          <div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 }}>
+              <BtPressable
+                onClick={() => navigate(-1)}
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 6,
+                  color: 'rgba(255, 255, 255, 0.72)',
+                  fontSize: 13,
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  background: 'none',
+                  border: 'none',
+                  padding: 0,
+                }}
+              >
+                <ArrowLeft size={16} />
+                <span>Back</span>
+              </BtPressable>
+              <span style={{ color: 'rgba(255, 255, 255, 0.25)' }}>/</span>
+              <span
+                style={{
+                  fontFamily: 'var(--font-mono)',
+                  fontSize: 11,
+                  letterSpacing: '0.12em',
+                  textTransform: 'uppercase',
+                  color: 'var(--gold-brass)',
+                  fontWeight: 700,
+                }}
+              >
+                LEDGER · AUDIT TRAIL
+              </span>
+            </div>
+
+            <h1
+              style={{
+                fontFamily: 'var(--font-serif)',
+                fontSize: 32,
+                fontWeight: 700,
+                color: 'var(--bone)',
+                margin: '0 0 6px',
+                letterSpacing: '-0.02em',
+              }}
+            >
+              Transaction Logs
             </h1>
-            <button onClick={() => setRunTour(true)} title="Help" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 36, height: 36, background: '#fff', border: '1px solid #E5E7EB', borderRadius: 8, cursor: 'pointer' }}>
-              <HelpCircle size={16} color={colors.textLight} />
+            <p
+              style={{
+                color: 'rgba(255, 255, 255, 0.65)',
+                margin: 0,
+                fontSize: 14,
+                maxWidth: 580,
+                lineHeight: 1.5,
+              }}
+            >
+              Unified audit log of all project expenditures, labour payroll, and supplier vouchers.
+            </p>
+          </div>
+
+          <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+            <button
+              onClick={() => setRunTour(true)}
+              title="Help Tour"
+              style={{
+                width: 38,
+                height: 38,
+                borderRadius: 'var(--r-btn, 12px)',
+                background: 'rgba(255, 255, 255, 0.08)',
+                border: '1px solid rgba(255, 255, 255, 0.12)',
+                color: 'var(--bone)',
+                display: 'grid',
+                placeItems: 'center',
+                cursor: 'pointer',
+                flexShrink: 0,
+              }}
+            >
+              <HelpCircle size={17} />
+            </button>
+            <button
+              onClick={() => navigate('/choose-entry-mode')}
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 7,
+                height: 38,
+                padding: '0 16px',
+                borderRadius: 'var(--r-btn, 12px)',
+                background: '#FFFFFF',
+                border: 'none',
+                color: 'var(--ink)',
+                fontSize: 13,
+                fontWeight: 700,
+                cursor: 'pointer',
+                boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
+              }}
+            >
+              <Plus size={16} />
+              <span>+ New entry</span>
             </button>
           </div>
-          <p style={{ fontSize: 14, color: colors.textSecondary, margin: 0 }}>View and manage all transactions across construction projects</p>
         </div>
-        <div style={{ display: 'flex', gap: 10 }}>
-          <Button variant="secondary" size="md" onClick={fetchTransactions}>
-            <RefreshCw size={14} style={{ marginRight: 6 }} /> Refresh
-          </Button>
-          <Button variant="primary" size="md" onClick={() => navigate("/manualentry")}>
-            <Plus size={16} style={{ marginRight: 4 }} /> New Entry
-          </Button>
-        </div>
-      </div>
+      </BtHero>
 
-      <div className="tour-stats" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 20, marginBottom: 32 }}>
+      {/* ── MAIN CONTENT (Overlapping BtSheet) ── */}
+      <BtSheet overlap={26} padding="28px 32px 64px">
+        <div style={{ maxWidth: 1100, margin: '0 auto' }}>
+          <div className="tour-stats"  style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 20, marginBottom: 32 }}>
         {[
           { label: 'Total Income', value: income, color: colors.success, bg: colors.successLight, icon: ArrowUpRight },
           { label: 'Total Expenses', value: expenses, color: colors.danger, bg: colors.dangerLight, icon: ArrowDownRight },
-          { label: 'Net Balance', value: income - expenses, color: income - expenses >= 0 ? colors.primary : colors.danger, bg: income - expenses >= 0 ? colors.primaryLight : colors.dangerLight, icon: IndianRupee },
+          { label: 'Net Balance', value: income - expenses, color: income - expenses >= 0 ? 'var(--ink, #111317)' : colors.danger, bg: income - expenses >= 0 ? colors.primaryLight : colors.dangerLight, icon: IndianRupee },
         ].map((item, idx) => {
           const Icon = item.icon;
           return (
@@ -221,7 +315,7 @@ export default function TransactionLog() {
           padding: '0 14px', height: 42, gap: 10, minWidth: 320,
           transition: 'all 150ms ease',
         }}
-          onFocus={(e) => { e.currentTarget.style.borderColor = colors.primary; e.currentTarget.style.boxShadow = '0 0 0 3px rgba(249, 115, 22, 0.1)'; }}
+          onFocus={(e) => { e.currentTarget.style.borderColor = 'var(--ink, #111317)'; e.currentTarget.style.boxShadow = '0 0 0 3px rgba(249, 115, 22, 0.1)'; }}
           onBlur={(e) => { e.currentTarget.style.borderColor = colors.border; e.currentTarget.style.boxShadow = 'none'; }}
         >
           <Search size={16} color={colors.textTertiary} />
@@ -240,7 +334,7 @@ export default function TransactionLog() {
                 padding: '8px 16px', borderRadius: 8, border: 'none', cursor: 'pointer',
                 fontWeight: 700, fontSize: 13,
                 background: filter === f.value ? colors.card : 'transparent',
-                color: filter === f.value ? colors.primary : colors.textSecondary,
+                color: filter === f.value ? 'var(--ink, #111317)' : colors.textSecondary,
                 transition: 'all 150ms ease', fontFamily: typography.fontFamily,
                 boxShadow: filter === f.value ? '0 1px 3px rgba(0,0,0,0.05)' : 'none',
               }}>
@@ -259,7 +353,7 @@ export default function TransactionLog() {
 
       {loading ? (
         <div style={{ textAlign: 'center', padding: 80 }}>
-          <div style={{ width: 32, height: 32, borderRadius: '50%', border: `3px solid ${colors.border}`, borderTopColor: colors.primary, animation: 'spin 0.7s linear infinite', margin: '0 auto 16px' }} />
+          <div style={{ width: 32, height: 32, borderRadius: '50%', border: `3px solid ${colors.border}`, borderTopColor: 'var(--ink, #111317)', animation: 'spin 0.7s linear infinite', margin: '0 auto 16px' }} />
           <div style={{ fontSize: 14, color: colors.textSecondary }}>Loading transactions...</div>
         </div>
       ) : paginated.length === 0 ? (
@@ -393,6 +487,8 @@ export default function TransactionLog() {
           )}
         </div>
       )}
+        </div>
+      </BtSheet>
     </div>
   );
 }

@@ -1,24 +1,13 @@
-import { useState, useEffect, useCallback, useRef, useMemo } from "react";
+import React, { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
-import {
-  projectAPI,
-  transactionAPI,
-  userAPI
-} from "../api";
+import { projectAPI, transactionAPI, userAPI } from "../api";
 import useProjectStore from "../stores/projectStore";
 import useTransactionStore from "../stores/transactionStore";
 import perfLogger from "../utils/performanceLogger";
 import { Toast } from "../components/Toast";
 import { jsPDF } from "jspdf";
 import autoTable from "jspdf-autotable";
-import {
-  colors,
-  radius,
-  shadows,
-  gradients,
-  typography
-} from "../styles/designTokens";
 import RecordPaymentSheet from "../components/RecordPaymentSheet";
 import CsvImport from "../components/CsvImport";
 import {
@@ -48,7 +37,13 @@ import {
   HelpCircle,
   CheckCircle,
   Clock,
-  Trash2
+  Trash2,
+  Table as TableIcon,
+  LayoutGrid,
+  Filter,
+  FileSpreadsheet,
+  ArrowUpDown,
+  Building2,
 } from "lucide-react";
 import ModuleTour from "../components/ModuleTour";
 import { SpendVsBudgetChart } from "../components/Charts";
@@ -56,12 +51,30 @@ import {
   isReportEntry,
   mapTransactionToEntry,
   getPaymentStatusLabel,
-  calculateFilteredCostSummary
+  calculateFilteredCostSummary,
 } from "../utils/reportCalculations";
+import BtHero from "../components/ui/BtHero";
+import BtSheet from "../components/ui/BtSheet";
+import BtCard from "../components/ui/BtCard";
+import BtChip from "../components/ui/BtChip";
+import BtSegmented from "../components/ui/BtSegmented";
+import BtBadge from "../components/ui/BtBadge";
+import BtEmpty from "../components/ui/BtEmpty";
+import BtButton from "../components/ui/BtButton";
+import BtPressable from "../components/ui/BtPressable";
 
-const primaryBlue = "var(--color-primary, #F97316)";
-const primaryPurple = "var(--color-primary-hover, #EA580C)";
-const primaryLightBlue = "#06B6D4";
+const isValidDate = (d) => d instanceof Date && !isNaN(d.getTime());
+
+const parseSessionDate = (key) => {
+  try {
+    const val = sessionStorage.getItem(key);
+    if (!val || val === "null" || val === "undefined") return null;
+    const d = new Date(val);
+    return isValidDate(d) ? d : null;
+  } catch {
+    return null;
+  }
+};
 
 function formatINR(n) {
   return `\u20B9${Number(n || 0).toLocaleString("en-IN")}`;
@@ -71,7 +84,11 @@ function formatDateShort(d) {
   if (!d) return "—";
   try {
     const dt = new Date(d);
-    return dt.toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" });
+    return dt.toLocaleDateString("en-IN", {
+      day: "numeric",
+      month: "short",
+      year: "numeric",
+    });
   } catch {
     return String(d);
   }
@@ -79,52 +96,170 @@ function formatDateShort(d) {
 
 function formatDateLong(dt) {
   if (!dt) return "-";
-  
   let dateObj = dt;
   if (!(dt instanceof Date)) {
     dateObj = new Date(dt);
   }
-  
   if (isNaN(dateObj.getTime())) return String(dt);
-  
-  const isMidnightLocal = dateObj.getHours() === 0 && dateObj.getMinutes() === 0 && dateObj.getSeconds() === 0;
-  
-  const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-  
-  const day = String(dateObj.getDate()).padStart(2, '0');
+
+  const isMidnightLocal =
+    dateObj.getHours() === 0 &&
+    dateObj.getMinutes() === 0 &&
+    dateObj.getSeconds() === 0;
+  const months = [
+    "Jan", "Feb", "Mar", "Apr", "May", "Jun",
+    "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
+  ];
+  const day = String(dateObj.getDate()).padStart(2, "0");
   const month = months[dateObj.getMonth()];
   const year = dateObj.getFullYear();
-  
+
   if (isMidnightLocal) {
     return `${day} ${month} ${year}`;
   }
-  
+
   const hour24 = dateObj.getHours();
-  const ampm = hour24 >= 12 ? 'PM' : 'AM';
+  const ampm = hour24 >= 12 ? "PM" : "AM";
   let hour12 = hour24 % 12;
   if (hour12 === 0) hour12 = 12;
-  const hour = String(hour12).padStart(2, '0');
-  const minute = String(dateObj.getMinutes()).padStart(2, '0');
+  const hour = String(hour12).padStart(2, "0");
+  const minute = String(dateObj.getMinutes()).padStart(2, "0");
   return `${day} ${month} ${year} ${hour}:${minute} ${ampm}`;
 }
 
 const DEFAULT_COLS = {
-  All: ['Purchased Date', 'Project', 'Type', 'Description', 'Brand', 'Floor', 'Phase', 'Activity', 'Unit', 'Status', 'Amount', 'Paid', 'Remaining', 'Payment Date'],
-  Materials: ['Purchased Date', 'Project', 'Material', 'Brand', 'Rate', 'Qty', 'Unit', 'Status', 'Amount', 'Paid', 'Remaining', 'Payment Date'],
-  Labour: ['Purchased Date', 'Project', 'Worker Type', 'Rate/Day', 'Days', 'Status', 'Amount', 'Paid', 'Remaining', 'Payment Date'],
-  Equipment: ['Purchased Date', 'Project', 'Equipment', 'Rent Rate', 'Duration', 'Status', 'Amount', 'Paid', 'Remaining', 'Payment Date']
+  All: [
+    "Purchased Date",
+    "Project",
+    "Type",
+    "Description",
+    "Brand",
+    "Floor",
+    "Phase",
+    "Activity",
+    "Unit",
+    "Status",
+    "Amount",
+    "Paid",
+    "Remaining",
+    "Payment Date",
+  ],
+  Materials: [
+    "Purchased Date",
+    "Project",
+    "Material",
+    "Brand",
+    "Rate",
+    "Qty",
+    "Unit",
+    "Status",
+    "Amount",
+    "Paid",
+    "Remaining",
+    "Payment Date",
+  ],
+  Labour: [
+    "Purchased Date",
+    "Project",
+    "Worker Type",
+    "Rate/Day",
+    "Days",
+    "Status",
+    "Amount",
+    "Paid",
+    "Remaining",
+    "Payment Date",
+  ],
+  Equipment: [
+    "Purchased Date",
+    "Project",
+    "Equipment",
+    "Rent Rate",
+    "Duration",
+    "Status",
+    "Amount",
+    "Paid",
+    "Remaining",
+    "Payment Date",
+  ],
 };
 
 const ALL_COLS = {
-  All: ['Created At', 'Purchased Date', 'Project', 'Type', 'Description', 'Brand', 'Floor', 'Phase', 'Activity', 'Unit', 'Status', 'Amount', 'Paid', 'Remaining', 'Payment Date'],
-  Materials: ['Created At', 'Purchased Date', 'Project', 'Material', 'Brand', 'Rate', 'Qty', 'Unit', 'Floor', 'Phase', 'Activity', 'Status', 'Amount', 'Paid', 'Remaining', 'Payment Date'],
-  Labour: ['Created At', 'Purchased Date', 'Project', 'Worker Type', 'Rate/Day', 'Days', 'Unit', 'Floor', 'Phase', 'Activity', 'Status', 'Amount', 'Paid', 'Remaining', 'Payment Date'],
-  Equipment: ['Created At', 'Purchased Date', 'Project', 'Equipment', 'Rent Rate', 'Duration', 'Unit', 'Floor', 'Phase', 'Activity', 'Status', 'Amount', 'Paid', 'Remaining', 'Payment Date']
+  All: [
+    "Created At",
+    "Purchased Date",
+    "Project",
+    "Type",
+    "Description",
+    "Brand",
+    "Floor",
+    "Phase",
+    "Activity",
+    "Unit",
+    "Status",
+    "Amount",
+    "Paid",
+    "Remaining",
+    "Payment Date",
+  ],
+  Materials: [
+    "Created At",
+    "Purchased Date",
+    "Project",
+    "Material",
+    "Brand",
+    "Rate",
+    "Qty",
+    "Unit",
+    "Floor",
+    "Phase",
+    "Activity",
+    "Status",
+    "Amount",
+    "Paid",
+    "Remaining",
+    "Payment Date",
+  ],
+  Labour: [
+    "Created At",
+    "Purchased Date",
+    "Project",
+    "Worker Type",
+    "Rate/Day",
+    "Days",
+    "Unit",
+    "Floor",
+    "Phase",
+    "Activity",
+    "Status",
+    "Amount",
+    "Paid",
+    "Remaining",
+    "Payment Date",
+  ],
+  Equipment: [
+    "Created At",
+    "Purchased Date",
+    "Project",
+    "Equipment",
+    "Rent Rate",
+    "Duration",
+    "Unit",
+    "Floor",
+    "Phase",
+    "Activity",
+    "Status",
+    "Amount",
+    "Paid",
+    "Remaining",
+    "Payment Date",
+  ],
 };
 
 export default function FinancialReportPage() {
   const navigate = useNavigate();
   const { user, can } = useAuth();
+  const location = useLocation();
 
   const [projects, setProjects] = useState([]);
   const [transactions, setTransactions] = useState([]);
@@ -133,26 +268,73 @@ export default function FinancialReportPage() {
   const [toast, setToast] = useState({ msg: "", type: "info" });
 
   const [showExportModal, setShowExportModal] = useState(false);
-  const [selectedProjectId, setSelectedProjectId] = useState(() => sessionStorage.getItem("fr_proj") || useProjectStore.getState().selectedProject?._id || "all");
-  const [selectedFloor, setSelectedFloor] = useState(() => sessionStorage.getItem("fr_floor") || "");
-  const [selectedPhaseId, setSelectedPhaseId] = useState(() => sessionStorage.getItem("fr_phase") || "");
-  const [selectedActivityName, setSelectedActivityName] = useState(() => sessionStorage.getItem("fr_activity") || "");
-  const [datePreset, setDatePreset] = useState(() => sessionStorage.getItem("fr_datePreset") || "All Time");
-  const [startDate, setStartDate] = useState(() => sessionStorage.getItem("fr_startDate") ? new Date(sessionStorage.getItem("fr_startDate")) : null);
-  const [endDate, setEndDate] = useState(() => sessionStorage.getItem("fr_endDate") ? new Date(sessionStorage.getItem("fr_endDate")) : null);
+  const [showImportModal, setShowImportModal] = useState(false);
+  const [showFiltersDrawer, setShowFiltersDrawer] = useState(false);
+  const [showChart, setShowChart] = useState(false);
+  const [viewMode, setViewMode] = useState("table"); // "table" | "cards"
 
-  const location = useLocation(); const [activeTab, setActiveTab] = useState(() => location.state?.activeTab || sessionStorage.getItem("fr_tab") || "All");
+  const [selectedProjectId, setSelectedProjectId] = useState(
+    () =>
+      sessionStorage.getItem("fr_proj") ||
+      useProjectStore.getState().selectedProject?._id ||
+      "all"
+  );
+  const [selectedFloor, setSelectedFloor] = useState(
+    () => sessionStorage.getItem("fr_floor") || ""
+  );
+  const [selectedPhaseId, setSelectedPhaseId] = useState(
+    () => sessionStorage.getItem("fr_phase") || ""
+  );
+  const [selectedActivityName, setSelectedActivityName] = useState(
+    () => sessionStorage.getItem("fr_activity") || ""
+  );
+  const [datePreset, setDatePreset] = useState(
+    () => sessionStorage.getItem("fr_datePreset") || "All Time"
+  );
+  const [startDate, setStartDate] = useState(() => parseSessionDate("fr_startDate"));
+  const [endDate, setEndDate] = useState(() => parseSessionDate("fr_endDate"));
 
-  const [searchQuery, setSearchQuery] = useState(() => sessionStorage.getItem("fr_search") || "");
-  const [selectedItemName, setSelectedItemName] = useState(() => sessionStorage.getItem("fr_item") || "");
+  const [activeTab, setActiveTab] = useState(
+    () =>
+      location.state?.activeTab ||
+      sessionStorage.getItem("fr_tab") ||
+      "All"
+  );
+
+  const [searchQuery, setSearchQuery] = useState(
+    () => sessionStorage.getItem("fr_search") || ""
+  );
+  const [selectedItemName, setSelectedItemName] = useState(
+    () => sessionStorage.getItem("fr_item") || ""
+  );
   const [reportGenerated, setReportGenerated] = useState(true);
   const [showSuggestions, setShowSuggestions] = useState(false);
 
-  const [selectedPaymentStatus, setSelectedPaymentStatus] = useState(() => sessionStorage.getItem("fr_payStatus") || "All");
+  const [selectedPaymentStatus, setSelectedPaymentStatus] = useState(
+    () => sessionStorage.getItem("fr_payStatus") || "All"
+  );
   const [sortColumn, setSortColumn] = useState("date");
   const [sortAscending, setSortAscending] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [rowsPerPage, setRowsPerPage] = useState(10);
+  const [projectDropdownOpen, setProjectDropdownOpen] = useState(false);
+  const [dateDropdownOpen, setDateDropdownOpen] = useState(false);
+  const projectDropdownRef = useRef(null);
+  const dateDropdownRef = useRef(null);
+
+  useEffect(() => {
+    function handleClickOutside(event) {
+      if (projectDropdownRef.current && !projectDropdownRef.current.contains(event.target)) {
+        setProjectDropdownOpen(false);
+      }
+      if (dateDropdownRef.current && !dateDropdownRef.current.contains(event.target)) {
+        setDateDropdownOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
 
   const [activeColumns, setActiveColumns] = useState(() => {
     try {
@@ -162,7 +344,7 @@ export default function FinancialReportPage() {
       const cached = localStorage.getItem("bt_reports_active_cols_v1");
       if (cached) {
         const parsed = JSON.parse(cached);
-        if (parsed && typeof parsed === 'object') {
+        if (parsed && typeof parsed === "object") {
           return parsed;
         }
       }
@@ -177,63 +359,85 @@ export default function FinancialReportPage() {
   const [tempAllCols, setTempAllCols] = useState([]);
 
   const [detailsEntry, setDetailsEntry] = useState(null);
-
   const [paymentSheetOpen, setPaymentSheetOpen] = useState(false);
   const [paymentItem, setPaymentItem] = useState(null);
-  const [showImportModal, setShowImportModal] = useState(false);
 
   const clearToast = useCallback(() => setToast({ msg: "", type: "info" }), []);
 
   useEffect(() => {
-    sessionStorage.setItem('fr_proj', selectedProjectId);
-    sessionStorage.setItem('fr_floor', selectedFloor);
-    sessionStorage.setItem('fr_phase', selectedPhaseId);
-    sessionStorage.setItem('fr_activity', selectedActivityName);
-    sessionStorage.setItem('fr_datePreset', datePreset);
-    if (startDate) sessionStorage.setItem('fr_startDate', startDate.toISOString());
-    else sessionStorage.removeItem('fr_startDate');
-    if (endDate) sessionStorage.setItem('fr_endDate', endDate.toISOString());
-    else sessionStorage.removeItem('fr_endDate');
-    sessionStorage.setItem('fr_tab', activeTab);
-    sessionStorage.setItem('fr_search', searchQuery);
-    sessionStorage.setItem('fr_item', selectedItemName);
-    sessionStorage.setItem('fr_payStatus', selectedPaymentStatus);
+    sessionStorage.setItem("fr_proj", selectedProjectId);
+    sessionStorage.setItem("fr_floor", selectedFloor);
+    sessionStorage.setItem("fr_phase", selectedPhaseId);
+    sessionStorage.setItem("fr_activity", selectedActivityName);
+    sessionStorage.setItem("fr_datePreset", datePreset);
+    if (isValidDate(startDate)) sessionStorage.setItem("fr_startDate", startDate.toISOString());
+    else sessionStorage.removeItem("fr_startDate");
+    if (isValidDate(endDate)) sessionStorage.setItem("fr_endDate", endDate.toISOString());
+    else sessionStorage.removeItem("fr_endDate");
+    sessionStorage.setItem("fr_tab", activeTab);
+    sessionStorage.setItem("fr_search", searchQuery);
+    sessionStorage.setItem("fr_item", selectedItemName);
+    sessionStorage.setItem("fr_payStatus", selectedPaymentStatus);
   }, [
-    selectedProjectId, selectedFloor, selectedPhaseId, selectedActivityName, 
-    datePreset, startDate, endDate, activeTab, searchQuery, selectedItemName, selectedPaymentStatus
+    selectedProjectId,
+    selectedFloor,
+    selectedPhaseId,
+    selectedActivityName,
+    datePreset,
+    startDate,
+    endDate,
+    activeTab,
+    searchQuery,
+    selectedItemName,
+    selectedPaymentStatus,
   ]);
 
-
-  const { projects: projStore, fetchProjects: storeFetchProjects } = useProjectStore();
-  const { transactions: txStore, fetchTransactions: storeFetchTransactions } = useTransactionStore();
+  const { projects: projStore, fetchProjects: storeFetchProjects } =
+    useProjectStore();
+  const { transactions: txStore, fetchTransactions: storeFetchTransactions } =
+    useTransactionStore();
 
   const [runTour, setRunTour] = useState(false);
 
-
   const tourSteps = [
-    { target: '.tour-project-filter', content: 'Filter reports by Project, Floor, Phase, Activity, and Date.', disableBeacon: true },
-    { target: '.tour-report-tabs', content: 'Switch between All, Materials, Labour, and Equipment categories.' },
-    { target: '.tour-export-btns', content: 'Customize columns and export the report to CSV.' }
+    {
+      target: ".tour-project-filter",
+      content: "Filter reports by Project, Floor, Phase, Activity, and Date.",
+      disableBeacon: true,
+    },
+    {
+      target: ".tour-report-tabs",
+      content: "Switch between All, Materials, Labour, and Equipment categories.",
+    },
+    {
+      target: ".tour-export-btns",
+      content: "Customize columns and export the report to CSV or PDF.",
+    },
   ];
 
   useEffect(() => {
-    perfLogger.endRoute('/reports');
-    perfLogger.logMount('ReportsPage');
+    perfLogger.endRoute("/reports");
+    perfLogger.logMount("ReportsPage");
   }, []);
 
-  const loadData = useCallback((force = false) => {
-    if (useProjectStore.getState().projects.length === 0 && useTransactionStore.getState().transactions.length === 0) setLoading(true);
-    setError("");
-    Promise.all([
-      storeFetchProjects({}, force),
-      storeFetchTransactions({ limit: 10000, filterByViewAccess: true }, force)
-    ])
-      .then(([projList, rawList]) => {
-        // Data is synced via useEffects below
-      })
-      .catch(() => setError("Failed to load project details and reports log."))
-      .finally(() => setLoading(false));
-  }, [storeFetchProjects, storeFetchTransactions]);
+  const loadData = useCallback(
+    (force = false) => {
+      if (
+        useProjectStore.getState().projects.length === 0 &&
+        useTransactionStore.getState().transactions.length === 0
+      )
+        setLoading(true);
+      setError("");
+      Promise.all([
+        storeFetchProjects({}, force),
+        storeFetchTransactions({ limit: 10000, filterByViewAccess: true }, force),
+      ])
+        .then(() => {})
+        .catch(() => setError("Failed to load project details and reports log."))
+        .finally(() => setLoading(false));
+    },
+    [storeFetchProjects, storeFetchTransactions]
+  );
 
   useEffect(() => {
     loadData();
@@ -247,7 +451,9 @@ export default function FinancialReportPage() {
 
   useEffect(() => {
     if (txStore) {
-      const mappedList = txStore.filter(isReportEntry).map(tx => mapTransactionToEntry(tx));
+      const mappedList = txStore
+        .filter(isReportEntry)
+        .map((tx) => mapTransactionToEntry(tx));
       setTransactions(mappedList);
     }
   }, [txStore]);
@@ -255,8 +461,11 @@ export default function FinancialReportPage() {
   const saveActiveColumns = (updated) => {
     setActiveColumns(updated);
     localStorage.setItem("bt_reports_active_cols_v1", JSON.stringify(updated));
-    userAPI.updateProfileAlt({ preferences: { reportColumns: updated } })
-      .catch(err => console.error("Failed to save report columns to profile", err));
+    userAPI
+      .updateProfileAlt({ preferences: { reportColumns: updated } })
+      .catch((err) =>
+        console.error("Failed to save report columns to profile", err)
+      );
   };
 
   useEffect(() => {
@@ -267,13 +476,16 @@ export default function FinancialReportPage() {
   }, [activeTab]);
 
   const selectedProject = useMemo(() => {
-    return projects.find(p => String(p._id) === selectedProjectId);
+    return projects.find((p) => String(p._id) === selectedProjectId);
   }, [projects, selectedProjectId]);
 
-  const getProjectName = useCallback((id) => {
-    const match = projects.find(p => String(p._id) === String(id));
-    return match ? match.projectName || match.name : "Unknown Project";
-  }, [projects]);
+  const getProjectName = useCallback(
+    (id) => {
+      const match = projects.find((p) => String(p._id) === String(id));
+      return match ? match.projectName || match.name : "Unknown Project";
+    },
+    [projects]
+  );
 
   const floors = useMemo(() => {
     return selectedProject?.floors || [];
@@ -284,19 +496,21 @@ export default function FinancialReportPage() {
   }, [selectedProject]);
 
   const selectedPhaseName = useMemo(() => {
-    const match = phases.find(ph => String(ph.id) === selectedPhaseId);
+    const match = phases.find((ph) => String(ph.id) === selectedPhaseId);
     return match ? match.phaseName : "Select Phase";
   }, [phases, selectedPhaseId]);
 
   const uniqueActivityNames = useMemo(() => {
     const activities = [];
     if (selectedPhaseId) {
-      const match = phases.find(ph => String(ph.id) === selectedPhaseId);
+      const match = phases.find((ph) => String(ph.id) === selectedPhaseId);
       activities.push(...(match?.activities || []));
     } else if (selectedProject) {
-      activities.push(...(selectedProject.selectedPhases?.flatMap(p => p.activities || []) || []));
+      activities.push(
+        ...(selectedProject.selectedPhases?.flatMap((p) => p.activities || []) || [])
+      );
     }
-    return [...new Set(activities.map(a => a.name))];
+    return [...new Set(activities.map((a) => a.name))];
   }, [selectedProject, phases, selectedPhaseId]);
 
   const handleDatePreset = (preset) => {
@@ -311,7 +525,9 @@ export default function FinancialReportPage() {
         break;
       case "Today":
         setStartDate(new Date(now.getFullYear(), now.getMonth(), now.getDate()));
-        setEndDate(new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59));
+        setEndDate(
+          new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59)
+        );
         break;
       case "This Week": {
         const weekday = now.getDay() || 7;
@@ -337,7 +553,6 @@ export default function FinancialReportPage() {
         setEndDate(null);
         break;
       case "Custom":
-
         break;
       default:
         break;
@@ -352,9 +567,11 @@ export default function FinancialReportPage() {
   }, [activeTab]);
 
   const filteredEntries = useMemo(() => {
-    return transactions.filter(entry => {
-
-      if (selectedProjectId !== "all" && String(entry.projectId) !== selectedProjectId) {
+    return transactions.filter((entry) => {
+      if (
+        selectedProjectId !== "all" &&
+        String(entry.projectId) !== selectedProjectId
+      ) {
         return false;
       }
 
@@ -364,16 +581,24 @@ export default function FinancialReportPage() {
         }
 
         if (selectedPhaseId && selectedPhaseId !== "Select Phase") {
-          const matchPhase = phases.find(ph => String(ph.id) === selectedPhaseId);
+          const matchPhase = phases.find((ph) => String(ph.id) === selectedPhaseId);
           const phaseName = matchPhase?.phaseName;
-
-          if (entry.phaseId !== selectedPhaseId && (!phaseName || entry.phase !== phaseName)) {
+          if (
+            entry.phaseId !== selectedPhaseId &&
+            (!phaseName || entry.phase !== phaseName)
+          ) {
             return false;
           }
         }
 
-        if (selectedActivityName && selectedActivityName !== "Select Activity") {
-          if (entry.activity !== selectedActivityName && entry.description !== selectedActivityName) {
+        if (
+          selectedActivityName &&
+          selectedActivityName !== "Select Activity"
+        ) {
+          if (
+            entry.activity !== selectedActivityName &&
+            entry.description !== selectedActivityName
+          ) {
             return false;
           }
         }
@@ -385,28 +610,37 @@ export default function FinancialReportPage() {
 
       if (searchQuery.trim().length > 0) {
         const q = searchQuery.toLowerCase().trim();
-        const cleanNumeric = q.replace(/^(rs\.?|₹)\s*/i, '').replace(/,/g, '').trim();
+        const cleanNumeric = q
+          .replace(/^(rs\.?|₹)\s*/i, "")
+          .replace(/,/g, "")
+          .trim();
         const projectName = getProjectName(entry.projectId).toLowerCase();
-        const descMatch = (entry.description || '').toLowerCase().includes(q);
-        const brandMatch = (entry.brand || '').toLowerCase().includes(q);
-        const contractorMatch = (entry.contractor || '').toLowerCase().includes(q);
-        const supplierMatch = (entry.supplier || '').toLowerCase().includes(q);
-        const categoryMatch = (entry.category || '').toLowerCase().includes(q);
-        const workerMatch = (entry.workerName || '').toLowerCase().includes(q);
-        const notesMatch = (entry.notes || '').toLowerCase().includes(q);
-        const remarksMatch = (entry.remarks || '').toLowerCase().includes(q);
+        const descMatch = (entry.description || "").toLowerCase().includes(q);
+        const brandMatch = (entry.brand || "").toLowerCase().includes(q);
+        const contractorMatch = (entry.contractor || "")
+          .toLowerCase()
+          .includes(q);
+        const supplierMatch = (entry.supplier || "").toLowerCase().includes(q);
+        const categoryMatch = (entry.category || "").toLowerCase().includes(q);
+        const workerMatch = (entry.workerName || "").toLowerCase().includes(q);
+        const notesMatch = (entry.notes || "").toLowerCase().includes(q);
+        const remarksMatch = (entry.remarks || "").toLowerCase().includes(q);
         const projectMatch = projectName.includes(q);
-        const floorMatch = (entry.floor || '').toLowerCase().includes(q);
-        const phaseMatch = (entry.phase || '').toLowerCase().includes(q);
-        const activityMatch = (entry.activity || '').toLowerCase().includes(q);
-        const unitMatch = (entry.unit || '').toLowerCase().includes(q);
-        const typeMatch = (entry.type || '').toLowerCase().includes(q);
+        const floorMatch = (entry.floor || "").toLowerCase().includes(q);
+        const phaseMatch = (entry.phase || "").toLowerCase().includes(q);
+        const activityMatch = (entry.activity || "").toLowerCase().includes(q);
+        const unitMatch = (entry.unit || "").toLowerCase().includes(q);
+        const typeMatch = (entry.type || "").toLowerCase().includes(q);
         const statusMatch = getPaymentStatusLabel(entry.paymentStatus, {
           amount: entry.amount,
           paidAmount: entry.paidAmount,
-        }).toLowerCase().includes(q);
+        })
+          .toLowerCase()
+          .includes(q);
         const dateMatch = formatDateShort(entry.date).toLowerCase().includes(q);
-        const payDateMatch = entry.paymentDate ? formatDateShort(entry.paymentDate).toLowerCase().includes(q) : false;
+        const payDateMatch = entry.paymentDate
+          ? formatDateShort(entry.paymentDate).toLowerCase().includes(q)
+          : false;
 
         let amountMatch = false;
         if (cleanNumeric.length > 0 && !isNaN(Number(cleanNumeric))) {
@@ -416,8 +650,10 @@ export default function FinancialReportPage() {
             String(entry.ratePerUnit || 0).includes(cleanNumeric) ||
             String(entry.paidAmount || 0).includes(cleanNumeric) ||
             String(Math.round(entry.paidAmount || 0)).includes(cleanNumeric) ||
-            String((entry.amount - entry.paidAmount) || 0).includes(cleanNumeric) ||
-            String(Math.round((entry.amount - entry.paidAmount) || 0)).includes(cleanNumeric) ||
+            String(entry.amount - entry.paidAmount || 0).includes(cleanNumeric) ||
+            String(Math.round(entry.amount - entry.paidAmount || 0)).includes(
+              cleanNumeric
+            ) ||
             String(entry.quantity || 0).includes(cleanNumeric);
         }
         if (!amountMatch) {
@@ -428,21 +664,37 @@ export default function FinancialReportPage() {
         }
 
         let rawTxMatch = false;
-        if (entry.rawTx && typeof entry.rawTx === 'object') {
+        if (entry.rawTx && typeof entry.rawTx === "object") {
           for (const key of Object.keys(entry.rawTx)) {
             const val = entry.rawTx[key];
-            if (typeof val === 'string' && val.toLowerCase().includes(q)) {
+            if (typeof val === "string" && val.toLowerCase().includes(q)) {
               rawTxMatch = true;
               break;
             }
           }
         }
 
-        if (!descMatch && !brandMatch && !contractorMatch && !supplierMatch &&
-            !categoryMatch && !workerMatch && !notesMatch && !remarksMatch &&
-            !projectMatch && !floorMatch && !phaseMatch && !activityMatch &&
-            !unitMatch && !amountMatch && !typeMatch && !statusMatch &&
-            !dateMatch && !payDateMatch && !rawTxMatch) {
+        if (
+          !descMatch &&
+          !brandMatch &&
+          !contractorMatch &&
+          !supplierMatch &&
+          !categoryMatch &&
+          !workerMatch &&
+          !notesMatch &&
+          !remarksMatch &&
+          !projectMatch &&
+          !floorMatch &&
+          !phaseMatch &&
+          !activityMatch &&
+          !unitMatch &&
+          !amountMatch &&
+          !typeMatch &&
+          !statusMatch &&
+          !dateMatch &&
+          !payDateMatch &&
+          !rawTxMatch
+        ) {
           return false;
         }
       }
@@ -468,20 +720,73 @@ export default function FinancialReportPage() {
         }
       }
 
-      if (startDate) {
-        const eDate = new Date(entry.date.getFullYear(), entry.date.getMonth(), entry.date.getDate());
-        const sDate = new Date(startDate.getFullYear(), startDate.getMonth(), startDate.getDate());
+      const entDate = isValidDate(entry.date)
+        ? entry.date
+        : entry.date ? new Date(entry.date) : null;
+
+      if (isValidDate(startDate)) {
+        if (!isValidDate(entDate)) return false;
+        const eDate = new Date(
+          entDate.getFullYear(),
+          entDate.getMonth(),
+          entDate.getDate()
+        );
+        const sDate = new Date(
+          startDate.getFullYear(),
+          startDate.getMonth(),
+          startDate.getDate()
+        );
         if (eDate.getTime() < sDate.getTime()) return false;
       }
-      if (endDate) {
-        const eDate = new Date(entry.date.getFullYear(), entry.date.getMonth(), entry.date.getDate());
-        const edDate = new Date(endDate.getFullYear(), endDate.getMonth(), endDate.getDate() + 1);
+      if (isValidDate(endDate)) {
+        if (!isValidDate(entDate)) return false;
+        const eDate = new Date(
+          entDate.getFullYear(),
+          entDate.getMonth(),
+          entDate.getDate()
+        );
+        const edDate = new Date(
+          endDate.getFullYear(),
+          endDate.getMonth(),
+          endDate.getDate() + 1
+        );
         if (eDate.getTime() >= edDate.getTime()) return false;
       }
 
       return true;
     });
-  }, [transactions, selectedProjectId, selectedFloor, selectedPhaseId, selectedActivityName, selectedTypes, activeTab, reportGenerated, searchQuery, selectedItemName, selectedPaymentStatus, startDate, endDate, getProjectName, phases]);
+  }, [
+    transactions,
+    selectedProjectId,
+    selectedFloor,
+    selectedPhaseId,
+    selectedActivityName,
+    selectedTypes,
+    activeTab,
+    reportGenerated,
+    searchQuery,
+    selectedItemName,
+    selectedPaymentStatus,
+    startDate,
+    endDate,
+    getProjectName,
+    phases,
+  ]);
+
+  const textQuerySuggestions = useMemo(() => {
+    if (!searchQuery.trim()) return [];
+    const q = searchQuery.toLowerCase().trim();
+    const set = new Set();
+    for (const t of transactions) {
+      const desc = t.itemDescription || t.description || t.title || t.name || "";
+      if (desc && desc.toLowerCase().includes(q)) set.add(desc);
+      const contractor = t.contractorName || t.contractor || "";
+      if (contractor && contractor.toLowerCase().includes(q)) set.add(contractor);
+      const brand = t.brand || "";
+      if (brand && brand.toLowerCase().includes(q)) set.add(brand);
+    }
+    return Array.from(set).slice(0, 8);
+  }, [searchQuery, transactions]);
 
   const sortedEntries = useMemo(() => {
     return [...filteredEntries].sort((a, b) => {
@@ -491,7 +796,9 @@ export default function FinancialReportPage() {
       } else if (sortColumn === "amount") {
         cmp = a.amount - b.amount;
       } else if (sortColumn === "project") {
-        cmp = getProjectName(a.projectId).localeCompare(getProjectName(b.projectId));
+        cmp = getProjectName(a.projectId).localeCompare(
+          getProjectName(b.projectId)
+        );
       }
       return sortAscending ? cmp : -cmp;
     });
@@ -506,14 +813,21 @@ export default function FinancialReportPage() {
     let labourBudget = 0;
     let equipmentBudget = 0;
     if (selectedProject) {
-      materialBudget = selectedProject.budget?.material || selectedProject.budgetMaterial || 0;
-      labourBudget = selectedProject.budget?.labour || selectedProject.budgetLabour || 0;
-      equipmentBudget = selectedProject.budget?.equipment || selectedProject.budgetEquipment || 0;
+      materialBudget =
+        selectedProject.budget?.material ||
+        selectedProject.budgetMaterial ||
+        0;
+      labourBudget =
+        selectedProject.budget?.labour || selectedProject.budgetLabour || 0;
+      equipmentBudget =
+        selectedProject.budget?.equipment ||
+        selectedProject.budgetEquipment ||
+        0;
     } else {
       for (const p of projects) {
-        materialBudget += (p.budget?.material || p.budgetMaterial || 0);
-        labourBudget += (p.budget?.labour || p.budgetLabour || 0);
-        equipmentBudget += (p.budget?.equipment || p.budgetEquipment || 0);
+        materialBudget += p.budget?.material || p.budgetMaterial || 0;
+        labourBudget += p.budget?.labour || p.budgetLabour || 0;
+        equipmentBudget += p.budget?.equipment || p.budgetEquipment || 0;
       }
     }
 
@@ -525,25 +839,25 @@ export default function FinancialReportPage() {
       {
         category: "Material",
         actual: matActual,
-        budget: materialBudget > 0 ? materialBudget : Math.max(matActual * 1.2, 50000)
+        budget:
+          materialBudget > 0 ? materialBudget : Math.max(matActual * 1.2, 50000),
       },
       {
         category: "Labour",
         actual: labActual,
-        budget: labourBudget > 0 ? labourBudget : Math.max(labActual * 1.15, 40000)
+        budget:
+          labourBudget > 0 ? labourBudget : Math.max(labActual * 1.15, 40000),
       },
       {
         category: "Equipment",
         actual: eqActual,
-        budget: equipmentBudget > 0 ? equipmentBudget : Math.max(eqActual * 1.25, 25000)
-      }
+        budget:
+          equipmentBudget > 0
+            ? equipmentBudget
+            : Math.max(eqActual * 1.25, 25000),
+      },
     ];
   }, [selectedProject, projects, costSummary]);
-
-  const materialTotal = costSummary.material;
-  const labourTotal = costSummary.labour;
-  const equipmentTotal = costSummary.equipment;
-  const grandTotal = costSummary.totalBilled;
 
   const totalCount = sortedEntries.length;
   const totalPages = Math.ceil(totalCount / rowsPerPage) || 1;
@@ -554,41 +868,11 @@ export default function FinancialReportPage() {
     return sortedEntries.slice(startIdx, startIdx + rowsPerPage);
   }, [sortedEntries, safeCurrentPage, rowsPerPage]);
 
-  const uniqueItemNames = useMemo(() => {
-    const targetType = activeTab === "Materials" ? "material" : activeTab === "Labour" ? "labour" : "equipment";
-    return [...new Set(
-      transactions
-        .filter(e => e.type === targetType && (selectedProjectId === "all" || String(e.projectId) === selectedProjectId))
-        .map(e => e.description)
-        .filter(name => name !== undefined && name !== null && String(name).trim().length > 0)
-    )].map(name => String(name));
-  }, [transactions, activeTab, selectedProjectId]);
-
-  const textQuerySuggestions = useMemo(() => {
-    if (!searchQuery.trim()) return [];
-    const q = searchQuery.toLowerCase();
-    const targetType = activeTab === "Materials" ? "material" : activeTab === "Labour" ? "labour" : (activeTab === "Equipment" ? "equipment" : null);
-    const candidates = new Set();
-    for (const e of transactions) {
-      if (targetType && e.type !== targetType) continue;
-      if (selectedProjectId !== "all" && String(e.projectId) !== selectedProjectId) continue;
-      if (e.description) candidates.add(e.description);
-      if (e.brand) candidates.add(e.brand);
-      if (e.contractor) candidates.add(e.contractor);
-      if (e.supplier) candidates.add(e.supplier);
-      if (e.workerName) candidates.add(e.workerName);
-      if (e.category) candidates.add(e.category);
-    }
-    return [...candidates].filter(name => String(name).toLowerCase().includes(q));
-  }, [transactions, activeTab, selectedProjectId, searchQuery]);
-
-  const showSuggestionsList = showSuggestions && searchQuery.trim().length > 0 && textQuerySuggestions.length > 0 &&
-    !(textQuerySuggestions.length === 1 && textQuerySuggestions[0].toLowerCase() === searchQuery.toLowerCase());
-
   const openCustomizeModal = () => {
-    const all = ALL_COLS[activeTab];
-    const active = (activeColumns && activeColumns[activeTab]) || DEFAULT_COLS[activeTab];
-    const inactive = all.filter(c => !active.includes(c));
+    const all = (ALL_COLS && ALL_COLS[activeTab]) || ALL_COLS.All || [];
+    const active =
+      (activeColumns && activeColumns[activeTab]) || DEFAULT_COLS[activeTab] || DEFAULT_COLS.All || [];
+    const inactive = all.filter((c) => !active.includes(c));
     setTempActiveCols([...active]);
     setTempAllCols([...active, ...inactive]);
     setShowCustomizeModal(true);
@@ -597,12 +881,11 @@ export default function FinancialReportPage() {
   const handleToggleColumn = (col) => {
     if (tempActiveCols.includes(col)) {
       if (tempActiveCols.length > 1) {
-        setTempActiveCols(tempActiveCols.filter(c => c !== col));
+        setTempActiveCols(tempActiveCols.filter((c) => c !== col));
       } else {
         setToast({ msg: "At least one column must be visible.", type: "error" });
       }
     } else {
-
       const updated = [];
       for (const c of tempAllCols) {
         if (tempActiveCols.includes(c) || c === col) {
@@ -616,12 +899,10 @@ export default function FinancialReportPage() {
   const handleMoveColumn = (index, direction) => {
     const newIndex = index + direction;
     if (newIndex < 0 || newIndex >= tempAllCols.length) return;
-
     const copy = [...tempAllCols];
     const [moved] = copy.splice(index, 1);
     copy.splice(newIndex, 0, moved);
     setTempAllCols(copy);
-
     const updatedActive = [];
     for (const c of copy) {
       if (tempActiveCols.includes(c)) {
@@ -638,17 +919,19 @@ export default function FinancialReportPage() {
     setToast({ msg: "Column preferences saved!", type: "success" });
   };
 
-  const resetCustomizeColumns = () => {
-    const all = ALL_COLS[activeTab];
-    setTempActiveCols([...DEFAULT_COLS[activeTab]]);
-    setTempAllCols([...all]);
-  };
-
   const handleAddMore = (entry) => {
-    const activeKey = entry.type === "material" ? "material" : entry.type === "labour" ? "labour" : "equipment";
-    const sourceId = entry.id || (entry.rawTx ? (entry.rawTx._id || entry.rawTx.id) : "");
+    const activeKey =
+      entry.type === "material"
+        ? "material"
+        : entry.type === "labour"
+          ? "labour"
+          : "equipment";
+    const sourceId =
+      entry.id || (entry.rawTx ? entry.rawTx._id || entry.rawTx.id : "");
     const returnUrl = encodeURIComponent("/reports");
-    navigate(`/manualentry?type=${activeKey}&project=${entry.projectId}&name=${entry.description}&unit=${entry.unit}&brand=${entry.brand || ""}&isDuplicate=true&sourceTransactionId=${sourceId}&returnUrl=${returnUrl}`);
+    navigate(
+      `/manualentry?type=${activeKey}&project=${entry.projectId}&name=${entry.description}&unit=${entry.unit}&brand=${entry.brand || ""}&isDuplicate=true&sourceTransactionId=${sourceId}&returnUrl=${returnUrl}`
+    );
   };
 
   const handleEditEntry = (entry) => {
@@ -667,11 +950,16 @@ export default function FinancialReportPage() {
     }
 
     try {
-
-      const activeCols = exportAll 
-          ? (ALL_COLS[activeTab] || [])
-          : ((activeColumns && activeColumns[activeTab]) || DEFAULT_COLS[activeTab] || []);
-      const headers = ['Transaction ID', 'Action', ...activeCols.map(col => col === "Amount" ? "Amount (INR)" : col)];
+      const activeCols = exportAll
+        ? ALL_COLS[activeTab] || []
+        : (activeColumns && activeColumns[activeTab]) ||
+          DEFAULT_COLS[activeTab] ||
+          [];
+      const headers = [
+        "Transaction ID",
+        "Action",
+        ...activeCols.map((col) => (col === "Amount" ? "Amount (INR)" : col)),
+      ];
 
       let maxPayments = 0;
       for (const entry of filteredEntries) {
@@ -685,13 +973,15 @@ export default function FinancialReportPage() {
       }
 
       const csvBuffer = [];
-      csvBuffer.push(headers.map(h => `"${String(h).replace(/"/g, '""')}"`).join(","));
+      csvBuffer.push(
+        headers.map((h) => `"${String(h).replace(/"/g, '""')}"`).join(",")
+      );
 
       const formatLocal = (dStr) => {
         if (!dStr) return "—";
-        const d = typeof dStr === 'string' ? new Date(dStr) : dStr;
+        const d = typeof dStr === "string" ? new Date(dStr) : dStr;
         if (isNaN(d.getTime())) return "—";
-        const pad = (n) => n.toString().padStart(2, '0');
+        const pad = (n) => n.toString().padStart(2, "0");
         return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
       };
 
@@ -706,9 +996,13 @@ export default function FinancialReportPage() {
           let d = null;
           if (dStr) {
             d = new Date(dStr);
-            // If it's a date-only string like "2026-09-22" mapped to midnight UTC,
-            // fallback to _id to avoid 5:30 AM local time issue
-            if (d.toISOString().endsWith("T00:00:00.000Z") && rawTxId && rawTxId.length === 24) {
+            if (!isValidDate(d)) {
+              d = null;
+            } else if (
+              d.toISOString().endsWith("T00:00:00.000Z") &&
+              rawTxId &&
+              rawTxId.length === 24
+            ) {
               const timestamp = parseInt(rawTxId.substring(0, 8), 16) * 1000;
               d = new Date(timestamp);
             }
@@ -720,69 +1014,89 @@ export default function FinancialReportPage() {
 
           let hours = d.getHours();
           const minutes = d.getMinutes();
-          const ampm = hours >= 12 ? 'PM' : 'AM';
+          const ampm = hours >= 12 ? "PM" : "AM";
           hours = hours % 12;
-          hours = hours ? hours : 12; // the hour '0' should be '12'
-          const pad = (n) => n.toString().padStart(2, '0');
+          hours = hours ? hours : 12;
+          const pad = (n) => n.toString().padStart(2, "0");
           return `${pad(d.getDate())}-${pad(d.getMonth() + 1)}-${d.getFullYear()} ${pad(hours)}:${pad(minutes)} ${ampm}`;
         };
+
         const rowValues = [entry.rawTx?._id || "", "unchanged"];
         for (const col of activeCols) {
-          if (col === 'Created At') {
+          if (col === "Created At") {
             rowValues.push(formatDateTime(entry.rawTx?.createdAt, entry.rawTx?._id));
-          } else if (col === 'Purchased Date') {
+          } else if (col === "Purchased Date") {
             rowValues.push(dateStr);
-          } else if (col === 'Payment Date') {
+          } else if (col === "Payment Date") {
             rowValues.push(payDateStr);
-          } else if (col === 'Project') {
+          } else if (col === "Project") {
             rowValues.push(projectName);
-          } else if (col === 'Type') {
+          } else if (col === "Type") {
             rowValues.push(entry.type.toUpperCase());
-          } else if (col === 'Description' || col === 'Material' || col === 'Worker Type' || col === 'Equipment') {
-            rowValues.push(entry.description || '—');
-          } else if (col === 'Brand') {
-            rowValues.push(entry.brand || '—');
-          } else if (col === 'Floor') {
-            rowValues.push(entry.floor || '—');
-          } else if (col === 'Phase') {
-            rowValues.push(entry.phase || '—');
-          } else if (col === 'Activity') {
-            rowValues.push(entry.activity || '—');
-          } else if (col === 'Unit') {
-            rowValues.push(entry.unit || '—');
-          } else if (col === 'Status') {
+          } else if (
+            col === "Description" ||
+            col === "Material" ||
+            col === "Worker Type" ||
+            col === "Equipment"
+          ) {
+            rowValues.push(entry.description || "—");
+          } else if (col === "Brand") {
+            rowValues.push(entry.brand || "—");
+          } else if (col === "Floor") {
+            rowValues.push(entry.floor || "—");
+          } else if (col === "Phase") {
+            rowValues.push(entry.phase || "—");
+          } else if (col === "Activity") {
+            rowValues.push(entry.activity || "—");
+          } else if (col === "Unit") {
+            rowValues.push(entry.unit || "—");
+          } else if (col === "Status") {
             rowValues.push(statusStr);
-          } else if (col === 'Amount') {
+          } else if (col === "Amount") {
             rowValues.push(amountStr);
-          } else if (col === 'Paid') {
+          } else if (col === "Paid") {
             rowValues.push((entry.paidAmount || 0).toFixed(2));
-          } else if (col === 'Remaining') {
+          } else if (col === "Remaining") {
             const rem = Math.max(0, (entry.amount || 0) - (entry.paidAmount || 0));
             rowValues.push(rem.toFixed(2));
-          } else if (col === 'Rate' || col === 'Rate/Day' || col === 'Rent Rate') {
+          } else if (
+            col === "Rate" ||
+            col === "Rate/Day" ||
+            col === "Rent Rate"
+          ) {
             rowValues.push((entry.ratePerUnit || 0).toFixed(2));
-          } else if (col === 'Qty' || col === 'Days' || col === 'Duration') {
+          } else if (
+            col === "Qty" ||
+            col === "Days" ||
+            col === "Duration"
+          ) {
             const rate = entry.ratePerUnit || 0;
-            const val = (rate === 0) ? 0 : entry.amount / rate;
+            const val = rate === 0 ? 0 : entry.amount / rate;
             rowValues.push(val.toFixed(1));
           }
         }
-        
+
         const ph = entry.rawTx?.paymentHistory || [];
         for (let i = 0; i < maxPayments; i++) {
-           if (i < ph.length) {
-              rowValues.push(ph[i].amount);
-              rowValues.push(formatLocal(ph[i].date));
-              rowValues.push(ph[i].method || ph[i].mode || '');
-           } else {
-              rowValues.push(''); rowValues.push(''); rowValues.push('');
-           }
+          if (i < ph.length) {
+            rowValues.push(ph[i].amount);
+            rowValues.push(formatLocal(ph[i].date));
+            rowValues.push(ph[i].method || ph[i].mode || "");
+          } else {
+            rowValues.push("");
+            rowValues.push("");
+            rowValues.push("");
+          }
         }
-        
-        csvBuffer.push(rowValues.map(v => `"${String(v).replace(/"/g, '""')}"`).join(","));
+
+        csvBuffer.push(
+          rowValues.map((v) => `"${String(v).replace(/"/g, '""')}"`).join(",")
+        );
       }
 
-      const blob = new Blob(["\uFEFF" + csvBuffer.join("\n")], { type: "text/csv;charset=utf-8;" });
+      const blob = new Blob(["\uFEFF" + csvBuffer.join("\n")], {
+        type: "text/csv;charset=utf-8;",
+      });
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
@@ -809,9 +1123,10 @@ export default function FinancialReportPage() {
       doc.setFont("helvetica", "bold");
       doc.setFontSize(16);
 
-      const title = selectedProjectId === 'all'
-        ? 'All Active Projects Summary Report'
-        : `${getProjectName(selectedProjectId)} Report`;
+      const title =
+        selectedProjectId === "all"
+          ? "All Active Projects Summary Report"
+          : `${getProjectName(selectedProjectId)} Report`;
       doc.text(title, 14, 16);
 
       doc.setFont("helvetica", "normal");
@@ -825,54 +1140,83 @@ export default function FinancialReportPage() {
       } else {
         parts.push("All Projects");
       }
-      parts.push(`Types: ${[...selectedTypes].map(t => t.toUpperCase()).join(", ")}`);
+      parts.push(
+        `Types: ${[...selectedTypes].map((t) => t.toUpperCase()).join(", ")}`
+      );
       parts.push(`Payment Status: ${selectedPaymentStatus}`);
       parts.push(`Date Preset: ${datePreset}`);
       doc.text(parts.join(" | "), 14, 23);
 
       doc.setFontSize(10);
-      doc.text(`Total Billed: ${formatINR(costSummary.totalBilled)}  |  Paid: ${formatINR(costSummary.paid)}  |  Remaining: ${formatINR(costSummary.remaining)}  |  Material: ${formatINR(costSummary.material)}  |  Labour: ${formatINR(costSummary.labour)}  |  Equipment: ${formatINR(costSummary.equipment)}`, 14, 30);
+      doc.text(
+        `Total Billed: ${formatINR(costSummary.totalBilled)}  |  Paid: ${formatINR(costSummary.paid)}  |  Remaining: ${formatINR(costSummary.remaining)}  |  Material: ${formatINR(costSummary.material)}  |  Labour: ${formatINR(costSummary.labour)}  |  Equipment: ${formatINR(costSummary.equipment)}`,
+        14,
+        30
+      );
 
-      const activeCols = (activeColumns && activeColumns[activeTab]) || DEFAULT_COLS[activeTab] || [];
-      const headers = activeCols.map(col => col === "Amount" ? "Amount (INR)" : col);
+      const activeCols =
+        (activeColumns && activeColumns[activeTab]) ||
+        DEFAULT_COLS[activeTab] ||
+        [];
+      const headers = activeCols.map((col) =>
+        col === "Amount" ? "Amount (INR)" : col
+      );
 
-      const body = filteredEntries.map(entry => {
+      const body = filteredEntries.map((entry) => {
         const row = [];
         for (const col of activeCols) {
-          if (col === 'Purchased Date') {
+          if (col === "Purchased Date") {
             row.push(formatDateShort(entry.date));
-          } else if (col === 'Payment Date') {
-            row.push(entry.paymentDate ? formatDateShort(entry.paymentDate) : '—');
-          } else if (col === 'Project') {
+          } else if (col === "Payment Date") {
+            row.push(entry.paymentDate ? formatDateShort(entry.paymentDate) : "—");
+          } else if (col === "Project") {
             row.push(getProjectName(entry.projectId));
-          } else if (col === 'Type') {
+          } else if (col === "Type") {
             row.push(entry.type.toUpperCase());
-          } else if (col === 'Description' || col === 'Material' || col === 'Worker Type' || col === 'Equipment') {
-            row.push(entry.description || '—');
-          } else if (col === 'Brand') {
-            row.push(entry.brand || '—');
-          } else if (col === 'Floor') {
-            row.push(entry.floor || '—');
-          } else if (col === 'Phase') {
-            row.push(entry.phase || '—');
-          } else if (col === 'Activity') {
-            row.push(entry.activity || '—');
-          } else if (col === 'Unit') {
-            row.push(entry.unit || '—');
-          } else if (col === 'Status') {
-            row.push(getPaymentStatusLabel(entry.paymentStatus, { amount: entry.amount, paidAmount: entry.paidAmount }));
-          } else if (col === 'Amount') {
+          } else if (
+            col === "Description" ||
+            col === "Material" ||
+            col === "Worker Type" ||
+            col === "Equipment"
+          ) {
+            row.push(entry.description || "—");
+          } else if (col === "Brand") {
+            row.push(entry.brand || "—");
+          } else if (col === "Floor") {
+            row.push(entry.floor || "—");
+          } else if (col === "Phase") {
+            row.push(entry.phase || "—");
+          } else if (col === "Activity") {
+            row.push(entry.activity || "—");
+          } else if (col === "Unit") {
+            row.push(entry.unit || "—");
+          } else if (col === "Status") {
+            row.push(
+              getPaymentStatusLabel(entry.paymentStatus, {
+                amount: entry.amount,
+                paidAmount: entry.paidAmount,
+              })
+            );
+          } else if (col === "Amount") {
             row.push(entry.amount.toFixed(2));
-          } else if (col === 'Paid') {
+          } else if (col === "Paid") {
             row.push((entry.paidAmount || 0).toFixed(2));
-          } else if (col === 'Remaining') {
+          } else if (col === "Remaining") {
             const rem = Math.max(0, (entry.amount || 0) - (entry.paidAmount || 0));
             row.push(rem.toFixed(2));
-          } else if (col === 'Rate' || col === 'Rate/Day' || col === 'Rent Rate') {
+          } else if (
+            col === "Rate" ||
+            col === "Rate/Day" ||
+            col === "Rent Rate"
+          ) {
             row.push((entry.ratePerUnit || 0).toFixed(2));
-          } else if (col === 'Qty' || col === 'Days' || col === 'Duration') {
+          } else if (
+            col === "Qty" ||
+            col === "Days" ||
+            col === "Duration"
+          ) {
             const rate = entry.ratePerUnit || 0;
-            const val = (rate === 0) ? 0 : entry.amount / rate;
+            const val = rate === 0 ? 0 : entry.amount / rate;
             row.push(val.toFixed(1));
           }
         }
@@ -884,7 +1228,7 @@ export default function FinancialReportPage() {
         head: [headers],
         body: body,
         styles: { fontSize: 8 },
-        headStyles: { fillColor: [249, 115, 22], textColor: 255 }
+        headStyles: { fillColor: [17, 19, 23], textColor: 255 },
       });
 
       doc.save(`BuildTrack_Report_${new Date().getTime()}.pdf`);
@@ -894,12 +1238,14 @@ export default function FinancialReportPage() {
     }
   };
 
-  const activeCols = (activeColumns && activeColumns[activeTab]) || DEFAULT_COLS[activeTab] || [];
-  const uiActiveCols = [...activeCols, 'Add More', 'Record Payment', 'Actions'];
+  const activeCols =
+    (activeColumns && activeColumns[activeTab]) || DEFAULT_COLS[activeTab] || [];
+  const uiActiveCols = [...activeCols, "Add More", "Record Payment", "Actions"];
 
-  const canRecordPayment = can('mark_paid') || can('approve_payments') || user?.role === 'Admin';
-  const canApprove = can('approve_payments') || user?.role === 'Admin';
-  const canAddEdit = can('add_entries') || user?.role === 'Admin';
+  const canRecordPayment =
+    can("mark_paid") || can("approve_payments") || user?.role === "Admin";
+  const canApprove = can("approve_payments") || user?.role === "Admin";
+  const canAddEdit = can("add_entries") || user?.role === "Admin";
 
   const handleInlineApprove = async (entry) => {
     try {
@@ -907,7 +1253,10 @@ export default function FinancialReportPage() {
       setToast({ msg: "Entry approved successfully!", type: "success" });
       loadData();
     } catch (err) {
-      setToast({ msg: err.response?.data?.message || "Failed to approve entry", type: "error" });
+      setToast({
+        msg: err.response?.data?.message || "Failed to approve entry",
+        type: "error",
+      });
     }
   };
 
@@ -919,573 +1268,1476 @@ export default function FinancialReportPage() {
       setToast({ msg: "Entry rejected", type: "info" });
       loadData();
     } catch (err) {
-      setToast({ msg: err.response?.data?.message || "Failed to reject entry", type: "error" });
+      setToast({
+        msg: err.response?.data?.message || "Failed to reject entry",
+        type: "error",
+      });
     }
   };
 
+  const extraFiltersCount = [
+    selectedFloor,
+    selectedPhaseId,
+    selectedActivityName,
+    selectedPaymentStatus !== "All" ? selectedPaymentStatus : null,
+  ].filter(Boolean).length;
+
+  const categoryTabOptions = [
+    { label: "All", value: "All" },
+    { label: "Materials", value: "Materials" },
+    { label: "Labour", value: "Labour" },
+    { label: "Equipment", value: "Equipment" },
+  ];
+
   return (
-    <div style={{ display: "flex", flexDirection: "column", width: "100%", minHeight: "100vh", background: colors.bgBase4, fontFamily: typography.fontFamily }}>
-      <ModuleTour steps={tourSteps} run={runTour} setRun={setRunTour} moduleName="FinancialReportPage" />
+    <div
+      style={{
+        display: "flex",
+        flexDirection: "column",
+        width: "100%",
+        minHeight: "100vh",
+        background: "var(--ground)",
+        fontFamily: "var(--font-ui)",
+        color: "var(--ink)",
+      }}
+    >
+      <ModuleTour
+        steps={tourSteps}
+        run={runTour}
+        setRun={setRunTour}
+        moduleName="FinancialReportPage"
+      />
       <Toast message={toast.msg} type={toast.type} onClose={clearToast} />
 
-      <div style={{ background: colors.cardBg, borderBottom: `1px solid ${colors.cardBorder}`, padding: "16px 24px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexShrink: 0 }}>
-        <div>
-          <h1 style={{ margin: 0, fontSize: 22, fontWeight: 800, color: colors.textPrimary }}>Reports</h1>
-          <p style={{ margin: "2px 0 0", fontSize: 12, color: colors.textLight }}>Financial analytics &amp; transaction log audit</p>
-        </div>
-        <div className="tour-export-btns" style={{ display: "flex", alignItems: "center", gap: 12 }}>
-          <button onClick={() => setRunTour(true)} title="Help" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 36, height: 36, background: '#fff', border: `1.5px solid ${colors.cardBorder}`, borderRadius: radius.md, cursor: 'pointer', flexShrink: 0, boxShadow: shadows.card }}>
-            <HelpCircle size={16} color={colors.textLight} />
-          </button>
-          <button
-            onClick={() => openCustomizeModal()}
-            style={{
-              padding: "9px 18px",
-              borderRadius: radius.md,
-              border: `1.5px solid ${colors.cardBorder}`,
-              background: colors.cardBg,
-              color: colors.textMedium,
-              fontWeight: 700,
-              fontSize: 13,
-              cursor: "pointer",
-              display: "flex",
-              alignItems: "center",
-              gap: 8,
-              boxShadow: shadows.card
-            }}
+      {/* ── TOP HERO (Deep Noir with blueprint grid & glow) ── */}
+      <BtHero padding="24px 32px 48px">
+        {/* Row 1: Eyebrow + Title + Header Actions */}
+        <div
+          style={{
+            display: "flex",
+            alignItems: "flex-start",
+            justifyContent: "space-between",
+            gap: 16,
+            flexWrap: "wrap",
+            marginBottom: 20,
+          }}
+        >
+          <div>
+            <div
+              style={{
+                fontFamily: "var(--font-mono)",
+                fontSize: 11,
+                letterSpacing: "0.08em",
+                color: "var(--on-noir-2)",
+                textTransform: "uppercase",
+                fontWeight: 600,
+                marginBottom: 4,
+              }}
+            >
+              {totalCount} {totalCount === 1 ? "ENTRY" : "ENTRIES"} ·{" "}
+              {(datePreset || "All Time").toUpperCase()}
+            </div>
+            <h1
+              style={{
+                fontFamily: "var(--font-display)",
+                fontSize: 34,
+                fontWeight: 700,
+                letterSpacing: "-0.02em",
+                color: "var(--bone)",
+                margin: 0,
+                lineHeight: 1.15,
+              }}
+            >
+              Reports
+            </h1>
+            <p
+              style={{
+                fontSize: 13,
+                color: "var(--on-noir-2)",
+                margin: "4px 0 0",
+              }}
+            >
+              Financial analytics &amp; transaction log audit
+            </p>
+          </div>
+
+          {/* Action buttons on dark hero */}
+          <div
+            className="tour-export-btns"
+            style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}
           >
-            <SlidersHorizontal size={14} />
-            Edit Columns
-          </button>
-  
+            <button
+              onClick={() => setRunTour(true)}
+              title="Tour &amp; Guidelines"
+              style={{
+                width: 38,
+                height: 38,
+                borderRadius: "var(--r-btn, 12px)",
+                background: "rgba(255, 255, 255, 0.08)",
+                border: "1px solid rgba(255, 255, 255, 0.12)",
+                color: "var(--bone)",
+                display: "grid",
+                placeItems: "center",
+                cursor: "pointer",
+                transition: "background 150ms ease",
+              }}
+              onMouseEnter={(e) =>
+                (e.currentTarget.style.background = "rgba(255, 255, 255, 0.14)")
+              }
+              onMouseLeave={(e) =>
+                (e.currentTarget.style.background = "rgba(255, 255, 255, 0.08)")
+              }
+            >
+              <HelpCircle size={17} />
+            </button>
+
+            <button
+              onClick={() => navigate("/ai-chat")}
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 7,
+                height: 38,
+                padding: "0 14px",
+                borderRadius: "var(--r-btn, 12px)",
+                background: "rgba(255, 255, 255, 0.08)",
+                border: "1px solid rgba(255, 255, 255, 0.12)",
+                color: "var(--bone)",
+                fontSize: 13,
+                fontWeight: 600,
+                cursor: "pointer",
+                transition: "background 150ms ease",
+              }}
+              onMouseEnter={(e) =>
+                (e.currentTarget.style.background = "rgba(255, 255, 255, 0.14)")
+              }
+              onMouseLeave={(e) =>
+                (e.currentTarget.style.background = "rgba(255, 255, 255, 0.08)")
+              }
+            >
+              <Sparkles size={15} color="var(--accent)" />
+              <span>Ask AI</span>
+            </button>
+
             <button
               onClick={() => setShowImportModal(true)}
               style={{
-                padding: "9px 18px",
-                borderRadius: radius.md,
-                border: "none",
-                background: colors.cardBg,
-                color: colors.textMedium,
-                fontWeight: 700,
-                fontSize: 13,
-                cursor: "pointer",
-                display: "flex",
+                display: "inline-flex",
                 alignItems: "center",
-                gap: 8,
-                boxShadow: shadows.card
+                gap: 7,
+                height: 38,
+                padding: "0 14px",
+                borderRadius: "var(--r-btn, 12px)",
+                background: "rgba(255, 255, 255, 0.08)",
+                border: "1px solid rgba(255, 255, 255, 0.12)",
+                color: "var(--bone)",
+                fontSize: 13,
+                fontWeight: 600,
+                cursor: "pointer",
+                transition: "background 150ms ease",
               }}
+              onMouseEnter={(e) =>
+                (e.currentTarget.style.background = "rgba(255, 255, 255, 0.14)")
+              }
+              onMouseLeave={(e) =>
+                (e.currentTarget.style.background = "rgba(255, 255, 255, 0.08)")
+              }
             >
-              Import / Revert CSV
+              <FileSpreadsheet size={15} />
+              <span>Import CSV</span>
             </button>
 
-            <div style={{ position: "relative" }}>
             <button
               onClick={() => setShowExportModal(true)}
               disabled={filteredEntries.length === 0}
               style={{
-                padding: "9px 18px",
-                borderRadius: radius.md,
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 7,
+                height: 38,
+                padding: "0 16px",
+                borderRadius: "var(--r-btn, 12px)",
+                background: "#FFFFFF",
                 border: "none",
-                background: gradients.primaryButton,
-                color: "#FFF",
-                fontWeight: 700,
+                color: "var(--ink)",
                 fontSize: 13,
+                fontWeight: 700,
                 cursor: filteredEntries.length === 0 ? "not-allowed" : "pointer",
                 opacity: filteredEntries.length === 0 ? 0.6 : 1,
-                display: "flex",
-                alignItems: "center",
-                gap: 8,
-                boxShadow: shadows.card
+                boxShadow: "0 2px 8px rgba(0,0,0,0.15)",
+                transition: "transform 150ms ease",
               }}
+              onMouseEnter={(e) => (e.currentTarget.style.transform = "scale(1.02)")}
+              onMouseLeave={(e) => (e.currentTarget.style.transform = "scale(1)")}
             >
-              <Download size={14} />
-              Export CSV
+              <Download size={15} />
+              <span>Export</span>
             </button>
           </div>
         </div>
-      </div>
 
-      <div style={{ flex: 1, overflowY: "auto", padding: "24px" }}>
-
+        {/* Row 2: Horizontal Filter Chips on Dark */}
         <div
-          onClick={() => navigate("/ai-chat")}
+          className="tour-project-filter"
           style={{
-            background: "linear-gradient(135deg, var(--color-primary, #F97316) 0%, rgba(249, 115, 22, 0.8) 100%)",
-            borderRadius: radius.lg,
-            padding: "16px 20px",
-            marginBottom: 24,
-            cursor: "pointer",
-            boxShadow: shadows.card,
             display: "flex",
             alignItems: "center",
-            gap: 16,
-            transition: "transform 0.15s ease"
+            gap: 8,
+            overflowX: "auto",
+            scrollbarWidth: "none",
+            paddingBottom: 4,
           }}
-          className="hover-lift-sm"
         >
-          <div style={{ width: 42, height: 42, background: "rgba(255,255,255,0.18)", borderRadius: 12, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-            <Sparkles size={20} color="#FFFFFF" />
-          </div>
-          <div style={{ flex: 1 }}>
-            <div style={{ color: "#FFFFFF", fontWeight: "800", fontSize: 16 }}>Ask AI</div>
-            <div style={{ color: "rgba(255,255,255,0.75)", fontSize: 12.5, marginTop: 2 }}>Ask about costs, entries &amp; inventory insights</div>
-          </div>
-          <ChevronRight size={18} color="rgba(255,255,255,0.7)" />
-        </div>
+          {/* Project selector dropdown (Blueprint Noir) */}
+          <div ref={projectDropdownRef} style={{ position: "relative" }}>
+            <button
+              type="button"
+              onClick={() => {
+                setProjectDropdownOpen((v) => !v);
+                setDateDropdownOpen(false);
+              }}
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 7,
+                padding: "7px 12px",
+                borderRadius: "var(--r-btn, 12px)",
+                background: selectedProjectId !== "all" ? "rgba(224, 169, 59, 0.16)" : "rgba(255, 255, 255, 0.08)",
+                border: selectedProjectId !== "all" ? "1px solid rgba(224, 169, 59, 0.38)" : "1px solid rgba(255, 255, 255, 0.14)",
+                color: selectedProjectId !== "all" ? "var(--accent, #E0A93B)" : "var(--bone, #F6F4EF)",
+                fontSize: 12.5,
+                fontWeight: 600,
+                fontFamily: "var(--font-ui)",
+                cursor: "pointer",
+                transition: "all 140ms ease",
+                whiteSpace: "nowrap",
+                backdropFilter: "blur(8px)",
+              }}
+            >
+              <Building2 size={14} color={selectedProjectId !== "all" ? "var(--accent)" : "rgba(255, 255, 255, 0.75)"} />
+              <span>
+                {selectedProjectId === "all" ? "All projects" : getProjectName(selectedProjectId)}
+              </span>
+              <ChevronDown
+                size={13}
+                style={{
+                  transform: projectDropdownOpen ? "rotate(180deg)" : "rotate(0deg)",
+                  transition: "transform 180ms ease",
+                  opacity: 0.7,
+                }}
+              />
+            </button>
 
-        <div className="tour-project-filter" style={{ background: colors.cardBg, borderRadius: radius.lg, border: `1px solid ${colors.cardBorder}`, padding: 20, marginBottom: 24, boxShadow: shadows.card }}>
+            {projectDropdownOpen && (
+              <div
+                style={{
+                  position: "absolute",
+                  top: "calc(100% + 6px)",
+                  left: 0,
+                  width: "280px",
+                  background: "var(--noir-2, #14171D)",
+                  border: "1px solid rgba(255, 255, 255, 0.14)",
+                  borderRadius: "14px",
+                  boxShadow: "0 18px 45px rgba(0, 0, 0, 0.7)",
+                  zIndex: 200,
+                  padding: "6px",
+                  backdropFilter: "blur(20px)",
+                  animation: "fadeIn 120ms ease",
+                }}
+              >
+                <div
+                  style={{
+                    padding: "6px 10px 6px",
+                    fontSize: "10.5px",
+                    fontFamily: "var(--font-mono)",
+                    color: "rgba(246, 244, 239, 0.45)",
+                    letterSpacing: "0.08em",
+                    textTransform: "uppercase",
+                    borderBottom: "1px solid rgba(255, 255, 255, 0.08)",
+                    marginBottom: "4px",
+                  }}
+                >
+                  Select Project
+                </div>
 
-          <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 16 }}>
-            <div style={{ width: 34, height: 34, background: "rgba(249, 115, 22, 0.1)", borderRadius: 8, display: "flex", alignItems: "center", justifyContent: "center", color: primaryBlue, flexShrink: 0 }}>
-              <Building size={16} />
-            </div>
-            <div>
-              <div style={{ fontSize: 15, fontWeight: "800", color: colors.textPrimary }}>Project Context</div>
-              <div style={{ fontSize: 11.5, color: colors.textLight, marginTop: 1 }}>Configure scoping properties</div>
-            </div>
-          </div>
-
-          <hr style={{ border: "none", borderTop: `1px solid ${colors.divider}`, margin: "0 0 16px" }} />
-
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 16 }}>
-
-            <div>
-              <label style={{ display: "block", fontSize: 11.5, fontWeight: "600", color: colors.textSecondary, marginBottom: 6 }}>Project</label>
-              <div style={{ position: "relative" }}>
-                <select
-                  value={selectedProjectId}
-                  onChange={e => {
-                    setSelectedProjectId(e.target.value);
+                <div
+                  onClick={() => {
+                    setSelectedProjectId("all");
                     setSelectedFloor("");
                     setSelectedPhaseId("");
                     setSelectedActivityName("");
                     setCurrentPage(1);
-                  }}
-                  style={{ width: "100%", padding: "10px 14px", borderRadius: 10, border: `1.2px solid #E2E4FA`, background: "#FFF", fontSize: 13, fontWeight: "600", color: colors.textPrimary, outline: "none", appearance: "none", cursor: "pointer" }}
-                >
-                  <option value="all">All projects</option>
-                  {projects.map(p => (
-                    <option key={p._id} value={p._id}>{p.projectName || p.name}</option>
-                  ))}
-                </select>
-                <ChevronDown size={14} color="#757299" style={{ position: "absolute", right: 14, top: "50%", transform: "translateY(-50%)", pointerEvents: "none" }} />
-              </div>
-            </div>
-
-            <div>
-              <label style={{ display: "block", fontSize: 11.5, fontWeight: "600", color: selectedProjectId === "all" || floors.length === 0 ? "#C5CAE9" : colors.textSecondary, marginBottom: 6 }}>Floor</label>
-              <div style={{ position: "relative" }}>
-                <select
-                  disabled={selectedProjectId === "all" || floors.length === 0}
-                  value={floors.length === 0 ? "" : (selectedFloor || "Select Floor")}
-                  onChange={e => {
-                    setSelectedFloor(e.target.value === "Select Floor" ? "" : e.target.value);
-                    setCurrentPage(1);
+                    setProjectDropdownOpen(false);
                   }}
                   style={{
-                    width: "100%",
-                    padding: "10px 14px",
-                    borderRadius: 10,
-                    border: `1.2px solid #E2E4FA`,
-                    background: selectedProjectId === "all" || floors.length === 0 ? "#F9FAFB" : "#FFF",
+                    padding: "9px 11px",
+                    borderRadius: "9px",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    cursor: "pointer",
+                    background: selectedProjectId === "all" ? "rgba(255, 255, 255, 0.10)" : "transparent",
+                    color: selectedProjectId === "all" ? "var(--bone, #F6F4EF)" : "rgba(246, 244, 239, 0.8)",
                     fontSize: 13,
-                    fontWeight: "600",
-                    color: selectedProjectId === "all" || floors.length === 0 ? "#9CA3AF" : colors.textPrimary,
-                    outline: "none",
-                    appearance: "none",
-                    cursor: selectedProjectId === "all" || floors.length === 0 ? "not-allowed" : "pointer"
+                    fontWeight: selectedProjectId === "all" ? 600 : 500,
+                    transition: "background 100ms ease",
+                  }}
+                  onMouseEnter={(e) => {
+                    if (selectedProjectId !== "all") e.currentTarget.style.background = "rgba(255, 255, 255, 0.06)";
+                  }}
+                  onMouseLeave={(e) => {
+                    if (selectedProjectId !== "all") e.currentTarget.style.background = "transparent";
                   }}
                 >
-                  <option value={floors.length === 0 ? "" : "Select Floor"}>{floors.length === 0 ? "" : "Select Floor"}</option>
-                  {floors.map((fl, idx) => (
-                    <option key={idx} value={typeof fl === 'string' ? fl : fl.name}>{typeof fl === 'string' ? fl : fl.name}</option>
-                  ))}
-                </select>
-                <ChevronDown size={14} color="#757299" style={{ position: "absolute", right: 14, top: "50%", transform: "translateY(-50%)", pointerEvents: "none" }} />
+                  <div style={{ display: "flex", alignItems: "center", gap: 9 }}>
+                    <Building2 size={14} color="var(--accent, #E0A93B)" />
+                    <span>All projects</span>
+                  </div>
+                  {selectedProjectId === "all" && <Check size={14} color="var(--accent, #E0A93B)" />}
+                </div>
+
+                {projects.length > 0 && (
+                  <div
+                    style={{
+                      maxHeight: "220px",
+                      overflowY: "auto",
+                      marginTop: "4px",
+                      paddingTop: "4px",
+                      borderTop: "1px solid rgba(255, 255, 255, 0.08)",
+                    }}
+                  >
+                    {projects.map((p) => {
+                      const pid = p._id || p.id;
+                      const isSel = selectedProjectId === pid;
+                      return (
+                        <div
+                          key={pid}
+                          onClick={() => {
+                            setSelectedProjectId(pid);
+                            setSelectedFloor("");
+                            setSelectedPhaseId("");
+                            setSelectedActivityName("");
+                            setCurrentPage(1);
+                            setProjectDropdownOpen(false);
+                          }}
+                          style={{
+                            padding: "9px 11px",
+                            borderRadius: "9px",
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "space-between",
+                            cursor: "pointer",
+                            background: isSel ? "rgba(255, 255, 255, 0.10)" : "transparent",
+                            color: isSel ? "var(--bone, #F6F4EF)" : "rgba(246, 244, 239, 0.8)",
+                            fontSize: 13,
+                            fontWeight: isSel ? 600 : 500,
+                            transition: "background 100ms ease",
+                          }}
+                          onMouseEnter={(e) => {
+                            if (!isSel) e.currentTarget.style.background = "rgba(255, 255, 255, 0.06)";
+                          }}
+                          onMouseLeave={(e) => {
+                            if (!isSel) e.currentTarget.style.background = "transparent";
+                          }}
+                        >
+                          <div style={{ display: "flex", alignItems: "center", gap: 9, minWidth: 0, flex: 1 }}>
+                            <Building2 size={14} color={isSel ? "var(--accent)" : "rgba(255, 255, 255, 0.45)"} />
+                            <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                              {p.projectName || p.name}
+                            </span>
+                          </div>
+                          {isSel && <Check size={14} color="var(--accent, #E0A93B)" />}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
+            )}
+          </div>
+
+          {/* Date preset selector dropdown (Blueprint Noir) */}
+          <div ref={dateDropdownRef} style={{ position: "relative" }}>
+            <button
+              type="button"
+              onClick={() => {
+                setDateDropdownOpen((v) => !v);
+                setProjectDropdownOpen(false);
+              }}
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 7,
+                padding: "7px 12px",
+                borderRadius: "var(--r-btn, 12px)",
+                background: datePreset !== "All Time" ? "rgba(224, 169, 59, 0.16)" : "rgba(255, 255, 255, 0.08)",
+                border: datePreset !== "All Time" ? "1px solid rgba(224, 169, 59, 0.38)" : "1px solid rgba(255, 255, 255, 0.14)",
+                color: datePreset !== "All Time" ? "var(--accent, #E0A93B)" : "var(--bone, #F6F4EF)",
+                fontSize: 12.5,
+                fontWeight: 600,
+                fontFamily: "var(--font-ui)",
+                cursor: "pointer",
+                transition: "all 140ms ease",
+                whiteSpace: "nowrap",
+                backdropFilter: "blur(8px)",
+              }}
+            >
+              <Calendar size={14} color={datePreset !== "All Time" ? "var(--accent)" : "rgba(255, 255, 255, 0.75)"} />
+              <span>
+                {datePreset === "Custom" && (startDate || endDate)
+                  ? `${startDate ? formatDateShort(startDate) : "…"} – ${endDate ? formatDateShort(endDate) : "…"}`
+                  : datePreset}
+              </span>
+              <ChevronDown
+                size={13}
+                style={{
+                  transform: dateDropdownOpen ? "rotate(180deg)" : "rotate(0deg)",
+                  transition: "transform 180ms ease",
+                  opacity: 0.7,
+                }}
+              />
+            </button>
+
+            {dateDropdownOpen && (
+              <div
+                style={{
+                  position: "absolute",
+                  top: "calc(100% + 6px)",
+                  left: 0,
+                  width: "220px",
+                  background: "var(--noir-2, #14171D)",
+                  border: "1px solid rgba(255, 255, 255, 0.14)",
+                  borderRadius: "14px",
+                  boxShadow: "0 18px 45px rgba(0, 0, 0, 0.7)",
+                  zIndex: 200,
+                  padding: "6px",
+                  backdropFilter: "blur(20px)",
+                  animation: "fadeIn 120ms ease",
+                }}
+              >
+                <div
+                  style={{
+                    padding: "6px 10px 6px",
+                    fontSize: "10.5px",
+                    fontFamily: "var(--font-mono)",
+                    color: "rgba(246, 244, 239, 0.45)",
+                    letterSpacing: "0.08em",
+                    textTransform: "uppercase",
+                    borderBottom: "1px solid rgba(255, 255, 255, 0.08)",
+                    marginBottom: "4px",
+                  }}
+                >
+                  Date Preset
+                </div>
+
+                {[
+                  "All Time",
+                  "Today",
+                  "This Week",
+                  "This Month",
+                  "Last 30 Days",
+                  "This Year",
+                  "Custom",
+                ].map((preset) => {
+                  const isSel = datePreset === preset;
+                  return (
+                    <div
+                      key={preset}
+                      onClick={() => {
+                        handleDatePreset(preset);
+                        setDateDropdownOpen(false);
+                      }}
+                      style={{
+                        padding: "8px 11px",
+                        borderRadius: "9px",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "space-between",
+                        cursor: "pointer",
+                        background: isSel ? "rgba(255, 255, 255, 0.10)" : "transparent",
+                        color: isSel ? "var(--bone, #F6F4EF)" : "rgba(246, 244, 239, 0.8)",
+                        fontSize: 13,
+                        fontWeight: isSel ? 600 : 500,
+                        transition: "background 100ms ease",
+                      }}
+                      onMouseEnter={(e) => {
+                        if (!isSel) e.currentTarget.style.background = "rgba(255, 255, 255, 0.06)";
+                      }}
+                      onMouseLeave={(e) => {
+                        if (!isSel) e.currentTarget.style.background = "transparent";
+                      }}
+                    >
+                      <span>{preset}</span>
+                      {isSel && <Check size={14} color="var(--accent, #E0A93B)" />}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+
+          {/* Scoping Filters toggle chip */}
+          <BtChip
+            label={
+              extraFiltersCount === 0
+                ? "Filter"
+                : `Filter · ${extraFiltersCount}`
+            }
+            onDark={true}
+            selected={extraFiltersCount > 0 || showFiltersDrawer}
+            icon={Filter}
+            onClick={() => setShowFiltersDrawer(!showFiltersDrawer)}
+          />
+
+          {/* Chart Toggle Chip */}
+          <BtChip
+            label={showChart ? "Hide Chart" : "Analytics Chart"}
+            onDark={true}
+            selected={showChart}
+            icon={SlidersHorizontal}
+            onClick={() => setShowChart(!showChart)}
+          />
+
+          {/* Reset Filters chip */}
+          {(selectedProjectId !== "all" ||
+            datePreset !== "All Time" ||
+            extraFiltersCount > 0 ||
+            searchQuery.trim().length > 0) && (
+            <button
+              onClick={() => {
+                setSelectedProjectId("all");
+                setSelectedFloor("");
+                setSelectedPhaseId("");
+                setSelectedActivityName("");
+                setDatePreset("All Time");
+                setStartDate(null);
+                setEndDate(null);
+                setSearchQuery("");
+                setSelectedItemName("");
+                setSelectedPaymentStatus("All");
+                setCurrentPage(1);
+              }}
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 5,
+                height: 36,
+                padding: "0 12px",
+                borderRadius: "var(--r-chip)",
+                background: "rgba(239, 68, 68, 0.15)",
+                border: "1px solid rgba(239, 68, 68, 0.3)",
+                color: "#FCA5A5",
+                fontSize: 12.5,
+                fontWeight: 600,
+                cursor: "pointer",
+              }}
+            >
+              <RotateCcw size={13} />
+              <span>Reset</span>
+            </button>
+          )}
+        </div>
+      </BtHero>
+
+      {/* ── MAIN CONTENT (Overlapping BtSheet) ── */}
+      <BtSheet overlap={26} padding="24px 32px 64px">
+        {/* Category Tabs: All | Materials | Labour | Equipment */}
+        <div
+          className="tour-report-tabs"
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            flexWrap: "wrap",
+            gap: 16,
+            marginBottom: 20,
+          }}
+        >
+          <BtSegmented
+            options={categoryTabOptions}
+            value={activeTab}
+            onChange={(val) => {
+              setActiveTab(val);
+              setCurrentPage(1);
+            }}
+          />
+
+          {/* View Toggle: Table vs Cards */}
+          <div
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              background: "var(--fill)",
+              borderRadius: "var(--r-tile)",
+              padding: 3,
+            }}
+          >
+            <button
+              onClick={() => setViewMode("table")}
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 6,
+                padding: "6px 14px",
+                height: 32,
+                borderRadius: 10,
+                background: viewMode === "table" ? "#FFFFFF" : "transparent",
+                color: viewMode === "table" ? "var(--ink)" : "var(--ink-soft)",
+                boxShadow:
+                  viewMode === "table"
+                    ? "0 1px 3px rgba(12, 14, 18, 0.08)"
+                    : "none",
+                fontSize: 12.5,
+                fontWeight: viewMode === "table" ? 700 : 500,
+                cursor: "pointer",
+                border: "none",
+              }}
+            >
+              <TableIcon size={14} />
+              <span>Table</span>
+            </button>
+            <button
+              onClick={() => setViewMode("cards")}
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 6,
+                padding: "6px 14px",
+                height: 32,
+                borderRadius: 10,
+                background: viewMode === "cards" ? "#FFFFFF" : "transparent",
+                color: viewMode === "cards" ? "var(--ink)" : "var(--ink-soft)",
+                boxShadow:
+                  viewMode === "cards"
+                    ? "0 1px 3px rgba(12, 14, 18, 0.08)"
+                    : "none",
+                fontSize: 12.5,
+                fontWeight: viewMode === "cards" ? 700 : 500,
+                cursor: "pointer",
+                border: "none",
+              }}
+            >
+              <LayoutGrid size={14} />
+              <span>Cards</span>
+            </button>
+          </div>
+        </div>
+
+        {/* Expandable Scoping Filters Bar */}
+        {showFiltersDrawer && (
+          <div
+            style={{
+              background: "var(--card)",
+              borderRadius: "var(--r-card)",
+              border: "1px solid var(--line)",
+              padding: 20,
+              marginBottom: 20,
+              boxShadow: "var(--shadow-card)",
+            }}
+          >
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                marginBottom: 14,
+              }}
+            >
+              <span
+                style={{
+                  fontFamily: "var(--font-mono)",
+                  fontSize: 11,
+                  letterSpacing: "0.08em",
+                  color: "var(--ink-soft)",
+                  textTransform: "uppercase",
+                  fontWeight: 600,
+                }}
+              >
+                Granular Scoping Filters
+              </span>
+              <button
+                onClick={() => setShowFiltersDrawer(false)}
+                style={{
+                  background: "none",
+                  border: "none",
+                  cursor: "pointer",
+                  color: "var(--ink-soft)",
+                }}
+              >
+                <X size={16} />
+              </button>
             </div>
 
-            <div>
-              <label style={{ display: "block", fontSize: 11.5, fontWeight: "600", color: selectedProjectId === "all" || phases.length === 0 ? "#C5CAE9" : colors.textSecondary, marginBottom: 6 }}>Phase</label>
-              <div style={{ position: "relative" }}>
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
+                gap: 12,
+              }}
+            >
+              {/* Floor */}
+              <div>
+                <label
+                  style={{
+                    display: "block",
+                    fontSize: 12,
+                    fontWeight: 600,
+                    color: "var(--ink-soft)",
+                    marginBottom: 5,
+                  }}
+                >
+                  Floor
+                </label>
+                <div style={{ position: "relative" }}>
+                  <select
+                    disabled={selectedProjectId === "all" || floors.length === 0}
+                    value={floors.length === 0 ? "" : selectedFloor || "Select Floor"}
+                    onChange={(e) => {
+                      setSelectedFloor(
+                        e.target.value === "Select Floor" ? "" : e.target.value
+                      );
+                      setCurrentPage(1);
+                    }}
+                    style={{
+                      width: "100%",
+                      padding: "8px 12px",
+                      borderRadius: 8,
+                      border: "1px solid var(--line)",
+                      background:
+                        selectedProjectId === "all" || floors.length === 0
+                          ? "var(--fill)"
+                          : "#FFFFFF",
+                      fontSize: 13,
+                      fontWeight: 600,
+                      color: "var(--ink)",
+                      outline: "none",
+                    }}
+                  >
+                    <option value={floors.length === 0 ? "" : "Select Floor"}>
+                      {floors.length === 0 ? "No floors" : "All Floors"}
+                    </option>
+                    {floors.map((fl, idx) => (
+                      <option
+                        key={idx}
+                        value={typeof fl === "string" ? fl : fl.name}
+                      >
+                        {typeof fl === "string" ? fl : fl.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              {/* Phase */}
+              <div>
+                <label
+                  style={{
+                    display: "block",
+                    fontSize: 12,
+                    fontWeight: 600,
+                    color: "var(--ink-soft)",
+                    marginBottom: 5,
+                  }}
+                >
+                  Phase
+                </label>
                 <select
                   disabled={selectedProjectId === "all" || phases.length === 0}
                   value={selectedPhaseId || "Select Phase"}
-                  onChange={e => {
-                    const val = e.target.value === "Select Phase" ? "" : e.target.value;
+                  onChange={(e) => {
+                    const val =
+                      e.target.value === "Select Phase" ? "" : e.target.value;
                     setSelectedPhaseId(val);
                     setSelectedActivityName("");
                     setCurrentPage(1);
                   }}
-                  style={{ width: "100%", padding: "10px 14px", borderRadius: 10, border: `1.2px solid #E2E4FA`, background: selectedProjectId === "all" || phases.length === 0 ? "#F9FAFB" : "#FFF", fontSize: 13, fontWeight: "600", color: selectedProjectId === "all" || phases.length === 0 ? "#9CA3AF" : colors.textPrimary, outline: "none", appearance: "none", cursor: "pointer" }}
+                  style={{
+                    width: "100%",
+                    padding: "8px 12px",
+                    borderRadius: 8,
+                    border: "1px solid var(--line)",
+                    background:
+                      selectedProjectId === "all" || phases.length === 0
+                        ? "var(--fill)"
+                        : "#FFFFFF",
+                    fontSize: 13,
+                    fontWeight: 600,
+                    color: "var(--ink)",
+                    outline: "none",
+                  }}
                 >
-                  <option value="Select Phase">Select Phase</option>
-                  {phases.map(ph => (
-                    <option key={ph.id} value={ph.id}>{ph.phaseName}</option>
+                  <option value="Select Phase">All Phases</option>
+                  {phases.map((ph) => (
+                    <option key={ph.id} value={ph.id}>
+                      {ph.phaseName}
+                    </option>
                   ))}
                 </select>
-                <ChevronDown size={14} color="#757299" style={{ position: "absolute", right: 14, top: "50%", transform: "translateY(-50%)", pointerEvents: "none" }} />
               </div>
-            </div>
 
-            <div>
-              <label style={{ display: "block", fontSize: 11.5, fontWeight: "600", color: selectedProjectId === "all" || uniqueActivityNames.length === 0 ? "#C5CAE9" : colors.textSecondary, marginBottom: 6 }}>Activity</label>
-              <div style={{ position: "relative" }}>
+              {/* Activity */}
+              <div>
+                <label
+                  style={{
+                    display: "block",
+                    fontSize: 12,
+                    fontWeight: 600,
+                    color: "var(--ink-soft)",
+                    marginBottom: 5,
+                  }}
+                >
+                  Activity
+                </label>
                 <select
-                  disabled={selectedProjectId === "all" || uniqueActivityNames.length === 0}
+                  disabled={
+                    selectedProjectId === "all" ||
+                    uniqueActivityNames.length === 0
+                  }
                   value={selectedActivityName || "Select Activity"}
-                  onChange={e => {
-                    setSelectedActivityName(e.target.value === "Select Activity" ? "" : e.target.value);
+                  onChange={(e) => {
+                    setSelectedActivityName(
+                      e.target.value === "Select Activity" ? "" : e.target.value
+                    );
                     setCurrentPage(1);
                   }}
-                  style={{ width: "100%", padding: "10px 14px", borderRadius: 10, border: `1.2px solid #E2E4FA`, background: selectedProjectId === "all" || uniqueActivityNames.length === 0 ? "#F9FAFB" : "#FFF", fontSize: 13, fontWeight: "600", color: selectedProjectId === "all" || uniqueActivityNames.length === 0 ? "#9CA3AF" : colors.textPrimary, outline: "none", appearance: "none", cursor: "pointer" }}
+                  style={{
+                    width: "100%",
+                    padding: "8px 12px",
+                    borderRadius: 8,
+                    border: "1px solid var(--line)",
+                    background:
+                      selectedProjectId === "all" ||
+                      uniqueActivityNames.length === 0
+                        ? "var(--fill)"
+                        : "#FFFFFF",
+                    fontSize: 13,
+                    fontWeight: 600,
+                    color: "var(--ink)",
+                    outline: "none",
+                  }}
                 >
-                  <option value="Select Activity">Select Activity</option>
+                  <option value="Select Activity">All Activities</option>
                   {uniqueActivityNames.map((actName, idx) => (
-                    <option key={idx} value={actName}>{actName}</option>
+                    <option key={idx} value={actName}>
+                      {actName}
+                    </option>
                   ))}
                 </select>
-                <ChevronDown size={14} color="#757299" style={{ position: "absolute", right: 14, top: "50%", transform: "translateY(-50%)", pointerEvents: "none" }} />
               </div>
-            </div>
 
-            <div>
-              <label style={{ display: "block", fontSize: 11.5, fontWeight: "600", color: colors.textSecondary, marginBottom: 6 }}>Date Period</label>
-              <div style={{ position: "relative" }}>
-                <select
-                  value={datePreset}
-                  onChange={e => handleDatePreset(e.target.value)}
-                  style={{ width: "100%", padding: "10px 14px", borderRadius: 10, border: `1.2px solid #E2E4FA`, background: "#FFF", fontSize: 13, fontWeight: "600", color: colors.textPrimary, outline: "none", appearance: "none", cursor: "pointer" }}
+              {/* Payment Status */}
+              <div>
+                <label
+                  style={{
+                    display: "block",
+                    fontSize: 12,
+                    fontWeight: 600,
+                    color: "var(--ink-soft)",
+                    marginBottom: 5,
+                  }}
                 >
-                  <option value="All Time">All Time</option>
-                  <option value="Today">Today</option>
-                  <option value="This Week">This Week</option>
-                  <option value="This Month">This Month</option>
-                  <option value="Last 30 Days">Last 30 Days</option>
-                  <option value="This Year">This Year</option>
-                  <option value="Custom">Custom Range</option>
-                </select>
-                <ChevronDown size={14} color="#757299" style={{ position: "absolute", right: 14, top: "50%", transform: "translateY(-50%)", pointerEvents: "none" }} />
-              </div>
-            </div>
-
-            <div>
-              <label style={{ display: "block", fontSize: 11.5, fontWeight: "600", color: colors.textSecondary, marginBottom: 6 }}>Payment Status</label>
-              <div style={{ position: "relative" }}>
+                  Payment Status
+                </label>
                 <select
                   value={selectedPaymentStatus}
-                  onChange={e => {
+                  onChange={(e) => {
                     setSelectedPaymentStatus(e.target.value);
                     setCurrentPage(1);
                   }}
-                  style={{ width: "100%", padding: "10px 14px", borderRadius: 10, border: `1.2px solid #E2E4FA`, background: "#FFF", fontSize: 13, fontWeight: "600", color: colors.textPrimary, outline: "none", appearance: "none", cursor: "pointer" }}
+                  style={{
+                    width: "100%",
+                    padding: "8px 12px",
+                    borderRadius: 8,
+                    border: "1px solid var(--line)",
+                    background: "#FFFFFF",
+                    fontSize: 13,
+                    fontWeight: 600,
+                    color: "var(--ink)",
+                    outline: "none",
+                  }}
                 >
                   <option value="All">All Statuses</option>
                   <option value="Fully Paid">Fully Paid</option>
                   <option value="Partial">Partial</option>
                   <option value="Not Paid">Not Paid</option>
                 </select>
-                <ChevronDown size={14} color="#757299" style={{ position: "absolute", right: 14, top: "50%", transform: "translateY(-50%)", pointerEvents: "none" }} />
               </div>
-            </div>
 
-            {datePreset === "Custom" && (
-              <>
-                <div>
-                  <label style={{ display: "block", fontSize: 11.5, fontWeight: "600", color: colors.textSecondary, marginBottom: 6 }}>Start Date</label>
-                  <input
-                    type="date"
-                    value={startDate ? startDate.toISOString().split("T")[0] : ""}
-                    onChange={e => {
-                      setStartDate(e.target.value ? new Date(e.target.value) : null);
-                      setCurrentPage(1);
-                    }}
-                    style={{ width: "100%", padding: "9px 12px", borderRadius: 10, border: `1.2px solid #E2E4FA`, background: "#FFF", fontSize: 13, color: colors.textPrimary, outline: "none" }}
-                  />
-                </div>
-                <div>
-                  <label style={{ display: "block", fontSize: 11.5, fontWeight: "600", color: colors.textSecondary, marginBottom: 6 }}>End Date</label>
-                  <input
-                    type="date"
-                    value={endDate ? endDate.toISOString().split("T")[0] : ""}
-                    onChange={e => {
-                      setEndDate(e.target.value ? new Date(e.target.value) : null);
-                      setCurrentPage(1);
-                    }}
-                    style={{ width: "100%", padding: "9px 12px", borderRadius: 10, border: `1.2px solid #E2E4FA`, background: "#FFF", fontSize: 13, color: colors.textPrimary, outline: "none" }}
-                  />
-                </div>
-              </>
-            )}
-
-          </div>
-
-        </div>
-
-        <div style={{ marginBottom: 20 }}>
-          <h2 style={{ fontSize: 16, fontWeight: "800", color: colors.textPrimary, margin: "0 0 12px", letterSpacing: "-0.3px" }}>Filtered Cost Summary</h2>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 14 }}>
-
-            {/* ROW 1: Total Billed, Paid, Remaining */}
-            <div style={{ background: "linear-gradient(135deg, var(--color-primary, #F97316) 0%, var(--color-primary-hover, #EA580C) 100%)", borderRadius: radius.lg, padding: "18px 20px", boxShadow: shadows.card, display: "flex", flexDirection: "column", justifyContent: "space-between", minHeight: 104 }}>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
-                <span style={{ fontSize: 13, fontWeight: "700", color: "rgba(255,255,255,0.85)" }}>Total Billed</span>
-                <span style={{ width: 28, height: 28, borderRadius: 8, background: "rgba(255,255,255,0.2)", display: "flex", alignItems: "center", justifyContent: "center" }}><CreditCard size={16} color="#FFF" /></span>
-              </div>
-              <div style={{ color: "#FFF", fontSize: 22, fontWeight: "900", letterSpacing: "-0.3px" }}>{formatINR(costSummary.totalBilled)}</div>
-            </div>
-
-            <div style={{ background: colors.cardBg, borderRadius: radius.lg, border: `1px solid ${colors.cardBorder}`, padding: "18px 20px", boxShadow: shadows.card, display: "flex", flexDirection: "column", justifyContent: "space-between", minHeight: 104 }}>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
-                <span style={{ fontSize: 13, fontWeight: "700", color: colors.textSecondary }}>Paid</span>
-                <span style={{ width: 28, height: 28, borderRadius: 8, background: "rgba(21, 128, 61, 0.1)", display: "flex", alignItems: "center", justifyContent: "center", color: "#15803D" }}><CheckCircle size={16} /></span>
-              </div>
-              <div style={{ color: colors.textPrimary, fontSize: 22, fontWeight: "900", letterSpacing: "-0.3px" }}>{formatINR(costSummary.paid)}</div>
-            </div>
-
-            <div style={{ background: colors.cardBg, borderRadius: radius.lg, border: `1px solid ${colors.cardBorder}`, padding: "18px 20px", boxShadow: shadows.card, display: "flex", flexDirection: "column", justifyContent: "space-between", minHeight: 104 }}>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
-                <span style={{ fontSize: 13, fontWeight: "700", color: colors.textSecondary }}>Remaining</span>
-                <span style={{ width: 28, height: 28, borderRadius: 8, background: costSummary.remaining > 0 ? "rgba(220, 38, 38, 0.1)" : "rgba(21, 128, 61, 0.1)", display: "flex", alignItems: "center", justifyContent: "center", color: costSummary.remaining > 0 ? "#DC2626" : "#15803D" }}><Clock size={16} /></span>
-              </div>
-              <div style={{ color: colors.textPrimary, fontSize: 22, fontWeight: "900", letterSpacing: "-0.3px" }}>{formatINR(costSummary.remaining)}</div>
-            </div>
-
-            {/* ROW 2: Material, Labour, Equipment */}
-            <div style={{ background: colors.cardBg, borderRadius: radius.lg, border: `1px solid ${colors.cardBorder}`, padding: "18px 20px", boxShadow: shadows.card, display: "flex", flexDirection: "column", justifyContent: "space-between", minHeight: 104 }}>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
-                <span style={{ fontSize: 13, fontWeight: "700", color: colors.textSecondary }}>Material</span>
-                <span style={{ width: 28, height: 28, borderRadius: 8, background: "rgba(91, 95, 207, 0.1)", display: "flex", alignItems: "center", justifyContent: "center", color: "#5B5FCF" }}><Package size={16} /></span>
-              </div>
-              <div style={{ color: colors.textPrimary, fontSize: 22, fontWeight: "900", letterSpacing: "-0.3px" }}>{formatINR(costSummary.material)}</div>
-            </div>
-
-            <div style={{ background: colors.cardBg, borderRadius: radius.lg, border: `1px solid ${colors.cardBorder}`, padding: "18px 20px", boxShadow: shadows.card, display: "flex", flexDirection: "column", justifyContent: "space-between", minHeight: 104 }}>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
-                <span style={{ fontSize: 13, fontWeight: "700", color: colors.textSecondary }}>Labour</span>
-                <span style={{ width: 28, height: 28, borderRadius: 8, background: `${primaryPurple}15`, display: "flex", alignItems: "center", justifyContent: "center", color: primaryPurple }}><Users size={16} /></span>
-              </div>
-              <div style={{ color: colors.textPrimary, fontSize: 22, fontWeight: "900", letterSpacing: "-0.3px" }}>{formatINR(costSummary.labour)}</div>
-            </div>
-
-            <div style={{ background: colors.cardBg, borderRadius: radius.lg, border: `1px solid ${colors.cardBorder}`, padding: "18px 20px", boxShadow: shadows.card, display: "flex", flexDirection: "column", justifyContent: "space-between", minHeight: 104 }}>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
-                <span style={{ fontSize: 13, fontWeight: "700", color: colors.textSecondary }}>Equipment</span>
-                <span style={{ width: 28, height: 28, borderRadius: 8, background: `${primaryLightBlue}15`, display: "flex", alignItems: "center", justifyContent: "center", color: primaryLightBlue }}><Wrench size={16} /></span>
-              </div>
-              <div style={{ color: colors.textPrimary, fontSize: 22, fontWeight: "900", letterSpacing: "-0.3px" }}>{formatINR(costSummary.equipment)}</div>
-            </div>
-
-          </div>
-        </div>
-
-        {/* Visual Analytics Chart: Spend vs Budget with hover tooltips */}
-        <div style={{ background: colors.cardBg, borderRadius: radius.lg, border: `1px solid ${colors.cardBorder}`, padding: "18px 20px", marginBottom: 20, boxShadow: shadows.card, minWidth: 0, overflow: "hidden" }}>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
-            <div>
-              <h3 style={{ margin: 0, fontSize: 15, fontWeight: "800", color: colors.textPrimary, letterSpacing: "-0.3px" }}>Spend vs Budget by Category</h3>
-              <p style={{ margin: "2px 0 0", fontSize: 12, color: colors.textLight }}>Compare actual expenses against allocated category budgets with hover tooltips</p>
+              {/* Custom Date Range if Custom Selected */}
+              {datePreset === "Custom" && (
+                <>
+                  <div>
+                    <label
+                      style={{
+                        display: "block",
+                        fontSize: 12,
+                        fontWeight: 600,
+                        color: "var(--ink-soft)",
+                        marginBottom: 5,
+                      }}
+                    >
+                      Start Date
+                    </label>
+                    <input
+                      type="date"
+                      value={isValidDate(startDate) ? startDate.toISOString().split("T")[0] : ""}
+                      onChange={(e) => {
+                        const d = e.target.value ? new Date(e.target.value) : null;
+                        setStartDate(isValidDate(d) ? d : null);
+                      }}
+                      style={{
+                        width: "100%",
+                        padding: "8px 12px",
+                        borderRadius: 8,
+                        border: "1px solid var(--line)",
+                        background: "#FFFFFF",
+                        fontSize: 13,
+                        color: "var(--ink)",
+                        outline: "none",
+                      }}
+                    />
+                  </div>
+                  <div>
+                    <label
+                      style={{
+                        display: "block",
+                        fontSize: 12,
+                        fontWeight: 600,
+                        color: "var(--ink-soft)",
+                        marginBottom: 5,
+                      }}
+                    >
+                      End Date
+                    </label>
+                    <input
+                      type="date"
+                      value={isValidDate(endDate) ? endDate.toISOString().split("T")[0] : ""}
+                      onChange={(e) => {
+                        const d = e.target.value ? new Date(e.target.value) : null;
+                        setEndDate(isValidDate(d) ? d : null);
+                      }}
+                      style={{
+                        width: "100%",
+                        padding: "8px 12px",
+                        borderRadius: 8,
+                        border: "1px solid var(--line)",
+                        background: "#FFFFFF",
+                        fontSize: 13,
+                        color: "var(--ink)",
+                        outline: "none",
+                      }}
+                    />
+                  </div>
+                </>
+              )}
             </div>
           </div>
-          <div style={{ width: "100%", height: 280, minWidth: 0 }}>
-            <SpendVsBudgetChart data={chartData} />
-          </div>
-        </div>
+        )}
 
-        <div className="tour-report-tabs" style={{ display: "flex", background: colors.cardBg, borderRadius: radius.md, border: `1.2px solid ${colors.cardBorder}`, padding: 4, marginBottom: 20, boxShadow: shadows.card }}>
-          {["All", "Materials", "Labour", "Equipment"].map(tab => {
-            const active = activeTab === tab;
-            return (
-              <button
-                key={tab}
-                onClick={() => {
-                  if (tab === "Stock View") {
-                    navigate("/inventory");
-                  } else {
-                    setActiveTab(tab);
-                  }
-                }}
+        {/* ── SUMMARY STRIP (Total Billed · Paid · Remaining) ── */}
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))",
+            gap: 14,
+            marginBottom: 20,
+          }}
+        >
+          {/* Card 1: Total Billed */}
+          <div
+            style={{
+              background: "var(--ink)",
+              color: "#FFFFFF",
+              borderRadius: "var(--r-card)",
+              padding: "20px 24px",
+              boxShadow: "var(--shadow-card)",
+              display: "flex",
+              flexDirection: "column",
+              justifyContent: "space-between",
+              minHeight: 110,
+            }}
+          >
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+              }}
+            >
+              <span
                 style={{
-                  flex: 1,
-                  padding: "10px 0",
-                  borderRadius: radius.sm,
-                  border: "none",
-                  background: active ? gradients.primaryButton : "transparent",
-                  color: active ? "#FFF" : colors.textMedium,
-                  fontWeight: "700",
-                  fontSize: 13,
-                  cursor: "pointer",
-                  transition: "all 0.15s ease"
+                  fontFamily: "var(--font-mono)",
+                  fontSize: 11,
+                  letterSpacing: "0.08em",
+                  color: "var(--on-noir-2)",
+                  textTransform: "uppercase",
+                  fontWeight: 600,
                 }}
               >
-                {tab}
-              </button>
-            );
-          })}
+                Total Billed
+              </span>
+              <CreditCard size={18} color="var(--accent)" />
+            </div>
+            <div
+              style={{
+                fontFamily: "var(--font-display)",
+                fontSize: 26,
+                fontWeight: 700,
+                letterSpacing: "-0.02em",
+                fontVariantNumeric: "tabular-nums",
+                color: "var(--bone)",
+                marginTop: 6,
+              }}
+            >
+              {formatINR(costSummary.totalBilled)}
+            </div>
+            <div
+              style={{
+                display: "flex",
+                gap: 10,
+                fontSize: 12,
+                color: "var(--on-noir-2)",
+                marginTop: 4,
+              }}
+            >
+              <span>Mat: {formatINR(costSummary.material)}</span>
+              <span>·</span>
+              <span>Lab: {formatINR(costSummary.labour)}</span>
+              <span>·</span>
+              <span>Eq: {formatINR(costSummary.equipment)}</span>
+            </div>
+          </div>
+
+          {/* Card 2: Total Paid */}
+          <div
+            style={{
+              background: "var(--card)",
+              borderRadius: "var(--r-card)",
+              border: "1px solid var(--line)",
+              padding: "20px 24px",
+              boxShadow: "var(--shadow-card)",
+              display: "flex",
+              flexDirection: "column",
+              justifyContent: "space-between",
+              minHeight: 110,
+            }}
+          >
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+              }}
+            >
+              <span
+                style={{
+                  fontFamily: "var(--font-mono)",
+                  fontSize: 11,
+                  letterSpacing: "0.08em",
+                  color: "var(--ink-soft)",
+                  textTransform: "uppercase",
+                  fontWeight: 600,
+                }}
+              >
+                Paid Out
+              </span>
+              <span
+                style={{
+                  width: 28,
+                  height: 28,
+                  borderRadius: 8,
+                  background: "var(--success-soft)",
+                  color: "var(--success)",
+                  display: "grid",
+                  placeItems: "center",
+                }}
+              >
+                <CheckCircle size={16} />
+              </span>
+            </div>
+            <div
+              style={{
+                fontFamily: "var(--font-display)",
+                fontSize: 26,
+                fontWeight: 700,
+                letterSpacing: "-0.02em",
+                color: "var(--success)",
+                fontVariantNumeric: "tabular-nums",
+                marginTop: 6,
+              }}
+            >
+              {formatINR(costSummary.paid)}
+            </div>
+            <div style={{ fontSize: 12, color: "var(--ink-soft)", marginTop: 4 }}>
+              {costSummary.totalBilled > 0
+                ? `${Math.round((costSummary.paid / costSummary.totalBilled) * 100)}% of billed amount cleared`
+                : "No bills recorded"}
+            </div>
+          </div>
+
+          {/* Card 3: Remaining / Due */}
+          <div
+            style={{
+              background: "var(--card)",
+              borderRadius: "var(--r-card)",
+              border: "1px solid var(--line)",
+              padding: "20px 24px",
+              boxShadow: "var(--shadow-card)",
+              display: "flex",
+              flexDirection: "column",
+              justifyContent: "space-between",
+              minHeight: 110,
+            }}
+          >
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+              }}
+            >
+              <span
+                style={{
+                  fontFamily: "var(--font-mono)",
+                  fontSize: 11,
+                  letterSpacing: "0.08em",
+                  color: "var(--ink-soft)",
+                  textTransform: "uppercase",
+                  fontWeight: 600,
+                }}
+              >
+                Remaining Due
+              </span>
+              <span
+                style={{
+                  width: 28,
+                  height: 28,
+                  borderRadius: 8,
+                  background:
+                    costSummary.remaining > 0
+                      ? "var(--warn-soft)"
+                      : "var(--success-soft)",
+                  color:
+                    costSummary.remaining > 0 ? "var(--warn)" : "var(--success)",
+                  display: "grid",
+                  placeItems: "center",
+                }}
+              >
+                <Clock size={16} />
+              </span>
+            </div>
+            <div
+              style={{
+                fontFamily: "var(--font-display)",
+                fontSize: 26,
+                fontWeight: 700,
+                letterSpacing: "-0.02em",
+                color:
+                  costSummary.remaining > 0 ? "var(--warn)" : "var(--success)",
+                fontVariantNumeric: "tabular-nums",
+                marginTop: 6,
+              }}
+            >
+              {formatINR(costSummary.remaining)}
+            </div>
+            <div style={{ fontSize: 12, color: "var(--ink-soft)", marginTop: 4 }}>
+              {costSummary.remaining > 0
+                ? "Pending payment settlement"
+                : "All approved bills cleared"}
+            </div>
+          </div>
         </div>
 
-        {activeTab === "All" ? (
+        {/* Visual Analytics Chart: Spend vs Budget (collapsible) */}
+        {showChart && (
+          <div
+            style={{
+              background: "var(--card)",
+              borderRadius: "var(--r-card)",
+              border: "1px solid var(--line)",
+              padding: "20px 24px",
+              marginBottom: 20,
+              boxShadow: "var(--shadow-card)",
+            }}
+          >
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                marginBottom: 12,
+              }}
+            >
+              <div>
+                <h3
+                  style={{
+                    margin: 0,
+                    fontSize: 16,
+                    fontWeight: 700,
+                    color: "var(--ink)",
+                  }}
+                >
+                  Spend vs Budget by Category
+                </h3>
+                <p
+                  style={{
+                    margin: "2px 0 0",
+                    fontSize: 12.5,
+                    color: "var(--ink-soft)",
+                  }}
+                >
+                  Compare actual expenses against allocated category budgets
+                </p>
+              </div>
+            </div>
+            <div style={{ width: "100%", height: 260 }}>
+              <SpendVsBudgetChart data={chartData} />
+            </div>
+          </div>
+        )}
 
-          <div style={{ background: colors.cardBg, borderRadius: radius.lg, border: `1px solid ${colors.cardBorder}`, padding: 14, marginBottom: 20, boxShadow: shadows.card, display: "flex", alignItems: "center", gap: 12 }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 10, flex: 1, background: colors.bgBase4, borderRadius: 10, padding: "10px 14px" }}>
-              <Search size={16} color="#757299" />
+        {/* ── TOOLBAR (Search · Suggestions · Edit Columns · Sort) ── */}
+        <div
+          style={{
+            background: "var(--card)",
+            borderRadius: "var(--r-card)",
+            border: "1px solid var(--line)",
+            padding: "14px 18px",
+            marginBottom: 16,
+            boxShadow: "var(--shadow-card)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            flexWrap: "wrap",
+            gap: 12,
+          }}
+        >
+          {/* Live Search Bar */}
+          <div style={{ position: "relative", flex: "1 1 280px", maxWidth: 440 }}>
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 10,
+                background: "var(--fill)",
+                borderRadius: "var(--r-btn, 12px)",
+                padding: "8px 14px",
+                border: "1px solid transparent",
+              }}
+            >
+              <Search size={16} color="var(--ink-soft)" />
               <input
                 value={searchQuery}
-                onChange={e => {
+                onFocus={() => setShowSuggestions(true)}
+                onBlur={() => setTimeout(() => setShowSuggestions(false), 200)}
+                onChange={(e) => {
                   setSearchQuery(e.target.value);
+                  setSelectedItemName("");
+                  setShowSuggestions(true);
                   setCurrentPage(1);
                 }}
-                placeholder="Search by description, brand, contractor, supplier, price..."
-                style={{ border: "none", background: "transparent", width: "100%", outline: "none", fontSize: 13, color: colors.textPrimary }}
+                placeholder="Search description, contractor, brand, amount..."
+                style={{
+                  border: "none",
+                  background: "transparent",
+                  width: "100%",
+                  outline: "none",
+                  fontSize: 13,
+                  fontFamily: "var(--font-ui)",
+                  color: "var(--ink)",
+                }}
               />
               {searchQuery.trim().length > 0 && (
                 <button
                   onClick={() => {
                     setSearchQuery("");
+                    setSelectedItemName("");
+                    setShowSuggestions(false);
                     setCurrentPage(1);
                   }}
-                  style={{ background: "none", border: "none", cursor: "pointer", color: "#757299", display: "flex", alignItems: "center", padding: 0 }}
+                  style={{
+                    background: "none",
+                    border: "none",
+                    cursor: "pointer",
+                    color: "var(--ink-soft)",
+                    display: "flex",
+                    alignItems: "center",
+                    padding: 0,
+                  }}
                 >
-                  <X size={16} />
+                  <X size={15} />
                 </button>
               )}
             </div>
-          </div>
-        ) : (
 
-          <div style={{ background: colors.cardBg, borderRadius: radius.lg, border: `1px solid ${colors.cardBorder}`, padding: 16, marginBottom: 20, boxShadow: shadows.card }}>
-
-            <div style={{ position: "relative", marginBottom: 14 }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 10, background: colors.bgBase4, borderRadius: 10, padding: "10px 14px", border: showSuggestionsList ? `1px solid ${primaryBlue}` : "none" }}>
-                <Search size={16} color="#757299" />
-                <input
-                  value={searchQuery}
-                  onFocus={() => setShowSuggestions(true)}
-                  onBlur={() => setTimeout(() => setShowSuggestions(false), 200)}
-                  onChange={e => {
-                    setSearchQuery(e.target.value);
-                    setSelectedItemName("");
-                    setShowSuggestions(true);
-                  }}
-                  placeholder={`Search ${activeTab.toLowerCase()}, contractors, workers, prices...`}
-                  style={{ border: "none", background: "transparent", width: "100%", outline: "none", fontSize: 13, color: colors.textPrimary }}
-                />
-                {searchQuery.trim().length > 0 && (
-                  <button
-                    onClick={() => {
-                      setSearchQuery("");
-                      setSelectedItemName("");
-                      setShowSuggestions(false);
-                      setCurrentPage(1);
-                    }}
-                    style={{ background: "none", border: "none", cursor: "pointer", color: "#757299", display: "flex", alignItems: "center", padding: 0 }}
-                  >
-                    <X size={16} />
-                  </button>
-                )}
-              </div>
-
-              {showSuggestionsList && (
-                <div style={{ position: "absolute", top: "calc(100% + 4px)", left: 0, right: 0, background: "#FFF", border: `1px solid #E2E4FA`, borderRadius: 10, boxShadow: shadows.card, zIndex: 50, maxHeight: 180, overflowY: "auto" }}>
-                  {textQuerySuggestions.map(name => (
-                    <div
-                      key={name}
-                      onMouseDown={() => {
-                        setSearchQuery(name);
-                        setSelectedItemName(name);
-                        setShowSuggestions(false);
-                      }}
-                      style={{ padding: "10px 14px", fontSize: 13, color: colors.textPrimary, cursor: "pointer", display: "flex", alignItems: "center", gap: 8 }}
-                      className="hover-bg-subtle"
-                    >
-                      <span style={{ color: primaryBlue }}>↳</span>
-                      <span>{name}</span>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
-              <div style={{ flex: 1, position: "relative" }}>
-                <select
-                  value={selectedItemName || "All"}
-                  onChange={e => {
-                    const val = e.target.value;
-                    setSelectedItemName(val === "All" ? "" : val);
-                    setSearchQuery(val === "All" ? "" : val);
-                  }}
-                  style={{ width: "100%", padding: "10px 14px", borderRadius: 10, border: `1.2px solid #E2E4FA`, background: "#FFF", fontSize: 13, fontWeight: "600", color: colors.textPrimary, outline: "none", appearance: "none", cursor: "pointer" }}
-                >
-                  <option value="All">All {activeTab === "Materials" ? "Material Names" : activeTab === "Labour" ? "Worker Types" : "Equipment Names"}</option>
-                  {uniqueItemNames.map(name => (
-                    <option key={name} value={name}>{name}</option>
-                  ))}
-                </select>
-                <ChevronDown size={14} color="#757299" style={{ position: "absolute", right: 14, top: "50%", transform: "translateY(-50%)", pointerEvents: "none" }} />
-              </div>
-            </div>
-
-            <div style={{ width: "100%", marginTop: 14 }}>
-              <button
-                onClick={() => {
-                  setReportGenerated(true);
-                  setCurrentPage(1);
-                }}
+            {/* Suggestions Popup */}
+            {showSuggestions && textQuerySuggestions.length > 0 && (
+              <div
                 style={{
-                  width: "100%",
-                  padding: "12px",
-                  background: activeTab === "Materials" ? "var(--color-primary, #F97316)" : activeTab === "Labour" ? primaryPurple : primaryLightBlue,
-                  borderRadius: 10,
-                  color: "#FFFFFF",
-                  fontWeight: "700",
-                  fontSize: 13.5,
-                  border: "none",
-                  cursor: "pointer",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  gap: 8
+                  position: "absolute",
+                  top: "calc(100% + 4px)",
+                  left: 0,
+                  right: 0,
+                  background: "#FFFFFF",
+                  border: "1px solid var(--line)",
+                  borderRadius: "var(--r-card)",
+                  boxShadow: "0 10px 25px rgba(0,0,0,0.1)",
+                  zIndex: 50,
+                  maxHeight: 180,
+                  overflowY: "auto",
                 }}
               >
-                Generate CSV Report
-              </button>
-            </div>
-
+                {textQuerySuggestions.map((name) => (
+                  <div
+                    key={name}
+                    onMouseDown={() => {
+                      setSearchQuery(name);
+                      setSelectedItemName(name);
+                      setShowSuggestions(false);
+                    }}
+                    style={{
+                      padding: "10px 14px",
+                      fontSize: 13,
+                      color: "var(--ink)",
+                      cursor: "pointer",
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 8,
+                    }}
+                    onMouseEnter={(e) =>
+                      (e.currentTarget.style.background = "var(--fill)")
+                    }
+                    onMouseLeave={(e) =>
+                      (e.currentTarget.style.background = "transparent")
+                    }
+                  >
+                    <span style={{ color: "var(--accent-ink)" }}>↳</span>
+                    <span>{name}</span>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
-        )}
 
-        {activeTab !== "All" && !reportGenerated ? (
+          {/* Toolbar actions on right: Edit Columns, Sort */}
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            {/* Edit Columns */}
+            <button
+              onClick={() => openCustomizeModal()}
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 6,
+                height: 36,
+                padding: "0 14px",
+                borderRadius: "var(--r-btn, 12px)",
+                border: "1px solid var(--line)",
+                background: "#FFFFFF",
+                color: "var(--ink)",
+                fontSize: 12.5,
+                fontWeight: 600,
+                cursor: "pointer",
+                transition: "background 150ms ease",
+              }}
+              onMouseEnter={(e) =>
+                (e.currentTarget.style.background = "var(--fill)")
+              }
+              onMouseLeave={(e) =>
+                (e.currentTarget.style.background = "#FFFFFF")
+              }
+            >
+              <SlidersHorizontal size={14} />
+              <span>Edit Columns</span>
+            </button>
 
-          <div style={{ background: colors.cardBg, borderRadius: radius.lg, border: `1px solid ${colors.cardBorder}`, padding: "60px 20px", textAlign: "center", boxShadow: shadows.card }}>
-            <div style={{ width: 56, height: 56, borderRadius: "50%", background: activeTab === "Materials" ? "var(--color-primary, #F97316)15" : activeTab === "Labour" ? `${primaryPurple}15` : `${primaryLightBlue}15`, display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 16px", color: activeTab === "Materials" ? "var(--color-primary, #F97316)" : activeTab === "Labour" ? primaryPurple : primaryLightBlue }}>
-              <FileText size={24} />
-            </div>
-            <h3 style={{ fontSize: 15, fontWeight: "700", color: colors.textPrimary, margin: "0 0 6px" }}>Configure Filters</h3>
-            <p style={{ fontSize: 12.5, color: colors.textLight, margin: 0, lineHeight: 1.5 }}>
-              Configure filters above and tap<br /><strong>"Generate CSV Report"</strong> to view transaction logs.
-            </p>
+            {/* Sort Toggle */}
+            <button
+              onClick={() => setSortAscending(!sortAscending)}
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 6,
+                height: 36,
+                padding: "0 14px",
+                borderRadius: "var(--r-btn, 12px)",
+                border: "1px solid var(--line)",
+                background: "#FFFFFF",
+                color: "var(--ink)",
+                fontSize: 12.5,
+                fontWeight: 600,
+                cursor: "pointer",
+                transition: "background 150ms ease",
+              }}
+              onMouseEnter={(e) =>
+                (e.currentTarget.style.background = "var(--fill)")
+              }
+              onMouseLeave={(e) =>
+                (e.currentTarget.style.background = "#FFFFFF")
+              }
+            >
+              <ArrowUpDown size={14} />
+              <span>
+                {sortColumn === "date"
+                  ? sortAscending
+                    ? "Date: Oldest"
+                    : "Date: Newest"
+                  : sortColumn === "amount"
+                    ? sortAscending
+                      ? "Amount: Low"
+                      : "Amount: High"
+                    : sortAscending
+                      ? "Project: A–Z"
+                      : "Project: Z–A"}
+              </span>
+            </button>
           </div>
-        ) : (
+        </div>
 
-          <div style={{ background: colors.cardBg, borderRadius: radius.lg, border: `1px solid ${colors.cardBorder}`, overflow: "hidden", boxShadow: shadows.card }}>
-
-            <div style={{ overflowX: "auto" }}>
-              <table style={{ width: "100%", borderCollapse: "collapse" }}>
+        {/* ── REPORT ENTRIES (Table View or Card View) ── */}
+        {viewMode === "table" ? (
+          <div
+            style={{
+              background: "var(--card)",
+              borderRadius: "var(--r-card)",
+              border: "1px solid var(--line)",
+              overflow: "hidden",
+              boxShadow: "var(--shadow-card)",
+            }}
+          >
+            <div style={{ overflowX: "auto", position: "relative" }}>
+              <table style={{ width: "100%", borderCollapse: "separate", borderSpacing: 0 }}>
+                {/* Sticky Header */}
                 <thead>
-                  <tr style={{ background: "#F5F6FF" }}>
-                    {uiActiveCols.map((colName) => {
-                      const isSortable = ["Date", "Purchased Date", "Project", "Amount"].includes(colName);
-                      let style = {
-                        padding: "14px 18px",
+                  <tr style={{ background: "var(--fill)" }}>
+                    {/* Pinned first column: row # */}
+                    <th
+                      style={{
+                        position: "sticky",
+                        left: 0,
+                        zIndex: 11,
+                        background: "var(--fill)",
+                        borderRight: "1px solid var(--line)",
+                        borderBottom: "1px solid var(--line)",
+                        padding: "12px 14px",
                         fontSize: 11,
                         fontWeight: 700,
-                        color: colors.textMedium,
+                        fontFamily: "var(--font-mono)",
+                        color: "var(--ink-soft)",
                         letterSpacing: "0.06em",
-                        textAlign: colName === "Amount" ? "right" : "left",
-                        whiteSpace: "nowrap",
-                        cursor: isSortable ? "pointer" : "default"
-                      };
+                        textAlign: "center",
+                        width: 44,
+                      }}
+                    >
+                      #
+                    </th>
+                    {uiActiveCols.map((colName) => {
+                      const isSortable = [
+                        "Date",
+                        "Purchased Date",
+                        "Project",
+                        "Amount",
+                      ].includes(colName);
+                      const isAmount = colName === "Amount" || colName === "Paid" || colName === "Remaining" || colName === "Rate" || colName === "Rate/Day" || colName === "Rent Rate";
 
                       const handleSortClick = () => {
                         if (colName === "Date" || colName === "Purchased Date") {
@@ -1503,100 +2755,258 @@ export default function FinancialReportPage() {
                       return (
                         <th
                           key={colName}
-                          style={style}
                           onClick={isSortable ? handleSortClick : undefined}
+                          style={{
+                            padding: "12px 16px",
+                            fontSize: 11,
+                            fontWeight: 700,
+                            fontFamily: "var(--font-mono)",
+                            color: "var(--ink-soft)",
+                            letterSpacing: "0.06em",
+                            textAlign: isAmount ? "right" : "left",
+                            whiteSpace: "nowrap",
+                            cursor: isSortable ? "pointer" : "default",
+                            borderBottom: "1px solid var(--line)",
+                          }}
                         >
-                          {colName === "Amount" ? "AMOUNT (INR)" : colName.toUpperCase()}
-                          {isSortable && sortColumn === (colName === "Project" ? "project" : colName === "Amount" ? "amount" : "date") && (
-                            <span style={{ marginLeft: 4 }}>{sortAscending ? "▲" : "▼"}</span>
-                          )}
+                          {colName === "Amount"
+                            ? "AMOUNT (INR)"
+                            : colName.toUpperCase()}
+                          {isSortable &&
+                            sortColumn ===
+                              (colName === "Project"
+                                ? "project"
+                                : colName === "Amount"
+                                  ? "amount"
+                                  : "date") && (
+                              <span style={{ marginLeft: 4, color: "var(--ink)" }}>
+                                {sortAscending ? "▲" : "▼"}
+                              </span>
+                            )}
                         </th>
                       );
                     })}
                   </tr>
                 </thead>
+
+                {/* Table Body */}
                 <tbody>
                   {paginatedEntries.length === 0 ? (
                     <tr>
-                      <td colSpan={uiActiveCols.length} style={{ padding: 48, textAlign: "center", color: colors.textLight, fontSize: 13 }}>
-                        No transaction logs match filters.
+                      <td
+                        colSpan={uiActiveCols.length + 1}
+                        style={{ padding: 48, textAlign: "center" }}
+                      >
+                        <BtEmpty
+                          title="No transaction logs match filters"
+                          message="Try adjusting your dates, project selection, or search keywords."
+                        />
                       </td>
                     </tr>
                   ) : (
-                    paginatedEntries.map((entry) => {
+                    paginatedEntries.map((entry, rowIdx) => {
                       const projectName = getProjectName(entry.projectId);
+                      const globalRowIdx = (safeCurrentPage - 1) * rowsPerPage + rowIdx + 1;
 
                       return (
                         <tr
-                          key={entry.id}
-                          style={{ borderBottom: `1px solid ${colors.divider}`, cursor: "pointer" }}
+                          key={entry.id || rowIdx}
+                          style={{
+                            borderBottom: "1px solid var(--line)",
+                            cursor: "pointer",
+                            transition: "background 120ms ease",
+                          }}
                           onClick={(e) => {
-
                             if (e.target.closest("button")) return;
                             setDetailsEntry(entry);
                           }}
-                          className="hover-bg-subtle"
+                          onMouseEnter={(e) =>
+                            (e.currentTarget.style.background = "var(--fill)")
+                          }
+                          onMouseLeave={(e) =>
+                            (e.currentTarget.style.background = "transparent")
+                          }
                         >
+                          {/* Pinned row number */}
+                          <td
+                            style={{
+                              position: "sticky",
+                              left: 0,
+                              zIndex: 5,
+                              background: "#FFFFFF",
+                              borderRight: "1px solid var(--line)",
+                              borderBottom: "1px solid var(--line)",
+                              padding: "14px 12px",
+                              fontSize: 12,
+                              fontFamily: "var(--font-mono)",
+                              color: "var(--ink-soft)",
+                              textAlign: "center",
+                              fontWeight: 600,
+                            }}
+                          >
+                            {globalRowIdx}
+                          </td>
+
                           {uiActiveCols.map((colName) => {
-                            const valStyle = { padding: "14px 18px", fontSize: 12.5, color: colors.textPrimary };
+                            const valStyle = {
+                              padding: "14px 16px",
+                              fontSize: 13,
+                              color: "var(--ink)",
+                              borderBottom: "1px solid var(--line)",
+                              whiteSpace: "nowrap",
+                            };
 
                             if (colName === "Purchased Date") {
-                              return <td key={colName} style={valStyle}>{formatDateShort(entry.date)}</td>;
-                            } else if (colName === "Payment Date") {
-                              return <td key={colName} style={valStyle}>{entry.paymentDate ? formatDateShort(entry.paymentDate) : "—"}</td>;
-                            } else if (colName === "Project") {
-                              return <td key={colName} style={{ ...valStyle, fontWeight: "600" }}>{projectName}</td>;
-                            } else if (colName === "Type") {
-                              const chipColor = entry.type === "material" ? "var(--color-primary, #F97316)" : entry.type === "labour" ? primaryPurple : primaryLightBlue;
-                              const chipBg = entry.type === "material" ? "var(--color-primary, #F97316)15" : entry.type === "labour" ? `${primaryPurple}15` : `${primaryLightBlue}15`;
                               return (
                                 <td key={colName} style={valStyle}>
-                                  <span style={{ padding: "3px 10px", borderRadius: 6, fontSize: 10.5, fontWeight: "700", background: chipBg, color: chipColor }}>
+                                  {formatDateShort(entry.date)}
+                                </td>
+                              );
+                            } else if (colName === "Payment Date") {
+                              return (
+                                <td key={colName} style={valStyle}>
+                                  {entry.paymentDate
+                                    ? formatDateShort(entry.paymentDate)
+                                    : "—"}
+                                </td>
+                              );
+                            } else if (colName === "Project") {
+                              return (
+                                <td
+                                  key={colName}
+                                  style={{ ...valStyle, fontWeight: 600 }}
+                                >
+                                  {projectName}
+                                </td>
+                              );
+                            } else if (colName === "Type") {
+                              const typeTones = {
+                                material: "info",
+                                labour: "warn",
+                                equipment: "good",
+                              };
+                              return (
+                                <td key={colName} style={valStyle}>
+                                  <BtBadge tone={typeTones[entry.type] || "muted"}>
                                     {entry.type.toUpperCase()}
-                                  </span>
+                                  </BtBadge>
                                 </td>
                               );
                             } else if (colName === "Description") {
-                              return <td key={colName} style={valStyle}>{entry.description || "—"}</td>;
-                            } else if (colName === "Material" || colName === "Worker Type" || colName === "Equipment") {
-                              return <td key={colName} style={valStyle}>{entry.description}</td>;
-                            } else if (colName === "Brand") {
-                              return <td key={colName} style={valStyle}>{entry.brand || "—"}</td>;
-                            } else if (colName === "Floor") {
-                              return <td key={colName} style={valStyle}>{entry.floor || "—"}</td>;
-                            } else if (colName === "Phase") {
-                              return <td key={colName} style={valStyle}>{entry.phase || "—"}</td>;
-                            } else if (colName === "Activity") {
-                              return <td key={colName} style={valStyle}>{entry.activity || "—"}</td>;
-                            } else if (colName === "Unit") {
-                              return <td key={colName} style={valStyle}>{entry.unit || "—"}</td>;
-                            } else if (colName === "Status") {
-                              const payStatus = getPaymentStatusLabel(entry.paymentStatus);
-                              const col = payStatus === "Fully Paid" ? "#16a34a" : payStatus === "Partial" ? "#d97706" : "#dc2626";
-                              const bg = payStatus === "Fully Paid" ? "#f0fdf4" : payStatus === "Partial" ? "#fffbeb" : "#fef2f2";
                               return (
                                 <td key={colName} style={valStyle}>
-                                  <span style={{ padding: "3px 9px", borderRadius: 6, fontSize: 10.5, fontWeight: "700", color: col, background: bg }}>
-                                    {payStatus}
-                                  </span>
+                                  {entry.description || "—"}
+                                </td>
+                              );
+                            } else if (
+                              colName === "Material" ||
+                              colName === "Worker Type" ||
+                              colName === "Equipment"
+                            ) {
+                              return (
+                                <td key={colName} style={{ ...valStyle, fontWeight: 500 }}>
+                                  {entry.description}
+                                </td>
+                              );
+                            } else if (colName === "Brand") {
+                              return (
+                                <td key={colName} style={valStyle}>
+                                  {entry.brand || "—"}
+                                </td>
+                              );
+                            } else if (colName === "Floor") {
+                              return (
+                                <td key={colName} style={valStyle}>
+                                  {entry.floor || "—"}
+                                </td>
+                              );
+                            } else if (colName === "Phase") {
+                              return (
+                                <td key={colName} style={valStyle}>
+                                  {entry.phase || "—"}
+                                </td>
+                              );
+                            } else if (colName === "Activity") {
+                              return (
+                                <td key={colName} style={valStyle}>
+                                  {entry.activity || "—"}
+                                </td>
+                              );
+                            } else if (colName === "Unit") {
+                              return (
+                                <td key={colName} style={valStyle}>
+                                  {entry.unit || "—"}
+                                </td>
+                              );
+                            } else if (colName === "Status") {
+                              const payStatus = getPaymentStatusLabel(
+                                entry.paymentStatus
+                              );
+                              const tone =
+                                payStatus === "Fully Paid"
+                                  ? "good"
+                                  : payStatus === "Partial"
+                                    ? "warn"
+                                    : "bad";
+                              return (
+                                <td key={colName} style={valStyle}>
+                                  <BtBadge tone={tone}>{payStatus}</BtBadge>
                                 </td>
                               );
                             } else if (colName === "Approval") {
                               const raw = entry.rawTx || {};
                               const appStatus = raw.approvalStatus || "Approved";
-                              const col = appStatus === "Approved" ? "#166534" : appStatus === "Rejected" ? "#991b1b" : "#854d0e";
-                              const bg = appStatus === "Approved" ? "#dcfce7" : appStatus === "Rejected" ? "#fee2e2" : "#fef9c3";
+                              const tone =
+                                appStatus === "Approved"
+                                  ? "good"
+                                  : appStatus === "Rejected"
+                                    ? "bad"
+                                    : "warn";
                               const isPendingApproval = appStatus === "Pending";
                               return (
                                 <td key={colName} style={valStyle}>
-                                  <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                                    <span style={{ padding: "3px 8px", borderRadius: 6, fontSize: 10.5, fontWeight: "700", color: col, background: bg }}>
-                                      {appStatus}
-                                    </span>
+                                  <div
+                                    style={{
+                                      display: "flex",
+                                      alignItems: "center",
+                                      gap: 6,
+                                    }}
+                                  >
+                                    <BtBadge tone={tone}>{appStatus}</BtBadge>
                                     {isPendingApproval && canApprove && (
                                       <div style={{ display: "flex", gap: 4 }}>
-                                        <button onClick={() => handleInlineApprove(entry)} title="Approve Entry" style={{ border: "none", background: "#dcfce7", color: "#166534", borderRadius: 4, padding: "2px 6px", cursor: "pointer", fontWeight: 700, fontSize: 11 }}>✓</button>
-                                        <button onClick={() => handleInlineReject(entry)} title="Reject Entry" style={{ border: "none", background: "#fee2e2", color: "#991b1b", borderRadius: 4, padding: "2px 6px", cursor: "pointer", fontWeight: 700, fontSize: 11 }}>✕</button>
+                                        <button
+                                          onClick={() => handleInlineApprove(entry)}
+                                          title="Approve Entry"
+                                          style={{
+                                            border: "none",
+                                            background: "var(--success-soft)",
+                                            color: "var(--success)",
+                                            borderRadius: 6,
+                                            padding: "2px 8px",
+                                            cursor: "pointer",
+                                            fontWeight: 700,
+                                            fontSize: 12,
+                                          }}
+                                        >
+                                          ✓
+                                        </button>
+                                        <button
+                                          onClick={() => handleInlineReject(entry)}
+                                          title="Reject Entry"
+                                          style={{
+                                            border: "none",
+                                            background: "var(--danger-soft)",
+                                            color: "var(--danger)",
+                                            borderRadius: 6,
+                                            padding: "2px 8px",
+                                            cursor: "pointer",
+                                            fontWeight: 700,
+                                            fontSize: 12,
+                                          }}
+                                        >
+                                          ✕
+                                        </button>
                                       </div>
                                     )}
                                   </div>
@@ -1604,34 +3014,89 @@ export default function FinancialReportPage() {
                               );
                             } else if (colName === "Amount") {
                               return (
-                                <td key={colName} style={{ ...valStyle, textAlign: "right", fontWeight: "700" }}>
+                                <td
+                                  key={colName}
+                                  style={{
+                                    ...valStyle,
+                                    textAlign: "right",
+                                    fontWeight: 700,
+                                    fontFamily: "var(--font-display)",
+                                    fontVariantNumeric: "tabular-nums",
+                                  }}
+                                >
                                   {formatINR(entry.amount)}
                                 </td>
                               );
                             } else if (colName === "Paid") {
                               return (
-                                <td key={colName} style={{ ...valStyle, textAlign: "right", fontWeight: "600", color: "#16a34a" }}>
+                                <td
+                                  key={colName}
+                                  style={{
+                                    ...valStyle,
+                                    textAlign: "right",
+                                    fontWeight: 600,
+                                    color: "var(--success)",
+                                    fontFamily: "var(--font-display)",
+                                    fontVariantNumeric: "tabular-nums",
+                                  }}
+                                >
                                   {formatINR(entry.paidAmount || 0)}
                                 </td>
                               );
                             } else if (colName === "Remaining") {
-                              const rem = Math.max(0, (entry.amount || 0) - (entry.paidAmount || 0));
+                              const rem = Math.max(
+                                0,
+                                (entry.amount || 0) - (entry.paidAmount || 0)
+                              );
                               return (
-                                <td key={colName} style={{ ...valStyle, textAlign: "right", fontWeight: "600", color: rem > 0 ? "#dc2626" : "#16a34a" }}>
+                                <td
+                                  key={colName}
+                                  style={{
+                                    ...valStyle,
+                                    textAlign: "right",
+                                    fontWeight: 600,
+                                    color: rem > 0 ? "var(--danger)" : "var(--success)",
+                                    fontFamily: "var(--font-display)",
+                                    fontVariantNumeric: "tabular-nums",
+                                  }}
+                                >
                                   {formatINR(rem)}
                                 </td>
                               );
-                            } else if (colName === "Rate" || colName === "Rate/Day" || colName === "Rent Rate") {
+                            } else if (
+                              colName === "Rate" ||
+                              colName === "Rate/Day" ||
+                              colName === "Rent Rate"
+                            ) {
                               return (
-                                <td key={colName} style={{ ...valStyle, textAlign: "right" }}>
+                                <td
+                                  key={colName}
+                                  style={{
+                                    ...valStyle,
+                                    textAlign: "right",
+                                    fontFamily: "var(--font-display)",
+                                    fontVariantNumeric: "tabular-nums",
+                                  }}
+                                >
                                   {formatINR(entry.ratePerUnit)}
                                 </td>
                               );
-                            } else if (colName === "Qty" || colName === "Days" || colName === "Duration") {
+                            } else if (
+                              colName === "Qty" ||
+                              colName === "Days" ||
+                              colName === "Duration"
+                            ) {
                               const rate = entry.ratePerUnit || 0;
-                              const val = (rate === 0) ? 0 : entry.amount / rate;
+                              const val = rate === 0 ? 0 : entry.amount / rate;
                               return (
-                                <td key={colName} style={{ ...valStyle, textAlign: "right" }}>
+                                <td
+                                  key={colName}
+                                  style={{
+                                    ...valStyle,
+                                    textAlign: "right",
+                                    fontFamily: "var(--font-mono)",
+                                  }}
+                                >
                                   {val.toFixed(1)}
                                 </td>
                               );
@@ -1641,11 +3106,26 @@ export default function FinancialReportPage() {
                                   {canAddEdit ? (
                                     <button
                                       onClick={() => handleAddMore(entry)}
-                                      style={{ padding: "6px 12px", border: `1.2px solid #E2E4FA`, background: "#FFF", borderRadius: 8, fontSize: 11.5, fontWeight: "700", color: primaryBlue, cursor: "pointer", display: "flex", alignItems: "center", gap: 4 }}
+                                      style={{
+                                        padding: "4px 10px",
+                                        border: "1px solid var(--line)",
+                                        background: "#FFFFFF",
+                                        borderRadius: 8,
+                                        fontSize: 11.5,
+                                        fontWeight: 600,
+                                        color: "var(--ink)",
+                                        cursor: "pointer",
+                                        display: "inline-flex",
+                                        alignItems: "center",
+                                        gap: 4,
+                                      }}
                                     >
-                                      <PlusCircle size={12} /> Add More
+                                      <PlusCircle size={12} />
+                                      <span>Add More</span>
                                     </button>
-                                  ) : <span style={{ color: "#94A3B8" }}>—</span>}
+                                  ) : (
+                                    <span style={{ color: "var(--ink-soft)" }}>—</span>
+                                  )}
                                 </td>
                               );
                             } else if (colName === "Record Payment") {
@@ -1654,30 +3134,60 @@ export default function FinancialReportPage() {
                                   {canRecordPayment ? (
                                     <button
                                       onClick={() => handleRecordPaymentClick(entry)}
-                                      style={{ padding: "6px 12px", border: `1.2px solid #ca8a04`, background: "#FFF", borderRadius: 8, fontSize: 11.5, fontWeight: "700", color: "#ca8a04", cursor: "pointer", display: "flex", alignItems: "center", gap: 4 }}
+                                      style={{
+                                        padding: "4px 10px",
+                                        border: "1px solid var(--accent)",
+                                        background: "var(--accent-soft)",
+                                        borderRadius: 8,
+                                        fontSize: 11.5,
+                                        fontWeight: 700,
+                                        color: "var(--accent-ink)",
+                                        cursor: "pointer",
+                                        display: "inline-flex",
+                                        alignItems: "center",
+                                        gap: 4,
+                                      }}
                                     >
-                                      <CreditCard size={12} /> Pay Log
+                                      <CreditCard size={12} />
+                                      <span>Pay Log</span>
                                     </button>
-                                  ) : <span style={{ color: "#94A3B8" }}>—</span>}
+                                  ) : (
+                                    <span style={{ color: "var(--ink-soft)" }}>—</span>
+                                  )}
                                 </td>
                               );
                             } else if (colName === "Actions") {
                               return (
                                 <td key={colName} style={valStyle}>
-                                  <div style={{ display: "flex", gap: 6 }}>
-                                    {canAddEdit && (
-                                      <button
-                                        onClick={() => handleEditEntry(entry)}
-                                        style={{ padding: "6px 10px", border: "1.2px solid #4b5563", background: "#fff", borderRadius: 8, fontSize: 11.5, fontWeight: "700", color: "#4b5563", cursor: "pointer", display: "flex", alignItems: "center", gap: 4 }}
-                                      >
-                                        <Edit2 size={12} /> Edit
-                                      </button>
-                                    )}
-                                  </div>
+                                  {canAddEdit && (
+                                    <button
+                                      onClick={() => handleEditEntry(entry)}
+                                      style={{
+                                        padding: "4px 10px",
+                                        border: "1px solid var(--line)",
+                                        background: "#FFFFFF",
+                                        borderRadius: 8,
+                                        fontSize: 11.5,
+                                        fontWeight: 600,
+                                        color: "var(--ink)",
+                                        cursor: "pointer",
+                                        display: "inline-flex",
+                                        alignItems: "center",
+                                        gap: 4,
+                                      }}
+                                    >
+                                      <Edit2 size={12} />
+                                      <span>Edit</span>
+                                    </button>
+                                  )}
                                 </td>
                               );
                             } else {
-                              return <td key={colName} style={valStyle}>—</td>;
+                              return (
+                                <td key={colName} style={valStyle}>
+                                  —
+                                </td>
+                              );
                             }
                           })}
                         </tr>
@@ -1688,23 +3198,60 @@ export default function FinancialReportPage() {
               </table>
             </div>
 
+            {/* Pagination Bar */}
             {totalCount > 0 && (
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 20px", borderTop: `1px solid ${colors.cardBorder}`, background: "#FFF", flexWrap: "wrap", gap: 12 }}>
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  padding: "14px 20px",
+                  borderTop: "1px solid var(--line)",
+                  background: "#FFFFFF",
+                  flexWrap: "wrap",
+                  gap: 12,
+                }}
+              >
                 <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
-                  <span style={{ fontSize: 12, color: colors.textLight }}>{totalCount} entries found</span>
+                  <span
+                    style={{
+                      fontSize: 12.5,
+                      fontFamily: "var(--font-mono)",
+                      color: "var(--ink-soft)",
+                    }}
+                  >
+                    Showing{" "}
+                    <b>
+                      {(safeCurrentPage - 1) * rowsPerPage + 1}–
+                      {Math.min(safeCurrentPage * rowsPerPage, totalCount)}
+                    </b>{" "}
+                    of <b>{totalCount}</b> entries
+                  </span>
+
                   <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                    <span style={{ fontSize: 11.5, color: colors.textLight }}>Show:</span>
+                    <span style={{ fontSize: 12, color: "var(--ink-soft)" }}>
+                      Rows:
+                    </span>
                     <select
                       value={rowsPerPage}
-                      onChange={e => {
+                      onChange={(e) => {
                         setRowsPerPage(Number(e.target.value));
                         setCurrentPage(1);
                       }}
-                      style={{ padding: "4px 8px", borderRadius: 6, border: `1.2px solid #E2E4FA`, fontSize: 12, fontWeight: "700", color: colors.textPrimary, outline: "none" }}
+                      style={{
+                        padding: "3px 8px",
+                        borderRadius: 6,
+                        border: "1px solid var(--line)",
+                        fontSize: 12,
+                        fontWeight: 600,
+                        color: "var(--ink)",
+                        outline: "none",
+                      }}
                     >
                       <option value={10}>10</option>
                       <option value={20}>20</option>
                       <option value={50}>50</option>
+                      <option value={100}>100</option>
                     </select>
                   </div>
                 </div>
@@ -1713,71 +3260,370 @@ export default function FinancialReportPage() {
                   <button
                     disabled={safeCurrentPage <= 1}
                     onClick={() => setCurrentPage(safeCurrentPage - 1)}
-                    style={{ border: `1px solid ${colors.cardBorder}`, background: "none", cursor: safeCurrentPage <= 1 ? "not-allowed" : "pointer", padding: 6, borderRadius: 8, color: safeCurrentPage <= 1 ? "#aaa" : colors.textPrimary }}
+                    style={{
+                      border: "1px solid var(--line)",
+                      background: safeCurrentPage <= 1 ? "var(--fill)" : "#FFFFFF",
+                      cursor: safeCurrentPage <= 1 ? "not-allowed" : "pointer",
+                      padding: "6px 10px",
+                      borderRadius: 8,
+                      color:
+                        safeCurrentPage <= 1 ? "var(--ink-soft)" : "var(--ink)",
+                      display: "flex",
+                      alignItems: "center",
+                    }}
                   >
                     <ChevronLeft size={16} />
                   </button>
-                  <span style={{ fontSize: 12.5, fontWeight: "600", color: colors.textPrimary }}>
+                  <span
+                    style={{
+                      fontSize: 12.5,
+                      fontWeight: 600,
+                      fontFamily: "var(--font-ui)",
+                      color: "var(--ink)",
+                    }}
+                  >
                     Page {safeCurrentPage} of {totalPages}
                   </span>
                   <button
                     disabled={safeCurrentPage >= totalPages}
                     onClick={() => setCurrentPage(safeCurrentPage + 1)}
-                    style={{ border: `1px solid ${colors.cardBorder}`, background: "none", cursor: safeCurrentPage >= totalPages ? "not-allowed" : "pointer", padding: 6, borderRadius: 8, color: safeCurrentPage >= totalPages ? "#aaa" : colors.textPrimary }}
+                    style={{
+                      border: "1px solid var(--line)",
+                      background:
+                        safeCurrentPage >= totalPages ? "var(--fill)" : "#FFFFFF",
+                      cursor:
+                        safeCurrentPage >= totalPages ? "not-allowed" : "pointer",
+                      padding: "6px 10px",
+                      borderRadius: 8,
+                      color:
+                        safeCurrentPage >= totalPages
+                          ? "var(--ink-soft)"
+                          : "var(--ink)",
+                      display: "flex",
+                      alignItems: "center",
+                    }}
                   >
                     <ChevronRight size={16} />
                   </button>
                 </div>
-
               </div>
             )}
+          </div>
+        ) : (
+          /* ── CARDS VIEW ── */
+          <div>
+            {paginatedEntries.length === 0 ? (
+              <BtEmpty
+                title="No transaction logs match filters"
+                message="Try adjusting your dates, project selection, or search keywords."
+              />
+            ) : (
+              <div
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))",
+                  gap: 16,
+                }}
+              >
+                {paginatedEntries.map((entry) => {
+                  const projectName = getProjectName(entry.projectId);
+                  const payStatus = getPaymentStatusLabel(entry.paymentStatus);
+                  const tone =
+                    payStatus === "Fully Paid"
+                      ? "good"
+                      : payStatus === "Partial"
+                        ? "warn"
+                        : "bad";
+                  const rem = Math.max(
+                    0,
+                    (entry.amount || 0) - (entry.paidAmount || 0)
+                  );
 
+                  return (
+                    <BtCard
+                      key={entry.id}
+                      onClick={() => setDetailsEntry(entry)}
+                      style={{ cursor: "pointer", position: "relative" }}
+                    >
+                      <div
+                        style={{
+                          display: "flex",
+                          justifyContent: "space-between",
+                          alignItems: "flex-start",
+                          marginBottom: 10,
+                        }}
+                      >
+                        <div>
+                          <div
+                            style={{
+                              fontSize: 12,
+                              color: "var(--ink-soft)",
+                              fontWeight: 500,
+                            }}
+                          >
+                            {projectName}
+                          </div>
+                          <div
+                            style={{
+                              fontSize: 15,
+                              fontWeight: 700,
+                              color: "var(--ink)",
+                              marginTop: 2,
+                            }}
+                          >
+                            {entry.description || "Entry Log"}
+                          </div>
+                        </div>
+                        <BtBadge tone={tone}>{payStatus}</BtBadge>
+                      </div>
+
+                      <div
+                        style={{
+                          display: "flex",
+                          justifyContent: "space-between",
+                          alignItems: "baseline",
+                          margin: "12px 0 8px",
+                        }}
+                      >
+                        <div>
+                          <div
+                            style={{
+                              fontSize: 11,
+                              fontFamily: "var(--font-mono)",
+                              color: "var(--ink-soft)",
+                              textTransform: "uppercase",
+                            }}
+                          >
+                            Amount
+                          </div>
+                          <div
+                            style={{
+                              fontFamily: "var(--font-display)",
+                              fontSize: 22,
+                              fontWeight: 700,
+                              color: "var(--ink)",
+                              fontVariantNumeric: "tabular-nums",
+                            }}
+                          >
+                            {formatINR(entry.amount)}
+                          </div>
+                        </div>
+
+                        {rem > 0 && (
+                          <div style={{ textAlign: "right" }}>
+                            <div
+                              style={{
+                                fontSize: 11,
+                                fontFamily: "var(--font-mono)",
+                                color: "var(--ink-soft)",
+                                textTransform: "uppercase",
+                              }}
+                            >
+                              Balance Due
+                            </div>
+                            <div
+                              style={{
+                                fontFamily: "var(--font-display)",
+                                fontSize: 16,
+                                fontWeight: 700,
+                                color: "var(--danger)",
+                                fontVariantNumeric: "tabular-nums",
+                              }}
+                            >
+                              {formatINR(rem)}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+
+                      <div
+                        style={{
+                          display: "flex",
+                          justifyContent: "space-between",
+                          alignItems: "center",
+                          borderTop: "1px solid var(--line)",
+                          paddingTop: 10,
+                          marginTop: 6,
+                          fontSize: 12,
+                          color: "var(--ink-soft)",
+                        }}
+                      >
+                        <span>{formatDateShort(entry.date)}</span>
+                        {canRecordPayment && rem > 0 && (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleRecordPaymentClick(entry);
+                            }}
+                            style={{
+                              border: "none",
+                              background: "var(--accent-soft)",
+                              color: "var(--accent-ink)",
+                              padding: "4px 10px",
+                              borderRadius: 6,
+                              fontSize: 12,
+                              fontWeight: 700,
+                              cursor: "pointer",
+                            }}
+                          >
+                            Record Payment
+                          </button>
+                        )}
+                      </div>
+                    </BtCard>
+                  );
+                })}
+              </div>
+            )}
           </div>
         )}
+      </BtSheet>
 
-      </div>
-
+      {/* ── CUSTOMIZE COLUMNS MODAL ── */}
       {showCustomizeModal && (
-        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}>
-          <div style={{ background: "#FFF", borderRadius: 16, width: 340, padding: 20, boxShadow: shadows.card, position: "relative" }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
-              <h3 style={{ margin: 0, fontSize: 16, fontWeight: 800, color: primaryBlue }}>Customize Columns</h3>
-              <button onClick={() => setShowCustomizeModal(false)} style={{ background: "none", border: "none", cursor: "pointer", color: colors.textLight }}><X size={18} /></button>
+        <div
+          style={{
+            position: "fixed",
+            inset: 0,
+            background: "rgba(12, 14, 18, 0.45)",
+            backdropFilter: "blur(4px)",
+            zIndex: 1000,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            padding: 20,
+          }}
+        >
+          <div
+            style={{
+              background: "#FFFFFF",
+              borderRadius: "var(--r-sheet)",
+              width: "100%",
+              maxWidth: 380,
+              padding: 24,
+              boxShadow: "0 25px 50px rgba(0,0,0,0.2)",
+              position: "relative",
+            }}
+          >
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                marginBottom: 12,
+              }}
+            >
+              <h3
+                style={{
+                  margin: 0,
+                  fontSize: 17,
+                  fontWeight: 700,
+                  fontFamily: "var(--font-ui)",
+                  color: "var(--ink)",
+                }}
+              >
+                Customize Columns
+              </h3>
+              <button
+                onClick={() => setShowCustomizeModal(false)}
+                style={{
+                  background: "none",
+                  border: "none",
+                  cursor: "pointer",
+                  color: "var(--ink-soft)",
+                }}
+              >
+                <X size={18} />
+              </button>
             </div>
 
-            <hr style={{ border: "none", borderTop: `1px solid ${colors.divider}`, margin: "0 0 10px" }} />
-
-            <p style={{ margin: "0 0 12px", fontSize: 11, color: colors.textLight, lineHeight: 1.4 }}>
-              Toggle visibility or reorder columns in the reports table log layout. Move columns up and down inside the table list.
+            <p
+              style={{
+                margin: "0 0 14px",
+                fontSize: 12.5,
+                color: "var(--ink-soft)",
+                lineHeight: 1.4,
+              }}
+            >
+              Check columns to display and use arrows to change column order.
             </p>
 
-            <div style={{ maxHeight: 280, overflowY: "auto", display: "flex", flexDirection: "column", gap: 6, paddingRight: 4 }}>
+            <div
+              style={{
+                display: "flex",
+                flexDirection: "column",
+                gap: 6,
+                maxHeight: 320,
+                overflowY: "auto",
+                paddingRight: 4,
+              }}
+            >
               {tempAllCols.map((col, idx) => {
                 const isChecked = tempActiveCols.includes(col);
                 return (
-                  <div key={col} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "8px 10px", background: colors.bgBase4, borderRadius: 8 }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                  <div
+                    key={col}
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "space-between",
+                      padding: "8px 12px",
+                      background: "var(--fill)",
+                      borderRadius: 8,
+                    }}
+                  >
+                    <label
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 10,
+                        cursor: "pointer",
+                        fontSize: 13,
+                        fontWeight: 600,
+                        color: "var(--ink)",
+                      }}
+                    >
                       <input
                         type="checkbox"
                         checked={isChecked}
                         onChange={() => handleToggleColumn(col)}
-                        style={{ width: 15, height: 15, accentColor: primaryBlue, cursor: "pointer" }}
+                        style={{ accentColor: "var(--ink)" }}
                       />
-                      <span style={{ fontSize: 12.5, fontWeight: "700", color: colors.textPrimary }}>{col}</span>
-                    </div>
+                      <span>{col}</span>
+                    </label>
 
                     <div style={{ display: "flex", gap: 4 }}>
                       <button
                         disabled={idx === 0}
                         onClick={() => handleMoveColumn(idx, -1)}
-                        style={{ border: "none", background: "none", cursor: idx === 0 ? "not-allowed" : "pointer", color: idx === 0 ? "#ccc" : colors.textPrimary, fontSize: 11, fontWeight: "bold" }}
+                        style={{
+                          border: "none",
+                          background: "none",
+                          cursor: idx === 0 ? "not-allowed" : "pointer",
+                          color: idx === 0 ? "#CBD5E1" : "var(--ink)",
+                          fontSize: 12,
+                          fontWeight: "bold",
+                        }}
                       >
                         ▲
                       </button>
                       <button
                         disabled={idx === tempAllCols.length - 1}
                         onClick={() => handleMoveColumn(idx, 1)}
-                        style={{ border: "none", background: "none", cursor: idx === tempAllCols.length - 1 ? "not-allowed" : "pointer", color: idx === tempAllCols.length - 1 ? "#ccc" : colors.textPrimary, fontSize: 11, fontWeight: "bold" }}
+                        style={{
+                          border: "none",
+                          background: "none",
+                          cursor:
+                            idx === tempAllCols.length - 1
+                              ? "not-allowed"
+                              : "pointer",
+                          color:
+                            idx === tempAllCols.length - 1
+                              ? "#CBD5E1"
+                              : "var(--ink)",
+                          fontSize: 12,
+                          fontWeight: "bold",
+                        }}
                       >
                         ▼
                       </button>
@@ -1787,129 +3633,273 @@ export default function FinancialReportPage() {
               })}
             </div>
 
-            <div style={{ display: "flex", justifyItems: "stretch", gap: 10, marginTop: 18 }}>
-              <button
-                onClick={resetCustomizeColumns}
-                style={{ flex: 1, padding: "10px 0", border: `1.2px solid ${colors.cardBorder}`, background: "none", borderRadius: 10, fontSize: 13, fontWeight: "700", color: colors.textMedium, cursor: "pointer" }}
-              >
-                Reset Default
-              </button>
+            <div
+              style={{
+                display: "flex",
+                gap: 10,
+                marginTop: 20,
+                borderTop: "1px solid var(--line)",
+                paddingTop: 16,
+              }}
+            >
               <button
                 onClick={saveCustomizeColumns}
-                style={{ flex: 1, padding: "10px 0", border: "none", background: gradients.primaryButton, borderRadius: 10, fontSize: 13, fontWeight: "700", color: "#FFF", cursor: "pointer" }}
+                style={{
+                  flex: 1,
+                  padding: "10px",
+                  borderRadius: "var(--r-btn, 12px)",
+                  background: "var(--ink)",
+                  color: "#FFFFFF",
+                  border: "none",
+                  fontWeight: 700,
+                  fontSize: 13,
+                  cursor: "pointer",
+                }}
               >
-                Save Columns
+                Save Preferences
               </button>
             </div>
-
           </div>
         </div>
       )}
 
+      {/* ── ENTRY DETAILS MODAL / DRAWER ── */}
       {detailsEntry && (
-        <div onClick={() => setDetailsEntry(null)} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", zIndex: 900, display: "flex", alignItems: "flex-start", justifyContent: "flex-end" }}>
-          <style>{`
-            @keyframes slideInRightFR {
-              from { transform: translateX(100%); }
-              to { transform: translateX(0); }
-            }
-          `}</style>
-          <div onClick={e => e.stopPropagation()} style={{ background: "#FFF", width: "100%", maxWidth: 420, height: "100vh", padding: "28px 32px", boxShadow: "-4px 0 15px rgba(0,0,0,0.1)", overflowY: "auto", animation: "slideInRightFR 0.3s forwards" }}>
-
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 24 }}>
-              <h3 style={{ margin: 0, fontSize: 20, fontWeight: 800, color: primaryBlue }}>Entry Details</h3>
-              <button onClick={() => setDetailsEntry(null)} style={{ background: "none", border: "none", cursor: "pointer", color: colors.textLight }}><X size={18} /></button>
+        <div
+          onClick={() => setDetailsEntry(null)}
+          style={{
+            position: "fixed",
+            inset: 0,
+            background: "rgba(12, 14, 18, 0.45)",
+            backdropFilter: "blur(4px)",
+            zIndex: 900,
+            display: "flex",
+            alignItems: "flex-start",
+            justifyContent: "flex-end",
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              background: "#FFFFFF",
+              width: "100%",
+              maxWidth: 440,
+              height: "100vh",
+              padding: "28px 32px",
+              boxShadow: "-4px 0 25px rgba(0,0,0,0.15)",
+              overflowY: "auto",
+            }}
+          >
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                marginBottom: 20,
+              }}
+            >
+              <h3
+                style={{
+                  margin: 0,
+                  fontSize: 20,
+                  fontWeight: 700,
+                  fontFamily: "var(--font-ui)",
+                  color: "var(--ink)",
+                }}
+              >
+                Entry Details
+              </h3>
+              <button
+                onClick={() => setDetailsEntry(null)}
+                style={{
+                  background: "none",
+                  border: "none",
+                  cursor: "pointer",
+                  color: "var(--ink-soft)",
+                }}
+              >
+                <X size={20} />
+              </button>
             </div>
 
-            <hr style={{ border: "none", borderTop: `1px solid ${colors.divider}`, margin: "0 0 14px" }} />
-
-            <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+            <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
               {[
                 { label: "Project", val: getProjectName(detailsEntry.projectId) },
                 { label: "Type", val: detailsEntry.type.toUpperCase() },
                 { label: "Date", val: formatDateLong(detailsEntry.date) },
-                { label: "Total Amount", val: formatINR(detailsEntry.rawTx?.amount || detailsEntry.amount), bold: true },
-                { label: "Paid Amount", val: formatINR(detailsEntry.rawTx?.paidAmount || 0), bold: true, textColor: "#166534" },
-                { label: "Balance", val: formatINR(detailsEntry.rawTx?.remainingAmount ?? ((detailsEntry.rawTx?.amount || detailsEntry.amount) - (detailsEntry.rawTx?.paidAmount || 0))), bold: true, textColor: "#dc2626" },
-                { label: "Status", val: getPaymentStatusLabel(detailsEntry.paymentStatus, detailsEntry.rawTx) },
+                {
+                  label: "Total Amount",
+                  val: formatINR(
+                    detailsEntry.rawTx?.amount || detailsEntry.amount
+                  ),
+                  bold: true,
+                },
+                {
+                  label: "Paid Amount",
+                  val: formatINR(detailsEntry.rawTx?.paidAmount || 0),
+                  bold: true,
+                  textColor: "var(--success)",
+                },
+                {
+                  label: "Balance",
+                  val: formatINR(
+                    detailsEntry.rawTx?.remainingAmount ??
+                      (detailsEntry.rawTx?.amount || detailsEntry.amount) -
+                        (detailsEntry.rawTx?.paidAmount || 0)
+                  ),
+                  bold: true,
+                  textColor: "var(--danger)",
+                },
+                {
+                  label: "Status",
+                  val: getPaymentStatusLabel(
+                    detailsEntry.paymentStatus,
+                    detailsEntry.rawTx
+                  ),
+                },
                 { label: "Description", val: detailsEntry.description || "—" },
                 { label: "Brand", val: detailsEntry.brand || "—" },
                 { label: "Floor", val: detailsEntry.floor || "—" },
                 { label: "Phase", val: detailsEntry.phase || "—" },
                 { label: "Unit", val: detailsEntry.unit || "—" },
-                { label: "Rejection Reason", val: detailsEntry.rejectionReason, isWarning: true }
+                {
+                  label: "Rejection Reason",
+                  val: detailsEntry.rejectionReason,
+                  isWarning: true,
+                },
               ].map((row) => {
                 if (!row.val && row.val !== 0 && row.val !== "₹0") return null;
                 return (
-                  <div key={row.label} style={{ display: "flex", fontSize: 12.5 }}>
-                    <span style={{ width: 110, fontWeight: "600", color: colors.textSecondary }}>{row.label}</span>
-                    <span style={{ flex: 1, fontWeight: row.bold ? "800" : "700", color: row.textColor ? row.textColor : (row.isWarning ? "#dc2626" : colors.textPrimary) }}>{row.val}</span>
+                  <div
+                    key={row.label}
+                    style={{
+                      display: "flex",
+                      fontSize: 13,
+                      borderBottom: "1px solid var(--fill)",
+                      paddingBottom: 6,
+                    }}
+                  >
+                    <span
+                      style={{
+                        width: 120,
+                        fontWeight: 600,
+                        color: "var(--ink-soft)",
+                      }}
+                    >
+                      {row.label}
+                    </span>
+                    <span
+                      style={{
+                        flex: 1,
+                        fontWeight: row.bold ? 700 : 500,
+                        color: row.textColor
+                          ? row.textColor
+                          : row.isWarning
+                            ? "var(--danger)"
+                            : "var(--ink)",
+                      }}
+                    >
+                      {row.val}
+                    </span>
                   </div>
                 );
               })}
             </div>
 
-            <hr style={{ border: "none", borderTop: `1px solid ${colors.divider}`, margin: "16px 0 14px" }} />
-
+            {/* Payment History */}
             {detailsEntry?.rawTx?.paymentHistory?.length > 0 && (
-              <>
-                <hr style={{ border: "none", borderTop: `1px solid ${colors.divider}`, margin: "14px 0" }} />
-                <div style={{ fontSize: 11.5, fontWeight: 700, color: colors.textSecondary, marginBottom: 8 }}>
-                  PAYMENT HISTORY
+              <div style={{ marginTop: 20 }}>
+                <div
+                  style={{
+                    fontFamily: "var(--font-mono)",
+                    fontSize: 11,
+                    fontWeight: 700,
+                    letterSpacing: "0.08em",
+                    color: "var(--ink-soft)",
+                    textTransform: "uppercase",
+                    marginBottom: 10,
+                  }}
+                >
+                  Payment History
                 </div>
-                <div style={{ display: "flex", flexDirection: "column", gap: 8, maxHeight: 140, overflowY: "auto" }}>
+                <div
+                  style={{
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: 8,
+                    maxHeight: 160,
+                    overflowY: "auto",
+                  }}
+                >
                   {detailsEntry.rawTx.paymentHistory.map((ph, idx) => (
                     <div
                       key={idx}
                       style={{
-                        padding: "8px 10px",
+                        padding: "10px 12px",
                         borderRadius: 8,
-                        background: colors.bgBase4,
-                        border: `1px solid ${colors.cardBorder}`,
+                        background: "var(--fill)",
+                        border: "1px solid var(--line)",
                         display: "flex",
                         flexDirection: "column",
-                        gap: 4
+                        gap: 4,
                       }}
                     >
-                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                        <span style={{ fontSize: 12.5, fontWeight: 700, color: colors.textPrimary }}>
+                      <div
+                        style={{
+                          display: "flex",
+                          justifyContent: "space-between",
+                          alignItems: "center",
+                        }}
+                      >
+                        <span
+                          style={{
+                            fontSize: 13,
+                            fontWeight: 700,
+                            fontFamily: "var(--font-display)",
+                            color: "var(--ink)",
+                          }}
+                        >
                           {formatINR(ph.amount)}
                         </span>
-                        <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
-                          <span style={{ fontSize: 11, padding: "2px 6px", background: "#FDE8D8", color: "var(--color-primary, #F97316)", borderRadius: 4, fontWeight: 600 }}>
-                            {ph.method || "—"}
-                          </span>
-                          {ph.receipt && (
-                            <a href={ph.receipt} target="_blank" rel="noopener noreferrer" style={{ fontSize: 11, color: "var(--color-primary-hover, #EA580C)", fontWeight: 600, textDecoration: "none" }}>
-                              Receipt ↗
-                            </a>
-                          )}
-                        </div>
+                        <BtBadge tone="muted">{ph.method || "Cash"}</BtBadge>
                       </div>
-                      <div style={{ fontSize: 10, color: colors.textLight }}>
+                      <div style={{ fontSize: 11, color: "var(--ink-soft)" }}>
                         {formatDateLong(ph.date)}
                       </div>
-                      {ph.note && (
-                        <div style={{ fontSize: 11, color: colors.textSecondary, fontStyle: "italic", marginTop: 2 }}>
-                          Note: {ph.note}
-                        </div>
-                      )}
                     </div>
                   ))}
                 </div>
-              </>
+              </div>
             )}
 
-            <div style={{ display: "flex", gap: 8 }}>
+            {/* Quick Action Buttons */}
+            <div
+              style={{
+                display: "flex",
+                gap: 8,
+                marginTop: 24,
+                borderTop: "1px solid var(--line)",
+                paddingTop: 16,
+              }}
+            >
               <button
                 onClick={() => {
                   const entry = detailsEntry;
                   setDetailsEntry(null);
                   handleAddMore(entry);
                 }}
-                style={{ flex: 1, padding: "8px 0", border: `1.2px solid #E2E4FA`, background: "#FFF", borderRadius: 8, fontSize: 11.5, fontWeight: "700", color: primaryBlue, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 4 }}
+                style={{
+                  flex: 1,
+                  padding: "9px 0",
+                  borderRadius: 8,
+                  border: "1px solid var(--line)",
+                  background: "#FFFFFF",
+                  fontSize: 12,
+                  fontWeight: 600,
+                  cursor: "pointer",
+                }}
               >
-                <PlusCircle size={11} /> Add More
+                Add More
               </button>
 
               <button
@@ -1918,9 +3908,19 @@ export default function FinancialReportPage() {
                   setDetailsEntry(null);
                   handleRecordPaymentClick(entry);
                 }}
-                style={{ flex: 1, padding: "8px 0", border: `1.2px solid #ca8a04`, background: "#FFF", borderRadius: 8, fontSize: 11.5, fontWeight: "700", color: "#ca8a04", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 4 }}
+                style={{
+                  flex: 1,
+                  padding: "9px 0",
+                  borderRadius: 8,
+                  border: "1px solid var(--accent)",
+                  background: "var(--accent-soft)",
+                  color: "var(--accent-ink)",
+                  fontSize: 12,
+                  fontWeight: 700,
+                  cursor: "pointer",
+                }}
               >
-                <CreditCard size={11} /> Pay Log
+                Record Payment
               </button>
 
               <button
@@ -1929,114 +3929,290 @@ export default function FinancialReportPage() {
                   setDetailsEntry(null);
                   handleEditEntry(entry);
                 }}
-                style={{ flex: 1, padding: "8px 0", border: `1.2px solid #4b5563`, background: "#FFF", borderRadius: 8, fontSize: 11.5, fontWeight: "700", color: "#4b5563", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 4 }}
-              >
-                <Edit2 size={11} /> Edit
-              </button>
-            </div>
-
-            {true && (
-              <button
-                onClick={async () => {
-                  if (window.confirm("Are you sure you want to delete this entry? This action cannot be undone.")) {
-                    try {
-                      await transactionAPI.delete(detailsEntry.rawTx?._id || detailsEntry.id || detailsEntry._id);
-                      setToast({ msg: "Entry deleted successfully.", type: "success" });
-                      setDetailsEntry(null);
-                      loadData(true);
-                    } catch (e) {
-                      setToast({ msg: "Failed to delete entry.", type: "error" });
-                    }
-                  }
+                style={{
+                  flex: 1,
+                  padding: "9px 0",
+                  borderRadius: 8,
+                  border: "1px solid var(--line)",
+                  background: "#FFFFFF",
+                  fontSize: 12,
+                  fontWeight: 600,
+                  cursor: "pointer",
                 }}
-                style={{ width: "100%", marginTop: 12, padding: "8px 0", border: `1.2px solid #ef4444`, background: "#fef2f2", borderRadius: 8, fontSize: 11.5, fontWeight: "700", color: "#dc2626", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 4 }}
               >
-                <Trash2 size={12} /> Delete Entry
+                Edit
               </button>
-            )}
-
+            </div>
           </div>
         </div>
       )}
 
+      {/* ── IMPORT CSV MODAL ── */}
       {showImportModal && (
-        <div style={{ position: "fixed", inset: 0, zIndex: 1100, background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }}>
-          <div style={{ background: "#fff", borderRadius: 18, width: "100%", maxWidth: 900, maxHeight: "90vh", overflowY: "auto", position: "relative" }}>
-            <button onClick={() => setShowImportModal(false)} style={{ position: "absolute", top: 16, right: 16, background: "#F1F5F9", border: "none", width: 32, height: 32, borderRadius: 16, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", color: "#64748B", fontWeight: "bold" }}>X</button>
-            <div style={{ padding: "16px 20px 0" }}>
-              <h2 style={{ margin: 0, fontSize: 18, fontWeight: 800 }}>Import or Revert CSV</h2>
+        <div
+          style={{
+            position: "fixed",
+            inset: 0,
+            zIndex: 1100,
+            background: "rgba(12, 14, 18, 0.45)",
+            backdropFilter: "blur(4px)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            padding: 20,
+          }}
+        >
+          <div
+            style={{
+              background: "#FFFFFF",
+              borderRadius: "var(--r-sheet)",
+              width: "100%",
+              maxWidth: 860,
+              maxHeight: "90vh",
+              overflowY: "auto",
+              position: "relative",
+              padding: 24,
+            }}
+          >
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                marginBottom: 16,
+              }}
+            >
+              <h2
+                style={{
+                  margin: 0,
+                  fontSize: 18,
+                  fontWeight: 700,
+                  fontFamily: "var(--font-ui)",
+                }}
+              >
+                Import or Revert CSV
+              </h2>
+              <button
+                onClick={() => setShowImportModal(false)}
+                style={{
+                  background: "none",
+                  border: "none",
+                  cursor: "pointer",
+                  color: "var(--ink-soft)",
+                }}
+              >
+                <X size={20} />
+              </button>
             </div>
-            <div style={{ padding: 20 }}>
-              <CsvImport onComplete={() => window.location.reload()} />
-            </div>
+            <CsvImport onComplete={() => window.location.reload()} />
           </div>
         </div>
       )}
 
-      {/* Export Options Modal */}
+      {/* ── EXPORT OPTIONS MODAL ── */}
       {showExportModal && (
-        <div style={{ position: "fixed", inset: 0, zIndex: 1200, background: "rgba(0,0,0,0.5)", backdropFilter: "blur(4px)", display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }}>
-          <div style={{ background: "#fff", borderRadius: 16, width: "100%", maxWidth: 400, overflow: "hidden", boxShadow: "0 25px 50px -12px rgba(0,0,0,0.25)", display: "flex", flexDirection: "column" }}>
-            <div style={{ padding: "20px", borderBottom: "1px solid #f1f5f9" }}>
-              <h3 style={{ margin: 0, fontSize: "18px", fontWeight: "700", color: "#0f172a" }}>Export CSV</h3>
-              <p style={{ margin: "4px 0 0", fontSize: "14px", color: "#64748b" }}>Choose how you want to export your data.</p>
+        <div
+          style={{
+            position: "fixed",
+            inset: 0,
+            zIndex: 1200,
+            background: "rgba(12, 14, 18, 0.45)",
+            backdropFilter: "blur(4px)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            padding: 20,
+          }}
+        >
+          <div
+            style={{
+              background: "#FFFFFF",
+              borderRadius: "var(--r-sheet)",
+              width: "100%",
+              maxWidth: 440,
+              padding: 24,
+              boxShadow: "0 25px 50px rgba(0,0,0,0.25)",
+              display: "flex",
+              flexDirection: "column",
+            }}
+          >
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                marginBottom: 14,
+              }}
+            >
+              <div>
+                <h3
+                  style={{
+                    margin: 0,
+                    fontSize: 18,
+                    fontWeight: 700,
+                    fontFamily: "var(--font-ui)",
+                    color: "var(--ink)",
+                  }}
+                >
+                  Export Report
+                </h3>
+                <p
+                  style={{
+                    margin: "2px 0 0",
+                    fontSize: 13,
+                    color: "var(--ink-soft)",
+                  }}
+                >
+                  Select your export format
+                </p>
+              </div>
+              <button
+                onClick={() => setShowExportModal(false)}
+                style={{
+                  background: "none",
+                  border: "none",
+                  cursor: "pointer",
+                  color: "var(--ink-soft)",
+                }}
+              >
+                <X size={18} />
+              </button>
             </div>
-            
-            <div style={{ padding: "20px", display: "flex", flexDirection: "column", gap: "12px" }}>
+
+            <div
+              style={{
+                display: "flex",
+                flexDirection: "column",
+                gap: 12,
+                marginTop: 10,
+              }}
+            >
+              {/* PDF Export Card */}
               <button
                 onClick={() => {
                   setShowExportModal(false);
-                  handleExportCSV(true);
+                  handleExportPDF();
                 }}
-                style={{ textAlign: "left", padding: "16px", borderRadius: "12px", border: "1px solid #e2e8f0", background: "#fff", cursor: "pointer", transition: "all 0.2s" }}
-                onMouseOver={(e) => { e.currentTarget.style.borderColor = "#3b82f6"; e.currentTarget.style.background = "#eff6ff"; }}
-                onMouseOut={(e) => { e.currentTarget.style.borderColor = "#e2e8f0"; e.currentTarget.style.background = "#fff"; }}
+                style={{
+                  textAlign: "left",
+                  padding: 16,
+                  borderRadius: "var(--r-card)",
+                  border: "1px solid var(--line)",
+                  background: "#FFFFFF",
+                  cursor: "pointer",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 14,
+                  transition: "all 150ms ease",
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.borderColor = "var(--ink)";
+                  e.currentTarget.style.background = "var(--fill)";
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.borderColor = "var(--line)";
+                  e.currentTarget.style.background = "#FFFFFF";
+                }}
               >
-                <div style={{ fontWeight: "600", color: "#0f172a", fontSize: "15px" }}>Export All Columns</div>
-                <div style={{ fontSize: "13px", color: "#64748b", marginTop: "2px" }}>Includes every available data point</div>
+                <div
+                  style={{
+                    width: 40,
+                    height: 40,
+                    borderRadius: 10,
+                    background: "var(--ink)",
+                    color: "#FFFFFF",
+                    display: "grid",
+                    placeItems: "center",
+                    fontWeight: 800,
+                    fontSize: 12,
+                  }}
+                >
+                  PDF
+                </div>
+                <div>
+                  <div
+                    style={{ fontWeight: 700, fontSize: 14, color: "var(--ink)" }}
+                  >
+                    Download PDF Report
+                  </div>
+                  <div style={{ fontSize: 12.5, color: "var(--ink-soft)" }}>
+                    Ready to print or share with clients
+                  </div>
+                </div>
               </button>
-              
+
+              {/* CSV Export Card */}
               <button
                 onClick={() => {
                   setShowExportModal(false);
                   handleExportCSV(false);
                 }}
-                style={{ textAlign: "left", padding: "16px", borderRadius: "12px", border: "1px solid #e2e8f0", background: "#fff", cursor: "pointer", transition: "all 0.2s" }}
-                onMouseOver={(e) => { e.currentTarget.style.borderColor = "#3b82f6"; e.currentTarget.style.background = "#eff6ff"; }}
-                onMouseOut={(e) => { e.currentTarget.style.borderColor = "#e2e8f0"; e.currentTarget.style.background = "#fff"; }}
+                style={{
+                  textAlign: "left",
+                  padding: 16,
+                  borderRadius: "var(--r-card)",
+                  border: "1px solid var(--line)",
+                  background: "#FFFFFF",
+                  cursor: "pointer",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 14,
+                  transition: "all 150ms ease",
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.borderColor = "var(--ink)";
+                  e.currentTarget.style.background = "var(--fill)";
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.borderColor = "var(--line)";
+                  e.currentTarget.style.background = "#FFFFFF";
+                }}
               >
-                <div style={{ fontWeight: "600", color: "#0f172a", fontSize: "15px" }}>Export Visible Columns</div>
-                <div style={{ fontSize: "13px", color: "#64748b", marginTop: "2px" }}>Includes only the columns you currently see</div>
-              </button>
-            </div>
-            
-            <div style={{ padding: "16px 20px", background: "#f8fafc", display: "flex", justifyContent: "flex-end" }}>
-              <button
-                onClick={() => setShowExportModal(false)}
-                style={{ padding: "8px 16px", borderRadius: "8px", border: "none", background: "transparent", color: "#475569", fontWeight: "600", cursor: "pointer" }}
-                onMouseOver={(e) => e.currentTarget.style.background = "#e2e8f0"}
-                onMouseOut={(e) => e.currentTarget.style.background = "transparent"}
-              >
-                Cancel
+                <div
+                  style={{
+                    width: 40,
+                    height: 40,
+                    borderRadius: 10,
+                    background: "var(--success-soft)",
+                    color: "var(--success)",
+                    display: "grid",
+                    placeItems: "center",
+                    fontWeight: 800,
+                    fontSize: 12,
+                  }}
+                >
+                  CSV
+                </div>
+                <div>
+                  <div
+                    style={{ fontWeight: 700, fontSize: 14, color: "var(--ink)" }}
+                  >
+                    Download CSV Spreadsheet
+                  </div>
+                  <div style={{ fontSize: 12.5, color: "var(--ink-soft)" }}>
+                    Opens cleanly in Excel or Google Sheets
+                  </div>
+                </div>
               </button>
             </div>
           </div>
         </div>
       )}
 
+      {/* Record Payment Sheet */}
       <RecordPaymentSheet
         open={paymentSheetOpen}
         entry={paymentItem}
         projects={projects}
         onClose={() => setPaymentSheetOpen(false)}
         onSaved={(msg) => {
-          setToast({ msg: msg || "Payment recorded successfully", type: "success" });
+          setToast({
+            msg: msg || "Payment recorded successfully",
+            type: "success",
+          });
           loadData();
         }}
       />
-
     </div>
   );
 }
-
-

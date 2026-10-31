@@ -2,7 +2,9 @@ import { useState, useEffect, useRef } from "react";
 import { aiChatAPI } from "../api";
 import useAuthStore from "../stores/authStore";
 import useProjectStore from "../stores/projectStore";
-import { Bell } from "lucide-react";
+import { Bell, Sparkles } from "lucide-react";
+import BtHero from "../components/ui/BtHero";
+import BtSheet from "../components/ui/BtSheet";
 
 const SUGGESTIONS = [
   "Entries in June",
@@ -244,9 +246,9 @@ export default function AIChatPage() {
           {!isUser && (
             <div style={{
               width: 32, height: 32, borderRadius: "50%", flexShrink: 0,
-              background: "linear-gradient(135deg, var(--color-primary-hover, #EA580C), #c2410c)",
+              background: "var(--ink, #111317)", border: "1px solid rgba(255,255,255,0.15)",
               display: "flex", alignItems: "center", justifyContent: "center",
-              fontSize: 14, color: "#fff", fontWeight: 700, boxShadow: "0 2px 8px rgba(234,88,12,0.3)",
+              fontSize: 14, color: "#fff", fontWeight: 700, boxShadow: "0 2px 8px rgba(0,0,0,0.2)",
             }}>AI</div>
           )}
           <div>
@@ -289,47 +291,28 @@ export default function AIChatPage() {
     <div style={{
       display: "flex", flexDirection: "column", height: "100vh",
       flex: 1, minWidth: 0, width: "100%",
-      background: "#f7f7f8",
+      background: "var(--bg, #0B0D10)",
       fontFamily: "'DM Sans', 'Segoe UI', system-ui, sans-serif",
     }}>
 
-      <div style={{
-        height: 64, flexShrink: 0,
-        background: "#fff", borderBottom: "1px solid #ebebeb",
-        padding: "0 24px", display: "flex", alignItems: "center",
-        justifyContent: "space-between", gap: 12,
-      }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-          <div style={{
-            width: 36, height: 36, borderRadius: 10,
-            background: "linear-gradient(135deg, var(--color-primary-hover, #EA580C), #c2410c)",
-            display: "flex", alignItems: "center", justifyContent: "center",
-            fontSize: 16, color: "#fff", fontWeight: 700,
-            boxShadow: "0 2px 8px rgba(234,88,12,0.3)",
-          }}>AI</div>
-          <div>
-            <h1 style={{ margin: 0, fontSize: 18, fontWeight: 800, color: "#1a1a1a", lineHeight: 1.2 }}>
-              AI Chat
-            </h1>
-            <div style={{ fontSize: 11, color: "#aaa", marginTop: 1 }}>
-              Report Insights &amp; Analytics
-            </div>
-          </div>
-        </div>
-        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          {selectedProject && (
+      <BtHero
+        eyebrow="FIELD INTELLIGENCE · ASSISTANT"
+        title="AI Chat"
+        subtitle="Report insights, ledger queries & analytics"
+        actions={
+          selectedProject && (
             <span style={{
-              fontSize: 11, fontWeight: 700, color: "var(--color-primary-hover, #EA580C)",
-              background: "#fff5f0", border: "1px solid #fed7aa",
-              borderRadius: 20, padding: "4px 12px", letterSpacing: "0.04em",
-              maxWidth: 180, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+              fontSize: 12, fontWeight: 700, color: "#F6F4EF",
+              background: "rgba(255,255,255,0.1)", border: "1px solid rgba(255,255,255,0.2)",
+              borderRadius: 20, padding: "6px 14px", letterSpacing: "0.04em",
             }}>
               {selectedProject.projectName || "Project"}
             </span>
-          )}
-          <div style={{ width: 36, height: 36, background: "#f5f5f5", borderRadius: 10, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16, cursor: "pointer" }}><Bell size={16} /></div>
-        </div>
-      </div>
+          )
+        }
+      />
+
+      <BtSheet overlap={26}>
 
       <div style={{
         flex: 1, minHeight: 0, overflowY: "auto", overflowX: "hidden",
@@ -378,10 +361,10 @@ export default function AIChatPage() {
           <div style={{ display: "flex", alignItems: "flex-end", gap: 8 }}>
             <div style={{
               width: 32, height: 32, borderRadius: "50%", flexShrink: 0,
-              background: "linear-gradient(135deg, var(--color-primary-hover, #EA580C), #c2410c)",
+              background: "var(--ink, #111317)", border: "1px solid rgba(255,255,255,0.15)",
               display: "flex", alignItems: "center", justifyContent: "center",
               fontSize: 14, color: "#fff", fontWeight: 700,
-              boxShadow: "0 2px 8px rgba(234,88,12,0.3)",
+              boxShadow: "0 2px 8px rgba(0,0,0,0.2)",
             }}>AI</div>
             <div style={{
               padding: "12px 18px", borderRadius: "16px 16px 16px 4px",
@@ -445,7 +428,7 @@ export default function AIChatPage() {
             disabled={!input.trim() || loading}
             style={{
               width: 40, height: 40, borderRadius: 12, flexShrink: 0,
-              background: input.trim() && !loading ? "var(--color-primary-hover, #EA580C)" : "#e5e5e5",
+              background: input.trim() && !loading ? "var(--ink, #111317)" : "#e5e5e5",
               border: "none", cursor: input.trim() && !loading ? "pointer" : "not-allowed",
               display: "flex", alignItems: "center", justifyContent: "center",
               transition: "background 0.2s, transform 0.15s",
@@ -453,13 +436,13 @@ export default function AIChatPage() {
             }}
             onMouseEnter={(e) => {
               if (input.trim() && !loading) {
-                e.currentTarget.style.background = "#c2410c";
+                e.currentTarget.style.background = "#22252a";
                 e.currentTarget.style.transform = "scale(1.05)";
               }
             }}
             onMouseLeave={(e) => {
               if (input.trim() && !loading) {
-                e.currentTarget.style.background = "var(--color-primary-hover, #EA580C)";
+                e.currentTarget.style.background = "var(--ink, #111317)";
                 e.currentTarget.style.transform = "scale(1)";
               }
             }}
@@ -474,6 +457,7 @@ export default function AIChatPage() {
           AI responses are based on your project data. Verify critical financial details.
         </div>
       </div>
+      </BtSheet>
     </div>
   );
 }

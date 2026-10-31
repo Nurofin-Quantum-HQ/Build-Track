@@ -46,12 +46,12 @@ export default function ExecutionContextSelector({ value, onChange, compact }) {
 
   return (
     <div style={{
-      background: compact ? "transparent" : "#FFF7F0",
-      border: compact ? "none" : "1px solid #FDE8D8",
+      background: compact ? "transparent" : "var(--card-bg, #FFFFFF)",
+      border: compact ? "none" : "1px solid var(--border, #E2E8F0)",
       borderRadius: compact ? 0 : 12,
       padding: compact ? 0 : "16px 20px",
     }}>
-      {!compact && <div style={{ fontSize: 13, fontWeight: 600, color: "var(--color-primary-hover, #EA580C)", marginBottom: 12 }}>📍 Execution Context</div>}
+      {!compact && <div style={{ fontSize: 11, fontWeight: 800, color: "var(--ink, #111317)", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 12, fontFamily: "JetBrains Mono, monospace" }}>EXECUTION CONTEXT</div>}
       <div style={rowStyle}>
         <div>
           <label style={labelStyle}>PROJECT</label>

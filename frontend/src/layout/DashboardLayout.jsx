@@ -1,21 +1,22 @@
-import { useState, useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import { Outlet, useNavigate, useLocation } from "react-router-dom";
 import Sidebar from "../components/Sidebar";
 import AppTour from "../components/AppTour";
-import { Bell, Settings } from "lucide-react";
-import { colors, typography, gradients } from "../styles/designTokens";
+import { Bell, Settings, Menu } from "lucide-react";
 import nurofinLogo from "../assets/nurofin-black.svg";
 import useNotificationStore from "../stores/notificationStore";
-import { notificationAPI } from "../api";
+import ErrorBoundary from "../components/ErrorBoundary";
 
 export default function DashboardLayout() {
-  const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
+  const [isMobile, setIsMobile] = useState(window.innerWidth < 1024);
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   const navigate = useNavigate();
   const location = useLocation();
-  const fetchAll = useNotificationStore(s => s.fetchAll);
-  const totalAlertCount = useNotificationStore(s => s.systemNotifications ? s.systemNotifications.filter(n => !n.read).length : 0);
+  const fetchAll = useNotificationStore((s) => s.fetchAll);
+  const totalAlertCount = useNotificationStore((s) =>
+    s.systemNotifications ? s.systemNotifications.filter((n) => !n.read).length : 0
+  );
 
   useEffect(() => {
     fetchAll();
@@ -23,7 +24,7 @@ export default function DashboardLayout() {
 
   useEffect(() => {
     const onResize = () => {
-      const mobile = window.innerWidth < 768;
+      const mobile = window.innerWidth < 1024;
       setIsMobile(mobile);
       if (!mobile) setSidebarOpen(false);
     };
@@ -31,118 +32,194 @@ export default function DashboardLayout() {
     return () => window.removeEventListener("resize", onResize);
   }, []);
 
-
-
   return (
-    <div style={{ display: "flex", height: "100vh", overflow: "hidden", background: gradients.pageBackground }}>
+    <div
+      style={{
+        display: "flex",
+        height: "100vh",
+        overflow: "hidden",
+        background: "var(--ground)",
+      }}
+    >
       <AppTour />
+
+      {/* ── Mobile Sidebar Backdrop ── */}
       {isMobile && sidebarOpen && (
         <div
           onClick={() => setSidebarOpen(false)}
           style={{
-            position: "fixed", inset: 0,
-            background: "rgba(17, 24, 39, 0.4)", zIndex: 40,
+            position: "fixed",
+            inset: 0,
+            background: "var(--scrim)",
+            zIndex: 40,
             backdropFilter: "blur(4px)",
             animation: "fadeIn 150ms ease",
           }}
         />
       )}
 
+      {/* ── Sidebar (Fixed Desktop or Drawer Mobile) ── */}
       {isMobile ? (
-        <div style={{
-          position: "fixed", top: 0, left: 0, bottom: 0, zIndex: 50,
-          transform: sidebarOpen ? "translateX(0)" : "translateX(-100%)",
-          transition: "transform 200ms cubic-bezier(0.16, 1, 0.3, 1)",
-        }}>
+        <div
+          style={{
+            position: "fixed",
+            top: 0,
+            left: 0,
+            bottom: 0,
+            zIndex: 50,
+            transform: sidebarOpen ? "translateX(0)" : "translateX(-100%)",
+            transition: "transform 220ms cubic-bezier(0.16, 1, 0.3, 1)",
+          }}
+        >
           <Sidebar />
         </div>
       ) : (
         <Sidebar />
       )}
 
-      <div style={{ flex: 1, display: "flex", flexDirection: "column", minWidth: 0, overflow: "hidden" }}>
+      {/* ── Main Viewport ── */}
+      <div
+        style={{
+          flex: 1,
+          display: "flex",
+          flexDirection: "column",
+          minWidth: 0,
+          overflow: "hidden",
+          position: "relative",
+        }}
+      >
+        {/* ── Top Header Bar (Blueprint Noir Surface) ── */}
         <header
           style={{
-            height: 46,
-            marginTop: 16,
-            marginRight: 24,
-            marginLeft: 24,
+            height: "56px",
+            minHeight: "56px",
+            background: "var(--noir, #0C0E12)",
+            borderBottom: "1px solid rgba(255, 255, 255, 0.08)",
             display: "flex",
             alignItems: "center",
             justifyContent: "space-between",
+            padding: isMobile ? "0 16px" : "0 28px",
+            zIndex: 30,
             flexShrink: 0,
-            zIndex: 20,
-            background: "transparent",
-            border: "none",
+            boxSizing: "border-box",
           }}
         >
-          {isMobile && (
+          {isMobile ? (
             <button
               onClick={() => setSidebarOpen(true)}
-              className="premium-topbar-btn"
               aria-label="Open Sidebar"
+              style={{
+                width: "38px",
+                height: "38px",
+                borderRadius: "12px",
+                background: "rgba(255, 255, 255, 0.08)",
+                border: "1px solid rgba(255, 255, 255, 0.14)",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                cursor: "pointer",
+                color: "var(--bone, #F6F4EF)",
+              }}
             >
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+              <Menu size={20} />
             </button>
+          ) : (
+            <div style={{ display: "flex", alignItems: "center", gap: "8px" }} />
           )}
-          <div style={{ flex: 1 }} />
-          <div style={{ display: "flex", alignItems: "center", gap: 16 }} className="header-right-group">
+
+          <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+            {/* ── Brand Badge ── */}
             <div
               onClick={() => navigate("/")}
-              className="header-brand-card"
-              title="BuildTrack - Powered by Nurofin"
+              style={{
+                height: "38px",
+                padding: "0 14px",
+                borderRadius: "12px",
+                background: "rgba(255, 255, 255, 0.06)",
+                border: "1px solid rgba(255, 255, 255, 0.12)",
+                display: "flex",
+                alignItems: "center",
+                gap: "10px",
+                cursor: "pointer",
+                userSelect: "none",
+                transition: "background 140ms ease",
+              }}
+              onMouseEnter={(e) => (e.currentTarget.style.background = "rgba(255, 255, 255, 0.10)")}
+              onMouseLeave={(e) => (e.currentTarget.style.background = "rgba(255, 255, 255, 0.06)")}
             >
-              <div className="header-brand-primary">
+              <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
                 <img
                   src="/buildtrack-logo.png"
                   alt="BuildTrack"
-                  className="header-brand-logo"
+                  style={{ width: "20px", height: "20px", borderRadius: "5px" }}
                 />
-                <span className="header-brand-name">
+                <span
+                  style={{
+                    fontFamily: "var(--font-display)",
+                    fontSize: "14px",
+                    fontWeight: 700,
+                    color: "var(--bone, #F6F4EF)",
+                    letterSpacing: "-0.3px",
+                  }}
+                >
                   BuildTrack
                 </span>
               </div>
 
-              <div className="header-brand-divider" />
+              <div style={{ width: "1px", height: "14px", background: "rgba(255, 255, 255, 0.16)" }} />
 
-              <div className="header-powered-by">
-                <span className="header-powered-text">
-                  Powered by
+              <div style={{ display: "flex", alignItems: "center", gap: "5px" }}>
+                <span style={{ fontSize: "11px", color: "var(--on-noir-3, rgba(246, 244, 239, 0.5))", fontFamily: "var(--font-ui)" }}>
+                  by
                 </span>
                 <img
                   src={nurofinLogo}
                   alt="Nurofin"
-                  className="header-nurofin-svg"
+                  style={{ height: "13px", filter: "brightness(0) invert(1)" }}
                 />
               </div>
             </div>
 
+            {/* ── Notifications Bell ── */}
             <button
               onClick={() => navigate("/notifications")}
-              className="premium-topbar-btn"
               aria-label="Notifications"
-              style={{ position: "relative" }}
+              style={{
+                position: "relative",
+                width: "38px",
+                height: "38px",
+                borderRadius: "12px",
+                background: "rgba(255, 255, 255, 0.06)",
+                border: "1px solid rgba(255, 255, 255, 0.12)",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                color: "var(--bone, #F6F4EF)",
+                cursor: "pointer",
+                transition: "background 140ms ease",
+              }}
+              onMouseEnter={(e) => (e.currentTarget.style.background = "rgba(255, 255, 255, 0.10)")}
+              onMouseLeave={(e) => (e.currentTarget.style.background = "rgba(255, 255, 255, 0.06)")}
             >
-              <Bell size={20} />
+              <Bell size={18} strokeWidth={1.8} />
               {totalAlertCount > 0 && (
                 <span
                   style={{
                     position: "absolute",
-                    top: -3,
-                    right: -3,
-                    minWidth: 17,
-                    height: 17,
-                    borderRadius: 9,
-                    background: "#EF4444",
+                    top: "-3px",
+                    right: "-3px",
+                    minWidth: "16px",
+                    height: "16px",
+                    borderRadius: "8px",
+                    background: "var(--status-danger-bright, #EF4444)",
                     color: "#FFFFFF",
-                    fontSize: 10,
+                    fontSize: "10px",
                     fontWeight: 700,
                     display: "flex",
                     alignItems: "center",
                     justifyContent: "center",
                     padding: "0 3px",
-                    border: "2px solid #FFFFFF",
-                    boxShadow: "0 2px 4px rgba(239, 68, 68, 0.4)",
+                    border: "2px solid var(--noir, #0C0E12)",
                     pointerEvents: "none",
                   }}
                 >
@@ -150,19 +227,45 @@ export default function DashboardLayout() {
                 </span>
               )}
             </button>
+
+            {/* ── Settings Shortcut ── */}
             <button
               onClick={() => navigate("/settings")}
-              className="premium-topbar-btn"
               aria-label="Settings"
+              style={{
+                width: "38px",
+                height: "38px",
+                borderRadius: "12px",
+                background: "rgba(255, 255, 255, 0.06)",
+                border: "1px solid rgba(255, 255, 255, 0.12)",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                color: "var(--bone, #F6F4EF)",
+                cursor: "pointer",
+                transition: "background 140ms ease",
+              }}
+              onMouseEnter={(e) => (e.currentTarget.style.background = "rgba(255, 255, 255, 0.10)")}
+              onMouseLeave={(e) => (e.currentTarget.style.background = "rgba(255, 255, 255, 0.06)")}
             >
-              <Settings size={20} />
+              <Settings size={18} strokeWidth={1.8} />
             </button>
           </div>
         </header>
 
-        <div style={{ flex: 1, overflow: "auto", display: "flex", flexDirection: "column" }}>
-          <Outlet />
-        </div>
+        {/* ── Content Viewport ── */}
+        <main
+          style={{
+            flex: 1,
+            overflowY: "auto",
+            display: "flex",
+            flexDirection: "column",
+          }}
+        >
+          <ErrorBoundary inline fallbackMessage="An unexpected issue occurred while rendering this section. You can refresh or switch tabs.">
+            <Outlet />
+          </ErrorBoundary>
+        </main>
       </div>
     </div>
   );

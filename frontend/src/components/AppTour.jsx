@@ -215,7 +215,7 @@ const AppTour = () => {
         steps={dynamicSteps.map((s) => ({ ...s, disableBeacon: true }))}
         styles={{ options: {
             zIndex: 10000,
-            primaryColor: 'var(--color-primary, #F97316)',
+            primaryColor: '#111317',
             }, beacon: { display: 'none' } }}
       />
     </>

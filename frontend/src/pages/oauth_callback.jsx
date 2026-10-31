@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { authAPI } from "../api";
+import BtBrickLoader from "../components/ui/BtBrickLoader";
 
 export default function OAuthCallback() {
   const navigate = useNavigate();
@@ -10,17 +11,17 @@ export default function OAuthCallback() {
     const run = async () => {
       try {
         const params = new URLSearchParams(window.location.search);
-        const token  = params.get("token");
-        const error  = params.get("error");
+        const token = params.get("token");
+        const error = params.get("error");
 
         if (error) {
-          setStatus("OAuth failed. Redirecting to login…");
+          setStatus("OAuth authentication failed. Redirecting to login…");
           setTimeout(() => navigate("/login?error=" + error), 1500);
           return;
         }
 
         if (!token) {
-          setStatus("No token received. Redirecting to login…");
+          setStatus("No access token received. Redirecting to login…");
           setTimeout(() => navigate("/login"), 1500);
           return;
         }
@@ -31,17 +32,14 @@ export default function OAuthCallback() {
           const { data } = await authAPI.me();
           const userData = data?.user || data;
           localStorage.setItem("bt_user", JSON.stringify(userData));
-          window.dispatchEvent(new Event('userUpdated'));
-        } catch {
-
-        }
+          window.dispatchEvent(new Event("userUpdated"));
+        } catch {}
 
         setStatus("Success! Taking you to your dashboard…");
 
         setTimeout(() => {
           window.location.assign("/");
-        }, 800);
-
+        }, 600);
       } catch (err) {
         setStatus("Something went wrong. Redirecting…");
         setTimeout(() => navigate("/login"), 1500);
@@ -49,40 +47,41 @@ export default function OAuthCallback() {
     };
 
     run();
-  }, []);
+  }, [navigate]);
 
   return (
-    <div style={{
-      minHeight: "100vh",
-      display: "flex",
-      flexDirection: "column",
-      alignItems: "center",
-      justifyContent: "center",
-      background: "#0f172a",
-      fontFamily: "'DM Sans', system-ui, sans-serif",
-      gap: 24,
-    }}>
-      <div style={{
-        width: 52,
-        height: 52,
-        border: "4px solid rgba(249,115,22,0.2)",
-        borderTopColor: "var(--color-primary, #F97316)",
-        borderRadius: "50%",
-        animation: "spin 0.8s linear infinite",
-      }} />
+    <div
+      style={{
+        minHeight: "100vh",
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+        justifyContent: "center",
+        background: "var(--noir, #0C0E12)",
+        backgroundImage: "radial-gradient(rgba(255, 255, 255, 0.08) 1px, transparent 1px)",
+        backgroundSize: "22px 22px",
+        fontFamily: "var(--font-ui, 'Instrument Sans', sans-serif)",
+        gap: 20,
+      }}
+    >
+      <BtBrickLoader size={48} />
 
-      <div style={{ fontSize: 32, fontWeight: 800, letterSpacing: "-1px" }}>
-        <span style={{ color: "#fff" }}>Build</span>
-        <span style={{ color: "var(--color-primary-light, #FB923C)" }}>Track</span>
+      <div
+        style={{
+          fontFamily: "var(--font-serif, 'Bricolage Grotesque', sans-serif)",
+          fontSize: 28,
+          fontWeight: 800,
+          letterSpacing: "-0.02em",
+          color: "var(--bone, #F2F0EB)",
+          marginTop: 8,
+        }}
+      >
+        Build<span style={{ color: "var(--accent, #E0A93B)" }}>Track</span>
       </div>
 
-      <p style={{ color: "rgba(255,255,255,0.6)", fontSize: 15, margin: 0 }}>
+      <p style={{ color: "rgba(255, 255, 255, 0.65)", fontSize: 14, margin: 0 }}>
         {status}
       </p>
-
-      <style>{`
-        @keyframes spin { to { transform: rotate(360deg); } }
-      `}</style>
     </div>
   );
 }

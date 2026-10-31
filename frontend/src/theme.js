@@ -1,53 +1,60 @@
+import { colors, applyAccent, ACCENT_PRESETS } from './styles/designTokens';
+
 export const COLORS = {
-  primary:        "var(--color-primary, #F97316)",
-  primaryDark:    "var(--color-primary-hover, #EA580C)",
-  primaryPurple:  "var(--color-primary-light, #FB923C)",
-  primaryLight:   "#FFF5F0",
+  primary: '#111317', // Brand ink
+  primaryDark: '#0C0E12',
+  primaryPurple: 'var(--accent, #E0A93B)',
+  primaryLight: 'var(--accent-soft, rgba(224, 169, 59, 0.16))',
 
-  background:     "#FFF1E8",
-  backgroundMid:  "#FFF7F0",
-  backgroundEnd:  "#FFFFFF",
+  background: '#F2F0EB',
+  backgroundMid: '#F8F7F4',
+  backgroundEnd: '#FFFFFF',
 
-  surface:        "rgba(255, 255, 255, 0.6)",
-  cardBg:         "rgba(255, 255, 255, 0.6)",
-  cardBorder:     "rgba(255, 255, 255, 0.4)",
+  surface: '#FFFFFF',
+  cardBg: '#FFFFFF',
+  cardBorder: '#E6E3DC',
 
-  textPrimary:    "#1A1A2E",
-  textMedium:     "#4B5563",
-  textSecondary:  "#6B7280",
-  textBlue:       "var(--color-primary, #F97316)",
-  textAmount:     "#1A1A2E",
+  textPrimary: '#111317',
+  textMedium: '#525864',
+  textSecondary: '#6F7582',
+  textBlue: 'var(--accent-ink, #7A5308)',
+  textAmount: '#111317',
 
-  divider:        "#E5E7EB",
-  inputBorder:    "#E5E7EB",
+  divider: '#E6E3DC',
+  inputBorder: '#D8D4CB',
 
-  iconBg:         "#FFF1E8",
-  sidebarActive:  "#FFF5F0",
-  sidebarBg:      "rgba(255, 255, 255, 0.6)",
+  iconBg: '#EFEDE8',
+  sidebarActive: '#EFEDE8',
+  sidebarBg: '#FFFFFF',
 
-  success:        "#10B981",
-  warning:        "#F59E0B",
-  error:          "#EF4444",
-  info:           "var(--color-primary, #F97316)",
+  success: '#067A52',
+  warning: '#935600',
+  error: '#BE2A30',
+  info: 'var(--accent, #E0A93B)',
 
-  badgeSuccessBg: "#E6F9F0",
-  badgeSuccessText: "#15803D",
-  badgeWarningBg: "#FFF4E0",
-  badgeWarningText: "#B45309",
-  badgePendingBg: "#FFF0D6",
-  badgePendingText: "#92400E",
-  badgeInfoBg:    "#FFF5F0",
-  badgeInfoText:  "var(--color-primary-hover, #EA580C)",
+  badgeSuccessBg: '#DDF3EA',
+  badgeSuccessText: '#067A52',
+  badgeWarningBg: '#FCEFD9',
+  badgeWarningText: '#935600',
+  badgePendingBg: '#FCEFD9',
+  badgePendingText: '#935600',
+  badgeInfoBg: 'var(--accent-soft, rgba(224, 169, 59, 0.16))',
+  badgeInfoText: 'var(--accent-ink, #7A5308)',
 
-  authStart:      "var(--color-primary-hover, #EA580C)",
-  authMid:        "var(--color-primary, #F97316)",
-  authEnd:        "var(--color-primary-light, #FB923C)",
+  authStart: '#0C0E12',
+  authMid: '#14171D',
+  authEnd: '#1F242D',
+
+  accent: 'var(--accent, #E0A93B)',
+  accentInk: 'var(--accent-ink, #7A5308)',
 };
 
 export const GRADIENTS = {
-  primaryButton:  `linear-gradient(135deg, ${COLORS.primary} 0%, ${COLORS.primaryPurple} 100%)`,
-  background:     `radial-gradient(circle at top right, #FFF1E8, #ffffff)`,
-  authBg:         `linear-gradient(135deg, ${COLORS.authStart} 0%, ${COLORS.authEnd} 100%)`,
+  primaryButton: '#111317',
+  background: '#F2F0EB',
+  authBg: '#0C0E12',
 };
+
+export { applyAccent, ACCENT_PRESETS };
 
 export default COLORS;

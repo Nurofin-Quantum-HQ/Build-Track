@@ -4,14 +4,17 @@ import { useAuth } from "../contexts/AuthContext";
 import { Lock, Search, ClipboardList, AlertTriangle } from "lucide-react";
 import ModuleTour from "../components/ModuleTour";
 import { colors, gradients, radius, typography } from "../styles/designTokens";
+import BtHero from "../components/ui/BtHero";
+import BtSheet from "../components/ui/BtSheet";
+import BtBrickLoader from "../components/ui/BtBrickLoader";
 
 const ITEMS_PER_PAGE = 15;
 
 const ACTION_META = {
   create:   { icon: "+", bg: "#dcfce7", color: "#16a34a", border: "#bbf7d0", label: "Created" },
-  update:   { icon: "~", bg: colors.primaryLight || "#FFF5F0", color: colors.primary, border: "#FDE8D8", label: "Updated" },
-  delete:   { icon: "x", bg: "#fee2e2", color: "#dc2626", border: "#fca5a5", label: "Deleted" },
-  approve:  { icon: "✓", bg: "#ccfbf1", color: "#0d9488", border: "#99f6e4", label: "Approved" },
+  update:   { icon: "~", bg: "rgba(224, 169, 59, 0.12)", color: "#B88728", border: "rgba(224, 169, 59, 0.3)", label: "Updated" },
+  delete:   { icon: "#dc2626", bg: "#fee2e2", color: "#dc2626", border: "#fca5a5", label: "Deleted" },
+  approve:  { icon: "✓", bg: "rgba(42, 120, 214, 0.12)", color: "#2A78D6", border: "rgba(42, 120, 214, 0.3)", label: "Approved" },
 };
 
 function relativeTime(dateStr) {
@@ -319,47 +322,47 @@ export default function AuditLogsPage() {
   }
 
   return (
-    <div style={{ padding: '28px 32px', maxWidth: 1200, margin: '0 auto', animation: 'fadeUp 300ms ease' }}>
+    <div style={{ minHeight: "100vh", background: "var(--bg, #0B0D10)" }}>
       <ModuleTour steps={tourSteps} run={runTour} setRun={setRunTour} moduleName="AuditLogs" />
-      {/* ── Top Bar ── */}
-      <div className="tour-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 24, flexWrap: 'wrap', gap: 16 }}>
-          <div>
-            <h1 style={{ fontSize: 28, fontWeight: 700, color: '#111827', letterSpacing: '-0.03em', margin: 0, marginBottom: 4 }}>Audit Logs</h1>
-            <p style={{ margin: 0, fontSize: 14, color: '#64748B' }}>Recent system activity across projects, transactions, and users.</p>
-          </div>
-        <button
-          onClick={fetchLogs}
-          style={{
-            padding: "10px 16px",
-            background: "#f5f5f5",
-            color: "#555",
-            border: "1px solid #e5e5e5",
-            borderRadius: 10,
-            fontWeight: 600,
-            fontSize: 13,
-            cursor: "pointer",
-            display: "flex",
-            alignItems: "center",
-            gap: 6,
-            whiteSpace: "nowrap",
-          }}
-        >
-          ↻ Refresh
-        </button>
+      <div className="tour-header">
+        <BtHero
+          eyebrow="SECURITY · AUDIT TRAIL"
+          title="Audit Logs"
+          subtitle="Recent system activity across projects, transactions, and users."
+          actions={
+            <button
+              onClick={fetchLogs}
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 6,
+                padding: "8px 16px",
+                borderRadius: 10,
+                background: "rgba(255, 255, 255, 0.08)",
+                border: "1px solid rgba(255, 255, 255, 0.15)",
+                color: "#F6F4EF",
+                fontSize: 13,
+                fontWeight: 600,
+                cursor: "pointer",
+                backdropFilter: "blur(8px)",
+                fontFamily: "inherit",
+              }}
+            >
+              ↻ Refresh
+            </button>
+          }
+        />
       </div>
 
-      {/* ── Body ── */}
-      <div
-        style={{
-          flex: 1,
-          overflowY: "auto",
-          overflowX: "hidden",
-          padding: 20,
-          display: "flex",
-          flexDirection: "column",
-          gap: 16,
-        }}
-      >
+      <BtSheet overlap={26}>
+        <div
+          style={{
+            padding: "24px 28px",
+            display: "flex",
+            flexDirection: "column",
+            gap: 20,
+          }}
+        >
         {/* Error Banner */}
         {error && (
           <div
@@ -405,55 +408,67 @@ export default function AuditLogsPage() {
         >
           <div
             style={{
-              background: "#dcfce7",
-              borderRadius: 14,
-              padding: "18px 22px",
-              border: "1px solid #bbf7d0",
+              background: "var(--card-bg, #FFFFFF)",
+              borderRadius: 16,
+              padding: "18px 20px",
+              border: "1px solid var(--border, #E2E8F0)",
+              boxShadow: "0 1px 3px rgba(0,0,0,0.03)",
             }}
           >
-            <div style={{ fontSize: 11, fontWeight: 700, color: "#16a34a", letterSpacing: "0.08em", marginBottom: 8 }}>
+            <div style={{ fontSize: 10, fontWeight: 800, color: "#16A34A", letterSpacing: "0.08em", marginBottom: 6, fontFamily: "JetBrains Mono, monospace" }}>
               CREATES
             </div>
-            <div style={{ fontSize: 26, fontWeight: 800, color: "#15803d" }}>{counts.create}</div>
+            <div style={{ fontSize: 28, fontWeight: 800, color: "var(--ink, #111317)", fontFamily: "JetBrains Mono, monospace", fontVariantNumeric: "tabular-nums" }}>
+              {counts.create}
+            </div>
           </div>
           <div
             style={{
-              background: "#FFF5F0",
-              borderRadius: 14,
-              padding: "18px 22px",
-              border: "1px solid #FDE8D8",
+              background: "var(--card-bg, #FFFFFF)",
+              borderRadius: 16,
+              padding: "18px 20px",
+              border: "1px solid var(--border, #E2E8F0)",
+              boxShadow: "0 1px 3px rgba(0,0,0,0.03)",
             }}
           >
-            <div style={{ fontSize: 11, fontWeight: 700, color: colors.primary, letterSpacing: "0.08em", marginBottom: 8 }}>
+            <div style={{ fontSize: 10, fontWeight: 800, color: "#B88728", letterSpacing: "0.08em", marginBottom: 6, fontFamily: "JetBrains Mono, monospace" }}>
               UPDATES
             </div>
-            <div style={{ fontSize: 26, fontWeight: 800, color: colors.primary }}>{counts.update}</div>
+            <div style={{ fontSize: 28, fontWeight: 800, color: "var(--ink, #111317)", fontFamily: "JetBrains Mono, monospace", fontVariantNumeric: "tabular-nums" }}>
+              {counts.update}
+            </div>
           </div>
           <div
             style={{
-              background: "#fee2e2",
-              borderRadius: 14,
-              padding: "18px 22px",
-              border: "1px solid #fca5a5",
+              background: "var(--card-bg, #FFFFFF)",
+              borderRadius: 16,
+              padding: "18px 20px",
+              border: "1px solid var(--border, #E2E8F0)",
+              boxShadow: "0 1px 3px rgba(0,0,0,0.03)",
             }}
           >
-            <div style={{ fontSize: 11, fontWeight: 700, color: "#dc2626", letterSpacing: "0.08em", marginBottom: 8 }}>
+            <div style={{ fontSize: 10, fontWeight: 800, color: "#DC2626", letterSpacing: "0.08em", marginBottom: 6, fontFamily: "JetBrains Mono, monospace" }}>
               DELETES
             </div>
-            <div style={{ fontSize: 26, fontWeight: 800, color: "#b91c1c" }}>{counts.delete}</div>
+            <div style={{ fontSize: 28, fontWeight: 800, color: "var(--ink, #111317)", fontFamily: "JetBrains Mono, monospace", fontVariantNumeric: "tabular-nums" }}>
+              {counts.delete}
+            </div>
           </div>
           <div
             style={{
-              background: "#ccfbf1",
-              borderRadius: 14,
-              padding: "18px 22px",
-              border: "1px solid #99f6e4",
+              background: "var(--card-bg, #FFFFFF)",
+              borderRadius: 16,
+              padding: "18px 20px",
+              border: "1px solid var(--border, #E2E8F0)",
+              boxShadow: "0 1px 3px rgba(0,0,0,0.03)",
             }}
           >
-            <div style={{ fontSize: 11, fontWeight: 700, color: "#0d9488", letterSpacing: "0.08em", marginBottom: 8 }}>
+            <div style={{ fontSize: 10, fontWeight: 800, color: "#2A78D6", letterSpacing: "0.08em", marginBottom: 6, fontFamily: "JetBrains Mono, monospace" }}>
               APPROVALS
             </div>
-            <div style={{ fontSize: 26, fontWeight: 800, color: "#0f766e" }}>{counts.approve}</div>
+            <div style={{ fontSize: 28, fontWeight: 800, color: "var(--ink, #111317)", fontFamily: "JetBrains Mono, monospace", fontVariantNumeric: "tabular-nums" }}>
+              {counts.approve}
+            </div>
           </div>
         </div>
 
@@ -480,9 +495,9 @@ export default function AuditLogsPage() {
                   fontWeight: 600,
                   cursor: "pointer",
                   transition: "all 0.15s",
-                  background: filter === f ? colors.primary : "#fff",
+                  background: filter === f ? "var(--ink, #111317)" : "#fff",
                   color: filter === f ? "#fff" : "#555",
-                  borderColor: filter === f ? colors.primary : "#e5e5e5",
+                  borderColor: filter === f ? "var(--ink, #111317)" : "#e5e5e5",
                 }}
               >
                 {f}
@@ -736,8 +751,8 @@ export default function AuditLogsPage() {
                       fontSize: 13,
                       cursor: typeof p === "number" ? "pointer" : "default",
                       fontWeight: 600,
-                      borderColor: page === p ? colors.primary : "#e5e5e5",
-                      background: page === p ? colors.primary : "#fff",
+                      borderColor: page === p ? "var(--ink, #111317)" : "#e5e5e5",
+                      background: page === p ? "var(--ink, #111317)" : "#fff",
                       color: page === p ? "#fff" : "#555",
                       display: "flex",
                       alignItems: "center",
@@ -771,6 +786,7 @@ export default function AuditLogsPage() {
           )}
         </div>
       </div>
+      </BtSheet>
     </div>
   );
 }

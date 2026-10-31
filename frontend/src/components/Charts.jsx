@@ -8,12 +8,12 @@ const fmtINR = (n) => {
 };
 
 const COLORS = {
-  material: "var(--color-primary, #F97316)",
-  labour: "var(--color-primary-hover, #EA580C)",
-  equipment: "#0891b2",
-  misc: "#6b7280",
-  budget: "#dc2626",
-  actual: "var(--color-primary-light, #FB923C)",
+  material: "#2A78D6",
+  labour: "#EB6834",
+  equipment: "#199E70",
+  misc: "#64748B",
+  budget: "#64748B",
+  actual: "#E0A93B",
 };
 
 export function SpendVsBudgetChart({ data }) {

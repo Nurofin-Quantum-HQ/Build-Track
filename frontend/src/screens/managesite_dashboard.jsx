@@ -1,79 +1,173 @@
-import React, { useState, useEffect, useCallback } from "react";
-import { useNavigate, useLocation } from "react-router-dom";
-import { useAuth } from "../contexts/AuthContext";
-import { projectAPI, transactionAPI } from "../api";
-import perfLogger from "../utils/performanceLogger";
-import { resolveImageUrl } from "../utils/imageUrl";
-import { calcProgress, getPhaseProgress, toggleActivity, isActivityCompleted } from "../utils/constructionPhases";
-import { Toast, ConfirmDialog } from "../components/Toast";
-import { Card, Badge, Button } from "../components/ui";
-import CsvImportExportCard from "../components/CsvImportExportCard";
-import useTransactionStore from "../stores/transactionStore";
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
+import { useAuth } from '../contexts/AuthContext';
+import { projectAPI, transactionAPI } from '../api';
+import perfLogger from '../utils/performanceLogger';
+import { resolveImageUrl } from '../utils/imageUrl';
 import {
-  ChevronDown, ChevronRight, Plus, FileDown, FileUp, Pencil, X, Check, ArrowRight, ArrowLeft,
-  Building2, MapPin, Calendar, User, Hash, Phone, Code, Wrench,
-  Home, Layers, Bed, Bath, Settings, Zap, Flame, ChefHat, Sun,
-  Clock, IndianRupee, CreditCard, PiggyBank, Target, ClipboardCheck,
-  List, Camera, FileText, Send, Trash2, Info, AlertCircle, Sparkles, TrendingUp,
-} from "lucide-react";
-
-const SECTIONS = {
-  projectInfo: "Project Information",
-  buildingType: "Building Type",
-  landFloors: "Land & Floor Configuration",
-  roomsBaths: "Rooms & Bathrooms",
-  addlConfig: "Additional Configuration",
-  utility: "Utility & Services",
-  gas: "Gas Connection",
-  kitchen: "Kitchen Requirements",
-  electrical: "Electrical & Plumbing",
-  terrace: "Terrace & Interior",
-  timeline: "Timeline & Status",
-  financial: "Financial Overview",
-  tracker: "Execution Tracker",
-  entries: "Recent Activity",
-  actions: "Actions",
-};
+  calcProgress,
+  getPhaseProgress,
+  toggleActivity,
+  isActivityCompleted,
+} from '../utils/constructionPhases';
+import {
+  BtHero,
+  BtGlassTile,
+  BtSheet,
+  BtButton,
+  BtCard,
+  BtGroup,
+  BtRow,
+  BtBadge,
+  BtChip,
+  BtBricks,
+  BtProgress,
+  BtCountUp,
+  formatInr,
+  BtEmpty,
+  BtTypeTile,
+  BtSectionHeader,
+  BtPageLoader,
+  btToast,
+} from '../components/ui';
+import CsvImportExportCard from '../components/CsvImportExportCard';
+import useTransactionStore from '../stores/transactionStore';
+import { Toast, ConfirmDialog } from '../components/Toast';
+import {
+  ChevronDown,
+  ChevronRight,
+  Plus,
+  FileDown,
+  FileUp,
+  Pencil,
+  X,
+  Check,
+  ArrowRight,
+  ArrowLeft,
+  Building2,
+  MapPin,
+  Calendar,
+  User,
+  Hash,
+  Phone,
+  Code,
+  Wrench,
+  Layers,
+  Bed,
+  Settings,
+  Zap,
+  Flame,
+  ChefHat,
+  Sun,
+  Clock,
+  IndianRupee,
+  CreditCard,
+  PiggyBank,
+  Target,
+  ClipboardCheck,
+  Camera,
+  FileText,
+  Mic,
+  TrendingUp,
+  Sparkles,
+  HardHat,
+  Info,
+} from 'lucide-react';
 
 const _kAddlConfig = [
-  "Balcony", "Car Parking", "Lift", "Terrace Access", "Interior Work",
-  "Compound Wall", "Parapet Wall", "Waterproofing", "Putty", "False Ceiling",
-  "Modular Kitchen", "Wardrobes", "Sump", "Septic Tank", "Rainwater",
-  "Borewell", "Solar", "Generator", "CCTV", "Intercom",
-  "Landscaping", "Paving", "Water Tanks", "Stairs", "Security Room",
-  "Cladding", "Elevation", "Gates", "Grills", "Aluminium", "Glass",
+  'Balcony', 'Car Parking', 'Lift', 'Terrace Access', 'Interior Work',
+  'Compound Wall', 'Parapet Wall', 'Waterproofing', 'Putty', 'False Ceiling',
+  'Modular Kitchen', 'Wardrobes', 'Sump', 'Septic Tank', 'Rainwater',
+  'Borewell', 'Solar', 'Generator', 'CCTV', 'Intercom',
+  'Landscaping', 'Paving', 'Water Tanks', 'Stairs', 'Security Room',
+  'Cladding', 'Elevation', 'Gates', 'Grills', 'Aluminium', 'Glass',
 ];
-const _kUtility = ["Main Electricity", "Temporary Connection", "Generator Backup", "Water Connection", "Borewell Motor", "Sump Motor"];
-const _kGas = ["Piped Gas", "Cylinder Bank", "Gas Pipeline Routing"];
-const _kKitchen = ["Granite Counter", "Quartz Counter", "Stainless Steel Sink", "Chimney Provision", "Exhaust Fan Provision"];
-const _kElectrical = ["Concealed Wiring", "Open Wiring", "3-Phase Connection", "AC Points", "Geyser Points"];
-const _kTerrace = ["Weathering Course", "Cool Roof Paint", "Overhead Tank", "Solar Panels"];
+const _kUtility = ['Main Electricity', 'Temporary Connection', 'Generator Backup', 'Water Connection', 'Borewell Motor', 'Sump Motor'];
+const _kGas = ['Piped Gas', 'Cylinder Bank', 'Gas Pipeline Routing'];
+const _kKitchen = ['Granite Counter', 'Quartz Counter', 'Stainless Steel Sink', 'Chimney Provision', 'Exhaust Fan Provision'];
+const _kElectrical = ['Concealed Wiring', 'Open Wiring', '3-Phase Connection', 'AC Points', 'Geyser Points'];
+const _kTerrace = ['Weathering Course', 'Cool Roof Paint', 'Overhead Tank', 'Solar Panels'];
 
-const _getStr = (item) => typeof item === "object" ? (item?.name || item?.label || item?.title || item?.value || "") : String(item || "");
-const _grp = (all, opts) => all.filter(f => opts.includes(_getStr(f)));
-const _months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-const _fmtDate = (d) => d ? `${d.getDate()} ${_months[d.getMonth()]} ${d.getFullYear()}` : "\u2014";
-const fmtINR = (n) => n ? `\u20B9${Number(n).toLocaleString("en-IN")}` : "\u2014";
+const _getStr = (item) => (typeof item === 'object' ? item?.name || item?.label || item?.title || item?.value || '' : String(item || ''));
+const _grp = (all, opts) => all.filter((f) => opts.includes(_getStr(f)));
+const _months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+const _fmtDate = (d) => (d ? `${d.getDate()} ${_months[d.getMonth()]} ${d.getFullYear()}` : '—');
+const fmtINR = (n) => (n !== undefined && n !== null ? `₹${Number(n).toLocaleString('en-IN')}` : '—');
 
-function CollapsibleCard({ title, icon, defaultOpen = true, count, subtitle, headerAction, children }) {
+function CollapsibleCard({ title, icon, defaultOpen = true, count, subtitle, children }) {
   const [open, setOpen] = useState(defaultOpen);
   return (
-    <div style={{ background: "#fff", borderRadius: 12, border: "1px solid #E5E7EB", overflow: "hidden" }}>
-      <div onClick={() => setOpen(!open)} style={{ padding: "14px 18px", display: "flex", alignItems: "center", gap: 10, cursor: "pointer", userSelect: "none" }}>
-        {icon && <span style={{ fontSize: 16, flexShrink: 0, color: 'var(--color-primary, #F97316)', display: 'flex' }}>{icon}</span>}
+    <BtCard padding="0" style={{ overflow: 'hidden' }}>
+      <div
+        onClick={() => setOpen(!open)}
+        style={{
+          padding: '16px 20px',
+          display: 'flex',
+          alignItems: 'center',
+          gap: 12,
+          cursor: 'pointer',
+          userSelect: 'none',
+          background: 'var(--card)',
+        }}
+      >
+        {icon && (
+          <span
+            style={{
+              fontSize: 16,
+              flexShrink: 0,
+              color: 'var(--accent)',
+              display: 'flex',
+            }}
+          >
+            {icon}
+          </span>
+        )}
         <div style={{ flex: 1, minWidth: 0 }}>
-          <span style={{ fontSize: 14, fontWeight: 600, color: "#111827" }}>{title}</span>
+          <span
+            style={{
+              fontFamily: 'var(--font-display)',
+              fontSize: '15px',
+              fontWeight: 700,
+              color: 'var(--ink)',
+            }}
+          >
+            {title}
+          </span>
           {(count !== undefined || subtitle) && (
-            <span style={{ fontSize: 12, color: "#64748B", marginLeft: 8 }}>
+            <span
+              style={{
+                fontFamily: 'var(--font-ui)',
+                fontSize: '12px',
+                color: 'var(--ink-3)',
+                marginLeft: 8,
+              }}
+            >
               {count !== undefined ? `(${count})` : subtitle}
             </span>
           )}
         </div>
-        {headerAction && <div onClick={e => e.stopPropagation()}>{headerAction}</div>}
-        <ChevronDown size={16} color="#94A3B8" style={{ transform: open ? "rotate(180deg)" : "none", transition: "transform 0.2s", flexShrink: 0 }} />
+        <ChevronDown
+          size={16}
+          color="var(--ink-3)"
+          style={{
+            transform: open ? 'rotate(180deg)' : 'none',
+            transition: 'transform 0.2s',
+            flexShrink: 0,
+          }}
+        />
       </div>
-      {open && <div style={{ padding: "0 18px 14px" }}>{children}</div>}
-    </div>
+      {open && (
+        <div
+          style={{
+            padding: '0 20px 18px',
+            borderTop: '1px solid var(--line)',
+            background: 'var(--card)',
+          }}
+        >
+          {children}
+        </div>
+      )}
+    </BtCard>
   );
 }
 
@@ -84,32 +178,26 @@ export default function ManageSitePage() {
   const projectId = project?._id || project?.id;
   const { isAdmin, user } = useAuth();
 
-  const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
-  const [toast, setToast] = useState({ msg: "", type: "info" });
+  const [activeTab, setActiveTab] = useState('tracker'); // tracker | overview | money | details | entries
+  const [toast, setToast] = useState({ msg: '', type: 'info' });
   const [confirmDlg, setConfirmDlg] = useState(null);
   const [stats, setStats] = useState(null);
   const [loadingStats, setLoadingStats] = useState(true);
   const [transactions, setTransactions] = useState([]);
   const [loadingT, setLoadingT] = useState(true);
-  const [expandedPhase, setExpandedPhase] = useState(null);
-  const [expandedActivityBudgets, setExpandedActivityBudgets] = useState({});
   const [viewingActivity, setViewingActivity] = useState(null);
   const [localProject, setLocalProject] = useState(project);
-  // Insights is a financial view. Mirror the backend's requirePermission exactly
-  // (Admin, or an explicit view_reports grant) so the button never leads to a 403.
-  const canViewInsights = isAdmin || (user?.permissions || []).includes("view_reports");
-  const openInsights = () => navigate(`/project-insights/${projectId}`, { state: { project: localProject || project } });
-  const clearToast = useCallback(() => setToast({ msg: "", type: "info" }), []);
+  const [budgetDialogActivity, setBudgetDialogActivity] = useState(null);
+  const [budgetForm, setBudgetForm] = useState({ material: 0, labour: 0, equipment: 0 });
+
+  const canViewInsights = isAdmin || (user?.permissions || []).includes('view_reports');
+  const openInsights = () =>
+    navigate(`/project-insights/${projectId}`, { state: { project: localProject || project } });
+  const clearToast = useCallback(() => setToast({ msg: '', type: 'info' }), []);
 
   useEffect(() => {
     perfLogger.endRoute('/managesite');
     perfLogger.logMount('ManageSitePage');
-  }, []);
-
-  useEffect(() => {
-    const onResize = () => setIsMobile(window.innerWidth < 768);
-    window.addEventListener("resize", onResize);
-    return () => window.removeEventListener("resize", onResize);
   }, []);
 
   useEffect(() => {
@@ -126,7 +214,6 @@ export default function ManageSitePage() {
   useEffect(() => {
     if (!projectId) return;
 
-    // Instantly populate from store cache if available
     const cachedStoreTxs = useTransactionStore.getState().transactions;
     if (cachedStoreTxs && cachedStoreTxs.length > 0) {
       const match = cachedStoreTxs.filter(
@@ -142,11 +229,10 @@ export default function ManageSitePage() {
       setLoadingT(true);
     }
 
-    // Fetch fresh transactions with limit=100 for fast response
-    transactionAPI.getAll({ project: projectId, limit: 100 })
+    transactionAPI
+      .getAll({ project: projectId, limit: 100 })
       .then(({ data }) => {
-        const fresh = data.transactions || [];
-        setTransactions(fresh);
+        setTransactions(data.transactions || []);
       })
       .catch(() => {})
       .finally(() => setLoadingT(false));
@@ -154,13 +240,35 @@ export default function ManageSitePage() {
 
   if (!project) {
     return (
-      <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", height: "100vh", gap: 16, padding: 24 }}>
-        <Building2 size={48} color="#CBD5E1" />
-        <h2 style={{ margin: 0, fontSize: 20, fontWeight: 700, color: "#111827" }}>No project selected</h2>
-        <p style={{ color: "#64748B", fontSize: 14, margin: 0 }}>Please select a project from the projects list.</p>
-        <Button variant="primary" size="md" onClick={() => navigate("/projects")}>
+      <div
+        style={{
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          justifyContent: 'center',
+          height: '100vh',
+          gap: 16,
+          padding: 24,
+        }}
+      >
+        <Building2 size={48} color="var(--ink-3)" />
+        <h2
+          style={{
+            margin: 0,
+            fontFamily: 'var(--font-display)',
+            fontSize: '22px',
+            fontWeight: 700,
+            color: 'var(--ink)',
+          }}
+        >
+          No project selected
+        </h2>
+        <p style={{ color: 'var(--ink-2)', fontSize: 14, margin: 0 }}>
+          Please select a project from the projects list.
+        </p>
+        <BtButton variant="primary" onPress={() => navigate('/projects')}>
           Go to Projects
-        </Button>
+        </BtButton>
       </div>
     );
   }
@@ -169,20 +277,27 @@ export default function ManageSitePage() {
   const phases = p.selectedPhases || [];
   const hasNewTracker = phases.length > 0;
   const trackerTotal = phases.reduce((s, ph) => s + (ph.activities?.length || 0), 0);
-  const trackerDone = phases.reduce((s, ph) => s + (ph.activities?.filter(a => isActivityCompleted(a, ph, p)).length || 0), 0);
+  const trackerDone = phases.reduce(
+    (s, ph) => s + (ph.activities?.filter((a) => isActivityCompleted(a, ph, p)).length || 0),
+    0
+  );
 
-  const projectName = p.projectName || "Untitled Project";
-  const projectLoc = p.location || "\u2014";
+  const projectName = p.projectName || p.name || 'Untitled Project';
+  const projectLoc = p.location || '—';
   const progFallback = p.progress || 0;
-  const progress = hasNewTracker ? calcProgress(phases, p) : (progFallback > 1 ? progFallback : progFallback * 100);
-  const status = p.status || "Active";
+  const progress = hasNewTracker
+    ? calcProgress(phases, p)
+    : progFallback > 1
+    ? progFallback
+    : progFallback * 100;
+  const status = p.status || 'Active';
   const hasPhoto = Boolean(p.photo && String(p.photo).trim());
-  const imgSrc = hasPhoto ? resolveImageUrl(p.photo) : "";
+  const imgSrc = hasPhoto ? resolveImageUrl(p.photo) : '';
 
   const totalIncome = Number(p.totalIncome || 0);
   const totalBudget = Number(p.budget?.total || p.totalBudget || stats?.totalBudget || 0);
   const spent = Number(p.spentAmount || stats?.totalSpent || 0);
-  const remaining = totalBudget - spent;
+  const remaining = Math.max(totalBudget - spent, 0);
   const util = totalBudget > 0 ? Math.min(spent / totalBudget, 1) : 0;
 
   const bMat = Number(p.budget?.material ?? p.budgetMaterial ?? 0);
@@ -199,975 +314,1616 @@ export default function ManageSitePage() {
   const electrical = _grp(selectedFeatures, _kElectrical);
   const terrace = _grp(selectedFeatures, _kTerrace);
   const allKnown = [..._kAddlConfig, ..._kUtility, ..._kGas, ..._kKitchen, ..._kElectrical, ..._kTerrace];
-  const unknown = selectedFeatures.filter(f => !allKnown.includes(f));
+  const unknown = selectedFeatures.filter((f) => !allKnown.includes(f));
   const addlAll = [...addl, ...unknown];
 
   const handleToggleActivity = async (phaseId, activityId) => {
     const updatedPhases = toggleActivity(phases, phaseId, activityId, p);
     const newProgress = calcProgress(updatedPhases, p);
-    const completedKeys = updatedPhases.flatMap(ph => ph.activities?.filter(a => isActivityCompleted(a, ph, p)).map(a => a.id) || []);
-    setLocalProject(prev => ({ ...prev, selectedPhases: updatedPhases, completedActivityKeys: completedKeys, progress: newProgress }));
+    const completedKeys = updatedPhases.flatMap(
+      (ph) => ph.activities?.filter((a) => isActivityCompleted(a, ph, p)).map((a) => a.id) || []
+    );
+    setLocalProject((prev) => ({
+      ...prev,
+      selectedPhases: updatedPhases,
+      completedActivityKeys: completedKeys,
+      progress: newProgress,
+    }));
     try {
-      await projectAPI.update(projectId, { selectedPhases: updatedPhases, completedActivityKeys: completedKeys, progress: newProgress });
+      await projectAPI.update(projectId, {
+        selectedPhases: updatedPhases,
+        completedActivityKeys: completedKeys,
+        progress: newProgress,
+      });
+      btToast.success('Activity status updated');
     } catch {
-      setLocalProject(prev => ({ ...prev, selectedPhases: phases, progress: calcProgress(phases, p) }));
-      setToast({ msg: "Failed to update activity.", type: "error" });
+      setLocalProject((prev) => ({
+        ...prev,
+        selectedPhases: phases,
+        progress: calcProgress(phases, p),
+      }));
+      btToast.error('Failed to update activity');
     }
   };
 
   const handleExportCSV = async () => {
     try {
       const { data } = await projectAPI.getStats(projectId);
-      const rows = [["Category", "Amount", "Date", "Type"]];
-      (data.transactions || []).forEach(t => {
-        rows.push([t.category || "", t.amount || 0, t.date || "", t.type || ""]);
+      const rows = [['Category', 'Amount', 'Date', 'Type']];
+      (data.transactions || []).forEach((t) => {
+        rows.push([t.category || '', t.amount || 0, t.date || '', t.type || '']);
       });
-      let csvContent = rows.map(r => r.join(",")).join("\n");
-      csvContent = "\uFEFF" + csvContent;
-      const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+      let csvContent = rows.map((r) => r.join(',')).join('\n');
+      csvContent = '\uFEFF' + csvContent;
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
       const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
+      const a = document.createElement('a');
       a.href = url;
       a.download = `${projectName}_export.csv`;
       a.click();
       URL.revokeObjectURL(url);
-      setToast({ msg: "CSV exported successfully.", type: "success" });
+      btToast.success('CSV exported successfully');
     } catch {
-      setToast({ msg: "Failed to export CSV.", type: "error" });
+      btToast.error('Failed to export CSV');
     }
   };
 
   const handleImportCSV = () => {
-    const input = document.createElement("input");
-    input.type = "file";
-    input.accept = ".csv";
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = '.csv';
     input.onchange = async (e) => {
       const file = e.target.files[0];
       if (!file) return;
       try {
         const text = await file.text();
-        const lines = text.split("\n").filter(l => l.trim());
-        const parsed = lines.slice(1).map(line => {
-          const cols = line.split(",");
-          return { category: cols[0]?.trim(), amount: parseFloat(cols[1]) || 0, date: cols[2]?.trim(), type: cols[3]?.trim() };
+        const lines = text.split('\n').filter((l) => l.trim());
+        const parsed = lines.slice(1).map((line) => {
+          const cols = line.split(',');
+          return {
+            category: cols[0]?.trim(),
+            amount: parseFloat(cols[1]) || 0,
+            date: cols[2]?.trim(),
+            type: cols[3]?.trim(),
+          };
         });
         await projectAPI.update(projectId, { importedTransactions: parsed });
-        setToast({ msg: `Imported ${parsed.length} entries.`, type: "success" });
+        btToast.success(`Imported ${parsed.length} entries`);
       } catch {
-        setToast({ msg: "Failed to import CSV.", type: "error" });
+        btToast.error('Failed to import CSV');
       }
     };
     input.click();
   };
 
-  const labelStyle = { fontSize: 10, fontWeight: 600, color: "#94A3B8", letterSpacing: "0.05em", marginBottom: 2, textTransform: "uppercase" };
-  const valueStyle = { fontSize: 14, fontWeight: 600, color: "#111827" };
-
-  const renderProjectInfo = () => {
-    const infoRows = [];
-    if (p.projectCode) infoRows.push({ icon: <Code size={14} />, label: "Project Code", val: p.projectCode });
-    if (p.clientName || p.client) infoRows.push({ icon: <User size={14} />, label: "Client", val: p.clientName || p.client });
-    if (p.contractorName || p.contractor) infoRows.push({ icon: <Wrench size={14} />, label: "Contractor", val: p.contractorName || p.contractor });
-    if (p.siteEngineer || p.engineer) infoRows.push({ icon: <HardHatIcon />, label: "Engineer", val: p.siteEngineer || p.engineer });
-    if (p.contactNumber || p.contact) infoRows.push({ icon: <Phone size={14} />, label: "Contact", val: p.contactNumber || p.contact });
-    if (p.mapAddress) infoRows.push({ icon: <MapPin size={14} />, label: "Map Address", val: p.mapAddress });
-    infoRows.push({ icon: <Info size={14} />, label: "Status", val: status });
-    infoRows.push({ icon: <MapPin size={14} />, label: "Location", val: projectLoc });
-    if (infoRows.length === 0) return null;
-    return (
-      <CollapsibleCard title={SECTIONS.projectInfo} icon={<ClipboardCheck size={16} />} defaultOpen>
-        {infoRows.map((r, i) => (
-          <div key={i} style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 0", borderBottom: i < infoRows.length - 1 ? "1px solid #F1F5F9" : "none" }}>
-            <div style={{ width: 32, height: 32, borderRadius: 8, background: "#F1F5F9", display: "flex", alignItems: "center", justifyContent: "center", color: "#64748B", flexShrink: 0 }}>{r.icon}</div>
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={labelStyle}>{r.label}</div>
-              <div style={{ ...valueStyle, fontSize: 13, overflow: "hidden", textOverflow: "ellipsis" }}>{r.val}</div>
-            </div>
-          </div>
-        ))}
-      </CollapsibleCard>
-    );
-  };
-
-  const renderBuildingType = (defaultOpen = false) => {
-    const raw = p.projectType || "";
-    if (!raw) return null;
-    const parts = raw.split(" \u2192 ");
-    const mainType = parts[0]?.trim() || raw;
-    const subType = parts.length > 1 ? parts[1]?.trim() : null;
-    return (
-      <CollapsibleCard title={SECTIONS.buildingType} icon={<Building2 size={16} />} defaultOpen={defaultOpen}>
-        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-          <div style={{ width: 40, height: 40, borderRadius: 10, background: "#F1F5F9", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--color-primary, #F97316)", flexShrink: 0 }}>
-            <Building2 size={18} />
-          </div>
-          <div style={{ flex: 1 }}>
-            <div style={labelStyle}>MAIN TYPE</div>
-            <div style={{ ...valueStyle, fontWeight: 700 }}>{mainType}</div>
-          </div>
-          {subType && (
-            <Badge variant="info" size="sm">{subType}</Badge>
-          )}
-        </div>
-      </CollapsibleCard>
-    );
-  };
-
-  const renderLandFloors = (defaultOpen = false) => {
-    const hasLand = p.landArea && String(p.landArea).trim();
-    const floors = p.floors || [];
-    if (!hasLand && floors.length === 0) return null;
-    return (
-      <CollapsibleCard title={SECTIONS.landFloors} icon={<Layers size={16} />} defaultOpen={defaultOpen}>
-        {hasLand && (
-          <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: floors.length > 0 ? 14 : 0 }}>
-            <div style={{ width: 32, height: 32, borderRadius: 8, background: "#F1F5F9", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--color-primary, #F97316)", flexShrink: 0 }}>
-              <MapPin size={14} />
-            </div>
-            <div style={{ flex: 1 }}>
-              <div style={labelStyle}>TOTAL LAND AREA</div>
-              <div style={{ ...valueStyle, fontWeight: 700 }}>{p.landArea} {p.landUnit || ""}</div>
-            </div>
-          </div>
-        )}
-        {floors.length > 0 && (
-          <>
-            <div style={labelStyle}>FLOORS INCLUDED</div>
-            <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 6 }}>
-              {floors.map((f, i) => (
-                <Badge key={i} variant="info" size="sm">{f}</Badge>
-              ))}
-            </div>
-          </>
-        )}
-      </CollapsibleCard>
-    );
-  };
-
-  const renderRoomsBaths = (defaultOpen = false) => {
-    const rooms = { "1 BHK": p.room1BHK, "2 BHK": p.room2BHK, "3 BHK": p.room3BHK, Custom: p.roomCustom };
-    const baths = { Western: p.bathWestern, Indian: p.bathIndian, Common: p.bathCommon, Attached: p.bathAttached };
-    const hasRoom = Object.values(rooms).some(v => (v || 0) > 0);
-    const hasBath = Object.values(baths).some(v => (v || 0) > 0);
-    if (!hasRoom && !hasBath) return null;
-    return (
-      <CollapsibleCard title={SECTIONS.roomsBaths} icon={<Bed size={16} />} defaultOpen={defaultOpen}>
-        {hasRoom && (
-          <>
-            <div style={labelStyle}>ROOMS</div>
-            <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 6, marginBottom: hasBath ? 14 : 0 }}>
-              {Object.entries(rooms).filter(([, v]) => (v || 0) > 0).map(([k, v]) => (
-                <div key={k} style={{ padding: "6px 12px", borderRadius: 8, background: "#FFF5F0", border: "1px solid #FDE8D8", fontSize: 13, fontWeight: 600, color: "var(--color-primary, #F97316)", display: "inline-flex", alignItems: "center", gap: 4 }}>
-                  {k} <span style={{ fontSize: 15 }}>{v || 0}</span>
-                </div>
-              ))}
-            </div>
-          </>
-        )}
-        {hasBath && (
-          <>
-            <div style={labelStyle}>BATHROOMS</div>
-            <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 6 }}>
-              {Object.entries(baths).filter(([, v]) => (v || 0) > 0).map(([k, v]) => (
-                <div key={k} style={{ padding: "6px 12px", borderRadius: 8, background: "#F0FDF4", border: "1px solid #BBF7D0", fontSize: 13, fontWeight: 600, color: "#16A34A", display: "inline-flex", alignItems: "center", gap: 4 }}>
-                  {k} <span style={{ fontSize: 15 }}>{v || 0}</span>
-                </div>
-              ))}
-            </div>
-          </>
-        )}
-      </CollapsibleCard>
-    );
-  };
-
-  const renderFeatureGroup = (title, icon, items, defaultOpen = false) => {
-    if (!items || items.length === 0) return null;
-    const validItems = items.map(_getStr).filter(s => Boolean(s && s.trim()));
-    if (validItems.length === 0) return null;
-    return (
-      <CollapsibleCard title={title} icon={icon} defaultOpen={defaultOpen} count={validItems.length}>
-        <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-          {validItems.map((str, i) => (
-            <span key={i} style={{ padding: "4px 10px", borderRadius: 6, background: "#F8FAFC", border: "1px solid #E5E7EB", fontSize: 11, fontWeight: 500, color: "#475569" }}>
-              {str}
-            </span>
-          ))}
-        </div>
-      </CollapsibleCard>
-    );
-  };
-
-  const renderTimeline = (defaultOpen = false) => {
-    const startDate = p.startDate ? new Date(p.startDate) : null;
-    const expectedEnd = p.expectedEndDate ? new Date(p.expectedEndDate) : (p.endDate ? new Date(p.endDate) : null);
-    const actualEnd = p.actualEndDate ? new Date(p.actualEndDate) : null;
-    const statusColor = status === "Completed" ? "#22C55E" : status === "In Progress" ? "var(--color-primary, #F97316)" : status === "On Hold" ? "#F59E0B" : status === "Cancelled" ? "#EF4444" : "#64748B";
-    return (
-      <CollapsibleCard title={SECTIONS.timeline} icon={<Calendar size={16} />} defaultOpen={defaultOpen}>
-        <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 12 }}>
-          <div style={{ width: 34, height: 34, borderRadius: 9, background: `${statusColor}15`, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-            <Info size={14} color={statusColor} />
-          </div>
-          <span style={{ flex: 1, fontSize: 13, color: "#475569" }}>Project Status</span>
-          <Badge variant={status === "Completed" ? "success" : status === "On Hold" ? "warning" : "info"} size="sm">{status}</Badge>
-        </div>
-        <div style={labelStyle}>PROJECT TIMELINE</div>
-        <div style={{ display: "flex", gap: 10, marginTop: 8, flexWrap: "wrap" }}>
-          <DateBox label="Start Date" val={startDate ? _fmtDate(startDate) : "\u2014"} icon={<PlayIcon />} color="var(--color-primary, #F97316)" />
-          {expectedEnd && <DateBox label="Expected End" val={_fmtDate(expectedEnd)} icon={<Calendar size={12} />} color="#F59E0B" />}
-          {actualEnd && <DateBox label="Actual End Date" val={_fmtDate(actualEnd)} icon={<Check size={12} />} color="#22C55E" />}
-        </div>
-      </CollapsibleCard>
-    );
-  };
-
-  const renderFinancial = () => (
-    <CollapsibleCard title={SECTIONS.financial} icon={<IndianRupee size={16} />} defaultOpen>
-      <div style={{ background: "#F8FAFC", borderRadius: 8, border: "1px solid #E5E7EB", padding: "12px 14px", marginBottom: 12 }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          <div style={{ width: 36, height: 36, borderRadius: 8, background: "#FFF5F0", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-            <CreditCard size={16} color="var(--color-primary, #F97316)" />
-          </div>
-          <div style={{ flex: 1 }}>
-            <div style={labelStyle}>TOTAL BUDGET</div>
-            <div style={{ fontSize: 20, fontWeight: 700, color: "var(--color-primary, #F97316)", letterSpacing: "-0.03em" }}>{fmtINR(totalBudget)}</div>
-          </div>
-        </div>
-      </div>
-      <FinRow label="Spent Amount" value={fmtINR(Math.max(spent, 0))} color={spent > totalBudget ? "#EF4444" : "var(--color-primary, #F97316)"} icon={<ArrowUpIcon />} />
-      <FinRow label="Total Income" value={fmtINR(totalIncome)} color="#22C55E" icon={<PiggyBank size={14} />} />
-      <FinRow label="Remaining" value={fmtINR(Math.max(remaining, 0))} color={remaining >= 0 ? "#22C55E" : "#EF4444"} icon={<Target size={14} />} />
-      {hasBrk && (
-        <>
-          <div style={{ height: 1, background: "#F1F5F9", margin: "10px 0" }} />
-          <div style={labelStyle}>BUDGET BREAKDOWN</div>
-          <div style={{ marginTop: 8, display: "flex", flexDirection: "column", gap: 6 }}>
-            {bMat > 0 && <CatRow label="Material" amount={bMat} color="var(--color-primary, #F97316)" />}
-            {bLab > 0 && <CatRow label="Labour" amount={bLab} color="#0EA5E9" />}
-            {bEq > 0 && <CatRow label="Equipment" amount={bEq} color="var(--color-primary-hover, #EA580C)" />}
-            {bMisc > 0 && <CatRow label="Miscellaneous" amount={bMisc} color="#F59E0B" />}
-          </div>
-        </>
-      )}
-      <div style={{ marginTop: 12 }}>
-        <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
-          <span style={{ ...labelStyle, fontSize: 11 }}>Budget Used</span>
-          <span style={{ fontSize: 13, fontWeight: 700, color: util >= 1 ? "#EF4444" : util >= 0.8 ? "#F59E0B" : "var(--color-primary, #F97316)" }}>{Math.round(util * 100)}%</span>
-        </div>
-        <div style={{ height: 6, background: "#F1F5F9", borderRadius: 8, overflow: "hidden" }}>
-          <div style={{ width: `${Math.min(util * 100, 100)}%`, height: "100%", borderRadius: 8, background: util >= 1 ? "#EF4444" : util >= 0.8 ? "#F59E0B" : "var(--color-primary, #F97316)", transition: "width 0.4s ease" }} />
-        </div>
-      </div>
-    </CollapsibleCard>
-  );
-
   const _isC = (act, phase = null) => isActivityCompleted(act, phase, p);
   const _completedDateLabel = (act) => {
     if (!act.completedAt) return null;
     const d = new Date(act.completedAt);
-    if (d.getFullYear() === 2000 && d.getMonth() === 0 && d.getDate() === 1) return "Date not recorded";
+    if (d.getFullYear() === 2000 && d.getMonth() === 0 && d.getDate() === 1) return 'Date not recorded';
     return `${d.getDate()} ${_months[d.getMonth()]} ${d.getFullYear()}`;
   };
 
   const _spentForActivity = (actId) => {
-    const txs = transactions.filter(t => t.activity === actId || t.activityId === actId);
+    const txs = transactions.filter((t) => t.activity === actId || t.activityId === actId);
     return txs.reduce((s, t) => s + Number(t.amount || 0), 0);
   };
 
-  const [budgetDialogActivity, setBudgetDialogActivity] = useState(null);
-  const [budgetForm, setBudgetForm] = useState({ material: 0, labour: 0, equipment: 0 });
-
   const openBudgetDialog = (act) => {
-    setBudgetForm({ material: act.budgetMaterial || 0, labour: act.budgetLabour || 0, equipment: act.budgetEquipment || 0 });
+    setBudgetForm({
+      material: act.budgetMaterial || 0,
+      labour: act.budgetLabour || 0,
+      equipment: act.budgetEquipment || 0,
+    });
     setBudgetDialogActivity(act);
   };
+
   const saveBudgetDialog = async () => {
     if (!budgetDialogActivity) return;
-    const updatedPhases = phases.map(ph => ({
+    const updatedPhases = phases.map((ph) => ({
       ...ph,
-      activities: ph.activities.map(a =>
+      activities: ph.activities.map((a) =>
         a.id === budgetDialogActivity.id
-          ? { ...a, budgetMaterial: Number(budgetForm.material), budgetLabour: Number(budgetForm.labour), budgetEquipment: Number(budgetForm.equipment) }
+          ? {
+              ...a,
+              budgetMaterial: Number(budgetForm.material),
+              budgetLabour: Number(budgetForm.labour),
+              budgetEquipment: Number(budgetForm.equipment),
+            }
           : a
       ),
     }));
-    setLocalProject(prev => ({ ...prev, selectedPhases: updatedPhases }));
+    setLocalProject((prev) => ({ ...prev, selectedPhases: updatedPhases }));
     try {
       await projectAPI.update(projectId, { selectedPhases: updatedPhases });
-      setToast({ msg: "Budget updated successfully!", type: "success" });
+      btToast.success('Budget allocated successfully');
     } catch {
-      setLocalProject(prev => ({ ...prev, selectedPhases: phases }));
-      setToast({ msg: "Failed to update budget.", type: "error" });
+      setLocalProject((prev) => ({ ...prev, selectedPhases: phases }));
+      btToast.error('Failed to update budget');
     }
     setBudgetDialogActivity(null);
   };
 
-  const renderTracker = () => {
-    if (!hasNewTracker) {
-      return (
-        <CollapsibleCard title={SECTIONS.tracker} icon={<ClipboardCheck size={16} />} defaultOpen>
-          <div style={{ textAlign: "center", padding: "24px 0" }}>
-            <ClipboardCheck size={36} color="#CBD5E1" style={{ marginBottom: 8 }} />
-            <div style={{ fontSize: 14, fontWeight: 600, color: "#94A3B8" }}>No execution plan configured</div>
-            <div style={{ fontSize: 12, color: "#ABB5C1", marginTop: 4 }}>Select phases & activities when creating a project.</div>
-          </div>
-        </CollapsibleCard>
-      );
-    }
-    return (
-      <CollapsibleCard title={SECTIONS.tracker} icon={<ClipboardCheck size={16} />} subtitle={`${trackerDone}/${trackerTotal} done`} defaultOpen>
-        <div style={{ overflowX: "auto" }}>
-          <table style={{ width: "100%", minWidth: "800px", borderCollapse: "collapse", textAlign: "left" }}>
-            <thead>
-              <tr style={{ borderBottom: "2px solid #E5E7EB", color: "#64748B", fontSize: 12, textTransform: "uppercase" }}>
-                <th style={{ padding: "12px 16px", fontWeight: 700 }}>Phase & Activity</th>
-                <th style={{ padding: "12px 16px", fontWeight: 700 }}>Status</th>
-                <th style={{ padding: "12px 16px", fontWeight: 700 }}>Budget (,1)</th>
-                <th style={{ padding: "12px 16px", fontWeight: 700 }}>Spend (,1)</th>
-                <th style={{ padding: "12px 16px", fontWeight: 700 }}>Variance (,1)</th>
-                <th style={{ padding: "12px 16px", fontWeight: 700, textAlign: "right" }}>Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {phases.map(phase => {
-                const phaseBud = phase.activities?.reduce((sum, act) => sum + (act.budgetMaterial || 0) + (act.budgetLabour || 0) + (act.budgetEquipment || 0), 0) || 0;
-                const phaseSpent = phase.activities?.reduce((sum, act) => sum + _spentForActivity(act.id), 0) || 0;
-                const phaseVariance = phaseBud - phaseSpent;
-                const pTotal = phase.activities?.length || 0;
-                const pDone = phase.activities?.filter(a => isActivityCompleted(a, phase, p)).length || 0;
-                
-                return (
-                  <React.Fragment key={phase.id}>
-                    {/* Phase Header Row */}
-                    <tr style={{ background: "#F8FAFC", borderBottom: "1px solid #E5E7EB" }}>
-                      <td style={{ padding: "12px 16px", fontWeight: 800, color: "#111827", display: "flex", alignItems: "center", gap: 8 }}>
-                        {phase.isCustom ? <Sparkles size={14} color="var(--color-primary-hover, #EA580C)" /> : <Settings size={14} color="var(--color-primary, #F97316)" />}
-                        {phase.phaseName}
-                      </td>
-                      <td style={{ padding: "12px 16px", fontSize: 12, color: "#64748B", fontWeight: 600 }}>
-                        {pDone} / {pTotal} Done
-                      </td>
-                      <td style={{ padding: "12px 16px", fontWeight: 800, color: "#111827" }}>{phaseBud.toLocaleString("en-IN")}</td>
-                      <td style={{ padding: "12px 16px", fontWeight: 800, color: "#111827" }}>{phaseSpent.toLocaleString("en-IN")}</td>
-                      <td style={{ padding: "12px 16px", fontWeight: 800, color: phaseVariance < 0 ? "#EF4444" : "#22C55E" }}>
-                        {phaseVariance.toLocaleString("en-IN")}
-                      </td>
-                      <td style={{ padding: "12px 16px" }}></td>
-                    </tr>
-                    
-                    {/* Activity Rows */}
-                    {phase.activities?.map(act => {
-                      const actBud = (act.budgetMaterial || 0) + (act.budgetLabour || 0) + (act.budgetEquipment || 0);
-                      const spentForAct = _spentForActivity(act.id);
-                      const actVariance = actBud - spentForAct;
-                      const isC = _isC(act);
-                      const dateLabel = _completedDateLabel(act);
-
-                      return (
-                        <tr key={act.id} style={{ borderBottom: "1px solid #F1F5F9", background: "#FFF" }}>
-                          <td style={{ padding: "12px 16px 12px 32px" }}>
-                            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                              <div onClick={e => { e.stopPropagation(); handleToggleActivity(phase.id, act.id); }}
-                                style={{ width: 18, height: 18, borderRadius: 4, border: `1.5px solid ${isC ? "#22C55E" : "#CBD5E1"}`, background: isC ? "#22C55E" : "transparent", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", flexShrink: 0 }}>
-                                {isC && <Check size={12} color="#fff" strokeWidth={3} />}
-                              </div>
-                              <div>
-                                <div style={{ fontSize: 13, fontWeight: isC ? 500 : 600, color: isC ? "#94A3B8" : "#111827", textDecoration: isC ? "line-through" : "none" }}>{act.name}</div>
-                                {isC && dateLabel && <div style={{ fontSize: 10, color: "#22C55E", fontWeight: 600 }}>Completed {dateLabel}</div>}
-                              </div>
-                            </div>
-                          </td>
-                          <td style={{ padding: "12px 16px" }}>
-                            <Badge variant={isC ? "success" : "warning"} size="sm">{isC ? "Done" : "Pending"}</Badge>
-                          </td>
-                          <td style={{ padding: "12px 16px", fontSize: 13, fontWeight: 600, color: "#475569" }}>{actBud.toLocaleString("en-IN")}</td>
-                          <td style={{ padding: "12px 16px", fontSize: 13, fontWeight: 600, color: "#475569" }}>{spentForAct.toLocaleString("en-IN")}</td>
-                          <td style={{ padding: "12px 16px", fontSize: 13, fontWeight: 600, color: actVariance < 0 ? "#EF4444" : (actVariance > 0 ? "#22C55E" : "#94A3B8") }}>
-                            {actVariance.toLocaleString("en-IN")}
-                          </td>
-                          <td style={{ padding: "12px 16px", textAlign: "right" }}>
-                            <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", gap: 6 }}>
-                              <div onClick={e => { e.stopPropagation(); navigate("/add-entry", { state: { project: p, prefill: { phase: phase.phaseName, activity: act.name } } }); }}
-                                style={{ padding: "4px 8px", borderRadius: 6, background: "#FFF5F0", border: "1px solid #FDE8D8", fontSize: 10, fontWeight: 700, color: "var(--color-primary, #F97316)", cursor: "pointer" }}>ADD</div>
-                              {isC && (
-                                <div onClick={e => { e.stopPropagation(); setViewingActivity(act); }}
-                                  style={{ padding: "4px 8px", borderRadius: 6, background: "#F0FDF4", border: "1px solid #BBF7D0", fontSize: 10, fontWeight: 700, color: "#22C55E", cursor: "pointer" }}>VIEW</div>
-                              )}
-                              {isAdmin && (
-                                <div onClick={e => { e.stopPropagation(); openBudgetDialog(act); }} style={{ padding: "4px 8px", borderRadius: 6, background: "#F8FAFC", border: "1px solid #E2E8F0", fontSize: 10, fontWeight: 700, color: "#475569", cursor: "pointer", display: "flex", alignItems: "center", gap: 4 }}>
-                                  <Pencil size={10} /> BUDGET
-                                </div>
-                              )}
-                            </div>
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </React.Fragment>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
-
-        {budgetDialogActivity && (
-          <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.35)", display: "flex", alignItems: "flex-end", justifyContent: "center", zIndex: 1000 }} onClick={() => setBudgetDialogActivity(null)}>
-            <div style={{ background: "#fff", width: "100%", maxWidth: 420, borderRadius: "20px 20px 0 0", padding: "20px 24px 32px" }} onClick={e => e.stopPropagation()}>
-              <div style={{ width: 36, height: 4, background: "#E5E7EB", borderRadius: 16, margin: "0 auto 20px" }} />
-              <div style={{ fontSize: 16, fontWeight: 700, color: "#111827", marginBottom: 4 }}>Budget Allocation: {budgetDialogActivity.name}</div>
-              <div style={{ fontSize: 12, color: "#64748B", marginBottom: 16 }}>Allocate activity budgets under Materials, Labour, and Equipment categories.</div>
-              <div style={{ marginBottom: 12 }}>
-                <div style={{ fontSize: 12, fontWeight: 600, color: "#111827", marginBottom: 6 }}>Materials Budget (₹)</div>
-                <input value={budgetForm.material} onChange={e => setBudgetForm(f => ({ ...f, material: e.target.value }))} type="number" style={{ width: "100%", padding: "10px 12px", border: "1px solid #E5E7EB", borderRadius: 8, fontSize: 14, fontWeight: 600, background: "#F8FAFC", outline: "none", fontFamily: 'inherit' }} />
-              </div>
-              <div style={{ marginBottom: 12 }}>
-                <div style={{ fontSize: 12, fontWeight: 600, color: "#111827", marginBottom: 6 }}>Labour Budget (₹)</div>
-                <input value={budgetForm.labour} onChange={e => setBudgetForm(f => ({ ...f, labour: e.target.value }))} type="number" style={{ width: "100%", padding: "10px 12px", border: "1px solid #E5E7EB", borderRadius: 8, fontSize: 14, fontWeight: 600, background: "#F8FAFC", outline: "none", fontFamily: 'inherit' }} />
-              </div>
-              <div style={{ marginBottom: 24 }}>
-                <div style={{ fontSize: 12, fontWeight: 600, color: "#111827", marginBottom: 6 }}>Equipment Budget (₹)</div>
-                <input value={budgetForm.equipment} onChange={e => setBudgetForm(f => ({ ...f, equipment: e.target.value }))} type="number" style={{ width: "100%", padding: "10px 12px", border: "1px solid #E5E7EB", borderRadius: 8, fontSize: 14, fontWeight: 600, background: "#F8FAFC", outline: "none", fontFamily: 'inherit' }} />
-              </div>
-              <Button variant="primary" size="md" fullWidth onClick={saveBudgetDialog}>
-                Save Budget Allocation
-              </Button>
-            </div>
-          </div>
-        )}
-
-        {viewingActivity && (
-          <ActivityDetailSheet activity={viewingActivity} phaseName={phases.find(p => p.activities?.some(a => a.id === viewingActivity.id))?.phaseName || ""} onClose={() => setViewingActivity(null)} />
-        )}
-      </CollapsibleCard>
-    );
+  const labelStyle = {
+    fontFamily: 'var(--font-mono)',
+    fontSize: '10.5px',
+    fontWeight: 600,
+    color: 'var(--ink-3)',
+    letterSpacing: '0.06em',
+    marginBottom: 2,
+    textTransform: 'uppercase',
+  };
+  const valueStyle = {
+    fontFamily: 'var(--font-ui)',
+    fontSize: '14px',
+    fontWeight: 600,
+    color: 'var(--ink)',
   };
 
-  const renderRecentEntries = () => {
-    const typeConfig = {
-      Materials: { color: 'var(--color-primary-hover, #EA580C)', bg: '#FFF7F0', label: 'Materials' },
-      Wages: { color: '#22C55E', bg: '#F0FDF4', label: 'Labour' },
-      Labour: { color: '#22C55E', bg: '#F0FDF4', label: 'Labour' },
-      Expense: { color: '#F59E0B', bg: '#FFFBEB', label: 'Equipment' },
-      Equipment: { color: '#F59E0B', bg: '#FFFBEB', label: 'Equipment' },
-      Income: { color: 'var(--color-primary-hover, #EA580C)', bg: '#FFF5F0', label: 'Income' },
-    };
+  return (
+    <div style={{ width: '100%', minHeight: '100%', display: 'flex', flexDirection: 'column' }}>
+      <Toast message={toast.msg} type={toast.type} onClose={clearToast} />
+      {confirmDlg && (
+        <ConfirmDialog
+          message={confirmDlg.message}
+          danger={confirmDlg.danger}
+          confirmLabel={confirmDlg.confirmLabel}
+          onConfirm={confirmDlg.onConfirm}
+          onCancel={() => setConfirmDlg(null)}
+        />
+      )}
 
-    const projectName = p?.projectName || p?.name || "Site Project";
-
-    return (
-      <CollapsibleCard
-        title={SECTIONS.entries}
-        icon={<List size={16} />}
-        defaultOpen
-        headerAction={
-          <button
-            onClick={() => navigate('/transaction', { state: { projectId: p?._id || p?.id } })}
+      {/* ══════════════════════════════════════════════════════════
+          HERO (Blueprint Noir Header with Project Command)
+         ══════════════════════════════════════════════════════════ */}
+      <BtHero padding="28px 32px 56px">
+        <div style={{ maxWidth: 1200, margin: '0 auto', width: '100%' }}>
+          {/* Breadcrumb & Quick Actions Bar */}
+          <div
             style={{
-              border: 'none',
-              background: 'transparent',
-              cursor: 'pointer',
-              fontSize: 13,
-              fontWeight: 700,
-              color: 'var(--color-primary, #F97316)',
               display: 'flex',
               alignItems: 'center',
-              gap: 4,
+              justifyContent: 'space-between',
+              flexWrap: 'wrap',
+              gap: '12px',
+              marginBottom: '20px',
             }}
           >
-            View All <ChevronRight size={14} />
-          </button>
-        }
-      >
-        {loadingT ? (
-          <div style={{ color: "#94A3B8", fontSize: 13, padding: 16, textAlign: "center" }}>Loading activity…</div>
-        ) : transactions.length === 0 ? (
-          <div style={{ textAlign: "center", padding: "24px 0", color: "#94A3B8" }}>
-            <List size={32} color="#CBD5E1" style={{ marginBottom: 8 }} />
-            <div style={{ fontSize: 13, fontWeight: 600 }}>No entries logged yet.</div>
-          </div>
-        ) : (
-          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-            {transactions.map((t, i) => {
-              const tc = typeConfig[t.type] || { color: '#64748B', bg: '#F1F5F9', label: t.type || 'Entry' };
-              const amt = Number(t.amount || t.totalAmount || 0);
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <button
+                type="button"
+                onClick={() => navigate('/projects')}
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  padding: '6px 12px',
+                  borderRadius: '16px',
+                  background: 'rgba(255, 255, 255, 0.08)',
+                  border: '1px solid rgba(255, 255, 255, 0.14)',
+                  color: 'var(--bone)',
+                  fontFamily: 'var(--font-ui)',
+                  fontSize: '13px',
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  transition: 'background 150ms ease',
+                }}
+              >
+                <ArrowLeft size={14} />
+                <span>Projects</span>
+              </button>
 
-              return (
-                <div
-                  key={t._id || t.id || i}
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 14,
-                    padding: "12px 14px",
-                    borderRadius: 10,
-                    background: "#F8FAFC",
-                    border: "1px solid #F1F5F9",
-                    cursor: "pointer",
-                    transition: "background 0.15s ease",
-                  }}
-                  onClick={() => navigate('/entry-detail', { state: { entry: t } })}
+              <span style={{ color: 'var(--on-noir-3)' }}>/</span>
+              <span
+                style={{
+                  fontFamily: 'var(--font-ui)',
+                  fontSize: '13px',
+                  fontWeight: 600,
+                  color: 'var(--on-noir-2)',
+                  maxWidth: '260px',
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                  whiteSpace: 'nowrap',
+                }}
+              >
+                {projectName}
+              </span>
+            </div>
+
+            {/* Header Right Actions */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+              <BtButton
+                variant="primary"
+                small
+                icon={Plus}
+                style={{ border: '1px solid rgba(255, 255, 255, 0.22)', boxShadow: '0 2px 8px rgba(0, 0, 0, 0.3)' }}
+                onPress={() => navigate('/add-entry', { state: { project: p } })}
+              >
+                Add Entry
+              </BtButton>
+
+              <BtButton
+                variant="onDark"
+                small
+                icon={Mic}
+                onPress={() => navigate('/voice', { state: { project: p } })}
+              >
+                Voice
+              </BtButton>
+
+              {canViewInsights && (
+                <BtButton
+                  variant="onDark"
+                  small
+                  icon={TrendingUp}
+                  onPress={openInsights}
                 >
-                  <div
-                    style={{
-                      width: 38,
-                      height: 38,
-                      borderRadius: 10,
-                      background: tc.bg,
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      flexShrink: 0,
-                    }}
-                  >
-                    <IndianRupee size={18} color={tc.color} />
-                  </div>
+                  Insights
+                </BtButton>
+              )}
 
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontSize: 14, fontWeight: 600, color: "#111827", marginBottom: 4 }}>
-                      {t.title || (t.type === "Wages" || t.type === "Labour" ? "Labour" : t.type === "Expense" || t.type === "Equipment" ? "Equipment" : t.type)}
-                    </div>
+              <BtButton
+                variant="onDark"
+                small
+                icon={FileText}
+                onPress={() => navigate(`/project-report/${projectId}`, { state: { project: p } })}
+              >
+                Report
+              </BtButton>
 
-                    <div style={{ display: "flex", gap: 12, fontSize: 12, color: "#64748B", alignItems: "center", flexWrap: "wrap" }}>
-                      <Badge variant={t.type === 'Wages' || t.type === 'Labour' ? 'success' : t.type === 'Expense' || t.type === 'Equipment' ? 'warning' : 'info'} size="sm">
-                        {tc.label}
-                      </Badge>
-
-                      <span style={{ display: "flex", alignItems: "center", gap: 4 }}>
-                        <Building2 size={13} color="#94A3B8" />
-                        {projectName}
-                      </span>
-
-                      <span style={{ display: "flex", alignItems: "center", gap: 4 }}>
-                        <Clock size={13} color="#94A3B8" />
-                        {t.date ? new Date(t.date).toLocaleDateString("en-IN", { day: "numeric", month: "short" }) : ""}
-                      </span>
-                    </div>
-                  </div>
-
-                  <div style={{ fontSize: 16, fontWeight: 700, color: "#111827", whiteSpace: "nowrap", flexShrink: 0 }}>
-                    ₹{amt.toLocaleString("en-IN")}
-                  </div>
-                </div>
-              );
-            })}
-
-            {/* Team Approval History Section */}
-            <div style={{ marginTop: 16, paddingTop: 16, borderTop: "1px solid #E5E7EB" }}>
-              <div style={{ fontSize: 11, fontWeight: 700, color: "#64748B", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 10 }}>
-                Team Approval History
-              </div>
-              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                {transactions.slice(0, 5).map((t, i) => {
-                  const submitter = typeof t.worker === "string" ? t.worker : t.worker?.name || t.createdBy?.name || "Worker";
-                  const actionedBy = t.approvedBy?.name || t.reviewedBy?.name || "Admin";
-                  const status = (t.approvalStatus || t.status || "Approved").toLowerCase();
-                  const isApproved = status === "approved";
-
-                  return (
-                    <div
-                      key={`approval-${t._id || i}`}
-                      style={{
-                        display: "flex",
-                        justifyContent: "space-between",
-                        alignItems: "center",
-                        padding: "10px 14px",
-                        background: "#FFFFFF",
-                        border: "1px solid #E5E7EB",
-                        borderRadius: 8,
-                      }}
-                    >
-                      <div>
-                        <div style={{ fontWeight: 600, fontSize: 13, color: "#111827" }}>
-                          {t.title || (t.type === "Wages" ? "Labour" : t.type)}
-                        </div>
-                        <div style={{ fontSize: 12, color: "#64748B", marginTop: 2 }}>
-                          Submitted by {submitter} • {isApproved ? "Approved" : "Pending"} by {actionedBy}
-                        </div>
-                      </div>
-                      <Badge variant={isApproved ? "success" : status === "pending" ? "warning" : "danger"} size="sm">
-                        {isApproved ? "Approved" : status === "pending" ? "Pending" : "Rejected"}
-                      </Badge>
-                    </div>
-                  );
-                })}
-              </div>
+              <BtButton
+                variant="onDark"
+                small
+                icon={Pencil}
+                onPress={() => navigate('/newproject', { state: { editProject: p } })}
+              >
+                Edit
+              </BtButton>
             </div>
           </div>
-        )}
-      </CollapsibleCard>
-    );
-  };
 
-  return (
-    <div style={{ display: "flex", flexDirection: "column", width: "100%", height: "100%", background: "#F8FAFC", fontFamily: "Inter, 'Segoe UI', sans-serif" }}>
-      <Toast message={toast.msg} type={toast.type} onClose={clearToast} />
-      {confirmDlg && <ConfirmDialog message={confirmDlg.message} danger={confirmDlg.danger} confirmLabel={confirmDlg.confirmLabel} onConfirm={confirmDlg.onConfirm} onCancel={() => setConfirmDlg(null)} />}
-
-      <div style={{ background: "#fff", borderBottom: "1px solid #E5E7EB", padding: "14px 24px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexShrink: 0 }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-          <button
-            onClick={() => navigate("/projects")}
-            title="Back to Projects"
-            style={{
-              display: "inline-flex",
-              alignItems: "center",
-              gap: 6,
-              padding: "7px 14px",
-              background: "#F8FAFC",
-              border: "1px solid #E2E8F0",
-              borderRadius: 8,
-              fontSize: 13,
-              fontWeight: 600,
-              color: "#334155",
-              cursor: "pointer",
-              transition: "all 0.15s ease",
-              fontFamily: "inherit",
-              boxShadow: "0 1px 2px rgba(0,0,0,0.04)"
-            }}
-            onMouseEnter={e => { e.currentTarget.style.background = "#F1F5F9"; e.currentTarget.style.color = "#0F172A"; }}
-            onMouseLeave={e => { e.currentTarget.style.background = "#F8FAFC"; e.currentTarget.style.color = "#334155"; }}
-          >
-            <ArrowLeft size={16} />
-            <span>Back</span>
-          </button>
-          <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 14 }}>
-            <span onClick={() => navigate("/projects")} style={{ color: "var(--color-primary, #F97316)", cursor: "pointer", fontWeight: 500, fontSize: 13 }}>Projects</span>
-            <ArrowRight size={12} color="#94A3B8" />
-            <span style={{ color: "#111827", fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: 300, fontSize: 13 }}>{projectName}</span>
-          </div>
-        </div>
-        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-          {canViewInsights && (
-            <button onClick={openInsights} style={{ padding: "6px 12px", background: "#EEF2FF", border: "1px solid #C7D2FE", borderRadius: 8, fontSize: 12, fontWeight: 600, color: "#4338CA", cursor: "pointer", display: "flex", alignItems: "center", gap: 6, fontFamily: 'inherit' }}>
-              <TrendingUp size={14} /> Insights
-            </button>
-          )}
-          <button onClick={handleExportCSV} style={{ padding: "6px 12px", background: "#fff", border: "1px solid #E5E7EB", borderRadius: 8, fontSize: 12, fontWeight: 600, color: "#475569", cursor: "pointer", display: "flex", alignItems: "center", gap: 6, fontFamily: 'inherit' }}>
-            <FileDown size={14} /> Export
-          </button>
-          <button onClick={handleImportCSV} style={{ padding: "6px 12px", background: "#fff", border: "1px solid #E5E7EB", borderRadius: 8, fontSize: 12, fontWeight: 600, color: "#475569", cursor: "pointer", display: "flex", alignItems: "center", gap: 6, fontFamily: 'inherit' }}>
-            <FileUp size={14} /> Import
-          </button>
-          <button onClick={() => navigate("/newproject", { state: { editProject: p } })} style={{ padding: "6px 12px", background: "#fff", border: "1px solid #E5E7EB", borderRadius: 8, fontSize: 12, fontWeight: 600, color: "#475569", cursor: "pointer", display: "flex", alignItems: "center", gap: 6, fontFamily: 'inherit' }}>
-            <Pencil size={14} /> Edit
-          </button>
-        </div>
-      </div>
-
-      <div style={{ padding: "20px 24px", display: "flex", flexDirection: "column", gap: 14, maxWidth: 1000, margin: "0 auto", width: "100%" }}>
-        <div style={{ background: "#fff", borderRadius: 12, border: "1px solid #E5E7EB", overflow: "hidden" }}>
-          <div style={{ padding: 20, display: "flex", flexDirection: isMobile ? "column" : "row", gap: 16 }}>
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: 8 }}>
-                <h2 style={{ margin: 0, fontSize: 22, fontWeight: 700, color: "#111827", letterSpacing: "-0.03em" }}>{projectName}</h2>
-              </div>
-              <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 10 }}>
-                <Badge variant={status === "Completed" ? "success" : status === "In Progress" ? "info" : status === "On Hold" ? "warning" : "info"} size="sm">{status}</Badge>
-                {phases.length > 0 && (() => {
-                  const completedKeys = new Set(phases.flatMap(ph => ph.activities?.filter(a => isActivityCompleted(a, ph, p)).map(a => a.id) || []));
-                  let activePhase = null;
-                  for (const ph of phases) {
-                    if (ph.activities?.some(a => !completedKeys.has(a.id))) {
-                      activePhase = ph.phaseName;
-                      break;
-                    }
-                  }
-                  return activePhase ? (
-                    <span style={{ padding: "3px 8px", borderRadius: 6, background: "#FFF5F0", border: "1px solid #FDE8D8", fontSize: 11, fontWeight: 600, color: "var(--color-primary, #F97316)", display: "flex", alignItems: "center", gap: 4 }}>
-                      <ArrowRight size={10} /> {activePhase}
-                    </span>
-                  ) : null;
-                })()}
-              </div>
-              <div style={{ fontSize: 12, color: "#64748B", display: "flex", flexDirection: "column", gap: 2 }}>
-                <span style={{ display: "flex", alignItems: "center", gap: 4 }}><MapPin size={12} /> {projectLoc}</span>
-                {p.startDate && <span style={{ display: "flex", alignItems: "center", gap: 4 }}><Calendar size={12} /> Started {_fmtDate(new Date(p.startDate))}</span>}
-                {p.expectedEndDate && <span style={{ display: "flex", alignItems: "center", gap: 4 }}><Calendar size={12} /> Due {_fmtDate(new Date(p.expectedEndDate))}</span>}
-                {p.clientName && <span style={{ display: "flex", alignItems: "center", gap: 4 }}><User size={12} /> {p.clientName}</span>}
-                {p.projectCode && <span style={{ display: "flex", alignItems: "center", gap: 4 }}><Hash size={12} /> {p.projectCode}</span>}
-              </div>
-              {p.floors && p.floors.length > 0 && (
-                <div style={{ display: "flex", flexWrap: "wrap", gap: 4, marginTop: 8 }}>
-                  {p.floors.map((f, i) => (
-                    <Badge key={i} variant="info" size="sm">{f}</Badge>
-                  ))}
-                </div>
+          {/* Project Title & Status Eyebrow */}
+          <div style={{ marginBottom: '24px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '8px' }}>
+              <BtBadge
+                label={status}
+                tone={status === 'Completed' ? 'green' : status === 'On Hold' ? 'amber' : 'brand'}
+              />
+              {p.projectCode && (
+                <span
+                  style={{
+                    fontFamily: 'var(--font-mono)',
+                    fontSize: '11px',
+                    color: 'var(--on-noir-3)',
+                    letterSpacing: '0.08em',
+                  }}
+                >
+                  CODE: {p.projectCode}
+                </span>
               )}
             </div>
-            <div style={{ display: "flex", flexDirection: "column", justifyContent: "center", gap: 8, minWidth: isMobile ? "100%" : 220 }}>
-              <div style={{ display: "flex", justifyContent: "space-between", width: "100%" }}>
-                <span style={{ fontSize: 13, fontWeight: 600, color: "#475569" }}>Overall Completion</span>
-                <span style={{ fontSize: 13, fontWeight: 700, color: "var(--color-primary, #F97316)" }}>{progress.toFixed(1)}%</span>
-              </div>
-              <div style={{ width: "100%", height: 8, background: "#F1F5F9", borderRadius: 8, overflow: "hidden" }}>
-                <div style={{ width: `${Math.min(progress, 100)}%`, height: "100%", background: status === "Completed" ? "#22C55E" : status === "On Hold" ? "#F59E0B" : status === "Cancelled" ? "#EF4444" : "var(--color-primary, #F97316)", borderRadius: 8, transition: "width 0.4s ease" }} />
-              </div>
-              <div style={{ fontSize: 11, color: "#94A3B8", textAlign: "right" }}>{trackerDone}/{trackerTotal || (progress > 0 ? "\u2014" : 0)} activities</div>
+
+            <h1
+              style={{
+                margin: 0,
+                fontFamily: 'var(--font-display)',
+                fontSize: 'clamp(28px, 4vw, 40px)',
+                fontWeight: 800,
+                letterSpacing: '-0.03em',
+                color: 'var(--bone)',
+                lineHeight: 1.1,
+              }}
+            >
+              {projectName}
+            </h1>
+
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                flexWrap: 'wrap',
+                gap: '16px',
+                marginTop: '8px',
+                fontFamily: 'var(--font-ui)',
+                fontSize: '13px',
+                color: 'var(--on-noir-2)',
+              }}
+            >
+              <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                <MapPin size={14} color="var(--accent)" />
+                {projectLoc}
+              </span>
+              {p.startDate && (
+                <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                  <Calendar size={14} />
+                  Started {_fmtDate(new Date(p.startDate))}
+                </span>
+              )}
+              {p.expectedEndDate && (
+                <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                  <Clock size={14} />
+                  Due {_fmtDate(new Date(p.expectedEndDate))}
+                </span>
+              )}
+              {p.clientName && (
+                <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                  <User size={14} />
+                  Client: {p.clientName}
+                </span>
+              )}
             </div>
+          </div>
+
+          {/* 4 Metric Glass Tiles */}
+          <div
+            style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+              gap: '12px',
+            }}
+          >
+            <BtGlassTile
+              label="Overall Completion"
+              value={`${progress.toFixed(1)}%`}
+              valueColor="var(--bone)"
+              icon={Target}
+            />
+            <BtGlassTile
+              label="Total Budget"
+              value={formatInr(totalBudget, { compact: true })}
+              icon={CreditCard}
+            />
+            <BtGlassTile
+              label="Spent Amount"
+              value={formatInr(spent, { compact: true })}
+              valueColor={spent > totalBudget && totalBudget > 0 ? 'var(--status-danger-bright)' : undefined}
+              icon={IndianRupee}
+            />
+            <BtGlassTile
+              label="Activities Completed"
+              value={`${trackerDone}/${trackerTotal || '—'}`}
+              icon={ClipboardCheck}
+            />
           </div>
         </div>
+      </BtHero>
 
-        {renderProjectInfo()}
-        {renderBuildingType()}
-        {renderLandFloors()}
-        {renderRoomsBaths()}
-        {renderFeatureGroup("Additional Configuration", <Settings size={16} />, addlAll)}
-        {renderFeatureGroup("Utility & Services", <Zap size={16} />, utility)}
-        {renderFeatureGroup("Gas Connection", <Flame size={16} />, gas)}
-        {renderFeatureGroup("Kitchen Requirements", <ChefHat size={16} />, kitchen)}
-        {renderFeatureGroup("Electrical & Plumbing", <Zap size={16} />, electrical)}
-        {renderFeatureGroup("Terrace & Interior", <Sun size={16} />, terrace)}
-        
-        {hasPhoto && (
-          <CollapsibleCard title="Site Photo" icon={<Camera size={16} />} defaultOpen>
-            <img src={imgSrc} alt="Site" style={{ width: "100%", maxHeight: 300, objectFit: "cover", borderRadius: 8, border: "1px solid #E5E7EB" }} />
-          </CollapsibleCard>
-        )}
-        
-        {p.scope && (
-          <CollapsibleCard title="Project Scope" icon={<ClipboardCheck size={16} />} defaultOpen>
-            <div style={{ fontSize: 13, color: "#475569", lineHeight: 1.6, whiteSpace: "pre-wrap" }}>{p.scope}</div>
-          </CollapsibleCard>
-        )}
-        
-        {p.documents && p.documents.length > 0 && (
-          <CollapsibleCard title="Documents & Blueprints" icon={<FileText size={16} />} defaultOpen count={p.documents.length}>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))", gap: 12 }}>
-              {p.documents.map((doc, idx) => {
-                const fileUrl = resolveImageUrl(doc);
-                const fileName = doc.split("/").pop() || `Document ${idx + 1}`;
-                const isImage = /\.(jpg|jpeg|png|gif|webp)$/i.test(fileName);
-                return (
-                  <div key={idx} style={{ border: "1px solid #E5E7EB", borderRadius: 10, overflow: "hidden", background: "#F8FAFC", display: "flex", flexDirection: "column" }}>
-                    <div style={{ height: 110, background: "#FFF5F0", display: "flex", alignItems: "center", justifyContent: "center", position: "relative", overflow: "hidden" }}>
-                      {isImage ? <img src={fileUrl} alt={fileName} style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : <FileText size={36} color="var(--color-primary, #F97316)" />}
-                      <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", gap: 8, background: "rgba(0,0,0,0.4)" }}>
-                        <a href={fileUrl} target="_blank" rel="noreferrer" style={{ padding: "6px 12px", borderRadius: 6, background: "#fff", fontSize: 12, fontWeight: 600, color: "#111827", textDecoration: "none" }}>View</a>
-                      </div>
-                    </div>
-                    <div style={{ padding: "10px 12px", fontSize: 12, fontWeight: 600, color: "#334155", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={fileName}>{fileName}</div>
+      {/* ══════════════════════════════════════════════════════════
+          SHEET (Bone Surface with Project Navigation Tabs)
+         ══════════════════════════════════════════════════════════ */}
+      <BtSheet overlap={26} padding="28px 32px 64px">
+        <div
+          style={{
+            maxWidth: 1200,
+            margin: '0 auto',
+            width: '100%',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '24px',
+          }}
+        >
+          {/* Detail Tabs Bar */}
+          <div
+            style={{
+              display: 'flex',
+              gap: '8px',
+              overflowX: 'auto',
+              borderBottom: '1px solid var(--line)',
+              paddingBottom: '12px',
+            }}
+          >
+            {[
+              { id: 'tracker', label: 'Execution Tracker', count: `${trackerDone}/${trackerTotal}` },
+              { id: 'money', label: 'Financials & CSV', count: formatInr(spent, { compact: true }) },
+              { id: 'overview', label: 'Site Overview', count: null },
+              { id: 'details', label: 'Building Specs', count: null },
+              { id: 'entries', label: 'Recent Activity', count: transactions.length },
+            ].map((tab) => {
+              const isActive = activeTab === tab.id;
+              return (
+                <button
+                  key={tab.id}
+                  type="button"
+                  onClick={() => setActiveTab(tab.id)}
+                  style={{
+                    height: '40px',
+                    padding: '0 16px',
+                    borderRadius: '20px',
+                    background: isActive ? 'var(--ink)' : 'var(--card)',
+                    color: isActive ? 'var(--bone, #F6F4EF)' : 'var(--ink-2)',
+                    border: `1px solid ${isActive ? 'var(--ink)' : 'var(--line)'}`,
+                    boxShadow: isActive ? '0 2px 8px rgba(17, 19, 23, 0.12)' : 'none',
+                    fontFamily: 'var(--font-ui)',
+                    fontSize: '13px',
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                    whiteSpace: 'nowrap',
+                    transition: 'all 150ms ease',
+                  }}
+                >
+                  <span>{tab.label}</span>
+                  {tab.count && (
+                    <span
+                      className="tnum"
+                      style={{
+                        fontSize: '11px',
+                        padding: '1px 6px',
+                        borderRadius: '10px',
+                        background: isActive ? 'rgba(255, 255, 255, 0.22)' : 'var(--fill)',
+                        color: isActive ? 'var(--bone, #F6F4EF)' : 'var(--ink-3)',
+                      }}
+                    >
+                      {tab.count}
+                    </span>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+
+          {/* ══════════════════════════════════════════════════════════
+              TAB 1: EXECUTION TRACKER (PHASES & ACTIVITIES CHECKLIST)
+             ══════════════════════════════════════════════════════════ */}
+          {activeTab === 'tracker' && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  flexWrap: 'wrap',
+                  gap: '12px',
+                }}
+              >
+                <div>
+                  <h3
+                    style={{
+                      margin: 0,
+                      fontFamily: 'var(--font-display)',
+                      fontSize: '20px',
+                      fontWeight: 800,
+                      color: 'var(--ink)',
+                    }}
+                  >
+                    Phase & Activity Execution Tracker
+                  </h3>
+                  <p
+                    style={{
+                      margin: '4px 0 0',
+                      fontFamily: 'var(--font-ui)',
+                      fontSize: '13px',
+                      color: 'var(--ink-3)',
+                    }}
+                  >
+                    Check off milestones as work completes on site. Real-time budget tracking per activity.
+                  </p>
+                </div>
+
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <BtButton
+                    variant="primary"
+                    small
+                    icon={Plus}
+                    onPress={() => navigate('/add-entry', { state: { project: p } })}
+                  >
+                    Log Entry
+                  </BtButton>
+                </div>
+              </div>
+
+              {!hasNewTracker ? (
+                <BtCard padding="48px 24px">
+                  <BtEmpty
+                    icon={ClipboardCheck}
+                    title="No execution plan configured"
+                    message="Phases and activities were not selected when creating this project. Click Edit to add them."
+                    action={
+                      <BtButton
+                        variant="secondary"
+                        onPress={() => navigate('/newproject', { state: { editProject: p } })}
+                      >
+                        Configure Phases
+                      </BtButton>
+                    }
+                  />
+                </BtCard>
+              ) : (
+                <BtCard padding="0" style={{ overflow: 'hidden' }}>
+                  <div style={{ overflowX: 'auto' }}>
+                    <table style={{ width: '100%', minWidth: '800px', borderCollapse: 'collapse', textAlign: 'left' }}>
+                      <thead>
+                        <tr
+                          style={{
+                            borderBottom: '1px solid var(--line)',
+                            background: 'var(--fill)',
+                            color: 'var(--ink-3)',
+                            fontFamily: 'var(--font-mono)',
+                            fontSize: '11px',
+                            letterSpacing: '0.07em',
+                            textTransform: 'uppercase',
+                          }}
+                        >
+                          <th style={{ padding: '14px 18px', fontWeight: 700 }}>Phase & Activity</th>
+                          <th style={{ padding: '14px 18px', fontWeight: 700 }}>Status</th>
+                          <th style={{ padding: '14px 18px', fontWeight: 700 }}>Budget</th>
+                          <th style={{ padding: '14px 18px', fontWeight: 700 }}>Spent</th>
+                          <th style={{ padding: '14px 18px', fontWeight: 700 }}>Variance</th>
+                          <th style={{ padding: '14px 18px', fontWeight: 700, textAlign: 'right' }}>Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {phases.map((phase) => {
+                          const phaseBud =
+                            phase.activities?.reduce(
+                              (sum, act) =>
+                                sum +
+                                (act.budgetMaterial || 0) +
+                                (act.budgetLabour || 0) +
+                                (act.budgetEquipment || 0),
+                              0
+                            ) || 0;
+                          const phaseSpent =
+                            phase.activities?.reduce((sum, act) => sum + _spentForActivity(act.id), 0) || 0;
+                          const phaseVariance = phaseBud - phaseSpent;
+                          const pTotal = phase.activities?.length || 0;
+                          const pDone =
+                            phase.activities?.filter((a) => isActivityCompleted(a, phase, p)).length || 0;
+
+                          return (
+                            <React.Fragment key={phase.id}>
+                              {/* Phase Row */}
+                              <tr
+                                style={{
+                                  background: 'var(--ground)',
+                                  borderBottom: '1px solid var(--line)',
+                                }}
+                              >
+                                <td
+                                  style={{
+                                    padding: '14px 18px',
+                                    fontFamily: 'var(--font-display)',
+                                    fontWeight: 800,
+                                    fontSize: '15px',
+                                    color: 'var(--ink)',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: 8,
+                                  }}
+                                >
+                                  {phase.isCustom ? (
+                                    <Sparkles size={16} color="var(--accent)" />
+                                  ) : (
+                                    <Layers size={16} color="var(--accent)" />
+                                  )}
+                                  <span>{phase.phaseName}</span>
+                                </td>
+                                <td style={{ padding: '14px 18px' }}>
+                                  <BtBadge
+                                    label={`${pDone}/${pTotal} Done`}
+                                    tone={pDone === pTotal && pTotal > 0 ? 'green' : 'brand'}
+                                  />
+                                </td>
+                                <td
+                                  className="tnum"
+                                  style={{
+                                    padding: '14px 18px',
+                                    fontFamily: 'var(--font-display)',
+                                    fontWeight: 700,
+                                    color: 'var(--ink)',
+                                  }}
+                                >
+                                  {fmtINR(phaseBud)}
+                                </td>
+                                <td
+                                  className="tnum"
+                                  style={{
+                                    padding: '14px 18px',
+                                    fontFamily: 'var(--font-display)',
+                                    fontWeight: 700,
+                                    color: 'var(--ink)',
+                                  }}
+                                >
+                                  {fmtINR(phaseSpent)}
+                                </td>
+                                <td
+                                  className="tnum"
+                                  style={{
+                                    padding: '14px 18px',
+                                    fontFamily: 'var(--font-display)',
+                                    fontWeight: 700,
+                                    color: phaseVariance < 0 ? 'var(--status-danger-bright)' : 'var(--tone-green)',
+                                  }}
+                                >
+                                  {fmtINR(phaseVariance)}
+                                </td>
+                                <td style={{ padding: '14px 18px' }} />
+                              </tr>
+
+                              {/* Activity Sub-rows */}
+                              {phase.activities?.map((act) => {
+                                const actBud =
+                                  (act.budgetMaterial || 0) +
+                                  (act.budgetLabour || 0) +
+                                  (act.budgetEquipment || 0);
+                                const spentForAct = _spentForActivity(act.id);
+                                const actVariance = actBud - spentForAct;
+                                const isC = _isC(act);
+                                const dateLabel = _completedDateLabel(act);
+
+                                return (
+                                  <tr
+                                    key={act.id}
+                                    style={{
+                                      borderBottom: '1px solid var(--line)',
+                                      background: 'var(--card)',
+                                      transition: 'background 120ms ease',
+                                    }}
+                                  >
+                                    <td style={{ padding: '12px 18px 12px 36px' }}>
+                                      <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                                        <div
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            handleToggleActivity(phase.id, act.id);
+                                          }}
+                                          style={{
+                                            width: 22,
+                                            height: 22,
+                                            borderRadius: '6px',
+                                            border: `1.5px solid ${isC ? 'var(--tone-green)' : 'var(--line)'}`,
+                                            background: isC ? 'var(--tone-green)' : 'var(--card)',
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            justifyContent: 'center',
+                                            cursor: 'pointer',
+                                            flexShrink: 0,
+                                            transition: 'all 120ms ease',
+                                          }}
+                                        >
+                                          {isC && <Check size={14} color="#fff" strokeWidth={3} />}
+                                        </div>
+
+                                        <div>
+                                          <div
+                                            style={{
+                                              fontFamily: 'var(--font-ui)',
+                                              fontSize: '14px',
+                                              fontWeight: isC ? 500 : 600,
+                                              color: isC ? 'var(--ink-3)' : 'var(--ink)',
+                                              textDecoration: isC ? 'line-through' : 'none',
+                                            }}
+                                          >
+                                            {act.name}
+                                          </div>
+                                          {isC && dateLabel && (
+                                            <div
+                                              style={{
+                                                fontSize: '11px',
+                                                color: 'var(--tone-green)',
+                                                fontWeight: 600,
+                                                marginTop: '2px',
+                                              }}
+                                            >
+                                              Completed {dateLabel}
+                                            </div>
+                                          )}
+                                        </div>
+                                      </div>
+                                    </td>
+
+                                    <td style={{ padding: '12px 18px' }}>
+                                      <BtBadge
+                                        label={isC ? 'Done' : 'Pending'}
+                                        tone={isC ? 'green' : 'amber'}
+                                      />
+                                    </td>
+
+                                    <td
+                                      className="tnum"
+                                      style={{
+                                        padding: '12px 18px',
+                                        fontSize: '13px',
+                                        fontWeight: 600,
+                                        color: 'var(--ink-2)',
+                                      }}
+                                    >
+                                      {fmtINR(actBud)}
+                                    </td>
+
+                                    <td
+                                      className="tnum"
+                                      style={{
+                                        padding: '12px 18px',
+                                        fontSize: '13px',
+                                        fontWeight: 600,
+                                        color: 'var(--ink-2)',
+                                      }}
+                                    >
+                                      {fmtINR(spentForAct)}
+                                    </td>
+
+                                    <td
+                                      className="tnum"
+                                      style={{
+                                        padding: '12px 18px',
+                                        fontSize: '13px',
+                                        fontWeight: 600,
+                                        color:
+                                          actVariance < 0
+                                            ? 'var(--status-danger-bright)'
+                                            : actVariance > 0
+                                            ? 'var(--tone-green)'
+                                            : 'var(--ink-3)',
+                                      }}
+                                    >
+                                      {fmtINR(actVariance)}
+                                    </td>
+
+                                    <td style={{ padding: '12px 18px', textAlign: 'right' }}>
+                                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 6 }}>
+                                        <button
+                                          type="button"
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            navigate('/add-entry', {
+                                              state: {
+                                                project: p,
+                                                prefill: { phase: phase.phaseName, activity: act.name },
+                                              },
+                                            });
+                                          }}
+                                          style={{
+                                            padding: '4px 10px',
+                                            borderRadius: '6px',
+                                            background: 'var(--fill)',
+                                            border: '1px solid var(--line)',
+                                            fontFamily: 'var(--font-mono)',
+                                            fontSize: '11px',
+                                            fontWeight: 700,
+                                            color: 'var(--ink)',
+                                            cursor: 'pointer',
+                                          }}
+                                        >
+                                          + ADD
+                                        </button>
+
+                                        {isC && (
+                                          <button
+                                            type="button"
+                                            onClick={(e) => {
+                                              e.stopPropagation();
+                                              setViewingActivity(act);
+                                            }}
+                                            style={{
+                                              padding: '4px 10px',
+                                              borderRadius: '6px',
+                                              background: 'var(--tone-green-bg)',
+                                              border: '1px solid rgba(16, 185, 129, 0.2)',
+                                              fontFamily: 'var(--font-mono)',
+                                              fontSize: '11px',
+                                              fontWeight: 700,
+                                              color: 'var(--tone-green)',
+                                              cursor: 'pointer',
+                                            }}
+                                          >
+                                            VIEW
+                                          </button>
+                                        )}
+
+                                        {isAdmin && (
+                                          <button
+                                            type="button"
+                                            onClick={(e) => {
+                                              e.stopPropagation();
+                                              openBudgetDialog(act);
+                                            }}
+                                            style={{
+                                              padding: '4px 10px',
+                                              borderRadius: '6px',
+                                              background: 'var(--card)',
+                                              border: '1px solid var(--line)',
+                                              fontFamily: 'var(--font-mono)',
+                                              fontSize: '11px',
+                                              fontWeight: 700,
+                                              color: 'var(--ink-2)',
+                                              cursor: 'pointer',
+                                              display: 'inline-flex',
+                                              alignItems: 'center',
+                                              gap: 4,
+                                            }}
+                                          >
+                                            <Pencil size={11} /> BUDGET
+                                          </button>
+                                        )}
+                                      </div>
+                                    </td>
+                                  </tr>
+                                );
+                              })}
+                            </React.Fragment>
+                          );
+                        })}
+                      </tbody>
+                    </table>
                   </div>
-                );
-              })}
+                </BtCard>
+              )}
             </div>
-          </CollapsibleCard>
-        )}
+          )}
 
-        {renderTimeline()}
-        {isAdmin && renderFinancial()}
-        <CsvImportExportCard project={p} onProjectUpdated={setLocalProject} setToast={setToast} />
-        {renderTracker()}
-        {renderRecentEntries()}
+          {/* ══════════════════════════════════════════════════════════
+              TAB 2: FINANCIALS & CSV IMPORT / EXPORT
+             ══════════════════════════════════════════════════════════ */}
+          {activeTab === 'money' && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  flexWrap: 'wrap',
+                  gap: '12px',
+                }}
+              >
+                <div>
+                  <h3
+                    style={{
+                      margin: 0,
+                      fontFamily: 'var(--font-display)',
+                      fontSize: '20px',
+                      fontWeight: 800,
+                      color: 'var(--ink)',
+                    }}
+                  >
+                    Financial Overview & Category Allocations
+                  </h3>
+                  <p
+                    style={{
+                      margin: '4px 0 0',
+                      fontFamily: 'var(--font-ui)',
+                      fontSize: '13px',
+                      color: 'var(--ink-3)',
+                    }}
+                  >
+                    Category breakdown, cash inflow, and automated spreadsheet import / export.
+                  </p>
+                </div>
 
-        <CollapsibleCard title="Actions" icon={<Zap size={16} />} defaultOpen>
-          <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr 1fr" : `repeat(${canViewInsights ? 5 : 4}, 1fr)`, gap: 10 }}>
-            <ActionBtn icon={<FileText size={18} />} label="Add Entry" onClick={() => navigate("/add-entry", { state: { project: p } })} borderColor="var(--color-primary-hover, #EA580C)" />
-            <ActionBtn icon={<MicIcon />} label="Voice Entry" onClick={() => navigate("/voice", { state: { project: p } })} borderColor="var(--color-primary-hover, #EA580C)" />
-            <ActionBtn icon={<BarChartIcon />} label="View Reports" onClick={() => navigate("/project-report/" + projectId, { state: { project: p } })} borderColor="var(--color-primary-light, #FB923C)" />
-            {canViewInsights && <ActionBtn icon={<TrendingUp size={18} />} label="Insights" onClick={openInsights} borderColor="#4F46E5" />}
-            <ActionBtn icon={<Building2 size={18} />} label="Full Details" onClick={() => navigate("/project-detail/" + projectId, { state: { project: p } })} borderColor="#22C55E" />
+                <div style={{ display: 'flex', gap: '8px' }}>
+                  <BtButton variant="secondary" small icon={FileDown} onPress={handleExportCSV}>
+                    Export CSV
+                  </BtButton>
+                  <BtButton variant="secondary" small icon={FileUp} onPress={handleImportCSV}>
+                    Import CSV
+                  </BtButton>
+                </div>
+              </div>
+
+              {/* Financial KPI Cards */}
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '14px' }}>
+                <BtCard padding="20px">
+                  <div style={labelStyle}>TOTAL BUDGET ALLOCATED</div>
+                  <div className="tnum" style={{ fontFamily: 'var(--font-display)', fontSize: '24px', fontWeight: 800, color: 'var(--ink)', marginTop: '4px' }}>
+                    {fmtINR(totalBudget)}
+                  </div>
+                  <div style={{ marginTop: '12px' }}>
+                    <BtBricks value={util} height={8} />
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', color: 'var(--ink-3)', marginTop: '8px' }}>
+                    <span>Budget Utilized</span>
+                    <span style={{ fontWeight: 700, color: util >= 1 ? 'var(--status-danger-bright)' : 'var(--ink)' }}>
+                      {(util * 100).toFixed(0)}%
+                    </span>
+                  </div>
+                </BtCard>
+
+                <BtCard padding="20px">
+                  <div style={labelStyle}>TOTAL FUNDS SPENT</div>
+                  <div
+                    className="tnum"
+                    style={{
+                      fontFamily: 'var(--font-display)',
+                      fontSize: '24px',
+                      fontWeight: 800,
+                      color: spent > totalBudget && totalBudget > 0 ? 'var(--status-danger-bright)' : 'var(--ink)',
+                      marginTop: '4px',
+                    }}
+                  >
+                    {fmtINR(spent)}
+                  </div>
+                  <div style={{ fontFamily: 'var(--font-ui)', fontSize: '13px', color: 'var(--ink-2)', marginTop: '10px' }}>
+                    Remaining budget: <strong style={{ color: 'var(--tone-green)' }}>{fmtINR(remaining)}</strong>
+                  </div>
+                </BtCard>
+
+                <BtCard padding="20px">
+                  <div style={labelStyle}>TOTAL REVENUE INFLOW</div>
+                  <div
+                    className="tnum"
+                    style={{
+                      fontFamily: 'var(--font-display)',
+                      fontSize: '24px',
+                      fontWeight: 800,
+                      color: 'var(--tone-green)',
+                      marginTop: '4px',
+                    }}
+                  >
+                    +{fmtINR(totalIncome)}
+                  </div>
+                  <div style={{ fontFamily: 'var(--font-ui)', fontSize: '13px', color: 'var(--ink-2)', marginTop: '10px' }}>
+                    Net cash flow: <strong>{fmtINR(totalIncome - spent)}</strong>
+                  </div>
+                </BtCard>
+              </div>
+
+              {/* Category Breakdown */}
+              {hasBrk && (
+                <BtCard padding="22px">
+                  <BtSectionHeader title="Category Breakdown" caption />
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '14px', marginTop: '10px' }}>
+                    {bMat > 0 && (
+                      <div style={{ padding: '12px 14px', borderRadius: 'var(--r-input)', background: 'var(--fill)' }}>
+                        <div style={labelStyle}>MATERIALS</div>
+                        <div className="tnum" style={{ fontFamily: 'var(--font-display)', fontSize: '18px', fontWeight: 700, color: 'var(--ink)' }}>
+                          {fmtINR(bMat)}
+                        </div>
+                      </div>
+                    )}
+                    {bLab > 0 && (
+                      <div style={{ padding: '12px 14px', borderRadius: 'var(--r-input)', background: 'var(--fill)' }}>
+                        <div style={labelStyle}>LABOUR</div>
+                        <div className="tnum" style={{ fontFamily: 'var(--font-display)', fontSize: '18px', fontWeight: 700, color: 'var(--ink)' }}>
+                          {fmtINR(bLab)}
+                        </div>
+                      </div>
+                    )}
+                    {bEq > 0 && (
+                      <div style={{ padding: '12px 14px', borderRadius: 'var(--r-input)', background: 'var(--fill)' }}>
+                        <div style={labelStyle}>EQUIPMENT</div>
+                        <div className="tnum" style={{ fontFamily: 'var(--font-display)', fontSize: '18px', fontWeight: 700, color: 'var(--ink)' }}>
+                          {fmtINR(bEq)}
+                        </div>
+                      </div>
+                    )}
+                    {bMisc > 0 && (
+                      <div style={{ padding: '12px 14px', borderRadius: 'var(--r-input)', background: 'var(--fill)' }}>
+                        <div style={labelStyle}>MISCELLANEOUS</div>
+                        <div className="tnum" style={{ fontFamily: 'var(--font-display)', fontSize: '18px', fontWeight: 700, color: 'var(--ink)' }}>
+                          {fmtINR(bMisc)}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </BtCard>
+              )}
+
+              {/* CSV Tool Card */}
+              <CsvImportExportCard project={p} onProjectUpdated={setLocalProject} setToast={setToast} />
+            </div>
+          )}
+
+          {/* ══════════════════════════════════════════════════════════
+              TAB 3: SITE OVERVIEW & TIMELINE
+             ══════════════════════════════════════════════════════════ */}
+          {activeTab === 'overview' && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+              <BtCard padding="24px">
+                <BtSectionHeader title="Project Timeline & Status" caption />
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '14px', marginTop: '12px' }}>
+                  <div style={{ padding: '14px', borderRadius: 'var(--r-input)', background: 'var(--fill)' }}>
+                    <div style={labelStyle}>START DATE</div>
+                    <div style={{ fontFamily: 'var(--font-display)', fontSize: '16px', fontWeight: 700, color: 'var(--ink)' }}>
+                      {p.startDate ? _fmtDate(new Date(p.startDate)) : '—'}
+                    </div>
+                  </div>
+                  <div style={{ padding: '14px', borderRadius: 'var(--r-input)', background: 'var(--fill)' }}>
+                    <div style={labelStyle}>EXPECTED COMPLETION</div>
+                    <div style={{ fontFamily: 'var(--font-display)', fontSize: '16px', fontWeight: 700, color: 'var(--ink)' }}>
+                      {p.expectedEndDate ? _fmtDate(new Date(p.expectedEndDate)) : (p.endDate ? _fmtDate(new Date(p.endDate)) : '—')}
+                    </div>
+                  </div>
+                  <div style={{ padding: '14px', borderRadius: 'var(--r-input)', background: 'var(--fill)' }}>
+                    <div style={labelStyle}>CURRENT STATUS</div>
+                    <div style={{ marginTop: '4px' }}>
+                      <BtBadge label={status} tone={status === 'Completed' ? 'green' : 'brand'} />
+                    </div>
+                  </div>
+                </div>
+              </BtCard>
+
+              {/* Site Photo Preview */}
+              {hasPhoto && (
+                <BtCard padding="20px">
+                  <BtSectionHeader title="Site Photo" caption />
+                  <div style={{ marginTop: '10px', borderRadius: 'var(--r-card)', overflow: 'hidden', maxHeight: '340px' }}>
+                    <img src={imgSrc} alt="Site preview" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                  </div>
+                </BtCard>
+              )}
+
+              {/* Project Scope */}
+              {p.scope && (
+                <BtCard padding="20px">
+                  <BtSectionHeader title="Project Scope" caption />
+                  <div style={{ fontFamily: 'var(--font-ui)', fontSize: '14px', color: 'var(--ink-2)', lineHeight: 1.6, whiteSpace: 'pre-wrap', marginTop: '8px' }}>
+                    {p.scope}
+                  </div>
+                </BtCard>
+              )}
+
+              {/* Blueprints and Documents */}
+              {p.documents && p.documents.length > 0 && (
+                <BtCard padding="20px">
+                  <BtSectionHeader title={`Blueprints & Documents (${p.documents.length})`} caption />
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: '12px', marginTop: '12px' }}>
+                    {p.documents.map((doc, idx) => {
+                      const fileUrl = resolveImageUrl(doc);
+                      const fileName = doc.split('/').pop() || `Document ${idx + 1}`;
+                      const isImage = /\.(jpg|jpeg|png|gif|webp)$/i.test(fileName);
+                      return (
+                        <div
+                          key={idx}
+                          style={{
+                            border: '1px solid var(--line)',
+                            borderRadius: 'var(--r-input)',
+                            overflow: 'hidden',
+                            background: 'var(--card)',
+                          }}
+                        >
+                          <div
+                            style={{
+                              height: '110px',
+                              background: 'var(--fill)',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              position: 'relative',
+                            }}
+                          >
+                            {isImage ? (
+                              <img src={fileUrl} alt={fileName} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                            ) : (
+                              <FileText size={36} color="var(--accent)" />
+                            )}
+                          </div>
+                          <div style={{ padding: '10px 12px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                            <span style={{ fontFamily: 'var(--font-ui)', fontSize: '12px', fontWeight: 600, color: 'var(--ink)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '140px' }}>
+                              {fileName}
+                            </span>
+                            <a
+                              href={fileUrl}
+                              target="_blank"
+                              rel="noreferrer"
+                              style={{
+                                fontSize: '11px',
+                                fontWeight: 700,
+                                color: 'var(--accent)',
+                                textDecoration: 'none',
+                              }}
+                            >
+                              View
+                            </a>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </BtCard>
+              )}
+            </div>
+          )}
+
+          {/* ══════════════════════════════════════════════════════════
+              TAB 4: BUILDING SPECIFICATIONS & DETAILS
+             ══════════════════════════════════════════════════════════ */}
+          {activeTab === 'details' && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+              {/* Project Info Details */}
+              <CollapsibleCard title="General Project Information" icon={<ClipboardCheck size={16} />} defaultOpen>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '12px', paddingTop: '12px' }}>
+                  {p.projectCode && (
+                    <div>
+                      <div style={labelStyle}>PROJECT CODE</div>
+                      <div style={valueStyle}>{p.projectCode}</div>
+                    </div>
+                  )}
+                  {p.clientName && (
+                    <div>
+                      <div style={labelStyle}>CLIENT</div>
+                      <div style={valueStyle}>{p.clientName}</div>
+                    </div>
+                  )}
+                  {p.contractorName && (
+                    <div>
+                      <div style={labelStyle}>CONTRACTOR</div>
+                      <div style={valueStyle}>{p.contractorName}</div>
+                    </div>
+                  )}
+                  {p.siteEngineer && (
+                    <div>
+                      <div style={labelStyle}>ENGINEER</div>
+                      <div style={valueStyle}>{p.siteEngineer}</div>
+                    </div>
+                  )}
+                  {p.contactNumber && (
+                    <div>
+                      <div style={labelStyle}>CONTACT</div>
+                      <div style={valueStyle}>{p.contactNumber}</div>
+                    </div>
+                  )}
+                  <div>
+                    <div style={labelStyle}>LOCATION</div>
+                    <div style={valueStyle}>{projectLoc}</div>
+                  </div>
+                </div>
+              </CollapsibleCard>
+
+              {/* Land and Floors */}
+              {(p.landArea || (p.floors && p.floors.length > 0)) && (
+                <CollapsibleCard title="Land & Floor Configuration" icon={<Layers size={16} />} defaultOpen>
+                  <div style={{ paddingTop: '12px' }}>
+                    {p.landArea && (
+                      <div style={{ marginBottom: '14px' }}>
+                        <div style={labelStyle}>TOTAL LAND AREA</div>
+                        <div style={{ ...valueStyle, fontSize: '16px' }}>
+                          {p.landArea} {p.landUnit || 'sq ft'}
+                        </div>
+                      </div>
+                    )}
+                    {p.floors && p.floors.length > 0 && (
+                      <div>
+                        <div style={labelStyle}>FLOORS INCLUDED</div>
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginTop: '6px' }}>
+                          {p.floors.map((f, i) => (
+                            <BtBadge key={i} label={f} tone="neutral" />
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </CollapsibleCard>
+              )}
+
+              {/* Features and Configurations */}
+              {addlAll.length > 0 && (
+                <CollapsibleCard title="Additional Configurations" icon={<Settings size={16} />} count={addlAll.length} defaultOpen>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', paddingTop: '12px' }}>
+                    {addlAll.map((item, i) => (
+                      <span
+                        key={i}
+                        style={{
+                          padding: '6px 12px',
+                          borderRadius: '8px',
+                          background: 'var(--fill)',
+                          border: '1px solid var(--line)',
+                          fontFamily: 'var(--font-ui)',
+                          fontSize: '12px',
+                          fontWeight: 500,
+                          color: 'var(--ink)',
+                        }}
+                      >
+                        {_getStr(item)}
+                      </span>
+                    ))}
+                  </div>
+                </CollapsibleCard>
+              )}
+
+              {utility.length > 0 && (
+                <CollapsibleCard title="Utility & Services" icon={<Zap size={16} />} count={utility.length} defaultOpen>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', paddingTop: '12px' }}>
+                    {utility.map((item, i) => (
+                      <span
+                        key={i}
+                        style={{
+                          padding: '6px 12px',
+                          borderRadius: '8px',
+                          background: 'var(--fill)',
+                          border: '1px solid var(--line)',
+                          fontFamily: 'var(--font-ui)',
+                          fontSize: '12px',
+                          fontWeight: 500,
+                          color: 'var(--ink)',
+                        }}
+                      >
+                        {_getStr(item)}
+                      </span>
+                    ))}
+                  </div>
+                </CollapsibleCard>
+              )}
+            </div>
+          )}
+
+          {/* ══════════════════════════════════════════════════════════
+              TAB 5: RECENT ACTIVITY LOG
+             ══════════════════════════════════════════════════════════ */}
+          {activeTab === 'entries' && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+              <BtSectionHeader
+                title={`Site Activity Log (${transactions.length})`}
+                action="View all entries"
+                onAction={() => navigate('/transaction')}
+              />
+
+              {transactions.length === 0 ? (
+                <BtCard padding="48px 24px">
+                  <BtEmpty
+                    icon={Clock}
+                    title="No logged transactions yet"
+                    message="Expenses, labour logs, and materials added for this project will be listed here."
+                    action={
+                      <BtButton
+                        variant="primary"
+                        icon={Plus}
+                        onPress={() => navigate('/add-entry', { state: { project: p } })}
+                      >
+                        Add First Entry
+                      </BtButton>
+                    }
+                  />
+                </BtCard>
+              ) : (
+                <BtGroup>
+                  {transactions.slice(0, 15).map((t, idx) => {
+                    const amt = Number(t.amount || t.totalAmount || 0);
+                    return (
+                      <BtRow
+                        key={t._id || idx}
+                        icon={<BtTypeTile type={t.type} size={40} />}
+                        title={t.title || t.name || t.type || 'Entry'}
+                        subtitle={`${t.category || t.type || ''} • ${_fmtDate(new Date(t.date || t.createdAt))}`}
+                        amount={Math.abs(amt)}
+                        tag={
+                          <BtBadge
+                            label={t.type || 'Material'}
+                            tone={
+                              t.type === 'Wages' || t.type === 'Labour'
+                                ? 'green'
+                                : t.type === 'Income'
+                                ? 'green'
+                                : t.type === 'Expense'
+                                ? 'amber'
+                                : 'brand'
+                            }
+                          />
+                        }
+                        onClick={() => navigate('/entry-detail', { state: { entry: t } })}
+                      />
+                    );
+                  })}
+                </BtGroup>
+              )}
+            </div>
+          )}
+        </div>
+      </BtSheet>
+
+      {/* ══════════════════════════════════════════════════════════
+          BUDGET ALLOCATION DIALOG (MODAL)
+         ══════════════════════════════════════════════════════════ */}
+      {budgetDialogActivity && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'var(--scrim)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 1000,
+            backdropFilter: 'blur(4px)',
+            padding: '16px',
+          }}
+          onClick={() => setBudgetDialogActivity(null)}
+        >
+          <div
+            style={{
+              background: 'var(--card)',
+              width: '100%',
+              maxWidth: 440,
+              borderRadius: 'var(--r-card)',
+              padding: '24px 28px',
+              boxShadow: 'var(--shadow-modal)',
+              border: '1px solid var(--line)',
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+              <h3
+                style={{
+                  margin: 0,
+                  fontFamily: 'var(--font-display)',
+                  fontSize: '18px',
+                  fontWeight: 800,
+                  color: 'var(--ink)',
+                }}
+              >
+                Allocate Budget
+              </h3>
+              <button
+                type="button"
+                onClick={() => setBudgetDialogActivity(null)}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  color: 'var(--ink-3)',
+                  cursor: 'pointer',
+                  padding: 4,
+                }}
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <p style={{ fontFamily: 'var(--font-ui)', fontSize: '13px', color: 'var(--ink-2)', margin: '0 0 20px' }}>
+              Set budget allocations for <strong>{budgetDialogActivity.name}</strong> across categories.
+            </p>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', marginBottom: '24px' }}>
+              <div>
+                <label style={labelStyle}>MATERIALS BUDGET (₹)</label>
+                <input
+                  type="number"
+                  value={budgetForm.material}
+                  onChange={(e) => setBudgetForm((f) => ({ ...f, material: e.target.value }))}
+                  style={{
+                    width: '100%',
+                    height: '46px',
+                    padding: '0 14px',
+                    borderRadius: 'var(--r-input)',
+                    border: '1px solid var(--line)',
+                    background: 'var(--fill)',
+                    color: 'var(--ink)',
+                    fontFamily: 'var(--font-display)',
+                    fontSize: '15px',
+                    fontWeight: 700,
+                    outline: 'none',
+                    boxSizing: 'border-box',
+                  }}
+                />
+              </div>
+
+              <div>
+                <label style={labelStyle}>LABOUR BUDGET (₹)</label>
+                <input
+                  type="number"
+                  value={budgetForm.labour}
+                  onChange={(e) => setBudgetForm((f) => ({ ...f, labour: e.target.value }))}
+                  style={{
+                    width: '100%',
+                    height: '46px',
+                    padding: '0 14px',
+                    borderRadius: 'var(--r-input)',
+                    border: '1px solid var(--line)',
+                    background: 'var(--fill)',
+                    color: 'var(--ink)',
+                    fontFamily: 'var(--font-display)',
+                    fontSize: '15px',
+                    fontWeight: 700,
+                    outline: 'none',
+                    boxSizing: 'border-box',
+                  }}
+                />
+              </div>
+
+              <div>
+                <label style={labelStyle}>EQUIPMENT BUDGET (₹)</label>
+                <input
+                  type="number"
+                  value={budgetForm.equipment}
+                  onChange={(e) => setBudgetForm((f) => ({ ...f, equipment: e.target.value }))}
+                  style={{
+                    width: '100%',
+                    height: '46px',
+                    padding: '0 14px',
+                    borderRadius: 'var(--r-input)',
+                    border: '1px solid var(--line)',
+                    background: 'var(--fill)',
+                    color: 'var(--ink)',
+                    fontFamily: 'var(--font-display)',
+                    fontSize: '15px',
+                    fontWeight: 700,
+                    outline: 'none',
+                    boxSizing: 'border-box',
+                  }}
+                />
+              </div>
+            </div>
+
+            <BtButton variant="primary" fullWidth onPress={saveBudgetDialog}>
+              Save Budget Allocation
+            </BtButton>
           </div>
-        </CollapsibleCard>
+        </div>
+      )}
 
-      </div>
-    </div>
-  );
-}
-
-function DateBox({ label, val, icon, color }) {
-  return (
-    <div style={{ flex: 1, minWidth: 120, padding: "8px 10px", background: `${color}10`, borderRadius: 8, display: "flex", alignItems: "center", gap: 6 }}>
-      <span style={{ fontSize: 12, color, display: 'flex' }}>{icon}</span>
-      <div>
-        <div style={{ fontSize: 9, color: "#64748B", fontWeight: 600, letterSpacing: "0.03em", textTransform: "uppercase" }}>{label}</div>
-        <div style={{ fontSize: 12, fontWeight: 700, color }}>{val}</div>
-      </div>
-    </div>
-  );
-}
-
-function FinRow({ label, value, color, icon }) {
-  return (
-    <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 0" }}>
-      <div style={{ width: 34, height: 34, borderRadius: 8, background: `${color}18`, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, color }}>{icon}</div>
-      <span style={{ flex: 1, fontSize: 13, color: "#475569" }}>{label}</span>
-      <span style={{ fontSize: 14, fontWeight: 700, color }}>{value}</span>
-    </div>
-  );
-}
-
-function CatRow({ label, amount, color }) {
-  return (
-    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-      <div style={{ width: 28, height: 28, borderRadius: 6, background: `${color}14`, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-        <IndianRupee size={12} color={color} />
-      </div>
-      <span style={{ flex: 1, fontSize: 13, color: "#475569" }}>{label}</span>
-      <span style={{ fontSize: 13, fontWeight: 700, color }}>{fmtINR(amount)}</span>
-    </div>
-  );
-}
-
-function BudgetRow({ label, allocated, spent, color, bold }) {
-  const remaining = allocated - spent;
-  const pct = allocated > 0 ? Math.min(spent / allocated, 1) : 0;
-  const isOver = spent > allocated && allocated > 0;
-  const barColor = isOver ? "#EF4444" : color;
-  return (
-    <div>
-      <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 2 }}>
-        <span style={{ fontSize: 11, fontWeight: bold ? 700 : 500, color: bold ? "#111827" : "#475569" }}>{label}</span>
-        <span style={{ fontSize: 11, fontWeight: bold ? 700 : 600, color: isOver ? "#EF4444" : bold ? "#111827" : "#374151" }}>
-          {fmtINR(spent)} / {fmtINR(allocated)}
-        </span>
-      </div>
-      {!bold && (
-        <>
-          <div style={{ height: 3, background: "#F1F5F9", borderRadius: 4, overflow: "hidden" }}>
-            <div style={{ width: `${pct * 100}%`, height: "100%", background: barColor, borderRadius: 4 }} />
-          </div>
-          {isOver && <div style={{ fontSize: 10, fontWeight: 600, color: "#EF4444", marginTop: 2 }}>Exceeded by {fmtINR(spent - allocated)}</div>}
-          {!isOver && allocated > 0 && spent > 0 && <div style={{ fontSize: 10, fontWeight: 500, color: "#64748B", marginTop: 2 }}>{fmtINR(remaining)} remaining</div>}
-        </>
+      {/* ══════════════════════════════════════════════════════════
+          ACTIVITY DETAIL VIEW SHEET
+         ══════════════════════════════════════════════════════════ */}
+      {viewingActivity && (
+        <ActivityDetailSheet
+          activity={viewingActivity}
+          phaseName={phases.find((p) => p.activities?.some((a) => a.id === viewingActivity.id))?.phaseName || ''}
+          onClose={() => setViewingActivity(null)}
+        />
       )}
     </div>
-  );
-}
-
-function ActionBtn({ icon, label, onClick, borderColor }) {
-  return (
-    <button onClick={onClick} style={{ padding: "14px", background: "#fff", border: "1px solid #E5E7EB", borderRadius: 10, cursor: "pointer", display: "flex", flexDirection: "column", alignItems: "center", gap: 8, transition: "border-color 0.15s, box-shadow 0.15s", fontFamily: 'inherit' }}
-      className="hover-lift-sm">
-      <span style={{ color: "#475569", display: 'flex' }}>{icon}</span>
-      <span style={{ fontSize: 12, fontWeight: 600, color: "#475569" }}>{label}</span>
-    </button>
   );
 }
 
 function ActivityDetailSheet({ activity, phaseName, onClose }) {
   const [photos, setPhotos] = useState([]);
-  const [notes, setNotes] = useState("");
+  const [notes, setNotes] = useState('');
 
   useEffect(() => {
     setPhotos(activity.photos || (activity.photo ? [activity.photo] : []));
-    setNotes(activity.notes || "");
+    setNotes(activity.notes || '');
   }, [activity]);
 
   const fmtDate = (d) => {
-    if (!d) return "Completed";
+    if (!d) return 'Completed';
     const dt = new Date(d);
-    if (dt.getFullYear() === 2000 && dt.getMonth() === 0 && dt.getDate() === 1) return "Date not recorded";
-    const __months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-    return `${dt.getDate()} ${__months[dt.getMonth()]} ${dt.getFullYear()}`;
+    if (dt.getFullYear() === 2000 && dt.getMonth() === 0 && dt.getDate() === 1) return 'Date not recorded';
+    return `${dt.getDate()} ${_months[dt.getMonth()]} ${dt.getFullYear()}`;
   };
 
   return (
-    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.35)", display: "flex", alignItems: "flex-end", justifyContent: "center", zIndex: 1000 }} onClick={onClose}>
-      <div style={{ background: "#fff", width: "100%", maxWidth: 480, maxHeight: "75vh", borderRadius: "20px 20px 0 0", overflow: "hidden" }} onClick={e => e.stopPropagation()}>
-        <div style={{ overflowY: "auto", padding: "12px 20px 24px" }}>
-          <div style={{ width: 36, height: 4, background: "#E5E7EB", borderRadius: 16, margin: "0 auto 20px" }} />
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 20 }}>
-            <div>
-              <div style={{ fontSize: 18, fontWeight: 700, color: "#111827", marginBottom: 6 }}>{activity.name}</div>
-              <Badge variant="info" size="sm">{phaseName}</Badge>
-            </div>
-            <div onClick={onClose} style={{ cursor: "pointer", color: "#94A3B8", display: 'flex', padding: 4 }}>
-              <X size={18} />
+    <div
+      style={{
+        position: 'fixed',
+        inset: 0,
+        background: 'var(--scrim)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        zIndex: 1000,
+        backdropFilter: 'blur(4px)',
+        padding: '16px',
+      }}
+      onClick={onClose}
+    >
+      <div
+        style={{
+          background: 'var(--card)',
+          width: '100%',
+          maxWidth: 480,
+          borderRadius: 'var(--r-card)',
+          padding: '24px 28px',
+          boxShadow: 'var(--shadow-modal)',
+          border: '1px solid var(--line)',
+        }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16 }}>
+          <div>
+            <h3
+              style={{
+                margin: 0,
+                fontFamily: 'var(--font-display)',
+                fontSize: '18px',
+                fontWeight: 800,
+                color: 'var(--ink)',
+              }}
+            >
+              {activity.name}
+            </h3>
+            <div style={{ marginTop: '4px' }}>
+              <BtBadge label={phaseName} tone="neutral" />
             </div>
           </div>
-          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 20 }}>
-            <Check size={16} color="#22C55E" strokeWidth={3} />
-            <span style={{ fontSize: 13, fontWeight: 700, color: "#22C55E" }}>Completed on {fmtDate(activity.completedAt)}</span>
-          </div>
-          {notes && notes.trim() ? (
-            <div style={{ marginBottom: 20 }}>
-              <div style={{ fontSize: 12, fontWeight: 600, color: "var(--color-primary, #F97316)", letterSpacing: 0.3, marginBottom: 8, textTransform: 'uppercase' }}>Notes & Remarks</div>
-              <div style={{ width: "100%", padding: 14, background: "#F8FAFC", borderRadius: 8, border: "1px solid #E5E7EB", fontSize: 13, lineHeight: 1.5, color: "#111827", fontWeight: 400 }}>{notes}</div>
-            </div>
-          ) : (
-            <div style={{ marginBottom: 20, padding: "24px 16px", background: "#F8FAFC", borderRadius: 8, border: "1px solid #E5E7EB", textAlign: "center" }}>
-              <Info size={24} color="#94A3B8" style={{ marginBottom: 8 }} />
-              <div style={{ fontSize: 13, color: "#94A3B8", fontStyle: "italic" }}>No additional notes or photos recorded for this activity.</div>
-            </div>
-          )}
-          {photos.length > 0 && (
-            <div>
-              <div style={{ fontSize: 12, fontWeight: 600, color: "var(--color-primary, #F97316)", letterSpacing: 0.3, marginBottom: 8, textTransform: 'uppercase' }}>Progress Photos</div>
-              <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
-                {photos.map((url, i) => (
-                  <div key={i} style={{ width: 80, height: 80, borderRadius: 8, border: "1px solid #E5E7EB", overflow: "hidden" }}>
-                    <img src={url} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} onError={e => { e.target.style.display = "none"; }} />
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
+          <button
+            type="button"
+            onClick={onClose}
+            style={{
+              background: 'none',
+              border: 'none',
+              color: 'var(--ink-3)',
+              cursor: 'pointer',
+              padding: 4,
+            }}
+          >
+            <X size={18} />
+          </button>
         </div>
+
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 20 }}>
+          <Check size={18} color="var(--tone-green)" strokeWidth={3} />
+          <span style={{ fontFamily: 'var(--font-ui)', fontSize: '13px', fontWeight: 700, color: 'var(--tone-green)' }}>
+            Completed on {fmtDate(activity.completedAt)}
+          </span>
+        </div>
+
+        {notes && notes.trim() ? (
+          <div style={{ marginBottom: 20 }}>
+            <div
+              style={{
+                fontFamily: 'var(--font-mono)',
+                fontSize: '11px',
+                fontWeight: 600,
+                color: 'var(--ink-3)',
+                letterSpacing: '0.06em',
+                marginBottom: 6,
+                textTransform: 'uppercase',
+              }}
+            >
+              Notes & Remarks
+            </div>
+            <div
+              style={{
+                padding: '12px 14px',
+                background: 'var(--fill)',
+                borderRadius: 'var(--r-input)',
+                border: '1px solid var(--line)',
+                fontSize: '13px',
+                color: 'var(--ink)',
+                lineHeight: 1.5,
+              }}
+            >
+              {notes}
+            </div>
+          </div>
+        ) : (
+          <div
+            style={{
+              marginBottom: 20,
+              padding: '20px 16px',
+              background: 'var(--fill)',
+              borderRadius: 'var(--r-input)',
+              textAlign: 'center',
+            }}
+          >
+            <Info size={20} color="var(--ink-3)" style={{ marginBottom: 6 }} />
+            <div style={{ fontSize: '13px', color: 'var(--ink-3)', fontStyle: 'italic' }}>
+              No additional notes recorded for this milestone.
+            </div>
+          </div>
+        )}
+
+        {photos.length > 0 && (
+          <div>
+            <div
+              style={{
+                fontFamily: 'var(--font-mono)',
+                fontSize: '11px',
+                fontWeight: 600,
+                color: 'var(--ink-3)',
+                letterSpacing: '0.06em',
+                marginBottom: 8,
+                textTransform: 'uppercase',
+              }}
+            >
+              Progress Photos
+            </div>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+              {photos.map((url, i) => (
+                <div
+                  key={i}
+                  style={{
+                    width: 80,
+                    height: 80,
+                    borderRadius: 'var(--r-input)',
+                    border: '1px solid var(--line)',
+                    overflow: 'hidden',
+                  }}
+                >
+                  <img
+                    src={url}
+                    alt="Progress milestone"
+                    style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                    onError={(e) => {
+                      e.target.style.display = 'none';
+                    }}
+                  />
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
     </div>
-  );
-}
-
-function MicIcon() {
-  return (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#475569" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z" />
-      <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
-      <line x1="12" y1="19" x2="12" y2="23" />
-      <line x1="8" y1="23" x2="16" y2="23" />
-    </svg>
-  );
-}
-
-function PackageIcon() {
-  return (
-    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M16.5 9.4 7.55 4.24" /><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z" />
-      <polyline points="3.29 7 12 12 20.71 7" /><line x1="12" y1="22" x2="12" y2="12" />
-    </svg>
-  );
-}
-
-function BoxIcon() {
-  return (
-    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z" />
-      <polyline points="3.27 6.96 12 12.01 20.73 6.96" /><line x1="12" y1="22.08" x2="12" y2="12" />
-    </svg>
-  );
-}
-
-function ArrowUpIcon() {
-  return (
-    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-      <line x1="12" y1="19" x2="12" y2="5" /><polyline points="5 12 12 5 19 12" />
-    </svg>
-  );
-}
-
-function PlayIcon() {
-  return (
-    <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
-      <polygon points="5 3 19 12 5 21 5 3" />
-    </svg>
-  );
-}
-
-function HardHatIcon() {
-  return (
-    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M2 18a1 1 0 0 1 1-1h18a1 1 0 0 1 1 1v2a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1v-2Z" />
-      <path d="M10 10V5a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1v5" />
-      <path d="M4 15v-3a6 6 0 0 1 6-6h0" />
-      <path d="M14 6a6 6 0 0 1 6 6v3" />
-    </svg>
-  );
-}
-
-function BarChartIcon() {
-  return (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#475569" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <line x1="12" y1="20" x2="12" y2="10" /><line x1="18" y1="20" x2="18" y2="4" /><line x1="6" y1="20" x2="6" y2="16" />
-    </svg>
   );
 }
