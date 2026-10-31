@@ -23,6 +23,16 @@ const subscriptionSchema = new mongoose.Schema({
   airpayOrderId:     { type: String },
   airpayTxnId:       { type: String }, // ap_transactionid from Airpay
 
+  // AutoPay (txnsubtype 12) — set from the first successful callback
+  isRecurring:          { type: Boolean, default: false },
+  airpaySubscriptionId: { type: String },               // AirPay subscription_id
+  nextRunDate:          { type: String },               // subscription_next_rundate as sent by AirPay
+  airpayUnsubscribe: {                                  // result of Manage Subscription "U" on cancel
+    status:  { type: String },
+    message: { type: String },
+    at:      { type: Date },
+  },
+
   // Activation dates (set only after verified successful payment)
   startDate: { type: Date },
   endDate:   { type: Date },
@@ -38,5 +48,6 @@ const subscriptionSchema = new mongoose.Schema({
 
 subscriptionSchema.index({ userId: 1, status: 1, endDate: -1 });
 subscriptionSchema.index({ airpayOrderId: 1 }, { sparse: true });
+subscriptionSchema.index({ airpaySubscriptionId: 1 }, { sparse: true });
 
 module.exports = mongoose.model('Subscription', subscriptionSchema);

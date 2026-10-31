@@ -48,3 +48,6 @@ identify_gemini_key.js
 scripts/measure_context_size.js
 scripts/profile_main_endpoint.js
 scripts/profile_projects.js
+
+# AirPay debug output — contains tokens/privatekey, never commit
+*_logs_output.txt

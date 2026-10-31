@@ -3,8 +3,9 @@
  * High-level Airpay v4 service: OAuth2 token fetch, payment payload builder,
  * and callback decryption/verification.
  */
-const axios = require('axios');
-const CRC32 = require('crc-32');
+const axios  = require('axios');
+const crypto = require('crypto');
+const CRC32  = require('crc-32');
 const {
   encrypt,
   decrypt,
@@ -16,6 +17,60 @@ const {
 
 const AIRPAY_OAUTH_URL        = 'https://kraken.airpay.co.in/airpay/pay/v4/api/oauth2/token.php';
 const AIRPAY_PAYMENT_BASE_URL = 'https://payments.airpay.co.in/pay/v4/index.php';
+// Subscription APIs — docs.airpay.co.in/v4/payments/subscription/*
+const AIRPAY_MANAGE_SUBSCRIPTION_URL = 'https://kraken.airpay.co.in/airpay/api/updatesubscription.php';
+const AIRPAY_SUBSCRIPTION_STATUS_URL = 'https://kraken.airpay.co.in/airpay/order/verify_subscription.php';
+
+// Simple Transaction doc: txnsubtype is Numeric and `12` = "INR Subscription".
+const SUBSCRIPTION_TXNSUBTYPE = '12';
+// Doc example value; 999 (never-ending) is documented for eNACH only.
+const DEFAULT_RECURRING_COUNT = '12';
+// AutoPay pricing (agreed with AirPay, 30 Oct): the first month is charged at signup
+// (`amount` = plan price), the mandate debits the same plan price (`sb_amount`) every month,
+// first on the same date next month (`sb_nextrundate`). UAT rejects that date with
+// "Invalid Trial Period"; AirPay says production accepts it.
+// chmod values listed in the Simple Transaction doc
+const VALID_CHMODS = new Set([
+  'ppc', 'pg', 'nb', 'pgcc', 'pgdc', 'cash', 'emi', 'rtgs', 'upi', 'btqr', 'payltr', 'va', 'enach', 'remit',
+]);
+
+/** Lower-cases a requested chmod and drops anything not in the documented list */
+function normaliseChmod(chmod) {
+  const v = String(chmod || '').trim().toLowerCase();
+  return VALID_CHMODS.has(v) ? v : '';
+}
+
+/** Calendar parts of a date as seen in India (AirPay runs on IST) */
+function istParts(date) {
+  const [y, m, d] = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Kolkata', year: 'numeric', month: '2-digit', day: '2-digit',
+  }).format(date).split('-').map(Number);
+  return { y, m, d };
+}
+
+/**
+ * Same IST calendar day `months` later; a day the target month doesn't have becomes its last
+ * day (31 Jan → 28/29 Feb, 31 Mar → 30 Apr). Returned at 12:00 IST on that day.
+ */
+function addMonthsIST(date, months) {
+  const { y, m, d } = istParts(date);
+  const first   = new Date(Date.UTC(y, m - 1 + months, 1));
+  const lastDay = new Date(Date.UTC(first.getUTCFullYear(), first.getUTCMonth() + 1, 0)).getUTCDate();
+  return new Date(Date.UTC(first.getUTCFullYear(), first.getUTCMonth(), Math.min(d, lastDay), 6, 30));
+}
+
+function formatDDMMYYYY(date, sep = '/') {
+  const { y, m, d } = istParts(date);
+  return [String(d).padStart(2, '0'), String(m).padStart(2, '0'), y].join(sep);
+}
+
+/** Masks buyer PII so the request log can be shared with AirPay support */
+function maskForLog(data) {
+  const out = { ...data };
+  if (out.buyer_phone) out.buyer_phone = `${String(out.buyer_phone).slice(0, 2)}******${String(out.buyer_phone).slice(-2)}`;
+  if (out.buyer_email) out.buyer_email = `${String(out.buyer_email).slice(0, 3)}***@***`;
+  return out;
+}
 
 /** Returns and validates all required Airpay config from environment */
 function getConfig() {
@@ -65,8 +120,9 @@ async function getAccessToken() {
   const decrypted = decrypt(response.data.response, encryptionKey);
   const result    = JSON.parse(decrypted);
   if (result.status !== 'success' || !result.data?.access_token) {
+    // AirPay wraps credential errors in an outer "Success" — the real reason is data.msg
     throw new Error(
-      `AirPay OAuth2 failed: ${result.message || 'unknown'} ` +
+      `AirPay OAuth2 failed: ${result.data?.msg || result.message || 'unknown'} ` +
       `(code: ${result.response_code || result.error_code})`
     );
   }
@@ -109,9 +165,8 @@ async function buildPaymentPayload({
   buyerPinCode,
   returnUrl,
   isRecurring,
-  startDate,
-  endDate,
-  recurringPeriod,
+  recurringAmount,
+  maxRecurringAmount,
   chmod,
 }) {
   const cfg           = getConfig();
@@ -119,6 +174,8 @@ async function buildPaymentPayload({
   const encryptionKey = generateEncryptionKeyFromCreds(cfg.username, cfg.password);
   const accessToken   = await getAccessToken();
   const amountFormatted = Number(amount).toFixed(2);
+  // AutoPay: `amount` is charged now (down payment), `recurringAmount` every month after.
+  const recurringFormatted = Number(recurringAmount ?? amount).toFixed(2);
 
   // Validate required fields in production
   if (!isSandbox) {
@@ -142,7 +199,10 @@ async function buildPaymentPayload({
     cfg.password
   );
 
-  // Build transaction data — only include optional fields when real values exist
+  // Build transaction data — only include optional fields when real values exist.
+  // Every request parameter from the Simple Transaction "Request Body" table goes in
+  // here (and so into encdata + checksum). merchant_id is NOT one of them — it is a
+  // plain form field only, per the doc's PHP sample.
   const transactionData = {
     orderid:         orderId,
     amount:          amountFormatted,
@@ -153,7 +213,6 @@ async function buildPaymentPayload({
     buyer_firstname: buyerFirstName,
     buyer_lastname:  buyerLastName,
     buyer_country:   buyerCountry || 'India',
-    merchant_id:     cfg.merchantId,
   };
 
   // Optional address fields — only include when real data is available
@@ -163,55 +222,55 @@ async function buildPaymentPayload({
   if (buyerPinCode && /^[1-9][0-9]{2}\s?[0-9]{3}$/.test(buyerPinCode.trim()))
     transactionData.buyer_pincode = buyerPinCode.trim();
 
-  // Autopay / Subscription fields for Simple Transaction (v4)
-  // Per Airpay Simple Transaction Documentation: https://docs.airpay.co.in/v4/payments/simple-transaction/
-  if (isRecurring) {
-    transactionData.txnsubtype = 'INR-SI';
-    transactionData.sb_isrecurring = 1;
-    transactionData.sb_period = 'M'; // 'M' = Month, 'D' = Day, 'W' = Week, 'Y' = Year
-    transactionData.sb_frequency = 1;
-    transactionData.sb_amount = amountFormatted;
-    transactionData.sb_maxamount = amountFormatted;
-    transactionData.sb_recurringcount = 999; // Never-ending subscription
-    transactionData.sb_retryattempts = 1; // Airpay allows 0 or 1
-  }
+  // chmod is a request parameter like any other, so it lives INSIDE encdata.
+  // Blank = "show all enabled modes" (doc). AutoPay is blank too for now: with chmod "upi"
+  // inside encdata AirPay UAT rejects the subscription ("Invalid Trial Period"); this
+  // isolates whether that check is specific to the UPI AutoPay path.
+  // AutoPay = UPI: AirPay's own working subscription test (29 Oct) sends chmod "upi".
+  const selectedChmod = normaliseChmod(chmod) || (isRecurring ? 'upi' : '');
+  if (selectedChmod) transactionData.chmod = selectedChmod;
 
-  // Payment channel mode (chmod):
-  // Per Airpay docs: "chmod (optional): Defines channel/payment modes available for user.
-  // If left blank, all enabled payment modes are displayed."
-  const selectedChmod = (typeof chmod === 'string') ? chmod.trim() : '';
-  if (selectedChmod) {
-    transactionData.chmod = selectedChmod;
+  // Subscription (AutoPay) fields — Simple Transaction doc, txnsubtype 12 = "INR Subscription".
+  if (isRecurring) {
+    transactionData.txnsubtype        = SUBSCRIPTION_TXNSUBTYPE;
+    transactionData.sb_isrecurring    = '1';
+    transactionData.sb_period         = 'M';
+    transactionData.sb_frequency      = '1';
+    transactionData.sb_amount         = recurringFormatted;
+    // Mandate ceiling: AutoPay can later debit up to this (Update the Amount API) without a new mandate
+    transactionData.sb_maxamount      = Number(Math.max(Number(maxRecurringAmount) || 0, Number(recurringFormatted))).toFixed(2);
+    // First AutoPay debit date (IST, AirPay's clock). The doc says T+1, but AirPay's team
+    // confirmed (28 Oct) the minimum is T+2 — T+1 and +1 month both got "Invalid Trial
+    // Period", and omitting it gets "Invalid request".
+    // First AutoPay debit: same date next month (the first month was paid at signup).
+    transactionData.sb_nextrundate    = formatDDMMYYYY(addMonthsIST(new Date(), 1));
+    // Doc: 999 = never-ending, but only "applicable for eNACH transactions".
+    transactionData.sb_recurringcount = selectedChmod === 'enach' ? '999' : DEFAULT_RECURRING_COUNT;
+    // Retries of a failed monthly debit. The doc marks this optional (example `3`), but
+    // AirPay UAT rejects a subscription without it: "Invalid Retry attempt, should be 0, 1".
+    transactionData.sb_retryattempts  = '1';
   }
 
   const encdata  = encrypt(JSON.stringify(transactionData), encryptionKey);
   const checksum = generateChecksum(transactionData);
-  console.log('[AirPay Request Decrypted JSON]:\n' + JSON.stringify(transactionData, null, 2));
 
-  if (isRecurring) {
-    console.log(`[AirPay Request] ── RECURRING SUBSCRIPTION (AutoPay Mandate: INR-SI) ──`);
-    console.log(`[AirPay Request] Order ID: ${orderId} | Amount: Rs.${amountFormatted}/month | Mode: INR-SI`);
-    console.log(`[AirPay Request] Mandate Parameters: txnsubtype='INR-SI', sb_isrecurring=1, sb_period='M', sb_frequency=1, sb_amount=${amountFormatted}, sb_maxamount=${amountFormatted}, sb_recurringcount=999, sb_retryattempts=1`);
-    console.log(`[AirPay Request] Channel Mode (chmod): "${selectedChmod}"`);
-  } else {
-    console.log(`[AirPay Request] ── SIMPLE TRANSACTION (One-Time Payment) ──`);
-    console.log(`[AirPay Request] Order ID: ${orderId} | Amount: Rs.${amountFormatted} | Mode: One-Time (Simple Transaction)`);
-    console.log(`[AirPay Request] Conforms strictly to Simple Transaction API (https://docs.airpay.co.in/v4/payments/simple-transaction/)`);
-    console.log(`[AirPay Request] Channel Mode (chmod): "${selectedChmod || 'ALL (UPI QR, Cards, Netbanking, Wallets)'}"`);
-  }
-  console.log(`[AirPay Request] Buyer: ${buyerFirstName} ${buyerLastName} | Phone: ${buyerPhone.slice(0, 2)}******${buyerPhone.slice(-2)} | Email: ${buyerEmail.slice(0, 3)}***@***`);
-  console.log(`[AirPay Request] Form fields sent: privatekey, orderid, merchant_id, encdata (len=${encdata.length}), checksum, chmod="${selectedChmod}"`);
+  // Shareable request log: exactly what went inside encdata (PII masked).
+  console.log(
+    `[AirPay Request] ${isRecurring ? 'SUBSCRIPTION (txnsubtype 12)' : 'ONE-TIME'} order=${orderId} ` +
+    `encdata(plain)=${JSON.stringify(maskForLog(transactionData))} ` +
+    `form=[privatekey, merchant_id, encdata(len=${encdata.length}), checksum]`
+  );
 
   return {
     postUrl: `${AIRPAY_PAYMENT_BASE_URL}?token=${accessToken}`,
+    // Exactly the four form fields in the doc's PHP sample — everything else is in encdata.
     formFields: {
       privatekey,
-      orderid: orderId,
       merchant_id: cfg.merchantId,
       encdata,
       checksum,
-      chmod: selectedChmod,
     },
+    requestData: transactionData,
   };
 }
 
@@ -360,8 +419,96 @@ function verifyAndDecryptCallbackData(reqBody) {
   return { data: dataObj, rawResult };
 }
 
+/**
+ * HMAC used by the subscription APIs:
+ *   privatekey = sha256(secret@username:|:password)
+ *   hash_hmac('sha256', <fields joined>, secret)
+ * The docs write the fields joined with "+"; we treat that as string concatenation.
+ */
+const PRIVATE_KEY = Symbol('airpay.privatekey'); // placeholder for the derived privatekey in subscriptionHmac parts
+function subscriptionHmac(parts) {
+  const cfg = getConfig();
+  const privatekey = generatePrivateKey(process.env.AIRPAY_API_KEY || cfg.secret, cfg.username, cfg.password);
+  const message = parts.map((p) => (p === PRIVATE_KEY ? privatekey : String(p))).join('');
+  return crypto.createHmac('sha256', cfg.secret).update(message).digest('hex');
+}
+
+/**
+ * Manage Subscription API — U(nsubscribe) / P(ause) / R(esume).
+ * docs.airpay.co.in/v4/payments/subscription/manage-subscription/
+ * sb_date must be a future date (DD-MM-YYYY); we use tomorrow (IST).
+ * @returns {{ ok: boolean, status: string, message: string }}
+ */
+async function manageSubscription(subscriptionId, action = 'U') {
+  const cfg = getConfig();
+  const tomorrow = new Date(Date.now() + 24 * 60 * 60 * 1000);
+  const sbDate = formatDDMMYYYY(tomorrow, '-');
+  const body = {
+    merchant_id:     cfg.merchantId,
+    subscription_id: String(subscriptionId),
+    action,
+    sb_date:         sbDate,
+    checksum:        subscriptionHmac([subscriptionId, PRIVATE_KEY, cfg.merchantId, action, sbDate]),
+  };
+  const { data } = await axios.post(AIRPAY_MANAGE_SUBSCRIPTION_URL, body, {
+    headers: { 'Content-Type': 'application/json' },
+    timeout: 15000,
+  });
+  const status = String(data?.status ?? '');
+  // 603 = "Subscription is in Unsubscribed state" — already stopped, which is what we want
+  const ok = status === '200' || (action === 'U' && status === '603');
+  return { ok, status, message: String(data?.message || '') };
+}
+
+/**
+ * Subscription Status Check — returns AirPay's view of a mandate incl. TRANSACTION_HISTORY.
+ * docs.airpay.co.in/v4/payments/subscription/status-check/
+ * Form-posted as merchant_id + encdata + checksum (same pattern as OAuth).
+ */
+async function getSubscriptionStatus(subscriptionId) {
+  const cfg = getConfig();
+  const encryptionKey = generateEncryptionKeyFromCreds(cfg.username, cfg.password);
+  // Doc table says `subscription_id`, its PHP sample says `subscriptionId` — send the table's name.
+  const payload = { subscription_id: String(subscriptionId), pgno: '0' };
+  const form = new URLSearchParams();
+  form.append('merchant_id', cfg.merchantId);
+  form.append('encdata', encrypt(JSON.stringify(payload), encryptionKey));
+  form.append('checksum', generateChecksum(payload));
+
+  const { data } = await axios.post(AIRPAY_SUBSCRIPTION_STATUS_URL, form, {
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    timeout: 15000,
+  });
+  // Decryption doc: "All the API responses are encrypted" — but accept plain JSON too.
+  const result = data?.response ? JSON.parse(decrypt(data.response, encryptionKey)) : data;
+  if (String(result?.status_code) !== '200') {
+    throw new Error(`AirPay subscription status failed: ${result?.message || 'unknown'}`);
+  }
+  return result.data || {};
+}
+
+/** Successful debits from a status-check `data` block (TRANSACTION_HISTORY + down-payment) */
+function successfulDebits(statusData) {
+  const list = []
+    .concat(statusData?.TRANSACTION_HISTORY || [])
+    .concat(statusData?.DOWNPAYMENNT_HISTORY ? [statusData.DOWNPAYMENNT_HISTORY] : []);
+  return list
+    .filter((t) => t && String(t.TRANSACTION_STATUS).toUpperCase() === 'SUCCESS' && t.AIRPAY_ID)
+    .map((t) => ({ airpayTxnId: String(t.AIRPAY_ID), amount: Number(t.TRANSACTION_AMOUNT) }));
+}
+
 module.exports = {
   getAccessToken,
   buildPaymentPayload,
   verifyAndDecryptCallbackData,
+  manageSubscription,
+  getSubscriptionStatus,
+  successfulDebits,
+  subscriptionHmac,
+  PRIVATE_KEY,
+  // exported for tests
+  formatDDMMYYYY,
+  normaliseChmod,
+  SUBSCRIPTION_TXNSUBTYPE,
+  addMonthsIST,
 };

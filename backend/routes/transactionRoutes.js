@@ -11,6 +11,7 @@ const Project = require("../models/Project");
 const Inventory = require("../models/Inventory");
 const User = require("../models/User");
 const { protect, requirePermission, getAdminId, canAccessProjectFilter } = require("../middleware/auth");
+const ledger = require("../services/ledger");
 const upload = require("../config/multer");
 const {
   getFileUrl,
@@ -461,6 +462,42 @@ router.get("/my", async (req, res) => {
   } catch (err) {
     console.error("Get my transactions error:", err);
     res.status(500).json({ message: "Failed to fetch transactions" });
+  }
+});
+// Re-label an entry for the Reports ledger. Touches ONLY ledgerCategory (an
+// updateOne $set) — never the PUT path, which recalculates amounts.
+router.patch("/:id/ledger-category", requirePermission(["view_finances"]), async (req, res) => {
+  try {
+    const { ledgerCategory } = req.body || {};
+    if (!ledger.LEDGER_CATEGORIES.includes(ledgerCategory)) {
+      return res.status(400).json({
+        message: `ledgerCategory must be one of ${ledger.LEDGER_CATEGORIES.join(", ")}`,
+      });
+    }
+    if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+      return res.status(404).json({ message: "Transaction not found" });
+    }
+    const tx = await Transaction.findById(req.params.id).select("project createdBy").lean();
+    if (!tx) return res.status(404).json({ message: "Transaction not found" });
+
+    // Same company scope as GET /transactions.
+    let allowed;
+    if (tx.project) {
+      const filter = canAccessProjectFilter(req, tx.project);
+      allowed = !!(await Project.findOne(filter).select("_id").lean());
+    } else if (req.user.role === "Admin") {
+      allowed = String(tx.createdBy) === String(req.user._id);
+    } else {
+      const adminId = await getAdminId(req.user);
+      allowed = [req.user._id, adminId].filter(Boolean).map(String).includes(String(tx.createdBy));
+    }
+    if (!allowed) return res.status(403).json({ message: "Access denied to this transaction" });
+
+    await Transaction.updateOne({ _id: tx._id }, { $set: { ledgerCategory } }, { timestamps: false });
+    res.json({ id: String(tx._id), ledgerCategory });
+  } catch (err) {
+    console.error("Ledger category update error:", err);
+    res.status(500).json({ message: "Failed to update ledger category" });
   }
 });
 router.get("/:id", async (req, res) => {

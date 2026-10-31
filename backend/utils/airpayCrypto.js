@@ -19,14 +19,25 @@ function generatePrivateKey(secret, username, password) {
   return encryptChecksum(udata, secret);
 }
 
-/** Sorts postData keys, concatenates values + today's date, returns SHA-256 hex */
-function checksumcal(postData) {
+/**
+ * Today's date as YYYY-MM-DD in India time.
+ * AirPay's checksum sample appends PHP date('Y-m-d') — their server's local (IST) date.
+ * Using the UTC date broke every checksum between 00:00 and 05:30 IST.
+ */
+function istDateYMD(now = new Date()) {
+  return new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Kolkata', year: 'numeric', month: '2-digit', day: '2-digit',
+  }).format(now);
+}
+
+/** Sorts postData keys, concatenates values + today's IST date, returns SHA-256 hex */
+function checksumcal(postData, now = new Date()) {
   const sortedKeys = Object.keys(postData).sort();
   let data = '';
   for (const k of sortedKeys) {
     data += postData[k];
   }
-  const dateStr = new Date().toISOString().split('T')[0];
+  const dateStr = istDateYMD(now);
   const fullString = data + dateStr;
   return {
     checksum: crypto.createHash('sha256').update(fullString).digest('hex'),
@@ -34,8 +45,8 @@ function checksumcal(postData) {
   };
 }
 
-function generateChecksum(postData) {
-  return checksumcal(postData).checksum;
+function generateChecksum(postData, now) {
+  return checksumcal(postData, now).checksum;
 }
 
 /**
@@ -100,6 +111,7 @@ function decryptCallbackResponse(responsedata, secretKey) {
 module.exports = {
   encryptChecksum,
   generatePrivateKey,
+  istDateYMD,
   checksumcal,
   generateChecksum,
   generateEncryptionKeyFromCreds,

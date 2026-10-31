@@ -5,7 +5,9 @@ const Transaction = require("../models/Transaction");
 const Worker = require("../models/Worker");
 const Project = require("../models/Project");
 const User = require("../models/User");
-const { protect, getAdminId, canAccessProjectFilter } = require("../middleware/auth");
+const mongoose = require("mongoose");
+const { protect, requirePermission, getAdminId, canAccessProjectFilter } = require("../middleware/auth");
+const ledger = require("../services/ledger");
 router.use(protect);
 function getDateRange(query) {
   const { year, month, rangeStart, rangeEnd } = query;
@@ -324,4 +326,177 @@ router.get("/financial/export-pdf", async (req, res) => {
     res.status(500).json({ message: "Failed to export PDF" });
   }
 });
+// ---------------------------------------------------------------------------
+// GET /api/reports/ledger — money in / money out, filterable and groupable.
+// Admin (the company account) or anyone holding the `view_finances` permission.
+// Company scope is identical to GET /api/transactions.
+// ---------------------------------------------------------------------------
+const LEDGER_ROW_CAP = 5000;
+const LEDGER_GROUPS = ["category", "project", "month", "payee", "none"];
+
+async function ledgerScope(req) {
+  if (req.user.role !== "Admin") {
+    const projects = await Project.find(canAccessProjectFilter(req)).select("_id").lean();
+    const adminId = await getAdminId(req.user);
+    return {
+      $or: [
+        { project: { $in: projects.map((p) => p._id) } },
+        { project: null, createdBy: { $in: [req.user._id, adminId].filter(Boolean) } },
+      ],
+    };
+  }
+  const projects = await Project.find({ createdBy: req.user._id }).select("_id").lean();
+  return {
+    $or: [
+      { project: { $in: projects.map((p) => p._id) } },
+      { project: null, createdBy: req.user._id },
+    ],
+  };
+}
+
+router.get("/ledger", requirePermission(["view_finances"]), async (req, res) => {
+  try {
+    const q = req.query;
+    const bad = (message) => res.status(400).json({ message });
+
+    const from = q.from ? String(q.from) : "";
+    const to = q.to ? String(q.to) : "";
+    if ((from && !ledger.DATE_RE.test(from)) || (to && !ledger.DATE_RE.test(to))) {
+      return bad("from/to must be YYYY-MM-DD");
+    }
+    const direction = q.direction ? String(q.direction) : "all";
+    if (!["in", "out", "all"].includes(direction)) return bad("direction must be in, out or all");
+    const groupBy = q.groupBy ? String(q.groupBy) : "none";
+    if (!LEDGER_GROUPS.includes(groupBy)) return bad(`groupBy must be one of ${LEDGER_GROUPS.join(", ")}`);
+    const categories = q.category
+      ? String(q.category).split(",").map((c) => c.trim()).filter(Boolean)
+      : [];
+    const unknownCat = categories.find((c) => !ledger.LEDGER_CATEGORIES.includes(c));
+    if (unknownCat) return bad(`Unknown category: ${unknownCat}`);
+    const search = q.q ? String(q.q).trim().slice(0, 100) : "";
+
+    const scope = await ledgerScope(req);
+    const projectId = q.projectId ? String(q.projectId) : "";
+    if (projectId && projectId !== "all") {
+      if (!mongoose.Types.ObjectId.isValid(projectId)) return bad("Invalid projectId");
+      const pDoc = await Project.findOne(canAccessProjectFilter(req, projectId)).select("_id").lean();
+      if (!pDoc) return res.status(403).json({ message: "Access denied to this project" });
+      // Same as GET /transactions: a project filter replaces the $or scope.
+      delete scope.$or;
+      scope.project = new mongoose.Types.ObjectId(projectId);
+    }
+
+    let workerIds = [];
+    if (search) {
+      const adminId = await getAdminId(req.user);
+      const ws = await Worker.find({
+        createdBy: adminId,
+        name: { $regex: ledger.escapeRegex(search), $options: "i" },
+      })
+        .select("_id")
+        .lean();
+      workerIds = ws.map((w) => w._id);
+    }
+
+    const base = ledger.buildBaseStages(scope, {
+      from,
+      to,
+      direction,
+      categories,
+      q: search,
+      workerIds,
+    });
+    const gStages = ledger.groupStages(groupBy);
+    const [sumAgg, groupAgg, rowAgg] = await Promise.all([
+      Transaction.aggregate([...base, ...ledger.summaryStages()]),
+      gStages ? Transaction.aggregate([...base, ...gStages]) : Promise.resolve([]),
+      Transaction.aggregate([...base, ...ledger.rowStages(LEDGER_ROW_CAP + 1)]),
+    ]);
+
+    const sum = sumAgg[0] || { moneyIn: 0, moneyOut: 0, count: 0 };
+    const summary = {
+      moneyIn: ledger.round2(sum.moneyIn),
+      moneyOut: ledger.round2(sum.moneyOut),
+      net: ledger.round2(sum.moneyIn - sum.moneyOut),
+      count: sum.count,
+    };
+
+    const truncated = rowAgg.length > LEDGER_ROW_CAP;
+    const rawRows = truncated ? rowAgg.slice(0, LEDGER_ROW_CAP) : rowAgg;
+
+    // Resolve names for the rows and groups we actually return.
+    const idStr = (v) => (v ? String(v) : "");
+    const projIds = new Set(rawRows.map((r) => idStr(r.project)).filter(Boolean));
+    const workerIdSet = new Set(rawRows.map((r) => idStr(r.worker)).filter(Boolean));
+    if (groupBy === "project") groupAgg.forEach((g) => g._id && projIds.add(String(g._id)));
+    if (groupBy === "payee") {
+      groupAgg.forEach((g) => {
+        if (String(g._id).startsWith("w:")) workerIdSet.add(String(g._id).slice(2));
+      });
+    }
+    const validIds = (set) => [...set].filter((i) => mongoose.Types.ObjectId.isValid(i));
+    const [projDocs, workerDocs] = await Promise.all([
+      projIds.size ? Project.find({ _id: { $in: validIds(projIds) } }).select("projectName").lean() : [],
+      workerIdSet.size ? Worker.find({ _id: { $in: validIds(workerIdSet) } }).select("name").lean() : [],
+    ]);
+    const projName = new Map(projDocs.map((p) => [String(p._id), p.projectName || ""]));
+    const workerName = new Map(workerDocs.map((w) => [String(w._id), w.name || ""]));
+
+    const rows = ledger.withRunningBalance(
+      rawRows.map((r) => ({
+        id: String(r._id),
+        date: r._d,
+        projectId: r.project ? String(r.project) : null,
+        projectName: r.project ? projName.get(String(r.project)) || "" : "",
+        direction: r._dir,
+        category: r._cat,
+        title: r.title || "",
+        payee: r.supplier || (r.worker ? workerName.get(String(r.worker)) || "" : ""),
+        notes: r.notes || "",
+        amount: Number(r.amount) || 0,
+        paymentStatus: r.paymentStatus || "",
+        runningBalance: 0,
+        type: r.type,
+        approvalStatus: r.approvalStatus || "",
+      })),
+      summary.net
+    );
+
+    const labelFor = (key) => {
+      if (groupBy === "category") return ledger.CATEGORY_LABELS[key] || key;
+      if (groupBy === "project") return key ? projName.get(key) || "Unknown project" : "No project";
+      if (groupBy === "payee") {
+        if (key.startsWith("s:")) return key.slice(2);
+        if (key.startsWith("w:")) return workerName.get(key.slice(2)) || "Unknown worker";
+        return "Unspecified";
+      }
+      if (groupBy === "month") {
+        const [y, m] = key.split("-");
+        const names = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+        return names[Number(m) - 1] ? `${names[Number(m) - 1]} ${y}` : key || "Unknown";
+      }
+      return key;
+    };
+    const groups = groupAgg
+      .map((g) => ({
+        key: String(g._id ?? ""),
+        label: labelFor(String(g._id ?? "")),
+        moneyIn: ledger.round2(g.moneyIn),
+        moneyOut: ledger.round2(g.moneyOut),
+        net: ledger.round2(g.moneyIn - g.moneyOut),
+        count: g.count,
+      }))
+      .sort((a, b) =>
+        groupBy === "month"
+          ? b.key.localeCompare(a.key)
+          : b.moneyIn + b.moneyOut - (a.moneyIn + a.moneyOut)
+      );
+
+    res.json({ summary, rows, groups, truncated });
+  } catch (err) {
+    console.error("Ledger report error:", err);
+    res.status(500).json({ message: "Failed to fetch ledger" });
+  }
+});
+
 module.exports = router;

@@ -206,6 +206,7 @@ const ADMIN_PERMISSIONS = [
   "mark_paid",
   "view_reports",
   "manage_team",
+  "view_finances",
 ];
 router.post("/send-registration-otp", async (req, res) => {
   try {
