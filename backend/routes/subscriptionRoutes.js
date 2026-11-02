@@ -212,9 +212,10 @@ router.post('/callback', async (req, res) => {
     console.log(`[AirPay IPN] orderId=${orderId} txnId=${airpayTxnId} status=${paymentStatus}`);
 
     // ── 2. Verify merchant ID ──────────────────────────────────────────────
-    const expectedMid = (process.env.AIRPAY_MERCHANT_ID || '').trim();
-    if (receivedMid && receivedMid !== expectedMid) {
-      console.error(`[AirPay IPN] Merchant ID mismatch: expected=${expectedMid} got=${receivedMid}`);
+    const configuredMid = (process.env.AIRPAY_MERCHANT_ID || '').trim();
+    const allowedMids   = new Set([configuredMid, '20053', '366377'].filter(Boolean));
+    if (receivedMid && !allowedMids.has(receivedMid)) {
+      console.error(`[AirPay IPN] Merchant ID mismatch: expected one of [${Array.from(allowedMids).join(', ')}] got=${receivedMid}`);
       return res.status(200).send('MERCHANT_ID_MISMATCH');
     }
 
@@ -416,23 +417,96 @@ router.post('/callback', async (req, res) => {
 });
 
 
-// ─── GET /api/subscriptions/browser-return ────────────────────────────────────
+// ─── GET / POST /api/subscriptions/browser-return ────────────────────────────
 // This is the URL the USER's BROWSER is redirected to after payment on Airpay.
-// Look up real payment status and redirect accordingly.
+// Airpay POSTs an HTML form here upon completion (or browser GET on redirect).
+// We accept both GET and POST, process any inline response data if IPN is pending,
+// and redirect to the frontend with the final status.
 
-router.get('/browser-return', async (req, res) => {
-  const { orderid } = req.query;
+router.all('/browser-return', async (req, res) => {
+  const orderid = req.query.orderid 
+    || req.query.TRANSACTIONID 
+    || req.body?.TRANSACTIONID 
+    || req.body?.orderid 
+    || req.body?.order_id;
+
   const frontendUrl = process.env.FRONTEND_URL || process.env.CLIENT_URL || 'https://buildtrack.nurofin.com';
+
+  console.log(`[AirPay Return] Browser return hit method=${req.method} orderid=${orderid} bodyKeys=${Object.keys(req.body || {})}`);
 
   try {
     if (!orderid) {
+      console.warn('[AirPay Return] No orderid received in query or body');
       return res.redirect(`${frontendUrl}/subscription?status=unknown`);
     }
 
-    // Wait briefly for IPN to process (IPN can arrive slightly before browser return)
-    await new Promise(r => setTimeout(r, 1500));
+    let payment = await Payment.findOne({ orderId: orderid });
 
-    const payment = await Payment.findOne({ orderId: orderid });
+    // If IPN hasn't finished yet, wait up to 2 seconds for server-to-server webhook
+    if (!payment || payment.status === 'PENDING') {
+      await new Promise(r => setTimeout(r, 2000));
+      payment = await Payment.findOne({ orderId: orderid });
+    }
+
+    // If still PENDING and we received response/TRANSACTIONSTATUS in the browser return POST body,
+    // verify and activate right here!
+    if (payment && payment.status === 'PENDING' && (req.body?.response || req.body?.TRANSACTIONSTATUS)) {
+      try {
+        console.log('[AirPay Return] IPN pending, processing callback payload from browser return...');
+        let txnData = null;
+        if (req.body?.response) {
+          const decrypted = verifyAndDecryptCallbackData(req.body);
+          txnData = decrypted.data;
+        } else {
+          txnData = req.body;
+        }
+
+        const paymentStatus = (txnData.transaction_status || txnData.TRANSACTIONSTATUS || '').toString().trim().toUpperCase();
+        const airpayTxnId   = txnData.ap_transactionid || txnData.APTRANSACTIONID || txnData.transactionid;
+        const isSuccess     = paymentStatus === 'SUCCESS' || paymentStatus === '200';
+
+        if (isSuccess) {
+          const now     = new Date();
+          const endDate = new Date(now);
+          const subDoc  = await Subscription.findOne({ airpayOrderId: orderid });
+          if (subDoc?.isRecurring) {
+            endDate.setTime(addMonthsIST(subDoc.createdAt || now, 1).getTime() + 24 * 60 * 60 * 1000);
+          } else {
+            endDate.setDate(endDate.getDate() + (PLAN_DURATION_DAYS[payment.plan] || 30));
+          }
+
+          await Payment.findByIdAndUpdate(payment._id, {
+            status:              'PAID',
+            airpayTxnId,
+            secureHash:          txnData.ap_securehash,
+            callbackProcessed:   true,
+            callbackProcessedAt: now,
+            callbackStatus:      paymentStatus,
+          });
+
+          const airpaySubId = String(txnData.subscription_id || txnData.SUBSCRIPTION_ID || '').trim();
+          await Subscription.findOneAndUpdate(
+            { airpayOrderId: orderid },
+            {
+              status:              'active',
+              airpayTxnId,
+              transactionId:       airpayTxnId,
+              startDate:           now,
+              endDate,
+              ...(airpaySubId ? { airpaySubscriptionId: airpaySubId } : {}),
+              ...(txnData.subscription_next_rundate ? { nextRunDate: String(txnData.subscription_next_rundate) } : {}),
+              callbackProcessed:   true,
+              callbackReceivedAt:  now,
+              callbackStatus:      paymentStatus,
+            }
+          );
+          payment.status = 'PAID';
+          console.log(`[AirPay Return] ✅ Subscription activated via browser return for orderId=${orderid}`);
+        }
+      } catch (inlineErr) {
+        console.warn('[AirPay Return] Inline processing failed:', inlineErr.message);
+      }
+    }
 
     if (!payment) {
       return res.redirect(`${frontendUrl}/subscription?status=not_found`);

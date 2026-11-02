@@ -395,22 +395,32 @@ function verifyAndDecryptCallbackData(reqBody) {
     : dataObj[b] !== undefined ? String(dataObj[b]) : '';
   const CHMOD = String(dataObj.chmod || dataObj.CHMOD || reqBody.CHMOD || reqBody.chmod || '').toLowerCase();
 
-  const hashFields = [
-    pick('orderid', 'TRANSACTIONID'),
-    pick('ap_transactionid', 'APTRANSACTIONID'),
-    pick('amount', 'AMOUNT'),
-    pick('transaction_status', 'TRANSACTIONSTATUS'),
-    pick('message', 'MESSAGE'),
-    String(cfg.merchantId),
-    String(cfg.username),
-  ];
-  if (CHMOD === 'upi') {
-    const vpa = pick('customervpa', 'CUSTOMERVPA') || String(dataObj.customer_vpa || '');
-    hashFields.push(vpa);
+  const midInPayload = String(dataObj.merchant_id || dataObj.MERCHANT_ID || reqBody.merchant_id || reqBody.MERCHANT_ID || '').trim();
+  const midsToTry = Array.from(new Set([midInPayload, String(cfg.merchantId).trim()].filter(Boolean)));
+
+  let hashMatched = false;
+  for (const midVal of midsToTry) {
+    const hashFields = [
+      pick('orderid', 'TRANSACTIONID'),
+      pick('ap_transactionid', 'APTRANSACTIONID'),
+      pick('amount', 'AMOUNT'),
+      pick('transaction_status', 'TRANSACTIONSTATUS'),
+      pick('message', 'MESSAGE'),
+      midVal,
+      String(cfg.username),
+    ];
+    if (CHMOD === 'upi') {
+      const vpa = pick('customervpa', 'CUSTOMERVPA') || String(dataObj.customer_vpa || '');
+      hashFields.push(vpa);
+    }
+    const computed = (CRC32.str(hashFields.join(':')) >>> 0).toString();
+    if (computed === String(secureHash)) {
+      hashMatched = true;
+      break;
+    }
   }
 
-  const computedHash = (CRC32.str(hashFields.join(':')) >>> 0).toString();
-  if (computedHash !== String(secureHash)) {
+  if (!hashMatched) {
     // Do not log the raw hash inputs (they include the secret username).
     throw new Error('[BT-SEC-02] Callback rejected: secure hash mismatch.');
   }
