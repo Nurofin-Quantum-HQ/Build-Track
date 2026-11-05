@@ -442,23 +442,31 @@ router.all('/browser-return', async (req, res) => {
 
     let payment = await Payment.findOne({ orderId: orderid });
 
-    // If IPN hasn't finished yet, wait up to 2 seconds for server-to-server webhook
+    // If IPN hasn't finished yet, poll for up to 6 seconds for server-to-server webhook
     if (!payment || payment.status === 'PENDING') {
-      await new Promise(r => setTimeout(r, 2000));
-      payment = await Payment.findOne({ orderId: orderid });
+      for (let i = 0; i < 6; i++) {
+        await new Promise(r => setTimeout(r, 1000));
+        payment = await Payment.findOne({ orderId: orderid });
+        if (payment && payment.status !== 'PENDING') break;
+      }
     }
 
-    // If still PENDING and we received response/TRANSACTIONSTATUS in the browser return POST body,
+    // Check both req.body and req.query for callback data in case Airpay did a GET or form POST redirect
+    const callbackData = (req.body?.response || req.body?.TRANSACTIONSTATUS)
+      ? req.body
+      : ((req.query?.response || req.query?.TRANSACTIONSTATUS) ? req.query : null);
+
+    // If still PENDING and we received response/TRANSACTIONSTATUS in browser return,
     // verify and activate right here!
-    if (payment && payment.status === 'PENDING' && (req.body?.response || req.body?.TRANSACTIONSTATUS)) {
+    if (payment && payment.status === 'PENDING' && callbackData) {
       try {
         console.log('[AirPay Return] IPN pending, processing callback payload from browser return...');
         let txnData = null;
-        if (req.body?.response) {
-          const decrypted = verifyAndDecryptCallbackData(req.body);
+        if (callbackData.response) {
+          const decrypted = verifyAndDecryptCallbackData(callbackData);
           txnData = decrypted.data;
         } else {
-          txnData = req.body;
+          txnData = callbackData;
         }
 
         const paymentStatus = (txnData.transaction_status || txnData.TRANSACTIONSTATUS || '').toString().trim().toUpperCase();
