@@ -107,10 +107,10 @@ describe('buildPaymentPayload — Simple Transaction doc compliance', () => {
     expect(sent.sb_maxamount).toBe('4999.00');
   });
 
-  it('AutoPay works for the ₹1 plan too (amount = sb_amount is allowed)', async () => {
-    const { sent } = await build({ isRecurring: true, amount: 1, recurringAmount: 1 });
-    expect(sent.amount).toBe('1.00');
-    expect(sent.sb_amount).toBe('1.00');
+  it('AutoPay works for the ₹2 plan too (amount = sb_amount is allowed)', async () => {
+    const { sent } = await build({ isRecurring: true, amount: 2, recurringAmount: 2 });
+    expect(sent.amount).toBe('2.00');
+    expect(sent.sb_amount).toBe('2.00');
   });
 
   it('AutoPay: txnsubtype 12 (numeric "INR Subscription") and the sb_* fields', async () => {
