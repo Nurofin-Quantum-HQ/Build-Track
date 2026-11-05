@@ -26,7 +26,7 @@ const PLANS = [
   {
     id: "starter",
     title: "Starter",
-    price: 1,
+    price: 2,
     period: "/mo",
     tagline: "For small teams just getting started.",
     users: "5 users",
@@ -257,7 +257,7 @@ export default function SubscriptionPage() {
   // Phone modal state
   const [phonePlan, setPhonePlan]     = useState(null); // which plan triggered modal
   const [phoneLoading, setPhoneLoading] = useState(false);
-  const [isAutoRenew, setIsAutoRenew]   = useState(false); // false = One-Time Payment, true = Monthly AutoPay
+  const [isAutoRenew, setIsAutoRenew]   = useState(true); // true = Monthly AutoPay (default), false = One-Time Payment
 
 
   const tourSteps = [
@@ -638,27 +638,6 @@ export default function SubscriptionPage() {
           }}>
             <button
               type="button"
-              onClick={() => setIsAutoRenew(false)}
-              style={{
-                border: "none",
-                background: !isAutoRenew ? "#fff" : "transparent",
-                color: !isAutoRenew ? "var(--color-primary-hover, #EA580C)" : "#666",
-                fontWeight: !isAutoRenew ? 700 : 500,
-                padding: "8px 20px",
-                borderRadius: 8,
-                fontSize: 13,
-                cursor: "pointer",
-                boxShadow: !isAutoRenew ? "0 2px 6px rgba(0,0,0,0.08)" : "none",
-                display: "flex",
-                alignItems: "center",
-                gap: 6,
-                transition: "all 0.2s ease",
-              }}
-            >
-              <span>⚡</span> One-Time Payment (UPI / QR / Cards)
-            </button>
-            <button
-              type="button"
               onClick={() => setIsAutoRenew(true)}
               style={{
                 border: "none",
@@ -678,11 +657,32 @@ export default function SubscriptionPage() {
             >
               <span>🔄</span> AutoPay (Monthly Auto-Debit)
             </button>
+            <button
+              type="button"
+              onClick={() => setIsAutoRenew(false)}
+              style={{
+                border: "none",
+                background: !isAutoRenew ? "#fff" : "transparent",
+                color: !isAutoRenew ? "var(--color-primary-hover, #EA580C)" : "#666",
+                fontWeight: !isAutoRenew ? 700 : 500,
+                padding: "8px 20px",
+                borderRadius: 8,
+                fontSize: 13,
+                cursor: "pointer",
+                boxShadow: !isAutoRenew ? "0 2px 6px rgba(0,0,0,0.08)" : "none",
+                display: "flex",
+                alignItems: "center",
+                gap: 6,
+                transition: "all 0.2s ease",
+              }}
+            >
+              <span>⚡</span> One-Time Payment (UPI / QR / Cards)
+            </button>
           </div>
           <div style={{ fontSize: 12, color: "#666", textAlign: "center" }}>
-            {!isAutoRenew
-              ? "⚡ Pay once for 30 days. No automatic renewals or recurring charges."
-              : "🔄 Pay for this month now. Your plan is then renewed automatically every month via UPI AutoPay. Cancel anytime."}
+            {isAutoRenew
+              ? "🔄 Pay for this month now. Your plan is then renewed automatically every month via UPI AutoPay. Cancel anytime."
+              : "⚡ Pay once for 30 days. No automatic renewals or recurring charges."}
           </div>
         </div>
 
