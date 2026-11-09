@@ -22,6 +22,8 @@ export function BtToastComponent({
 
   return (
     <div
+      role={error ? 'alert' : 'status'}
+      aria-live="polite"
       style={{
         position: 'fixed',
         bottom: '24px',

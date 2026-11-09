@@ -54,7 +54,7 @@ export default function BtRow({
             flexShrink: 0,
           }}
         >
-          {typeof Icon === 'function' ? <Icon size={20} strokeWidth={1.8} /> : Icon}
+          {typeof Icon === 'function' || Icon?.$$typeof === Symbol.for('react.forward_ref') ? <Icon size={20} strokeWidth={1.8} /> : Icon}
         </div>
       )}
 

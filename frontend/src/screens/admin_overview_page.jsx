@@ -3,31 +3,29 @@ import { useNavigate } from 'react-router-dom';
 import { authAPI, projectAPI, transactionAPI } from '../api';
 import {
   Users,
-  User,
   ClipboardList,
   Building2,
   HelpCircle,
   Plus,
   ArrowRight,
   ShieldCheck,
-  CheckCircle2,
-  Calendar,
-  IndianRupee,
-  Layers,
+  Activity,
+  FolderOpen,
+  Receipt,
 } from 'lucide-react';
 import ModuleTour from '../components/ModuleTour';
 import BtHero, { BtGlassTile } from '../components/ui/BtHero';
+import BtPageHeader from '../components/ui/BtPageHeader';
 import BtSheet from '../components/ui/BtSheet';
 import BtCard from '../components/ui/BtCard';
 import BtBadge from '../components/ui/BtBadge';
 import BtButton from '../components/ui/BtButton';
-import BtPressable from '../components/ui/BtPressable';
+import BtIconButton from '../components/ui/BtIconButton';
 import BtSegmented from '../components/ui/BtSegmented';
-import BtEmpty from '../components/ui/BtEmpty';
-
-function formatCurrency(amount) {
-  return '₹' + Number(amount || 0).toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 2 });
-}
+import BtChip from '../components/ui/BtChip';
+import BtEmpty, { BtErrorCard } from '../components/ui/BtEmpty';
+import BtSkeleton from '../components/ui/BtSkeleton';
+import { formatInr } from '../components/ui/BtCountUp';
 
 function formatDate(dateStr) {
   if (!dateStr) return '—';
@@ -36,6 +34,46 @@ function formatDate(dateStr) {
   } catch {
     return dateStr;
   }
+}
+
+const TYPE_META = {
+  material: { tone: 'material', label: 'Material' },
+  materials: { tone: 'material', label: 'Material' },
+  labour: { tone: 'labour', label: 'Labour' },
+  wages: { tone: 'labour', label: 'Labour' },
+  equipment: { tone: 'equipment', label: 'Equipment' },
+  expense: { tone: 'equipment', label: 'Equipment' },
+  income: { tone: 'income', label: 'Income' },
+};
+
+function typeMeta(type) {
+  const key = String(type || '').toLowerCase();
+  return TYPE_META[key] || { tone: 'neutral', label: type ? String(type).charAt(0).toUpperCase() + String(type).slice(1) : 'Entry' };
+}
+
+function roleTone(roleName = '') {
+  const r = roleName.toLowerCase();
+  if (r === 'admin') return 'brand';
+  if (r === 'supervisor') return 'material';
+  if (r === 'mason') return 'labour';
+  return 'neutral';
+}
+
+function paymentTone(status = '') {
+  const s = String(status).toLowerCase();
+  if (s === 'paid') return 'success';
+  if (s === 'partial' || s === 'partially paid') return 'warning';
+  return 'neutral';
+}
+
+function ListSkeleton({ height = 80 }) {
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+      {[1, 2, 3].map((i) => (
+        <BtSkeleton key={i} height={`${height}px`} borderRadius="var(--r-card)" />
+      ))}
+    </div>
+  );
 }
 
 export default function AdminOverviewPage() {
@@ -49,6 +87,13 @@ export default function AdminOverviewPage() {
   const [loadingProjects, setLoadingProjects] = useState(true);
   const [error, setError] = useState(null);
   const [runTour, setRunTour] = useState(false);
+  const [narrow, setNarrow] = useState(() => window.innerWidth < 560);
+
+  useEffect(() => {
+    const onResize = () => setNarrow(window.innerWidth < 560);
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, []);
 
   const tourSteps = [
     { target: '.tour-header', content: 'Overview of your team, projects, and entries.', disableBeacon: true },
@@ -58,6 +103,9 @@ export default function AdminOverviewPage() {
 
   const fetchAll = useCallback(async () => {
     setError(null);
+    setLoadingUsers(true);
+    setLoadingProjects(true);
+    setLoadingEntries(true);
     try {
       const [userRes, projRes, txRes] = await Promise.allSettled([
         authAPI.getUsers(),
@@ -98,309 +146,145 @@ export default function AdminOverviewPage() {
     fetchAll();
   }, [fetchAll]);
 
+  const weekAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
   const stats = {
     totalUsers: users.length,
     activeProjects: projects.filter((p) => (p.status || '').toLowerCase() === 'active').length,
     totalEntries: allEntries.length,
-    recentEntries: allEntries.length,
+    lastWeek: allEntries.filter((e) => {
+      const t = new Date(e.date || e.createdAt).getTime();
+      return Number.isFinite(t) && t >= weekAgo;
+    }).length,
   };
 
   const segmentedTabs = [
-    { label: `Team (${users.length})`, value: 'team' },
-    { label: `Recent Entries (${allEntries.length})`, value: 'entries' },
-    { label: `Projects (${projects.length})`, value: 'projects' },
+    { label: `Team (${users.length})`, value: 'team', icon: Users },
+    { label: `Recent Entries (${allEntries.length})`, value: 'entries', icon: Receipt },
+    { label: `Projects (${projects.length})`, value: 'projects', icon: Building2 },
   ];
+
+  const tileProps = (target) => ({
+    role: 'button',
+    tabIndex: 0,
+    onKeyDown: (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setTab(target); } },
+  });
 
   return (
     <div style={{ minHeight: '100vh', background: 'var(--ground)' }}>
       <ModuleTour steps={tourSteps} run={runTour} setRun={setRunTour} moduleName="AdminDashboard" />
 
-      {/* ── TOP HERO (Deep Noir with blueprint grid & glow) ── */}
-      <BtHero padding="24px 32px 48px">
-        <div
-          className="tour-header"
-          style={{
-            display: 'flex',
-            alignItems: 'flex-start',
-            justifyContent: 'space-between',
-            gap: 16,
-            flexWrap: 'wrap',
-            marginBottom: 24,
-          }}
-        >
-          <div>
-            <div
-              style={{
-                fontFamily: 'var(--font-mono)',
-                fontSize: 11,
-                letterSpacing: '0.08em',
-                color: 'var(--on-noir-2)',
-                textTransform: 'uppercase',
-                fontWeight: 600,
-                marginBottom: 4,
-              }}
-            >
-              Control Center
+      {/* ── HERO ── */}
+      <BtHero>
+        <div className="tour-header">
+          <BtPageHeader
+            eyebrow="Control center"
+            title="Admin Overview"
+            subtitle="Your team, active projects and the latest entries at a glance."
+            actions={
+              <>
+                <BtIconButton onDark icon={HelpCircle} label="Page tour" onClick={() => setRunTour(true)} />
+                <BtButton variant="onDark" size="small" icon={ShieldCheck} onClick={() => navigate('/assign-role')}>
+                  Assign Roles
+                </BtButton>
+                <BtButton variant="accent" size="small" icon={Plus} onClick={() => navigate('/newproject')}>
+                  New Project
+                </BtButton>
+              </>
+            }
+          >
+            <div className="tour-stats" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 12 }}>
+              <BtGlassTile label="Team members" value={stats.totalUsers} icon={Users} onClick={() => setTab('team')} {...tileProps('team')} />
+              <BtGlassTile label="Active projects" value={stats.activeProjects} icon={Building2} onClick={() => setTab('projects')} {...tileProps('projects')} />
+              <BtGlassTile label="Recent entries" value={stats.totalEntries} icon={ClipboardList} onClick={() => setTab('entries')} {...tileProps('entries')} />
+              <BtGlassTile label="Last 7 days" value={stats.lastWeek} icon={Activity} onClick={() => setTab('entries')} {...tileProps('entries')} />
             </div>
-            <h1
-              style={{
-                fontFamily: 'var(--font-display)',
-                fontSize: 34,
-                fontWeight: 700,
-                letterSpacing: '-0.02em',
-                color: 'var(--bone)',
-                margin: 0,
-                lineHeight: 1.15,
-              }}
-            >
-              Admin Overview
-            </h1>
-            <p style={{ fontSize: 13, color: 'var(--on-noir-2)', margin: '4px 0 0' }}>
-              Workforce distribution, active project statuses, and activity audit trail
-            </p>
-          </div>
-
-          {/* Quick Actions on Dark */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
-            <button
-              onClick={() => setRunTour(true)}
-              title="Help Tour"
-              style={{
-                width: 38,
-                height: 38,
-                borderRadius: 'var(--r-btn, 12px)',
-                background: 'rgba(255, 255, 255, 0.08)',
-                border: '1px solid rgba(255, 255, 255, 0.12)',
-                color: 'var(--bone)',
-                display: 'grid',
-                placeItems: 'center',
-                cursor: 'pointer',
-              }}
-            >
-              <HelpCircle size={17} />
-            </button>
-
-            <button
-              onClick={() => navigate('/assign-role')}
-              style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: 7,
-                height: 38,
-                padding: '0 14px',
-                borderRadius: 'var(--r-btn, 12px)',
-                background: 'rgba(255, 255, 255, 0.08)',
-                border: '1px solid rgba(255, 255, 255, 0.12)',
-                color: 'var(--bone)',
-                fontSize: 13,
-                fontWeight: 600,
-                cursor: 'pointer',
-              }}
-            >
-              <ShieldCheck size={15} />
-              <span>Assign Roles</span>
-            </button>
-
-            <button
-              onClick={() => navigate('/newproject')}
-              style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: 7,
-                height: 38,
-                padding: '0 16px',
-                borderRadius: 'var(--r-btn, 12px)',
-                background: '#FFFFFF',
-                border: 'none',
-                color: 'var(--ink)',
-                fontSize: 13,
-                fontWeight: 700,
-                cursor: 'pointer',
-                boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
-              }}
-            >
-              <Plus size={15} />
-              <span>New Project</span>
-            </button>
-          </div>
-        </div>
-
-        {/* 4 Glass KPI Tiles on Noir */}
-        <div
-          className="tour-stats"
-          style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
-            gap: 12,
-            marginBottom: 20,
-          }}
-        >
-          <BtGlassTile
-            label="Team Members"
-            value={stats.totalUsers}
-            icon={Users}
-            onClick={() => setTab('team')}
-          />
-          <BtGlassTile
-            label="Active Projects"
-            value={stats.activeProjects}
-            icon={Building2}
-            onClick={() => setTab('projects')}
-          />
-          <BtGlassTile
-            label="Total Entries"
-            value={stats.totalEntries}
-            icon={ClipboardList}
-            onClick={() => setTab('entries')}
-          />
-          <BtGlassTile
-            label="Recent Activity"
-            value={stats.recentEntries}
-            icon={Layers}
-            onClick={() => setTab('entries')}
-          />
+          </BtPageHeader>
         </div>
       </BtHero>
 
-      {/* ── MAIN CONTENT (Overlapping BtSheet) ── */}
+      {/* ── SHEET ── */}
       <BtSheet overlap={26} padding="28px 32px 64px">
-        {/* Navigation Tabs */}
         <div className="tour-tabs" style={{ marginBottom: 24 }}>
-          <BtSegmented
-            options={segmentedTabs}
-            value={tab}
-            onChange={(val) => setTab(val)}
-          />
+          {narrow ? (
+            <div role="tablist" style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+              {segmentedTabs.map((t) => (
+                <BtChip
+                  key={t.value}
+                  label={t.label}
+                  selected={tab === t.value}
+                  role="tab"
+                  aria-selected={tab === t.value}
+                  onClick={() => setTab(t.value)}
+                  style={{ height: 40 }}
+                />
+              ))}
+            </div>
+          ) : (
+            <BtSegmented options={segmentedTabs} value={tab} onChange={(val) => setTab(val)} />
+          )}
         </div>
 
         {error && (
-          <div
-            style={{
-              padding: '12px 18px',
-              borderRadius: 'var(--r-card)',
-              background: '#FEE2E2',
-              color: '#991B1B',
-              fontSize: 14,
-              marginBottom: 20,
-              display: 'flex',
-              justifyContent: 'space-between',
-              alignItems: 'center',
-            }}
-          >
-            <span>{error}</span>
-            <button
-              onClick={fetchAll}
-              style={{
-                border: 'none',
-                background: 'transparent',
-                color: '#991B1B',
-                fontWeight: 700,
-                cursor: 'pointer',
-                textDecoration: 'underline',
-              }}
-            >
-              Retry
-            </button>
-          </div>
+          <BtErrorCard title="Couldn't load the overview" message={error} onRetry={fetchAll} style={{ marginBottom: 20 }} />
         )}
 
-        {/* Tab 1: TEAM MEMBERS */}
+        {/* Tab 1: TEAM */}
         {tab === 'team' && (
           <div>
             {loadingUsers ? (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-                {[1, 2, 3].map((i) => (
-                  <div
-                    key={i}
-                    style={{
-                      height: 80,
-                      borderRadius: 'var(--r-card)',
-                      background: 'var(--fill)',
-                    }}
-                  />
-                ))}
-              </div>
+              <ListSkeleton />
             ) : users.length === 0 ? (
-              <BtEmpty
-                title="No team members yet"
-                message="Invite team members and assign roles to give them access to projects."
-                actionLabel="Assign Role"
-                onAction={() => navigate('/assign-role')}
-              />
+              <BtCard padding={0}>
+                <BtEmpty
+                  icon={Users}
+                  title="No team members yet"
+                  message="Add team members and assign roles to give them access to projects."
+                  actionLabel="Assign Role"
+                  onAction={() => navigate('/assign-role')}
+                />
+              </BtCard>
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
                 {users.map((member) => {
                   const roleName = member.role || 'Member';
-                  const roleTone =
-                    roleName.toLowerCase() === 'admin'
-                      ? 'accent'
-                      : roleName.toLowerCase() === 'supervisor'
-                        ? 'info'
-                        : roleName.toLowerCase() === 'mason'
-                          ? 'warn'
-                          : 'muted';
-
                   return (
                     <BtCard
                       key={member._id || member.id}
                       padding="16px 20px"
-                      style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'space-between',
-                        flexWrap: 'wrap',
-                        gap: 14,
-                      }}
+                      style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 14 }}
                     >
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 14, minWidth: 0, flex: '1 1 260px' }}>
                         <div
+                          aria-hidden="true"
                           style={{
-                            width: 44,
-                            height: 44,
-                            borderRadius: '50%',
-                            background: 'var(--fill)',
-                            border: '1px solid var(--line)',
-                            display: 'grid',
-                            placeItems: 'center',
-                            fontSize: 16,
-                            fontWeight: 700,
-                            color: 'var(--ink)',
+                            width: 44, height: 44, borderRadius: '50%', background: 'var(--fill)', border: '1px solid var(--line)',
+                            display: 'grid', placeItems: 'center', fontFamily: 'var(--font-display)', fontSize: 17, fontWeight: 700,
+                            color: 'var(--ink)', flexShrink: 0,
                           }}
                         >
                           {member.name ? member.name.charAt(0).toUpperCase() : 'U'}
                         </div>
-                        <div>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                            <span style={{ fontSize: 15, fontWeight: 700, color: 'var(--ink)' }}>
+                        <div style={{ minWidth: 0 }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                            <span style={{ fontSize: 16, fontWeight: 600, color: 'var(--ink)' }}>
                               {member.name || 'Unnamed User'}
                             </span>
-                            <BtBadge tone={roleTone}>{roleName}</BtBadge>
+                            <BtBadge tone={roleTone(roleName)} label={roleName} showDot={false} />
                           </div>
-                          <div style={{ fontSize: 12.5, color: 'var(--ink-soft)', marginTop: 2 }}>
+                          <div style={{ fontSize: 13, color: 'var(--ink-3)', marginTop: 3, overflowWrap: 'anywhere' }}>
                             {member.email || 'No email'} · Joined {formatDate(member.createdAt)}
                           </div>
                         </div>
                       </div>
 
-                      <button
+                      <BtButton
+                        variant="secondary"
+                        size="small"
+                        trailingIcon={ArrowRight}
                         onClick={() => navigate('/assign-role', { state: { user: member } })}
-                        style={{
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          gap: 6,
-                          padding: '6px 14px',
-                          borderRadius: 'var(--r-btn, 12px)',
-                          background: '#FFFFFF',
-                          border: '1px solid var(--line)',
-                          fontSize: 12.5,
-                          fontWeight: 600,
-                          color: 'var(--ink)',
-                          cursor: 'pointer',
-                        }}
                       >
-                        <span>Edit Role</span>
-                        <ArrowRight size={13} />
-                      </button>
+                        Edit Role
+                      </BtButton>
                     </BtCard>
                   );
                 })}
@@ -413,75 +297,47 @@ export default function AdminOverviewPage() {
         {tab === 'entries' && (
           <div>
             {loadingEntries ? (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-                {[1, 2, 3].map((i) => (
-                  <div
-                    key={i}
-                    style={{
-                      height: 80,
-                      borderRadius: 'var(--r-card)',
-                      background: 'var(--fill)',
-                    }}
-                  />
-                ))}
-              </div>
+              <ListSkeleton height={64} />
             ) : allEntries.length === 0 ? (
-              <BtEmpty
-                title="No recent entries recorded"
-                message="Transactions and daily material/labour updates will show up here."
-              />
+              <BtCard padding={0}>
+                <BtEmpty
+                  icon={Receipt}
+                  title="No entries recorded yet"
+                  message="Material, labour and equipment entries will show up here as your team logs them."
+                />
+              </BtCard>
             ) : (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-                {allEntries.map((entry) => {
-                  const id = entry._id || entry.id;
-                  const type = entry.type || 'material';
-                  const typeTone =
-                    type === 'material' ? 'info' : type === 'labour' ? 'warn' : 'good';
-
-                  return (
-                    <BtCard
-                      key={id}
-                      padding="16px 20px"
-                      style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'space-between',
-                        flexWrap: 'wrap',
-                        gap: 14,
-                      }}
-                    >
-                      <div>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
-                          <BtBadge tone={typeTone}>{type.toUpperCase()}</BtBadge>
-                          <span style={{ fontSize: 13, color: 'var(--ink-soft)' }}>
-                            {formatDate(entry.date || entry.createdAt)}
-                          </span>
-                        </div>
-                        <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--ink)' }}>
-                          {entry.description || 'Expense Entry'}
-                        </div>
-                      </div>
-
-                      <div style={{ textAlign: 'right' }}>
-                        <div
-                          style={{
-                            fontFamily: 'var(--font-display)',
-                            fontSize: 18,
-                            fontWeight: 700,
-                            color: 'var(--ink)',
-                            fontVariantNumeric: 'tabular-nums',
-                          }}
-                        >
-                          {formatCurrency(entry.amount)}
-                        </div>
-                        <span style={{ fontSize: 11.5, color: 'var(--ink-soft)' }}>
-                          {entry.paymentStatus || 'Pending'}
-                        </span>
-                      </div>
-                    </BtCard>
-                  );
-                })}
-              </div>
+              <BtCard padding={0} style={{ overflowX: 'auto' }}>
+                <table className="bt-table" style={{ minWidth: 640 }}>
+                  <thead>
+                    <tr>
+                      <th>Date</th>
+                      <th>Type</th>
+                      <th>Entry</th>
+                      <th>Payment</th>
+                      <th className="num" style={{ textAlign: 'right' }}>Amount</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {allEntries.map((entry) => {
+                      const id = entry._id || entry.id;
+                      const meta = typeMeta(entry.type);
+                      const pay = entry.paymentStatus || 'Pending';
+                      return (
+                        <tr key={id}>
+                          <td style={{ whiteSpace: 'nowrap', color: 'var(--ink-2)' }}>{formatDate(entry.date || entry.createdAt)}</td>
+                          <td><BtBadge tone={meta.tone} label={meta.label} showDot={false} /></td>
+                          <td style={{ fontWeight: 600, maxWidth: 320, overflowWrap: 'anywhere' }}>
+                            {entry.title || entry.description || 'Expense Entry'}
+                          </td>
+                          <td><BtBadge tone={paymentTone(pay)} label={pay} /></td>
+                          <td className="num tnum" style={{ fontWeight: 600, whiteSpace: 'nowrap' }}>{formatInr(entry.amount)}</td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </BtCard>
             )}
           </div>
         )}
@@ -490,79 +346,59 @@ export default function AdminOverviewPage() {
         {tab === 'projects' && (
           <div>
             {loadingProjects ? (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-                {[1, 2, 3].map((i) => (
-                  <div
-                    key={i}
-                    style={{
-                      height: 80,
-                      borderRadius: 'var(--r-card)',
-                      background: 'var(--fill)',
-                    }}
-                  />
-                ))}
-              </div>
+              <ListSkeleton height={120} />
             ) : projects.length === 0 ? (
-              <BtEmpty
-                title="No projects configured"
-                message="Start by creating your first construction project."
-                actionLabel="Create Project"
-                onAction={() => navigate('/newproject')}
-              />
+              <BtCard padding={0}>
+                <BtEmpty
+                  icon={FolderOpen}
+                  title="No projects yet"
+                  message="Start by creating your first construction project."
+                  actionLabel="Create Project"
+                  onAction={() => navigate('/newproject')}
+                />
+              </BtCard>
             ) : (
-              <div
-                style={{
-                  display: 'grid',
-                  gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))',
-                  gap: 16,
-                }}
-              >
+              <div className="bt-grid-3">
                 {projects.map((proj) => {
                   const id = proj._id || proj.id;
                   const status = proj.status || 'Active';
                   const isAct = status.toLowerCase() === 'active';
+                  const open = () => navigate('/managesite', { state: { project: proj } });
 
                   return (
                     <BtCard
                       key={id}
                       padding="20px"
-                      onClick={() => navigate('/managesite', { state: { project: proj } })}
-                      style={{ cursor: 'pointer' }}
+                      className="bt-hover-card"
+                      onClick={open}
+                      role="button"
+                      tabIndex={0}
+                      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); open(); } }}
+                      aria-label={`Open ${proj.projectName || proj.name}`}
+                      style={{ display: 'flex', flexDirection: 'column', gap: 14 }}
                     >
-                      <div
-                        style={{
-                          display: 'flex',
-                          justifyContent: 'space-between',
-                          alignItems: 'flex-start',
-                          marginBottom: 8,
-                        }}
-                      >
-                        <div>
-                          <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--ink)' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 10 }}>
+                        <div style={{ minWidth: 0 }}>
+                          <div style={{ fontSize: 16, fontWeight: 600, color: 'var(--ink)', overflowWrap: 'anywhere' }}>
                             {proj.projectName || proj.name}
                           </div>
-                          <div style={{ fontSize: 12.5, color: 'var(--ink-soft)', marginTop: 2 }}>
-                            {[proj.code, proj.location, proj.clientName].filter(Boolean).join(' · ')}
+                          <div style={{ fontSize: 13, color: 'var(--ink-3)', marginTop: 3, overflowWrap: 'anywhere' }}>
+                            {[proj.code, proj.location, proj.clientName].filter(Boolean).join(' · ') || 'No details added'}
                           </div>
                         </div>
-                        <BtBadge tone={isAct ? 'good' : 'muted'}>{status}</BtBadge>
+                        <BtBadge tone={isAct ? 'success' : 'neutral'} label={status} />
                       </div>
 
                       <div
                         style={{
-                          display: 'flex',
-                          justifyContent: 'space-between',
-                          alignItems: 'center',
-                          borderTop: '1px solid var(--line)',
-                          paddingTop: 12,
-                          marginTop: 12,
-                          fontSize: 13,
+                          display: 'flex', justifyContent: 'space-between', alignItems: 'baseline',
+                          borderTop: '1px solid var(--line)', paddingTop: 12,
                         }}
                       >
-                        <span style={{ color: 'var(--ink-soft)' }}>Budget:</span>
-                        <b style={{ fontFamily: 'var(--font-display)', fontVariantNumeric: 'tabular-nums' }}>
-                          {formatCurrency(proj.budget?.total || proj.totalBudget || 0)}
-                        </b>
+                        <span className="bt-eyebrow" style={{ color: 'var(--ink-3)' }}>Budget</span>
+                        <span className="tnum" style={{ fontFamily: 'var(--font-display)', fontSize: 18, fontWeight: 700, color: 'var(--ink)' }}>
+                          {formatInr(proj.budget?.total || proj.totalBudget || 0, { compact: true })}
+                        </span>
                       </div>
                     </BtCard>
                   );

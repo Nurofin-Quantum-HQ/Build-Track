@@ -1,13 +1,29 @@
 import React from "react";
 
+// Compact rupees: ₹45 L, ₹1.81 Cr, ₹27.1 k
 const fmtINR = (n) => {
-  if (n >= 10000000) return `₹${(n / 10000000).toFixed(2)}Cr`;
-  if (n >= 100000) return `₹${(n / 100000).toFixed(2)}L`;
-  if (n >= 1000) return `₹${(n / 1000).toFixed(1)}K`;
-  return `₹${Number(n || 0).toLocaleString("en-IN")}`;
+  const v = Number(n) || 0;
+  const a = Math.abs(v);
+  const sign = v < 0 ? "−" : "";
+  if (a >= 10000000) return `${sign}₹${(a / 10000000).toFixed(2).replace(/\.?0+$/, "")} Cr`;
+  if (a >= 100000) return `${sign}₹${(a / 100000).toFixed(2).replace(/\.?0+$/, "")} L`;
+  if (a >= 1000) return `${sign}₹${(a / 1000).toFixed(1).replace(/\.0$/, "")} k`;
+  return `${sign}₹${Math.round(a).toLocaleString("en-IN")}`;
 };
 
-export function MetricCard({ icon, label, value, budget, color = "var(--ink, #111317)", trend }) {
+const eyebrow = {
+  fontFamily: "var(--font-mono)",
+  fontSize: 10.5,
+  fontWeight: 600,
+  letterSpacing: "0.09em",
+  textTransform: "uppercase",
+  color: "var(--ink-3)",
+};
+
+// `color` may be a token (var(--type-labour)) or a legacy hex passed by a page.
+const soft = (color) => `color-mix(in srgb, ${color} 14%, transparent)`;
+
+export function MetricCard({ icon, label, value, budget, color = "var(--ink)", trend }) {
   const pct = budget > 0 ? Math.round((value / budget) * 100) : 0;
   const isOver = value > budget && budget > 0;
   const remaining = budget - value;
@@ -15,54 +31,48 @@ export function MetricCard({ icon, label, value, budget, color = "var(--ink, #11
   return (
     <div
       style={{
-        background: "var(--card-bg, #FFFFFF)",
-        borderRadius: 16,
-        border: "1px solid var(--border, #E2E8F0)",
+        background: "var(--card)",
+        borderRadius: "var(--r-card)",
+        border: "1px solid var(--line)",
         padding: "18px 20px",
-        boxShadow: "0 1px 3px rgba(0,0,0,0.02)",
+        boxShadow: "var(--shadow-card)",
         display: "flex",
         flexDirection: "column",
         justifyContent: "space-between",
+        boxSizing: "border-box",
+        fontFamily: "var(--font-ui)",
       }}
     >
       <div>
         <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 12 }}>
           <div
+            aria-hidden
             style={{
               width: 36,
               height: 36,
-              borderRadius: 10,
-              background: `${color}15`,
-              color: color,
+              borderRadius: "var(--r-chip)",
+              background: soft(color),
+              color,
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
-              fontSize: 16,
+              flexShrink: 0,
             }}
           >
             {icon}
           </div>
-          <div
-            style={{
-              fontSize: 11,
-              fontWeight: 800,
-              color: "#64748B",
-              textTransform: "uppercase",
-              letterSpacing: "0.06em",
-              fontFamily: "JetBrains Mono, monospace",
-            }}
-          >
-            {label}
-          </div>
+          <div style={eyebrow}>{label}</div>
         </div>
         <div
+          className="tnum"
           style={{
-            fontSize: 24,
-            fontWeight: 800,
-            color: "var(--ink, #111317)",
+            fontFamily: "var(--font-display)",
+            fontSize: 28,
+            fontWeight: 700,
+            letterSpacing: "-0.02em",
+            color: "var(--ink)",
             marginBottom: 8,
-            fontFamily: "JetBrains Mono, monospace",
-            fontVariantNumeric: "tabular-nums",
+            lineHeight: 1.1,
           }}
         >
           {fmtINR(value)}
@@ -71,74 +81,78 @@ export function MetricCard({ icon, label, value, budget, color = "var(--ink, #11
 
       {budget > 0 && (
         <div style={{ marginTop: 8 }}>
-          <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6, fontSize: 11 }}>
-            <span style={{ color: "#64748B", fontVariantNumeric: "tabular-nums" }}>Budget: {fmtINR(budget)}</span>
-            <span style={{ fontWeight: 700, color: isOver ? "#DC2626" : "#16A34A", fontVariantNumeric: "tabular-nums" }}>
-              {isOver ? `+${pct - 100}% over` : `${100 - pct}% rem`}
+          <div style={{ display: "flex", justifyContent: "space-between", gap: 8, marginBottom: 8, fontSize: 13 }}>
+            <span className="tnum" style={{ color: "var(--ink-2)" }}>
+              Budget {fmtINR(budget)}
+            </span>
+            <span
+              className="tnum"
+              style={{ fontWeight: 600, color: isOver ? "var(--status-danger)" : "var(--status-success)" }}
+            >
+              {isOver ? `${pct - 100}% over` : `${100 - pct}% left`}
             </span>
           </div>
-          <div style={{ height: 5, background: "#F1F5F9", borderRadius: 4, overflow: "hidden" }}>
+          <div style={{ height: 8, background: "var(--fill)", borderRadius: 4, overflow: "hidden" }}>
             <div
               style={{
                 width: `${Math.min(pct, 100)}%`,
                 height: "100%",
-                background: isOver ? "#DC2626" : color,
+                background: isOver ? "var(--status-danger)" : color,
                 borderRadius: 4,
-                transition: "width 0.4s ease",
+                transition: "width 0.4s var(--ease)",
               }}
             />
           </div>
           {isOver && (
-            <div style={{ fontSize: 11, color: "#DC2626", marginTop: 4, fontWeight: 700, fontVariantNumeric: "tabular-nums" }}>
-              Exceeded by {fmtINR(Math.abs(remaining))}
+            <div className="tnum" style={{ fontSize: 13, color: "var(--status-danger)", marginTop: 6, fontWeight: 600 }}>
+              Over by {fmtINR(Math.abs(remaining))}
             </div>
           )}
           {!isOver && remaining > 0 && (
-            <div style={{ fontSize: 11, color: "#16A34A", marginTop: 4, fontWeight: 600, fontVariantNumeric: "tabular-nums" }}>
-              Remaining: {fmtINR(remaining)}
+            <div className="tnum" style={{ fontSize: 13, color: "var(--ink-2)", marginTop: 6 }}>
+              {fmtINR(remaining)} remaining
             </div>
           )}
         </div>
       )}
-      {trend && (
-        <div style={{ fontSize: 11, color: "#64748B", marginTop: 6 }}>
-          {trend}
-        </div>
-      )}
+      {trend && <div style={{ fontSize: 13, color: "var(--ink-2)", marginTop: 8 }}>{trend}</div>}
     </div>
   );
 }
 
-export function CategoryBudgetBar({ name, spent, budget, color = "var(--ink, #111317)" }) {
+export function CategoryBudgetBar({ name, spent, budget, color = "var(--ink)" }) {
   const pct = budget > 0 ? Math.round((spent / budget) * 100) : 0;
   const isOver = spent > budget && budget > 0;
-  const barColor = pct > 100 ? "#DC2626" : pct > 75 ? "#E0A93B" : color;
+  const barColor = pct > 100 ? "var(--status-danger)" : pct > 75 ? "var(--status-warning-bright)" : color;
 
   return (
-    <div style={{ marginBottom: 16 }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
-        <span style={{ fontSize: 13, fontWeight: 700, color: "var(--ink, #111317)" }}>{name}</span>
-        <span style={{ fontSize: 12, fontWeight: 600, color: isOver ? "#DC2626" : "#64748B", fontVariantNumeric: "tabular-nums" }}>
+    <div style={{ marginBottom: 18, fontFamily: "var(--font-ui)" }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 12, marginBottom: 8 }}>
+        <span style={{ fontSize: 15, fontWeight: 600, color: "var(--ink)" }}>{name}</span>
+        <span
+          className="tnum"
+          style={{ fontSize: 14, fontWeight: 600, color: isOver ? "var(--status-danger)" : "var(--ink-2)", whiteSpace: "nowrap" }}
+        >
           {fmtINR(spent)} {budget > 0 ? `/ ${fmtINR(budget)}` : ""}
         </span>
       </div>
-      <div style={{ height: 6, background: "#F1F5F9", borderRadius: 4, overflow: "hidden" }}>
+      <div style={{ height: 8, background: "var(--fill)", borderRadius: 4, overflow: "hidden" }}>
         <div
           style={{
             width: `${Math.min(pct, 100)}%`,
             height: "100%",
             background: barColor,
             borderRadius: 4,
-            transition: "width 0.4s ease",
+            transition: "width 0.4s var(--ease)",
           }}
         />
       </div>
-      <div style={{ display: "flex", justifyContent: "space-between", marginTop: 4, fontSize: 11, fontVariantNumeric: "tabular-nums" }}>
-        <span style={{ color: "#64748B" }}>{pct}% utilized</span>
+      <div className="tnum" style={{ display: "flex", justifyContent: "space-between", gap: 8, marginTop: 6, fontSize: 13 }}>
+        <span style={{ color: "var(--ink-2)" }}>{pct}% used</span>
         {isOver ? (
-          <span style={{ color: "#DC2626", fontWeight: 700 }}>Exceeded by {fmtINR(spent - budget)}</span>
+          <span style={{ color: "var(--status-danger)", fontWeight: 600 }}>Over by {fmtINR(spent - budget)}</span>
         ) : budget > 0 ? (
-          <span style={{ color: "#16A34A", fontWeight: 600 }}>Remaining {fmtINR(budget - spent)}</span>
+          <span style={{ color: "var(--ink-2)" }}>{fmtINR(budget - spent)} remaining</span>
         ) : null}
       </div>
     </div>

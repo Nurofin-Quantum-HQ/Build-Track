@@ -1,80 +1,68 @@
 import { useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { X } from 'lucide-react';
-import { colors, radius, shadows } from '../../styles/designTokens';
+import BtIconButton from './BtIconButton';
 
 export default function Modal({ open, onClose, title, children, width = 480 }) {
   useEffect(() => {
-    if (open) document.body.style.overflow = 'hidden';
-    else document.body.style.overflow = '';
-    return () => { document.body.style.overflow = ''; };
-  }, [open]);
+    if (!open) return;
+    document.body.style.overflow = 'hidden';
+    const onKey = (e) => e.key === 'Escape' && onClose?.();
+    window.addEventListener('keydown', onKey);
+    return () => {
+      document.body.style.overflow = '';
+      window.removeEventListener('keydown', onKey);
+    };
+  }, [open, onClose]);
 
   if (!open) return null;
 
-  return (
+  return createPortal(
     <div
       onClick={onClose}
       style={{
-        position: 'fixed', inset: 0, zIndex: 1000,
-        background: 'rgba(17, 24, 39, 0.45)',
-        backdropFilter: 'blur(8px)',
-        WebkitBackdropFilter: 'blur(8px)',
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-        padding: 24, animation: 'fadeIn 200ms ease',
+        position: 'fixed',
+        inset: 0,
+        zIndex: 1000,
+        background: 'var(--scrim)',
+        backdropFilter: 'blur(4px)',
+        WebkitBackdropFilter: 'blur(4px)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: 16,
+        animation: 'fadeIn 160ms ease',
       }}
     >
       <div
+        role="dialog"
+        aria-modal="true"
+        aria-label={typeof title === 'string' ? title : undefined}
         onClick={(e) => e.stopPropagation()}
         style={{
-          background: 'rgba(255, 255, 255, 0.82)',
-          backdropFilter: 'blur(32px)',
-          WebkitBackdropFilter: 'blur(32px)',
-          border: '1px solid rgba(255, 255, 255, 0.65)',
-          borderRadius: '16px',
-          boxShadow: 'var(--shadow-lg)',
+          background: 'var(--card)',
+          border: '1px solid var(--line)',
+          borderRadius: 'var(--r-card)',
+          boxShadow: 'var(--shadow-raised)',
           width: '100%',
           maxWidth: width,
           maxHeight: '85vh',
           display: 'flex',
           flexDirection: 'column',
-          animation: 'fadeUp 300ms cubic-bezier(0.16, 1, 0.3, 1)',
+          animation: 'fadeUp 260ms var(--ease)',
         }}
       >
         {title && (
-          <div
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              padding: '24px 24px 0',
-            }}
-          >
-            <div style={{ fontSize: 18, fontWeight: 800, color: colors.textPrimary, letterSpacing: '-0.02em' }}>{title}</div>
-            <button
-              onClick={onClose}
-              style={{
-                width: 32, height: 32, borderRadius: radius.md,
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                color: colors.textSecondary, cursor: 'pointer',
-                transition: 'all 150ms ease',
-                border: `1px solid ${colors.border}`,
-                background: 'transparent',
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.background = colors.subtle;
-                e.currentTarget.style.color = colors.textPrimary;
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.background = 'transparent';
-                e.currentTarget.style.color = colors.textSecondary;
-              }}
-            >
-              <X size={16} />
-            </button>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, padding: '20px 20px 0 24px' }}>
+            <div style={{ fontFamily: 'var(--font-display)', fontSize: 19, fontWeight: 700, color: 'var(--ink)', letterSpacing: '-0.01em' }}>
+              {title}
+            </div>
+            <BtIconButton icon={X} label="Close" size={34} onClick={onClose} />
           </div>
         )}
         <div style={{ padding: 24, overflowY: 'auto', flex: 1 }}>{children}</div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }

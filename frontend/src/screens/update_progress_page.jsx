@@ -1,18 +1,21 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { useAuth } from '../contexts/AuthContext';
 import { projectAPI, taskAPI } from '../api';
 import { Toast } from '../components/Toast';
-import { CheckCircle, Upload, Save, ChevronLeft } from 'lucide-react';
-import { colors, radius, shadows, typography } from '../styles/designTokens';
-import BtHero from '../components/ui/BtHero';
-import BtSheet from '../components/ui/BtSheet';
-import BtCard from '../components/ui/BtCard';
-import BtButton from '../components/ui/BtButton';
-import BtPressable from '../components/ui/BtPressable';
+import { CheckCircle2, Upload, Save, ListChecks } from 'lucide-react';
+import {
+  BtHero,
+  BtSheet,
+  BtPageHeader,
+  BtCard,
+  BtButton,
+  BtSelect,
+  BtTextarea,
+  BtSectionHeader,
+  BtEmpty,
+} from '../components/ui';
 
 export default function UpdateProgressPage() {
-  const { user } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const prefillProjectId = location.state?.projectId;
@@ -21,10 +24,10 @@ export default function UpdateProgressPage() {
   const [projects, setProjects] = useState([]);
   const [selectedProjectId, setSelectedProjectId] = useState(prefillProjectId || '');
   const [projectData, setProjectData] = useState(null);
-  
+
   const [tasks, setTasks] = useState([]);
   const [completedTaskIds, setCompletedTaskIds] = useState(new Set(prefillTaskId ? [prefillTaskId] : []));
-  
+
   const [selectedFloor, setSelectedFloor] = useState('');
   const [selectedPhaseId, setSelectedPhaseId] = useState('');
   const [selectedActivityId, setSelectedActivityId] = useState('');
@@ -42,7 +45,7 @@ export default function UpdateProgressPage() {
         setSelectedProjectId(list[0]._id || list[0].id);
       }
     }).catch(() => {});
-    
+
     taskAPI.getDaily().then(res => {
       const list = res.data?.tasks || res.data || [];
       setTasks(list.filter(t => t.status !== 'Completed'));
@@ -99,7 +102,7 @@ export default function UpdateProgressPage() {
             })
           };
         });
-        
+
         let total = 0, completed = 0;
         updatedProject.selectedPhases.forEach(p => {
           (p.activities || []).forEach(a => {
@@ -134,225 +137,163 @@ export default function UpdateProgressPage() {
   const selectedPhase = phases.find(p => p.id === selectedPhaseId);
   const activities = selectedPhase?.activities || [];
   const floors = projectData?.floors?.length ? projectData.floors : ['Basement', 'Ground Floor', '1st Floor', '2nd Floor', 'Terrace'];
+  const progressPct = Math.round(Number(manualProgress) || 0);
 
   return (
-    <div style={{ minHeight: '100vh', background: 'var(--surface-ground, #F2F0EB)' }}>
+    <div style={{ width: '100%', minHeight: '100%', display: 'flex', flexDirection: 'column' }}>
       <Toast message={toast.msg} type={toast.type} onClose={() => setToast({ msg: '', type: 'info' })} />
 
-      {/* ── HERO BANNER (Blueprint Noir) ── */}
       <BtHero>
-        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 16 }}>
-          <div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 }}>
-              <BtPressable
-                onClick={() => navigate(-1)}
-                style={{
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: 6,
-                  color: 'rgba(255, 255, 255, 0.72)',
-                  fontSize: 13,
-                  fontWeight: 600,
-                  cursor: 'pointer',
-                  background: 'none',
-                  border: 'none',
-                  padding: 0,
-                }}
-              >
-                <ChevronLeft size={16} />
-                <span>Back</span>
-              </BtPressable>
-              <span style={{ color: 'rgba(255, 255, 255, 0.25)' }}>/</span>
-              <span
-                style={{
-                  fontFamily: 'var(--font-mono)',
-                  fontSize: 11,
-                  letterSpacing: '0.12em',
-                  textTransform: 'uppercase',
-                  color: 'var(--gold-brass)',
-                  fontWeight: 700,
-                }}
-              >
-                FIELD OPERATIONS · DAILY LOG
-              </span>
-            </div>
-
-            <h1
-              style={{
-                fontFamily: 'var(--font-serif)',
-                fontSize: 32,
-                fontWeight: 700,
-                color: 'var(--bone)',
-                margin: '0 0 6px',
-                letterSpacing: '-0.02em',
-              }}
-            >
-              Update Progress
-            </h1>
-            <p
-              style={{
-                color: 'rgba(255, 255, 255, 0.65)',
-                margin: 0,
-                fontSize: 14,
-                maxWidth: 580,
-                lineHeight: 1.5,
-              }}
-            >
-              Log daily site progress, floor activities, completed task checklists, and site photos.
-            </p>
-          </div>
-        </div>
+        <BtPageHeader
+          back={{ label: 'Back', onClick: () => navigate(-1) }}
+          eyebrow="Field operations"
+          size="md"
+          title="Update Progress"
+          subtitle="Log daily site progress, floor activities, completed tasks and site photos."
+        />
       </BtHero>
 
-      {/* ── MAIN CONTENT (Overlapping BtSheet) ── */}
-      <BtSheet overlap={26} padding="28px 32px 64px">
-        <div style={{ maxWidth: 760, margin: '0 auto' }}>
+      <BtSheet>
+        <div style={{ maxWidth: 960, margin: '0 auto', display: 'flex', flexDirection: 'column', gap: 20 }}>
+          <BtCard padding="20px">
+            <BtSectionHeader title="Where is the work?" />
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+              <BtSelect label="Project" required value={selectedProjectId} onChange={(e) => setSelectedProjectId(e.target.value)}>
+                <option value="">Select project</option>
+                {projects.map(p => <option key={p._id || p.id} value={p._id || p.id}>{p.name || p.projectName}</option>)}
+              </BtSelect>
 
-      <div style={{ background: '#fff', borderRadius: radius.lg, padding: 24, boxShadow: shadows.sm, marginBottom: 24 }}>
-        <div style={{ marginBottom: 16 }}>
-          <label style={{ display: 'block', marginBottom: 8, fontSize: 14, fontWeight: 600, color: colors.textPrimary }}>Project</label>
-          <select 
-            value={selectedProjectId} 
-            onChange={(e) => setSelectedProjectId(e.target.value)}
-            style={{ width: '100%', padding: '12px 16px', borderRadius: 8, border: '1px solid #e5e7eb', fontSize: 15 }}
-          >
-            <option value="">Select Project</option>
-            {projects.map(p => <option key={p._id || p.id} value={p._id || p.id}>{p.name || p.projectName}</option>)}
-          </select>
-        </div>
+              {projectData && (
+                <>
+                  <div className="bt-grid-2">
+                    <BtSelect label="Floor / zone (optional)" value={selectedFloor} onChange={(e) => setSelectedFloor(e.target.value)}>
+                      <option value="">Select floor or zone</option>
+                      {floors.map(f => <option key={f} value={f}>{f}</option>)}
+                    </BtSelect>
+                    <BtSelect
+                      label="Phase"
+                      value={selectedPhaseId}
+                      onChange={(e) => { setSelectedPhaseId(e.target.value); setSelectedActivityId(''); }}
+                    >
+                      <option value="">Select phase</option>
+                      {phases.map(p => <option key={p.id} value={p.id}>{p.phaseName || p.name}</option>)}
+                    </BtSelect>
+                  </div>
 
-        {projectData && (
-          <>
-            <div style={{ marginBottom: 16 }}>
-              <label style={{ display: 'block', marginBottom: 8, fontSize: 14, fontWeight: 600, color: colors.textPrimary }}>Floor / Zone (Optional)</label>
-              <select 
-                value={selectedFloor} 
-                onChange={(e) => setSelectedFloor(e.target.value)}
-                style={{ width: '100%', padding: '12px 16px', borderRadius: 8, border: '1px solid #e5e7eb', fontSize: 15 }}
-              >
-                <option value="">Select Floor or Zone</option>
-                {floors.map(f => <option key={f} value={f}>{f}</option>)}
-              </select>
+                  <BtSelect
+                    label="Activity"
+                    value={selectedActivityId}
+                    onChange={(e) => setSelectedActivityId(e.target.value)}
+                    disabled={!selectedPhaseId}
+                    helperText={!selectedPhaseId ? 'Choose a phase first.' : 'Submitting will mark this activity as done.'}
+                  >
+                    <option value="">Select activity</option>
+                    {activities.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
+                  </BtSelect>
+
+                  {!selectedActivityId && (
+                    <div>
+                      <label
+                        htmlFor="overall-progress"
+                        style={{ display: 'block', marginBottom: 8, fontFamily: 'var(--font-ui)', fontSize: 13, fontWeight: 600, color: 'var(--ink-2)' }}
+                      >
+                        Overall project progress
+                      </label>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+                        <input
+                          id="overall-progress"
+                          type="range"
+                          min="0"
+                          max="100"
+                          value={manualProgress}
+                          onChange={(e) => setManualProgress(e.target.value)}
+                          style={{ flex: 1, accentColor: 'var(--accent)', height: 32 }}
+                        />
+                        <span className="tnum" style={{ minWidth: 56, textAlign: 'right', fontFamily: 'var(--font-display)', fontSize: 24, fontWeight: 700, color: 'var(--ink)' }}>
+                          {progressPct}%
+                        </span>
+                      </div>
+                    </div>
+                  )}
+                </>
+              )}
             </div>
+          </BtCard>
 
-            <div style={{ marginBottom: 16 }}>
-              <label style={{ display: 'block', marginBottom: 8, fontSize: 14, fontWeight: 600, color: colors.textPrimary }}>Phase</label>
-              <select 
-                value={selectedPhaseId} 
-                onChange={(e) => { setSelectedPhaseId(e.target.value); setSelectedActivityId(''); }}
-                style={{ width: '100%', padding: '12px 16px', borderRadius: 8, border: '1px solid #e5e7eb', fontSize: 15 }}
-              >
-                <option value="">Select Phase</option>
-                {phases.map(p => <option key={p.id} value={p.id}>{p.phaseName || p.name}</option>)}
-              </select>
-            </div>
-
-            <div style={{ marginBottom: 16 }}>
-              <label style={{ display: 'block', marginBottom: 8, fontSize: 14, fontWeight: 600, color: colors.textPrimary }}>Activity</label>
-              <select 
-                value={selectedActivityId} 
-                onChange={(e) => setSelectedActivityId(e.target.value)}
-                disabled={!selectedPhaseId}
-                style={{ width: '100%', padding: '12px 16px', borderRadius: 8, border: '1px solid #e5e7eb', fontSize: 15, background: !selectedPhaseId ? '#f8fafc' : '#fff' }}
-              >
-                <option value="">Select Activity</option>
-                {activities.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
-              </select>
-            </div>
-
-            {!selectedActivityId && (
-              <div style={{ marginBottom: 16 }}>
-                <label style={{ display: 'block', marginBottom: 8, fontSize: 14, fontWeight: 600, color: colors.textPrimary }}>Overall Project Progress (%)</label>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                  <input 
-                    type="range" 
-                    min="0" max="100" 
-                    value={manualProgress} 
-                    onChange={(e) => setManualProgress(e.target.value)}
-                    style={{ flex: 1, accentColor: 'var(--ink, #111317)' }}
-                  />
-                  <span style={{ fontWeight: 600, color: 'var(--ink, #111317)', width: 40 }}>{Number(manualProgress).toFixed(0)}%</span>
-                </div>
+          <BtCard padding="20px">
+            <BtSectionHeader title="Daily tasks" />
+            {tasks.length === 0 ? (
+              <BtEmpty icon={ListChecks} title="No pending tasks" message="Tasks assigned for today will show up here to tick off." style={{ padding: '24px 16px' }} />
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                {tasks.map(t => {
+                  const done = completedTaskIds.has(t._id);
+                  return (
+                    <button
+                      key={t._id}
+                      type="button"
+                      role="checkbox"
+                      aria-checked={done}
+                      onClick={() => handleToggleTask(t._id)}
+                      className="bt-hover-row"
+                      style={{
+                        display: 'flex', alignItems: 'center', gap: 14, minHeight: 60, padding: '12px 16px', textAlign: 'left',
+                        border: `1px solid ${done ? 'var(--accent)' : 'var(--line)'}`, borderRadius: 'var(--r-tile)', cursor: 'pointer',
+                        background: done ? 'var(--accent-soft)' : 'var(--card)', fontFamily: 'var(--font-ui)', width: '100%',
+                      }}
+                    >
+                      <CheckCircle2 size={24} strokeWidth={1.9} color={done ? 'var(--ink)' : 'var(--input-border)'} style={{ flexShrink: 0 }} />
+                      <span style={{ minWidth: 0 }}>
+                        <span style={{ display: 'block', fontSize: 15, fontWeight: 600, color: 'var(--ink)' }}>{t.title}</span>
+                        {t.description && <span style={{ display: 'block', fontSize: 13, color: 'var(--ink-2)', marginTop: 2 }}>{t.description}</span>}
+                      </span>
+                    </button>
+                  );
+                })}
               </div>
             )}
-          </>
-        )}
-      </div>
+          </BtCard>
 
-      <div style={{ background: '#fff', borderRadius: radius.lg, padding: 24, boxShadow: shadows.sm, marginBottom: 24 }}>
-        <h3 style={{ margin: '0 0 16px', fontSize: 16, color: colors.textPrimary }}>Daily Tasks</h3>
-        {tasks.length === 0 ? (
-          <p style={{ color: colors.textSecondary }}>No pending tasks available.</p>
-        ) : (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-            {tasks.map(t => (
-              <div 
-                key={t._id} 
-                onClick={() => handleToggleTask(t._id)}
-                style={{ 
-                  display: 'flex', alignItems: 'center', gap: 12, padding: 16, 
-                  border: `1px solid ${completedTaskIds.has(t._id) ? 'var(--ink, #111317)' : '#e5e7eb'}`, 
-                  borderRadius: 12, cursor: 'pointer',
-                  background: completedTaskIds.has(t._id) ? `${'var(--ink, #111317)'}10` : '#fff'
-                }}
-              >
-                <div style={{ color: completedTaskIds.has(t._id) ? 'var(--ink, #111317)' : '#cbd5e1' }}>
-                  <CheckCircle size={24} fill={completedTaskIds.has(t._id) ? "currentColor" : "none"} color={completedTaskIds.has(t._id) ? "#fff" : "currentColor"} />
-                </div>
-                <div>
-                  <div style={{ fontWeight: 600, color: colors.textPrimary }}>{t.title}</div>
-                  {t.description && <div style={{ fontSize: 13, color: colors.textSecondary }}>{t.description}</div>}
-                </div>
+          <BtCard padding="20px">
+            <BtSectionHeader title="Daily remarks & attachments" />
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+              <BtTextarea label="Remarks" placeholder="Enter progress details…" value={notes} onChange={(e) => setNotes(e.target.value)} rows={4} />
+              <div style={{ display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap' }}>
+                <label
+                  style={{
+                    display: 'inline-flex', alignItems: 'center', gap: 8, minHeight: 44, padding: '0 16px', background: 'var(--fill)',
+                    border: '1px dashed var(--input-border)', borderRadius: 'var(--r-tile)', cursor: 'pointer', color: 'var(--ink)',
+                    fontFamily: 'var(--font-ui)', fontWeight: 600, fontSize: 14,
+                  }}
+                >
+                  <Upload size={18} />
+                  <span>{photo ? 'Replace site photo' : 'Attach site photo'}</span>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    style={{ display: 'none' }}
+                    onChange={(e) => {
+                      const file = e.target.files[0];
+                      if (file) {
+                        const reader = new FileReader();
+                        reader.onloadend = () => setPhoto(reader.result);
+                        reader.readAsDataURL(file);
+                      }
+                    }}
+                  />
+                </label>
+                {photo && (
+                  <img src={photo} alt="Attached site" style={{ width: 56, height: 56, borderRadius: 'var(--r-tile)', objectFit: 'cover', border: '1px solid var(--line)' }} />
+                )}
               </div>
-            ))}
-          </div>
-        )}
-      </div>
+            </div>
+          </BtCard>
 
-      <div style={{ background: '#fff', borderRadius: radius.lg, padding: 24, boxShadow: shadows.sm, marginBottom: 24 }}>
-        <h3 style={{ margin: '0 0 16px', fontSize: 16, color: colors.textPrimary }}>Daily Remarks & Attachments</h3>
-        <textarea 
-          placeholder="Enter progress details..." 
-          value={notes}
-          onChange={(e) => setNotes(e.target.value)}
-          style={{ width: '100%', padding: '16px', borderRadius: 8, border: '1px solid #e5e7eb', fontSize: 15, minHeight: 100, resize: 'vertical', marginBottom: 16 }}
-        />
-        <div>
-          <label style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '12px 16px', background: '#f8fafc', border: '1px dashed #cbd5e1', borderRadius: 8, cursor: 'pointer', width: 'fit-content', color: colors.textSecondary, fontWeight: 500, fontSize: 14 }}>
-            <Upload size={18} />
-            <span>{photo ? 'Photo attached' : 'Attach Site Photo'}</span>
-            <input 
-              type="file" 
-              accept="image/*" 
-              style={{ display: 'none' }}
-              onChange={(e) => {
-                const file = e.target.files[0];
-                if (file) {
-                  const reader = new FileReader();
-                  reader.onloadend = () => setPhoto(reader.result);
-                  reader.readAsDataURL(file);
-                }
-              }}
-            />
-          </label>
-        </div>
-      </div>
-
-      <div style={{ marginTop: 24 }}>
-          <BtButton
-            variant="primary"
-            size="lg"
-            loading={isSubmitting}
-            onClick={handleSubmit}
-            disabled={isSubmitting}
-            style={{ width: '100%', height: 48 }}
-          >
-            <Save size={18} />
-            <span>{isSubmitting ? 'Saving...' : (selectedActivityId ? 'Mark as Done & Submit' : 'Submit Progress Update')}</span>
+          <BtButton variant="primary" fullWidth loading={isSubmitting} onClick={handleSubmit} icon={Save}>
+            {selectedActivityId ? 'Mark as Done & Submit' : 'Submit Progress Update'}
           </BtButton>
         </div>
-      </div>
-    </BtSheet>
-  </div>
+      </BtSheet>
+    </div>
   );
 }

@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { createRoot } from 'react-dom/client';
-import { Check, Wallet, PackageCheck } from 'lucide-react';
+import { isFullMotion } from '../../utils/motion';
 
 /**
  * BtSuccessModal: Full-screen celebration modal matching Flutter's showBtSuccess.
@@ -31,69 +31,7 @@ export function BtSuccessModal({
     }, 240);
   };
 
-  const renderIcon = () => {
-    if (kind === 'bags') {
-      return (
-        <div
-          style={{
-            width: '80px',
-            height: '80px',
-            borderRadius: '24px',
-            background: 'var(--type-material-soft)',
-            color: 'var(--type-material)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            transform: mounted ? 'scale(1)' : 'scale(0.7)',
-            transition: 'transform 380ms cubic-bezier(0.34, 1.56, 0.64, 1)',
-          }}
-        >
-          <PackageCheck size={44} strokeWidth={1.8} />
-        </div>
-      );
-    }
-
-    if (kind === 'money') {
-      return (
-        <div
-          style={{
-            width: '80px',
-            height: '80px',
-            borderRadius: '24px',
-            background: 'var(--status-success-soft)',
-            color: 'var(--status-success)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            transform: mounted ? 'scale(1)' : 'scale(0.7)',
-            transition: 'transform 380ms cubic-bezier(0.34, 1.56, 0.64, 1)',
-          }}
-        >
-          <Wallet size={44} strokeWidth={1.8} />
-        </div>
-      );
-    }
-
-    // Default 'check'
-    return (
-      <div
-        style={{
-          width: '80px',
-          height: '80px',
-          borderRadius: '50%',
-          background: 'var(--accent)',
-          color: 'var(--on-accent)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          transform: mounted ? 'scale(1) rotate(0deg)' : 'scale(0.6) rotate(-20deg)',
-          transition: 'transform 420ms cubic-bezier(0.34, 1.56, 0.64, 1)',
-        }}
-      >
-        <Check size={44} strokeWidth={3} />
-      </div>
-    );
-  };
+  const renderIcon = () => <SuccessScene kind={kind} />;
 
   return (
     <div
@@ -212,6 +150,7 @@ export function showBtSuccess({
   label,
   doneLabel = 'Done',
   autoCloseMs = 2600,
+  onDismiss,
 }) {
   return new Promise((resolve) => {
     const container = document.createElement('div');
@@ -225,6 +164,7 @@ export function showBtSuccess({
         container.parentNode.removeChild(container);
       }
       resolve();
+      if (onDismiss) onDismiss();
     };
 
     root.render(
@@ -242,3 +182,84 @@ export function showBtSuccess({
 }
 
 export default showBtSuccess;
+
+/* ── Success scenes (parity with the mobile app's bt_success_scenes) ── */
+
+function CheckBadge({ delay = 0, size = 34, x = 86, y = 6 }) {
+  return (
+    <g className="bt-scene-badge" style={{ animationDelay: `${delay}ms`, transformOrigin: `${x + size / 2}px ${y + size / 2}px` }}>
+      <circle cx={x + size / 2} cy={y + size / 2} r={size / 2} fill="var(--status-success-bright)" />
+      <path
+        d={`M${x + size * 0.28} ${y + size * 0.52} l${size * 0.16} ${size * 0.16} l${size * 0.3} -${size * 0.34}`}
+        fill="none"
+        stroke="#FFFFFF"
+        strokeWidth="3.2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        className="bt-scene-tick"
+        style={{ animationDelay: `${delay + 160}ms` }}
+      />
+    </g>
+  );
+}
+
+function Bag({ x, y, delay }) {
+  return (
+    <g className="bt-scene-drop" style={{ animationDelay: `${delay}ms` }}>
+      <rect x={x} y={y} width="44" height="26" rx="7" fill="var(--bone)" />
+      <rect x={x} y={y + 9} width="44" height="7" fill="var(--accent)" />
+      <rect x={x + 3} y={y + 2} width="38" height="3" rx="1.5" fill="var(--bone-soft)" />
+    </g>
+  );
+}
+
+export function SuccessScene({ kind = 'check' }) {
+  const animated = isFullMotion();
+  const cls = animated ? 'bt-scene' : 'bt-scene bt-scene-static';
+
+  if (kind === 'bags') {
+    return (
+      <svg className={cls} width="128" height="104" viewBox="0 0 128 104" role="img" aria-label="Saved">
+        <ellipse cx="60" cy="98" rx="46" ry="4" fill="var(--noir-3)" />
+        <Bag x={14} y={70} delay={0} />
+        <Bag x={60} y={70} delay={140} />
+        <Bag x={37} y={42} delay={300} />
+        <CheckBadge delay={620} x={88} y={10} />
+      </svg>
+    );
+  }
+
+  if (kind === 'money') {
+    return (
+      <svg className={cls} width="128" height="104" viewBox="0 0 128 104" role="img" aria-label="Payment recorded">
+        <g className="bt-scene-note" style={{ animationDelay: '0ms' }}>
+          <rect x="34" y="8" width="50" height="28" rx="4" fill="var(--status-success-bright)" />
+          <circle cx="59" cy="22" r="7" fill="none" stroke="var(--noir)" strokeOpacity="0.35" strokeWidth="2" />
+        </g>
+        <g className="bt-scene-note" style={{ animationDelay: '160ms' }}>
+          <rect x="40" y="2" width="50" height="28" rx="4" fill="var(--status-success)" />
+          <circle cx="65" cy="16" r="7" fill="none" stroke="var(--bone)" strokeOpacity="0.4" strokeWidth="2" />
+        </g>
+        <rect x="16" y="46" width="88" height="52" rx="12" fill="var(--noir-3)" stroke="var(--noir-line)" />
+        <rect x="16" y="46" width="88" height="14" rx="7" fill="var(--noir-2)" />
+        <rect x="78" y="66" width="26" height="16" rx="6" fill="var(--accent)" />
+        <circle cx="86" cy="74" r="3" fill="var(--noir)" />
+        <CheckBadge delay={620} x={90} y={30} />
+      </svg>
+    );
+  }
+
+  return (
+    <svg className={cls} width="104" height="104" viewBox="0 0 104 104" role="img" aria-label="Done">
+      <circle cx="52" cy="52" r="44" fill="var(--status-success-bright)" fillOpacity="0.14" />
+      <circle
+        cx="52" cy="52" r="34" fill="none" stroke="var(--status-success-bright)" strokeWidth="4"
+        strokeLinecap="round" pathLength="1" className="bt-scene-ring"
+      />
+      <path
+        d="M37 53 l10 10 l20 -22" fill="none" stroke="var(--status-success-bright)" strokeWidth="5"
+        strokeLinecap="round" strokeLinejoin="round" pathLength="1" className="bt-scene-tick" style={{ animationDelay: '320ms' }}
+      />
+    </svg>
+  );
+}

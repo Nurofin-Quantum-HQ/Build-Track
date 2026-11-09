@@ -6,6 +6,7 @@ import { useAuth } from "./contexts/AuthContext";
 import RequireRole from "./components/RequireRole";
 import { applyAccent } from "./styles/designTokens";
 import ErrorBoundary from "./components/ErrorBoundary";
+import { BtPageLoader } from "./components/ui/BtBrickLoader";
 
 import LoginPage       from "./pages/login_page";
 import SignUpPage      from "./pages/signup_page";
@@ -69,34 +70,13 @@ export function preloadRoute(path) {
 }
 
 function PageLoader() {
-  return (
-    <div style={{
-      display: 'flex', alignItems: 'center', justifyContent: 'center',
-      minHeight: '300px', height: '100%',
-      fontFamily: "'Inter', 'Segoe UI', system-ui, sans-serif",
-      color: '#6B7280', fontSize: 13, fontWeight: 500,
-    }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-        <div style={{ width: 16, height: 16, border: '2px solid var(--color-primary, #F97316)', borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin 0.6s linear infinite' }} />
-        <span>Loading...</span>
-      </div>
-    </div>
-  );
+  return <BtPageLoader />;
 }
 
 function RequireAuth({ children }) {
   const { isAuthenticated, loading } = useAuth();
   if (loading) {
-    return (
-      <div style={{
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-        height: '100vh',
-        fontFamily: "'Inter', 'Segoe UI', system-ui, sans-serif",
-        color: '#6B7280', fontSize: 14,
-      }}>
-        Loading...
-      </div>
-    );
+    return <BtPageLoader />;
   }
   return isAuthenticated ? children : <Navigate to="/login" replace />;
 }
@@ -112,42 +92,42 @@ function AppRoutes() {
         <Route element={<RequireAuth><DashboardLayout /></RequireAuth>}>
           <Route path="/"            element={<Dashboard />} />
           <Route path="/add-entry" element={
-            <RequireRole permission="add_entries" route="/add-entry">
+            <RequireRole route="/add-entry">
               <AddEntry />
             </RequireRole>
           } />
           <Route path="/choose-entry-mode" element={
-            <RequireRole permission="add_entries" route="/choose-entry-mode">
+            <RequireRole route="/choose-entry-mode">
               <ChooseEntryMode />
             </RequireRole>
           } />
           <Route path="/update-progress" element={
-            <RequireRole permission="add_entries" route="/update-progress">
+            <RequireRole route="/update-progress">
               <UpdateProgressPage />
             </RequireRole>
           } />
           <Route path="/manualentry" element={
-            <RequireRole permission="add_entries" route="/manualentry">
+            <RequireRole route="/manualentry">
               <ManualEntryPage />
             </RequireRole>
           } />
           <Route path="/entry-detail" element={<EntryDetail />} />
           <Route path="/voice" element={
-            <RequireRole permission="add_entries" route="/voice">
+            <RequireRole route="/voice">
               <VoiceAssistant />
             </RequireRole>
           } />
           <Route path="/transaction" element={<TransactionLog />} />
           <Route path="/projects"    element={<Projects />} />
           <Route path="/newproject"  element={
-            <RequireRole permission="create_project">
+            <RequireRole route="/newproject">
               <NewProject />
             </RequireRole>
           } />
           <Route path="/inventory"   element={<Navigate to="/" replace />} />
 
           <Route path="/reports"     element={
-            <RequireRole permission="view_reports" route="/reports">
+            <RequireRole route="/reports">
               <Reports />
             </RequireRole>
           } />
@@ -156,13 +136,13 @@ function AppRoutes() {
           <Route path="/profile"     element={<Settings />} />
           <Route path="/managesite"  element={<ManageSite />} />
           <Route path="/project-report/:id" element={<ProjectReport />} />
-          <Route path="/project-insights/:id" element={<ProjectInsights />} />
-          <Route path="/project-insights" element={<ProjectInsights />} />
-          <Route path="/insights" element={<ProjectInsights />} />
+          <Route path="/project-insights/:id" element={<RequireRole route="/insights"><ProjectInsights /></RequireRole>} />
+          <Route path="/project-insights" element={<RequireRole route="/insights"><ProjectInsights /></RequireRole>} />
+          <Route path="/insights" element={<RequireRole route="/insights"><ProjectInsights /></RequireRole>} />
           <Route path="/reports/:id" element={<ProjectReport />} />
 
           <Route path="/approvals"  element={
-            <RequireRole permission="approve_payments" route="/approvals">
+            <RequireRole route="/approvals">
               <Approvals />
             </RequireRole>
           } />
@@ -173,23 +153,23 @@ function AppRoutes() {
             </RequireRole>
           } />
 
-          <Route path="/ai-chat"    element={<AiChatReport />} />
+          <Route path="/ai-chat"    element={<RequireRole route="/ai-chat"><AiChatReport /></RequireRole>} />
 
           <Route path="/assign-role" element={
-            <RequireRole permission="assign_roles">
+            <RequireRole route="/assign-role">
               <AssignRoles />
             </RequireRole>
           } />
 
           <Route path="/assign-task" element={
-            <RequireRole permission="assign_tasks" route="/assign-task">
+            <RequireRole route="/assign-task">
               <AssignTask />
             </RequireRole>
           } />
 
           <Route path="/notifications" element={<Notifications />} />
 
-          <Route path="/subscription" element={<SubscriptionPage />} />
+          <Route path="/subscription" element={<RequireRole route="/subscription"><SubscriptionPage /></RequireRole>} />
           <Route path="/audit-logs"   element={
             <RequireRole route="/audit-logs">
               <AuditLogsPage />

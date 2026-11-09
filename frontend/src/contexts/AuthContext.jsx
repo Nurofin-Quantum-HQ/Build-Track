@@ -1,5 +1,7 @@
 import { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
 import { authAPI, projectAPI, transactionAPI } from '../api';
+import { hasPermission } from '../utils/access';
+import { loadMotionFor } from '../utils/motion';
 
 const AuthContext = createContext(null);
 
@@ -139,20 +141,15 @@ export function AuthProvider({ children }) {
     window.dispatchEvent(new Event('userUpdated'));
   }, [user]);
 
+  // Per-user motion level (Full / Reduced / Off), like the mobile app
+  useEffect(() => {
+    loadMotionFor(user?.id || user?._id || '');
+  }, [user?.id, user?._id]);
+
   const isAuthenticated = !!token;
   const isAdmin = user?.role?.toLowerCase() === 'admin';
-  const can = useCallback((permission) => {
-    const r = user?.role?.toLowerCase();
-    if (r === 'admin' || r === 'supervisor') return true;
-    
-    if (r === 'mason' || r === 'site engineer' || r === 'contractor') {
-      const defaultPerms = ['add_entries', 'view_assigned_project', 'submit_daily_update', 'upload_photos'];
-      if (defaultPerms.includes(permission)) return true;
-    }
-    
-    const perms = user?.permissions || [];
-    return perms.includes(permission);
-  }, [user]);
+  // Follows the Assign Role switches only (see utils/access.js).
+  const can = useCallback((permission) => hasPermission(user, permission), [user]);
 
   const value = useMemo(() => ({
     user, token, loading,

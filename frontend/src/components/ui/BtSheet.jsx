@@ -15,7 +15,7 @@ export default function BtSheet({
 }) {
   return (
     <div
-      className={className}
+      className={`bt-sheet ${className}`.trim()}
       style={{
         position: 'relative',
         zIndex: 10,

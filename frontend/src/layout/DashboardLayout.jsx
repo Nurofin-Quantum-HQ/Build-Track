@@ -6,6 +6,8 @@ import { Bell, Settings, Menu } from "lucide-react";
 import nurofinLogo from "../assets/nurofin-black.svg";
 import useNotificationStore from "../stores/notificationStore";
 import ErrorBoundary from "../components/ErrorBoundary";
+import BtIconButton from "../components/ui/BtIconButton";
+import { navItems, adminNavItems } from "../navItems";
 
 export default function DashboardLayout() {
   const [isMobile, setIsMobile] = useState(window.innerWidth < 1024);
@@ -21,6 +23,38 @@ export default function DashboardLayout() {
   useEffect(() => {
     fetchAll();
   }, [fetchAll, location.pathname]);
+
+  // Close the mobile drawer after navigating, and on Escape
+  useEffect(() => {
+    setSidebarOpen(false);
+  }, [location.pathname]);
+
+  useEffect(() => {
+    if (!sidebarOpen) return;
+    const onKey = (e) => e.key === "Escape" && setSidebarOpen(false);
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [sidebarOpen]);
+
+  // Sub-pages that belong to a menu section
+  const SECTION_ALIASES = {
+    "/managesite": "/projects",
+    "/newproject": "/projects",
+    "/project-report": "/projects",
+    "/project-insights": "/projects",
+    "/insights": "/projects",
+    "/update-progress": "/projects",
+    "/add-entry": "/transaction",
+    "/choose-entry-mode": "/transaction",
+    "/manualentry": "/transaction",
+    "/entry-detail": "/transaction",
+    "/profile": "/settings",
+  };
+  const aliasKey = Object.keys(SECTION_ALIASES).find((p) => location.pathname.startsWith(p));
+  const sectionPath = aliasKey ? SECTION_ALIASES[aliasKey] : location.pathname;
+  const section = [...navItems, ...adminNavItems].find((item) =>
+    item.path === "/" ? sectionPath === "/" : sectionPath.startsWith(item.path)
+  );
 
   useEffect(() => {
     const onResize = () => {
@@ -38,7 +72,7 @@ export default function DashboardLayout() {
         display: "flex",
         height: "100vh",
         overflow: "hidden",
-        background: "var(--ground)",
+        background: "var(--noir)",
       }}
     >
       <AppTour />
@@ -93,8 +127,8 @@ export default function DashboardLayout() {
           style={{
             height: "56px",
             minHeight: "56px",
-            background: "var(--noir, #0C0E12)",
-            borderBottom: "1px solid rgba(255, 255, 255, 0.08)",
+            background: "var(--noir)",
+            borderBottom: "1px solid var(--noir-line)",
             display: "flex",
             alignItems: "center",
             justifyContent: "space-between",
@@ -105,31 +139,25 @@ export default function DashboardLayout() {
           }}
         >
           {isMobile ? (
-            <button
+            <BtIconButton
+              icon={Menu}
+              label="Open menu"
+              onDark
+              size={38}
               onClick={() => setSidebarOpen(true)}
-              aria-label="Open Sidebar"
-              style={{
-                width: "38px",
-                height: "38px",
-                borderRadius: "12px",
-                background: "rgba(255, 255, 255, 0.08)",
-                border: "1px solid rgba(255, 255, 255, 0.14)",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                cursor: "pointer",
-                color: "var(--bone, #F6F4EF)",
-              }}
-            >
-              <Menu size={20} />
-            </button>
+              aria-expanded={sidebarOpen}
+            />
           ) : (
-            <div style={{ display: "flex", alignItems: "center", gap: "8px" }} />
+            <span className="bt-eyebrow" style={{ color: "var(--on-noir-3)" }}>
+              {section ? section.label : "BuildTrack"}
+            </span>
           )}
 
           <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
             {/* ── Brand Badge ── */}
-            <div
+            <button
+              type="button"
+              aria-label="BuildTrack home"
               onClick={() => navigate("/")}
               style={{
                 height: "38px",
@@ -158,7 +186,7 @@ export default function DashboardLayout() {
                     fontFamily: "var(--font-display)",
                     fontSize: "14px",
                     fontWeight: 700,
-                    color: "var(--bone, #F6F4EF)",
+                    color: "var(--bone)",
                     letterSpacing: "-0.3px",
                   }}
                 >
@@ -178,78 +206,54 @@ export default function DashboardLayout() {
                   style={{ height: "13px", filter: "brightness(0) invert(1)" }}
                 />
               </div>
-            </div>
+            </button>
 
             {/* ── Notifications Bell ── */}
-            <button
-              onClick={() => navigate("/notifications")}
-              aria-label="Notifications"
-              style={{
-                position: "relative",
-                width: "38px",
-                height: "38px",
-                borderRadius: "12px",
-                background: "rgba(255, 255, 255, 0.06)",
-                border: "1px solid rgba(255, 255, 255, 0.12)",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                color: "var(--bone, #F6F4EF)",
-                cursor: "pointer",
-                transition: "background 140ms ease",
-              }}
-              onMouseEnter={(e) => (e.currentTarget.style.background = "rgba(255, 255, 255, 0.10)")}
-              onMouseLeave={(e) => (e.currentTarget.style.background = "rgba(255, 255, 255, 0.06)")}
-            >
-              <Bell size={18} strokeWidth={1.8} />
+            <div style={{ position: "relative" }}>
+              <BtIconButton
+                icon={Bell}
+                label={totalAlertCount > 0 ? `Notifications, ${totalAlertCount} unread` : "Notifications"}
+                onDark
+                size={38}
+                active={location.pathname.startsWith("/notifications")}
+                onClick={() => navigate("/notifications")}
+              />
               {totalAlertCount > 0 && (
                 <span
+                  aria-hidden="true"
                   style={{
                     position: "absolute",
-                    top: "-3px",
-                    right: "-3px",
-                    minWidth: "16px",
-                    height: "16px",
-                    borderRadius: "8px",
-                    background: "var(--status-danger-bright, #EF4444)",
+                    top: "-4px",
+                    right: "-4px",
+                    minWidth: "18px",
+                    height: "18px",
+                    borderRadius: "9px",
+                    background: "var(--status-danger-bright)",
                     color: "#FFFFFF",
                     fontSize: "10px",
                     fontWeight: 700,
+                    fontFamily: "var(--font-ui)",
                     display: "flex",
                     alignItems: "center",
                     justifyContent: "center",
-                    padding: "0 3px",
-                    border: "2px solid var(--noir, #0C0E12)",
+                    padding: "0 4px",
+                    border: "2px solid var(--noir)",
                     pointerEvents: "none",
                   }}
                 >
                   {totalAlertCount > 99 ? "99+" : totalAlertCount}
                 </span>
               )}
-            </button>
+            </div>
 
-            {/* ── Settings Shortcut ── */}
-            <button
+            <BtIconButton
+              icon={Settings}
+              label="Settings"
+              onDark
+              size={38}
+              active={location.pathname.startsWith("/settings")}
               onClick={() => navigate("/settings")}
-              aria-label="Settings"
-              style={{
-                width: "38px",
-                height: "38px",
-                borderRadius: "12px",
-                background: "rgba(255, 255, 255, 0.06)",
-                border: "1px solid rgba(255, 255, 255, 0.12)",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                color: "var(--bone, #F6F4EF)",
-                cursor: "pointer",
-                transition: "background 140ms ease",
-              }}
-              onMouseEnter={(e) => (e.currentTarget.style.background = "rgba(255, 255, 255, 0.10)")}
-              onMouseLeave={(e) => (e.currentTarget.style.background = "rgba(255, 255, 255, 0.06)")}
-            >
-              <Settings size={18} strokeWidth={1.8} />
-            </button>
+            />
           </div>
         </header>
 
@@ -260,10 +264,13 @@ export default function DashboardLayout() {
             overflowY: "auto",
             display: "flex",
             flexDirection: "column",
+            background: "var(--ground)",
           }}
         >
           <ErrorBoundary inline fallbackMessage="An unexpected issue occurred while rendering this section. You can refresh or switch tabs.">
-            <Outlet />
+            <div key={location.pathname} className="bt-route" style={{ display: "flex", flexDirection: "column", flex: 1, minHeight: 0 }}>
+              <Outlet />
+            </div>
           </ErrorBoundary>
         </main>
       </div>

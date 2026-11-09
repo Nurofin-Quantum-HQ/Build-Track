@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 
 export default function BtButton({
   children,
-  variant = 'primary', // 'primary' | 'secondary' | 'ghost' | 'accent' | 'destructive'
+  variant = 'primary', // 'primary' | 'secondary' | 'ghost' | 'accent' | 'destructive' | 'onDark' | 'light'
   size = 'normal', // 'normal' (52px) | 'small' (38px) | 'compact' (32px)
   icon: Icon,
   trailingIcon: TrailingIcon,
@@ -21,7 +21,7 @@ export default function BtButton({
     switch (variant) {
       case 'secondary':
         return {
-          background: '#FFFFFF',
+          background: 'var(--card)',
           color: 'var(--ink)',
           border: '1px solid var(--input-border)',
         };
@@ -36,6 +36,20 @@ export default function BtButton({
         return {
           background: 'var(--accent)',
           color: 'var(--on-accent)',
+          border: '1px solid transparent',
+        };
+      case 'onDark':
+        // Secondary action on the noir hero
+        return {
+          background: 'rgba(255, 255, 255, 0.06)',
+          color: 'var(--on-noir)',
+          border: '1px solid var(--noir-line)',
+        };
+      case 'light':
+        // High-emphasis action on the noir hero when brass would compete
+        return {
+          background: 'var(--bone)',
+          color: 'var(--ink)',
           border: '1px solid transparent',
         };
       case 'destructive':
@@ -99,7 +113,7 @@ export default function BtButton({
       onPointerDown={() => !isDisabled && setPressed(true)}
       onPointerUp={() => !isDisabled && setPressed(false)}
       onPointerLeave={() => !isDisabled && setPressed(false)}
-      className={className}
+      className={`bt-btn ${className}`.trim()}
       style={{
         display: 'inline-flex',
         alignItems: 'center',

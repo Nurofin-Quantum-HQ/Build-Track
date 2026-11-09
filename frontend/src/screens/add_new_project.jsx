@@ -1,24 +1,30 @@
-import { useState, useEffect, useRef, useCallback, useMemo } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { projectAPI, workerAPI, subscriptionAPI } from "../api";
 import { resolveImageUrl } from "../utils/imageUrl";
 import useProjectStore from "../stores/projectStore";
 import { buildDefaultPhases, addCustomPhase, addActivityToPhase, mergePhasesWithDefaults } from "../utils/constructionPhases";
-import { Badge, Button } from "../components/ui";
-import BtHero from "../components/ui/BtHero";
-import BtSheet from "../components/ui/BtSheet";
-import BtCard from "../components/ui/BtCard";
-import BtPressable from "../components/ui/BtPressable";
-import BtButton from "../components/ui/BtButton";
+import {
+  BtHero,
+  BtSheet,
+  BtPageHeader,
+  BtCard,
+  BtButton,
+  BtIconButton,
+  BtChip,
+  BtField,
+  BtSelect,
+  BtTextarea,
+  BtTile,
+  formatInr,
+} from "../components/ui";
 import ModuleTour from "../components/ModuleTour";
 import {
-  ChevronDown, Plus, Minus, X, Check, Camera, MapPin, Calendar, User, Phone,
-  Building2, Home, Layers, Bed, Bath, Settings, Zap, Flame, ChefHat, Sun,
-  CalendarDays, IndianRupee, HardHat, FileText, Hash, ArrowLeft, Upload,
-  ClipboardList, Users, Wrench, HelpCircle
+  ChevronDown, ChevronUp, Plus, Minus, X, Check, Camera, MapPin, Calendar, User, Phone,
+  Building2, Layers, Bed, Settings, Zap, Flame, ChefHat, Sun,
+  CalendarDays, HardHat, FileText, Hash, Upload, Download, Info,
+  ClipboardList, Pencil, AlertCircle, CheckCircle2, HelpCircle
 } from "lucide-react";
-
-const TOPBAR_H = 65;
 
 const buildingTypes = {
   Residential: ["Select Sub Type", "1 BHK", "2 BHK", "3 BHK", "Villa", "Apartment", "Duplex", "Penthouse", "Other (Custom)"],
@@ -52,23 +58,43 @@ const terraceInterior = ["Weathering Course", "Cool Roof Paint", "Overhead Tank"
 
 const statusChips = ["Planning", "In Progress", "On Hold", "Completed", "Cancelled"];
 
-function Accordion({ title, icon, defaultOpen, children, count, subtitle }) {
+const eyebrowStyle = { color: "var(--ink-3)", marginBottom: 10 };
+
+/** Collapsible section card: icon tile, title, count, chevron. */
+function Section({ title, icon: Icon, defaultOpen, children, count, className }) {
   const [open, setOpen] = useState(defaultOpen !== false);
   return (
-    <div style={{ marginBottom: 14, background: "#fff", borderRadius: 12, border: "1px solid #E5E7EB", overflow: "hidden" }}>
-      <div onClick={() => setOpen(!open)} style={{ padding: "14px 18px", display: "flex", alignItems: "center", gap: 10, cursor: "pointer", userSelect: "none" }}>
-        <span style={{ fontSize: 16, flexShrink: 0, color: 'var(--ink, #111317)', display: 'flex' }}>{icon}</span>
-        <div style={{ flex: 1 }}>
-          <span style={{ fontSize: 14, fontWeight: 600, color: "#111827" }}>{title}</span>
-          {(count !== undefined || subtitle) && (
-            <span style={{ fontSize: 12, color: "#64748B", marginLeft: 8 }}>
-              {count !== undefined ? `(${count})` : subtitle}
+    <BtCard padding="0" className={className}>
+      <button
+        type="button"
+        onClick={() => setOpen(!open)}
+        aria-expanded={open}
+        style={{
+          width: "100%", minHeight: 64, padding: "0 20px", display: "flex", alignItems: "center", gap: 12,
+          cursor: "pointer", background: "transparent", border: "none", textAlign: "left", fontFamily: "var(--font-ui)",
+        }}
+      >
+        <BtTile icon={Icon} bg="var(--accent-soft)" fg="var(--accent-ink)" size={36} />
+        <span style={{ flex: 1, minWidth: 0, fontSize: 16, fontWeight: 600, color: "var(--ink)" }}>
+          {title}
+          {count !== undefined && count > 0 && (
+            <span className="tnum" style={{ marginLeft: 8, fontSize: 13, fontWeight: 600, color: "var(--accent-ink)" }}>
+              {count} selected
             </span>
           )}
-        </div>
-        <ChevronDown size={16} color="#94A3B8" style={{ transform: open ? "rotate(180deg)" : "none", transition: "transform 0.2s", flexShrink: 0 }} />
-      </div>
-      {open && <div style={{ padding: "0 18px 14px" }}>{children}</div>}
+        </span>
+        <ChevronDown size={18} color="var(--ink-3)" style={{ transform: open ? "rotate(180deg)" : "none", transition: "transform 0.2s", flexShrink: 0 }} />
+      </button>
+      {open && <div style={{ padding: "4px 20px 22px", borderTop: "1px solid var(--line)" }}><div style={{ paddingTop: 18 }}>{children}</div></div>}
+    </BtCard>
+  );
+}
+
+function SubHeading({ icon: Icon, children }) {
+  return (
+    <div className="bt-eyebrow" style={{ ...eyebrowStyle, display: "flex", alignItems: "center", gap: 6 }}>
+      {Icon && <Icon size={13} strokeWidth={2} />}
+      {children}
     </div>
   );
 }
@@ -82,22 +108,10 @@ function ChipSelect({ options, selected, onChange, multi }) {
     }
   };
   return (
-    <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+    <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
       {options.map(opt => {
         const isOn = multi ? selected.includes(opt) : selected === opt;
-        return (
-          <div key={opt} onClick={() => handleToggle(opt)}
-            style={{
-              padding: "6px 14px", borderRadius: 6, fontSize: 13, fontWeight: 500,
-              cursor: "pointer", transition: "all 0.15s",
-              background: isOn ? "var(--ink, #111317)" : "#FFFFFF",
-              color: isOn ? "var(--bone, #F2F0EB)" : "var(--ink, #111317)",
-              border: `1px solid ${isOn ? "var(--ink, #111317)" : "var(--border, #E6E3DC)"}`,
-              fontFamily: 'inherit',
-            }}>
-            {opt}
-          </div>
-        );
+        return <BtChip key={opt} label={opt} selected={isOn} aria-pressed={isOn} onClick={() => handleToggle(opt)} />;
       })}
     </div>
   );
@@ -105,55 +119,139 @@ function ChipSelect({ options, selected, onChange, multi }) {
 
 function Stepper({ label, value, onChange, min = 0, max = 99 }) {
   return (
-    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "6px 0", borderBottom: "1px solid #F1F5F9" }}>
-      <span style={{ fontSize: 13, fontWeight: 500, color: "#475569" }}>{label}</span>
+    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, padding: "6px 0", borderBottom: "1px solid var(--line)" }}>
+      <span style={{ fontSize: 15, color: "var(--ink)" }}>{label}</span>
       <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-        <button onClick={() => onChange(Math.max(min, value - 1))}
-          style={{ width: 28, height: 28, borderRadius: 6, border: "1px solid #E5E7EB", background: "#fff", cursor: "pointer", fontSize: 14, fontWeight: 700, color: "#64748B", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: 'inherit' }}>
-          -
-        </button>
-        <span style={{ width: 24, textAlign: "center", fontSize: 14, fontWeight: 700, color: "#111827" }}>{value}</span>
-        <button
-          type="button"
-          onClick={() => onChange(Math.min(max, value + 1))}
-          aria-label={`Increase ${label}`}
-          disabled={value >= max}
-          style={{
-            width: 28,
-            height: 28,
-            borderRadius: 6,
-            border: "1px solid #E5E7EB",
-            background: value >= max ? "#F8FAFC" : "#fff",
-            cursor: value >= max ? "not-allowed" : "pointer",
-            color: value >= max ? "#CBD5E1" : "#64748B",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            fontFamily: "inherit",
-            transition: "all 0.15s"
-          }}>
-          <Plus size={13} strokeWidth={2.5} />
-        </button>
+        <BtIconButton icon={Minus} label={`Decrease ${label}`} onClick={() => onChange(Math.max(min, value - 1))} disabled={value <= min} />
+        <span className="tnum" style={{ minWidth: 28, textAlign: "center", fontFamily: "var(--font-display)", fontSize: 17, fontWeight: 700, color: "var(--ink)" }}>{value}</span>
+        <BtIconButton icon={Plus} label={`Increase ${label}`} onClick={() => onChange(Math.min(max, value + 1))} disabled={value >= max} />
       </div>
     </div>
   );
 }
 
-function CheckboxGroup({ items, selected, onChange, columns = 2 }) {
+/** Square checkbox used in the phase / activity pickers. */
+function CheckBox({ checked, partial, size = 22, label, onClick }) {
   return (
-    <div style={{ display: "grid", gridTemplateColumns: `repeat(${columns}, 1fr)`, gap: 6 }}>
+    <button
+      type="button"
+      role="checkbox"
+      aria-checked={partial ? "mixed" : checked}
+      aria-label={label}
+      onClick={onClick}
+      style={{ width: 40, height: 40, margin: -8, display: "inline-flex", alignItems: "center", justifyContent: "center", background: "transparent", border: "none", cursor: "pointer", flexShrink: 0 }}
+    >
+      <span
+        style={{
+          width: size, height: size, borderRadius: 7, display: "flex", alignItems: "center", justifyContent: "center",
+          border: `1.5px solid ${checked || partial ? "var(--ink)" : "var(--input-border)"}`,
+          background: checked ? "var(--ink)" : "var(--card)", transition: "all 0.15s",
+        }}
+      >
+        {checked && <Check size={size - 10} color="#FFFFFF" strokeWidth={3} />}
+        {!checked && partial && <Minus size={size - 10} color="var(--ink)" strokeWidth={3} />}
+      </span>
+    </button>
+  );
+}
+
+function CheckboxGroup({ items, selected, onChange }) {
+  return (
+    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(210px, 1fr))", gap: 8 }}>
       {items.map(item => {
         const isOn = selected.includes(item);
         return (
-          <label key={item} onClick={() => onChange(isOn ? selected.filter(s => s !== item) : [...selected, item])}
-            style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 10px", borderRadius: 6, cursor: "pointer", fontSize: 13, color: "#475569", userSelect: "none", background: isOn ? "#FFF5F0" : "transparent", transition: "background 0.15s" }}>
-            <div style={{ width: 16, height: 16, borderRadius: 4, border: `2px solid ${isOn ? "var(--ink, #111317)" : "#CBD5E1"}`, background: isOn ? "var(--ink, #111317)" : "transparent", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, transition: "all 0.15s" }}>
-              {isOn && <Check size={10} color="#fff" strokeWidth={3} />}
-            </div>
+          <button
+            key={item}
+            type="button"
+            role="checkbox"
+            aria-checked={isOn}
+            onClick={() => onChange(isOn ? selected.filter(s => s !== item) : [...selected, item])}
+            style={{
+              display: "flex", alignItems: "center", gap: 10, minHeight: 44, padding: "0 12px", borderRadius: "var(--r-tile)", cursor: "pointer",
+              fontFamily: "var(--font-ui)", fontSize: 14, color: "var(--ink)", textAlign: "left", transition: "all 0.15s",
+              background: isOn ? "var(--accent-soft)" : "var(--card)",
+              border: `1px solid ${isOn ? "var(--accent)" : "var(--input-border)"}`,
+            }}
+          >
+            <span style={{ width: 20, height: 20, borderRadius: 6, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", border: `1.5px solid ${isOn ? "var(--ink)" : "var(--input-border)"}`, background: isOn ? "var(--ink)" : "var(--card)" }}>
+              {isOn && <Check size={12} color="#FFFFFF" strokeWidth={3} />}
+            </span>
             {item}
-          </label>
+          </button>
         );
       })}
+    </div>
+  );
+}
+
+/** Inline message banner (error / success / info). */
+function Banner({ tone = "info", icon: Icon, children, style }) {
+  const map = {
+    error: { bg: "var(--status-danger-soft)", fg: "var(--status-danger)" },
+    success: { bg: "var(--status-success-soft)", fg: "var(--status-success)" },
+    info: { bg: "var(--accent-soft)", fg: "var(--ink)" },
+  }[tone];
+  return (
+    <div
+      role={tone === "error" ? "alert" : "status"}
+      style={{ display: "flex", alignItems: "flex-start", gap: 10, padding: "12px 14px", borderRadius: "var(--r-input)", background: map.bg, color: map.fg, fontFamily: "var(--font-ui)", fontSize: 14, lineHeight: 1.45, ...style }}
+    >
+      {Icon && <Icon size={18} strokeWidth={2} style={{ flexShrink: 0, marginTop: 1 }} />}
+      <div style={{ flex: 1, minWidth: 0 }}>{children}</div>
+    </div>
+  );
+}
+
+/** In-page naming dialog for custom phases / activities (replaces window.prompt). */
+function NameDialog({ title, label, initial = "", confirmLabel, onSubmit, onClose }) {
+  const [value, setValue] = useState(initial);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    const onKey = (e) => e.key === "Escape" && onClose();
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [onClose]);
+
+  const submit = (e) => {
+    e.preventDefault();
+    const err = onSubmit(value);
+    if (err) setError(err);
+  };
+
+  return (
+    <div
+      style={{ position: "fixed", inset: 0, background: "var(--scrim)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000, backdropFilter: "blur(4px)", padding: 16 }}
+      onClick={onClose}
+    >
+      <form
+        role="dialog"
+        aria-modal="true"
+        aria-label={title}
+        onSubmit={submit}
+        noValidate
+        onClick={(e) => e.stopPropagation()}
+        style={{ background: "var(--card)", width: "100%", maxWidth: 440, borderRadius: "var(--r-card)", padding: 24, boxShadow: "var(--shadow-modal)", border: "1px solid var(--line)", boxSizing: "border-box", display: "flex", flexDirection: "column", gap: 16 }}
+      >
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
+          <h3 style={{ margin: 0, fontFamily: "var(--font-display)", fontSize: 20, fontWeight: 700, letterSpacing: "-0.02em", color: "var(--ink)" }}>{title}</h3>
+          <BtIconButton icon={X} label="Close" onClick={onClose} />
+        </div>
+        <BtField
+          label={label}
+          required
+          autoFocus
+          value={value}
+          onChange={(e) => { setValue(e.target.value); if (error) setError(""); }}
+          error={error}
+          placeholder="e.g. Compound wall"
+        />
+        <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+          <BtButton variant="secondary" onClick={onClose} style={{ flex: "1 1 120px" }}>Cancel</BtButton>
+          <BtButton type="submit" variant="primary" style={{ flex: "2 1 180px" }}>{confirmLabel}</BtButton>
+        </div>
+      </form>
     </div>
   );
 }
@@ -182,7 +280,6 @@ export default function NewProjectPage() {
   const editProject = location.state?.editProject || location.state?.project || null;
   const isEditMode = Boolean(editProject);
 
-  const [isMobile, setIsMobile] = useState(() => window.innerWidth < 768);
   const [projectName, setProjectName] = useState("");
   const [scope, setScope] = useState("");
   const [city, setCity] = useState("");
@@ -224,6 +321,8 @@ export default function NewProjectPage() {
   const [removeExistingPhoto, setRemoveExistingPhoto] = useState(false);
   const [saving, setSaving] = useState(false);
   const [errMsg, setErrMsg] = useState("");
+  const [fieldErrors, setFieldErrors] = useState({});
+  const [nameDialog, setNameDialog] = useState(null);
   const [successMsg, setSuccessMsg] = useState("");
   const [documents, setDocuments] = useState([]);
   const [documentFiles, setDocumentFiles] = useState([]);
@@ -234,12 +333,6 @@ export default function NewProjectPage() {
   const limitMaxProjects = subscription?.maxProjects !== undefined ? subscription.maxProjects : (currentPlan.includes('free') ? 1 : currentPlan.includes('starter') ? 2 : currentPlan.includes('growth') ? 4 : -1);
 
   const projectCode = isEditMode ? (editProject.projectCode || `CF-${new Date().getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`) : `CF-${new Date().getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`;
-
-  useEffect(() => {
-    const onResize = () => setIsMobile(window.innerWidth < 768);
-    window.addEventListener("resize", onResize);
-    return () => window.removeEventListener("resize", onResize);
-  }, []);
 
   useEffect(() => {
     setSupervisorsLoading(true);
@@ -360,73 +453,74 @@ export default function NewProjectPage() {
     setPhases(updated);
   };
 
-  const handleAddCustomPhase = () => {
-    const name = prompt("Enter custom phase name:");
-    if (!name || !name.trim()) return;
-    const phaseName = name.trim();
-    const phaseId = `custom_phase_${Date.now()}_${Math.random().toString(36).substr(2, 4)}`;
-    const actId = `custom_act_${Date.now()}_${Math.random().toString(36).substr(2, 4)}`;
-    const newPhase = {
-      id: phaseId,
-      phaseName,
-      isCustom: true,
-      activities: [
-        {
-          id: actId,
-          name: phaseName,
-          isCustom: true,
-          completed: false,
-          completedAt: null,
-          budgetMaterial: 0,
-          budgetLabour: 0,
-          budgetEquipment: 0,
-          photos: [],
-          notes: "",
-        }
-      ],
-    };
-    setPhases(prev => [...prev, newPhase]);
-    setSelectedActivityIds(prev => new Set(prev).add(actId));
-    setPhasesExpanded(prev => ({ ...prev, [phaseId]: true }));
-  };
-
+  const handleAddCustomPhase = () => setNameDialog({ mode: "addPhase" });
   const handleRenamePhase = (phaseId) => {
     const phase = phases.find(p => p.id === phaseId);
-    if (!phase) return;
-    const newName = prompt("Edit phase name:", phase.phaseName);
-    if (!newName || !newName.trim()) return;
-    const phaseName = newName.trim();
-    const duplicate = phases.some(p => p.id !== phaseId && p.phaseName.trim().toLowerCase() === phaseName.toLowerCase());
-    if (duplicate) {
-      alert("A phase with this name already exists.");
-      return;
-    }
-    setPhases(prev => prev.map(p => p.id === phaseId ? { ...p, phaseName, isCustom: true } : p));
+    if (phase) setNameDialog({ mode: "renamePhase", phaseId, initial: phase.phaseName });
   };
+  const handleAddCustomActivity = (phaseId) => setNameDialog({ mode: "addActivity", phaseId });
 
-  const handleAddCustomActivity = (phaseId) => {
-    const name = prompt("Enter custom activity name:");
-    if (!name || !name.trim()) return;
-    const actName = name.trim();
-    const actId = `${phaseId}::custom_act_${Date.now()}_${Math.random().toString(36).substr(2, 4)}`;
-    const newAct = {
-      id: actId,
-      name: actName,
-      isCustom: true,
-      completed: false,
-      completedAt: null,
-      budgetMaterial: 0,
-      budgetLabour: 0,
-      budgetEquipment: 0,
-      photos: [],
-      notes: "",
-    };
-    setPhases(prev => prev.map(p => {
-      if (p.id !== phaseId) return p;
-      return { ...p, activities: [...(p.activities || []), newAct] };
-    }));
-    setSelectedActivityIds(prev => new Set(prev).add(actId));
-    setPhasesExpanded(prev => ({ ...prev, [phaseId]: true }));
+  // Applies the name typed in the dialog. Returns an error message (dialog stays open) or null on success.
+  const submitNameDialog = (rawName) => {
+    const name = (rawName || "").trim();
+    if (!name) return "Enter a name.";
+    const { mode, phaseId } = nameDialog;
+    const same = (x) => (x || "").trim().toLowerCase() === name.toLowerCase();
+
+    if (mode === "addPhase") {
+      if (phases.some(p => same(p.phaseName))) return "A phase with this name already exists.";
+      const newPhaseId = `custom_phase_${Date.now()}_${Math.random().toString(36).substr(2, 4)}`;
+      const actId = `custom_act_${Date.now()}_${Math.random().toString(36).substr(2, 4)}`;
+      const newPhase = {
+        id: newPhaseId,
+        phaseName: name,
+        isCustom: true,
+        activities: [
+          {
+            id: actId,
+            name,
+            isCustom: true,
+            completed: false,
+            completedAt: null,
+            budgetMaterial: 0,
+            budgetLabour: 0,
+            budgetEquipment: 0,
+            photos: [],
+            notes: "",
+          }
+        ],
+      };
+      setPhases(prev => [...prev, newPhase]);
+      setSelectedActivityIds(prev => new Set(prev).add(actId));
+      setPhasesExpanded(prev => ({ ...prev, [newPhaseId]: true }));
+    } else if (mode === "renamePhase") {
+      if (phases.some(p => p.id !== phaseId && same(p.phaseName))) return "A phase with this name already exists.";
+      setPhases(prev => prev.map(p => p.id === phaseId ? { ...p, phaseName: name, isCustom: true } : p));
+    } else if (mode === "addActivity") {
+      const phase = phases.find(p => p.id === phaseId);
+      if ((phase?.activities || []).some(a => same(a.name))) return "This phase already has an activity with this name.";
+      const actId = `${phaseId}::custom_act_${Date.now()}_${Math.random().toString(36).substr(2, 4)}`;
+      const newAct = {
+        id: actId,
+        name,
+        isCustom: true,
+        completed: false,
+        completedAt: null,
+        budgetMaterial: 0,
+        budgetLabour: 0,
+        budgetEquipment: 0,
+        photos: [],
+        notes: "",
+      };
+      setPhases(prev => prev.map(p => {
+        if (p.id !== phaseId) return p;
+        return { ...p, activities: [...(p.activities || []), newAct] };
+      }));
+      setSelectedActivityIds(prev => new Set(prev).add(actId));
+      setPhasesExpanded(prev => ({ ...prev, [phaseId]: true }));
+    }
+    setNameDialog(null);
+    return null;
   };
 
   const handlePhotoFile = (file) => {
@@ -462,13 +556,22 @@ export default function NewProjectPage() {
   const handleSubmit = async () => {
     setErrMsg("");
     setSuccessMsg("");
-    if (!projectName.trim()) { setErrMsg("Project name is required."); return; }
+    setFieldErrors({});
+    const focusFirstError = () => setTimeout(() => document.querySelector("[aria-invalid='true']")?.scrollIntoView({ behavior: "smooth", block: "center" }), 50);
+    if (!projectName.trim()) {
+      setErrMsg("Project name is required.");
+      setFieldErrors({ name: "Enter a project name." });
+      focusFirstError();
+      return;
+    }
 
     if (startDate && expectedEndDate) {
       const s = new Date(startDate);
       const e = new Date(expectedEndDate);
       if (e < s) {
         setErrMsg("Expected End Date cannot be earlier than Start Date.");
+        setFieldErrors({ endDate: "End date must be on or after the start date." });
+        focusFirstError();
         return;
       }
     }
@@ -579,8 +682,6 @@ export default function NewProjectPage() {
   const subTypes = buildingTypes[mainType] || buildingTypes.Residential;
   const totalBudget = Number(budgetMaterial || 0) + Number(budgetLabour || 0) + Number(budgetEquipment || 0) + Number(budgetMisc || 0);
 
-  const baseInput = { width: "100%", padding: "10px 12px", background: "#fff", border: "1px solid #E5E7EB", borderRadius: 8, fontSize: 14, color: "#111827", outline: "none", fontFamily: "inherit", boxSizing: "border-box", transition: "border-color 0.15s" };
-  const labelStyle = { fontSize: 12, fontWeight: 600, color: "#475569", marginBottom: 4, display: "block" };
 
   const csvFileInputRef = useRef(null);
   const [isUploadingCsv, setIsUploadingCsv] = useState(false);
@@ -756,417 +857,264 @@ export default function NewProjectPage() {
     }
   };
 
+  const grid2 = { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))", gap: 16 };
+
   return (
-    <div style={{ display: "flex", flexDirection: "column", width: "100%", minHeight: "100vh", fontFamily: "Inter, 'Segoe UI', sans-serif", background: "#F8FAFC" }}>
+    <div style={{ display: "flex", flexDirection: "column", width: "100%", minHeight: "100%" }}>
+      <ModuleTour steps={tourSteps} run={runTour} setRun={setRunTour} moduleName="NewProject" />
       <input ref={csvFileInputRef} type="file" accept=".csv" style={{ display: "none" }} onChange={handlePhaseCsvUpload} />
 
-      {/* ── HERO BANNER (Blueprint Noir) ── */}
       <BtHero>
-        <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 16 }}>
-          <div>
-            <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 12 }}>
-              <BtPressable
-                onClick={() => navigate("/projects")}
-                style={{
-                  display: "inline-flex",
-                  alignItems: "center",
-                  gap: 6,
-                  color: "rgba(255, 255, 255, 0.72)",
-                  fontSize: 13,
-                  fontWeight: 600,
-                  cursor: "pointer",
-                  background: "none",
-                  border: "none",
-                  padding: 0,
-                }}
-              >
-                <ArrowLeft size={16} />
-                <span>Projects</span>
-              </BtPressable>
-              <span style={{ color: "rgba(255, 255, 255, 0.25)" }}>/</span>
-              <span
-                style={{
-                  fontFamily: "var(--font-mono)",
-                  fontSize: 11,
-                  letterSpacing: "0.12em",
-                  textTransform: "uppercase",
-                  color: "var(--gold-brass)",
-                  fontWeight: 700,
-                }}
-              >
-                PORTFOLIO · NEW PROJECT
-              </span>
-            </div>
-
-            <h1
-              style={{
-                fontFamily: "var(--font-serif)",
-                fontSize: 32,
-                fontWeight: 700,
-                color: "var(--bone)",
-                margin: "0 0 6px",
-                letterSpacing: "-0.02em",
-              }}
-            >
-              {isEditMode ? "Edit Project" : "Create Project"}
-            </h1>
-            <p
-              style={{
-                color: "rgba(255, 255, 255, 0.65)",
-                margin: 0,
-                fontSize: 14,
-                maxWidth: 580,
-                lineHeight: 1.5,
-              }}
-            >
-              {isEditMode
-                ? "Update project configurations, timelines, and budget breakdown."
-                : "Configure project scope, budget allocation, floor breakdown, and construction phases."}
-            </p>
-          </div>
-
-          <button
-            onClick={() => setRunTour(true)}
-            title="Help Tour"
-            style={{
-              width: 38,
-              height: 38,
-              borderRadius: "var(--r-btn, 12px)",
-              background: "rgba(255, 255, 255, 0.08)",
-              border: "1px solid rgba(255, 255, 255, 0.12)",
-              color: "var(--bone)",
-              display: "grid",
-              placeItems: "center",
-              cursor: "pointer",
-              flexShrink: 0,
-            }}
-          >
-            <HelpCircle size={17} />
-          </button>
-        </div>
+        <BtPageHeader
+          back={{ label: "Projects", onClick: () => navigate("/projects") }}
+          eyebrow={isEditMode ? "Edit project" : "New project"}
+          size="md"
+          title={isEditMode ? "Edit Project" : "Create Project"}
+          subtitle={isEditMode
+            ? "Update project configurations, timelines, and budget breakdown."
+            : "Configure project scope, budget allocation, floor breakdown, and construction phases."}
+          actions={<BtIconButton icon={HelpCircle} label="Page tour" onDark onClick={() => setRunTour(true)} />}
+        />
       </BtHero>
 
-      {/* ── MAIN CONTENT (Overlapping BtSheet) ── */}
-      <BtSheet overlap={26} padding="24px 32px 64px">
-        <div style={{ maxWidth: 860, margin: "0 auto" }}>
-        <div className="tour-budget-config" style={{ background: "#fff", borderRadius: 12, border: "1px solid #E5E7EB", padding: "16px 20px", marginBottom: 16, boxShadow: "0 1px 3px rgba(0,0,0,0.04)", maxWidth: 800, margin: "0 auto 16px" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 14 }}>
-            <div style={{ width: 36, height: 36, borderRadius: 10, background: "#10B9811A", display: "flex", alignItems: "center", justifyContent: "center", color: "#10B981" }}>
-              <FileText size={20} />
-            </div>
-            <div>
-              <div style={{ fontSize: 11, fontWeight: 800, color: "#64748B", letterSpacing: "0.5px", textTransform: "uppercase" }}>PHASES & BUDGET CONFIGURATION</div>
-              <div style={{ fontSize: 13, fontWeight: 600, color: "#111827" }}>Import/Export CSV budgets for all phases.</div>
-            </div>
-          </div>
-          <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-            <button onClick={downloadPhaseTemplate} style={{ flex: 1, padding: "9px 14px", background: "#fff", border: "1.5px solid #E5E7EB", borderRadius: 8, fontSize: 13, fontWeight: 700, color: "var(--ink, #111317)", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 6, fontFamily: "inherit" }}>
-              <Upload size={14} style={{ transform: "rotate(180deg)" }} /> Download Template
-            </button>
-            <button onClick={() => csvFileInputRef.current?.click()} disabled={isUploadingCsv} style={{ flex: 1, padding: "9px 14px", background: "var(--ink, #111317)", border: "none", borderRadius: 8, fontSize: 13, fontWeight: 700, color: "#fff", cursor: isUploadingCsv ? "not-allowed" : "pointer", opacity: isUploadingCsv ? 0.7 : 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 6, fontFamily: "inherit" }}>
-              <Upload size={14} /> {isUploadingCsv ? "Uploading..." : "Upload Phase CSV"}
-            </button>
-            <button onClick={exportCurrentPhasesCsv} style={{ padding: "9px 14px", background: "#F1F5F9", border: "1px solid #E5E7EB", borderRadius: 8, fontSize: 13, fontWeight: 600, color: "#475569", cursor: "pointer", fontFamily: "inherit" }}>
-              Export CSV
-            </button>
-          </div>
-        </div>
-        {errMsg && (
-          <div style={{ background: "#FEF2F2", border: "1px solid #FECACA", borderRadius: 8, padding: "10px 14px", color: "#DC2626", fontSize: 13, marginBottom: 14, display: "flex", alignItems: "center", gap: 8 }}>
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ flexShrink: 0 }}><circle cx="12" cy="12" r="10" /><line x1="12" y1="8" x2="12" y2="12" /><line x1="12" y1="16" x2="12.01" y2="16" /></svg>
-            {errMsg}
-          </div>
-        )}
-        {successMsg && (
-          <div style={{ background: "#F0FDF4", border: "1px solid #BBF7D0", borderRadius: 8, padding: "10px 14px", color: "#166534", fontSize: 13, marginBottom: 14, display: "flex", alignItems: "center", gap: 8 }}>
-            <Check size={14} /> {successMsg}
-          </div>
-        )}
-
-        <div style={{ maxWidth: 800, margin: "0 auto" }}>
+      <BtSheet>
+        <div style={{ maxWidth: 960, margin: "0 auto", display: "flex", flexDirection: "column", gap: 16 }}>
           {!isEditMode && limitMaxProjects !== -1 && (
-            <div style={{ padding: '12px', background: '#FFF5F0', borderRadius: 8, border: '1px solid #FDE8D8', display: 'flex', gap: 8, marginBottom: 20 }}>
-              <div style={{ flexShrink: 0, color: 'var(--ink, #111317)' }}>
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>
-              </div>
-              <div style={{ fontSize: 13, color: '#111827' }}>
-                <strong>Project Limits:</strong> You have created <strong>{projectCount}</strong> out of <strong>{limitMaxProjects}</strong> projects.
-                {projectCount >= limitMaxProjects && (
-                  <span style={{ marginLeft: 8, color: '#DC2626', fontWeight: 700, cursor: 'pointer', textDecoration: 'underline' }} onClick={() => navigate('/subscription')}>
-                    Upgrade Plan
-                  </span>
-                )}
-              </div>
-            </div>
-          )}
-
-          <Accordion title="Project Setup" icon={<ClipboardList size={16} />} defaultOpen>
-            <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: 14, marginBottom: 12 }}>
-              <div className="tour-project-name">
-                <label style={labelStyle}>Project Name *</label>
-                <input value={projectName} onChange={e => setProjectName(e.target.value)} placeholder="e.g. Skyline Towers" style={baseInput} />
-              </div>
-              <div className="tour-city">
-                <label style={labelStyle}>City</label>
-                <div style={{ position: "relative" }}>
-                  <MapPin size={14} color="#94A3B8" style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)", pointerEvents: "none" }} />
-                  <input value={city} onChange={e => setCity(e.target.value)} placeholder="e.g. Bengaluru" style={{ ...baseInput, paddingLeft: 34 }} />
-                </div>
-              </div>
-            </div>
-          </Accordion>
-
-          <Accordion title="Basic Information" icon={<InfoIcon />} defaultOpen>
-            <div style={{ marginBottom: 14 }}>
-              <label style={labelStyle}>Project Code</label>
-              <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 14px", background: "#F8FAFC", borderRadius: 8, border: "1px solid #E5E7EB" }}>
-                <Hash size={14} color="var(--ink, #111317)" />
-                <span style={{ fontSize: 14, fontWeight: 700, color: "#111827", fontFamily: "monospace" }}>{projectCode}</span>
-              </div>
-            </div>
-
-            <div style={{ marginBottom: 14 }}>
-              <label style={labelStyle}>Map Location / Address</label>
-              <div style={{ position: "relative" }}>
-                <MapPin size={14} color="#94A3B8" style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)", pointerEvents: "none" }} />
-                <input value={mapAddress} onChange={e => setMapAddress(e.target.value)} placeholder="Full site address" style={{ ...baseInput, paddingLeft: 34 }} />
-              </div>
-            </div>
-
-            <div className="tour-client" style={{ marginBottom: 14 }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 10 }}>
-                <User size={14} color="var(--ink, #111317)" />
-                <span style={{ fontSize: 13, fontWeight: 600, color: "#111827" }}>Client Details</span>
-              </div>
-              <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: 10 }}>
-                <input value={clientName} onChange={e => setClientName(e.target.value)} placeholder="Client / Owner" style={baseInput} />
-                <input value={contactNumber} onChange={e => setContactNumber(e.target.value)} placeholder="+91 XXXXX XXXXX" maxLength={10} style={baseInput} />
-              </div>
-            </div>
-
-            <div className="tour-manager">
-              <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 10 }}>
-                <HardHat size={14} color="var(--ink, #111317)" />
-                <span style={{ fontSize: 13, fontWeight: 600, color: "#111827" }}>Site Team</span>
-              </div>
-              <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: 10 }}>
-                <input value={siteEngineer} onChange={e => setSiteEngineer(e.target.value)} placeholder="Engineer in charge" style={baseInput} />
-                <input value={contractorName} onChange={e => setContractorName(e.target.value)} placeholder="Main contractor" style={baseInput} />
-              </div>
-            </div>
-          </Accordion>
-
-          <div className="tour-building-type">
-            <Accordion title="Building Type" icon={<Building2 size={16} />} defaultOpen>
-              <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: 14 }}>
-              <div>
-                <label style={labelStyle}>Main Type</label>
-                <div style={{ position: "relative" }}>
-                  <select value={mainType} onChange={e => { setMainType(e.target.value); setSubType("Select Sub Type"); }}
-                    style={{ ...baseInput, appearance: "none", cursor: "pointer", paddingRight: 36 }}>
-                    {Object.keys(buildingTypes).map(t => <option key={t}>{t}</option>)}
-                  </select>
-                  <ChevronDown size={14} color="#94A3B8" style={{ position: "absolute", right: 12, top: "50%", transform: "translateY(-50%)", pointerEvents: "none" }} />
-                </div>
-              </div>
-              <div>
-                <label style={labelStyle}>Sub Type</label>
-                <div style={{ position: "relative" }}>
-                  <select value={showSubTypeCustom ? "Other (Custom)" : subType} onChange={e => setSubType(e.target.value)}
-                    style={{ ...baseInput, appearance: "none", cursor: "pointer", paddingRight: 36 }}>
-                    {subTypes.map(t => <option key={t}>{t}</option>)}
-                  </select>
-                  <ChevronDown size={14} color="#94A3B8" style={{ position: "absolute", right: 12, top: "50%", transform: "translateY(-50%)", pointerEvents: "none" }} />
-                </div>
-              </div>
-            </div>
-            {showSubTypeCustom && (
-              <div style={{ marginTop: 10 }}>
-                <input value={customSubType} onChange={e => setCustomSubType(e.target.value)} placeholder="Enter custom sub type" style={baseInput} />
-              </div>
-            )}
-            </Accordion>
-          </div>
-
-          <Accordion title="Land & Floors" icon={<Layers size={16} />} defaultOpen>
-            <div style={{ marginBottom: 14 }}>
-              <label style={labelStyle}>Total Land Area</label>
-              <div style={{ display: "flex", gap: 10 }}>
-                <input value={landArea} onChange={e => setLandArea(e.target.value)} placeholder="2400" type="number" style={{ ...baseInput, flex: 2 }} />
-                <div style={{ position: "relative", flex: 1 }}>
-                  <select value={landUnit} onChange={e => setLandUnit(e.target.value)}
-                    style={{ ...baseInput, appearance: "none", cursor: "pointer", paddingRight: 36 }}>
-                    {landUnits.map(u => <option key={u}>{u}</option>)}
-                  </select>
-                  <ChevronDown size={14} color="#94A3B8" style={{ position: "absolute", right: 12, top: "50%", transform: "translateY(-50%)", pointerEvents: "none" }} />
-                </div>
-              </div>
-            </div>
-            <div className="tour-floors">
-              <label style={labelStyle}>Floors Included</label>
-              <ChipSelect options={floorOptions} selected={selectedFloors} onChange={setSelectedFloors} multi />
-            </div>
-          </Accordion>
-
-          <Accordion title="Rooms & Bathrooms" icon={<Bed size={16} />} count={rooms.room1BHK + rooms.room2BHK + rooms.room3BHK + rooms.roomCustom + bathrooms.bathWestern + bathrooms.bathIndian + bathrooms.bathCommon + bathrooms.bathAttached}>
-            <div style={{ marginBottom: 14 }}>
-              <div style={{ fontSize: 11, fontWeight: 600, color: "#64748B", letterSpacing: "0.05em", marginBottom: 6, textTransform: "uppercase" }}>Room Types</div>
-              <Stepper label="1 BHK" value={rooms.room1BHK} onChange={v => setRooms(p => ({ ...p, room1BHK: v }))} />
-              <Stepper label="2 BHK" value={rooms.room2BHK} onChange={v => setRooms(p => ({ ...p, room2BHK: v }))} />
-              <Stepper label="3 BHK" value={rooms.room3BHK} onChange={v => setRooms(p => ({ ...p, room3BHK: v }))} />
-              <Stepper label="Custom Room" value={rooms.roomCustom} onChange={v => setRooms(p => ({ ...p, roomCustom: v }))} />
-            </div>
-            <div>
-              <div style={{ fontSize: 11, fontWeight: 600, color: "#64748B", letterSpacing: "0.05em", marginBottom: 6, textTransform: "uppercase" }}>Bathroom Types</div>
-              <Stepper label="Western Toilet" value={bathrooms.bathWestern} onChange={v => setBathrooms(p => ({ ...p, bathWestern: v }))} />
-              <Stepper label="Indian Toilet" value={bathrooms.bathIndian} onChange={v => setBathrooms(p => ({ ...p, bathIndian: v }))} />
-              <Stepper label="Common Bath" value={bathrooms.bathCommon} onChange={v => setBathrooms(p => ({ ...p, bathCommon: v }))} />
-              <Stepper label="Attached Bath" value={bathrooms.bathAttached} onChange={v => setBathrooms(p => ({ ...p, bathAttached: v }))} />
-            </div>
-          </Accordion>
-
-          <Accordion title="Additional Configuration" icon={<Settings size={16} />} count={features.length}>
-            <CheckboxGroup items={additionalFeatures} selected={features} onChange={setFeatures} />
-          </Accordion>
-
-          <Accordion title="Utility & Services" icon={<Zap size={16} />} count={utilities.length}>
-            <CheckboxGroup items={utilityServices} selected={utilities} onChange={setUtilities} />
-          </Accordion>
-
-          <Accordion title="Gas Connection" icon={<Flame size={16} />} count={gas.length}>
-            <CheckboxGroup items={gasConnections} selected={gas} onChange={setGas} />
-          </Accordion>
-
-          <Accordion title="Kitchen Requirements" icon={<ChefHat size={16} />} count={kitchen.length}>
-            <CheckboxGroup items={kitchenReqs} selected={kitchen} onChange={setKitchen} />
-          </Accordion>
-
-          <Accordion title="Electrical & Plumbing" icon={<Zap size={16} />} count={electrical.length}>
-            <CheckboxGroup items={electricalPlumbing} selected={electrical} onChange={setElectrical} />
-          </Accordion>
-
-          <Accordion title="Terrace & Interior" icon={<Sun size={16} />} count={terrace.length}>
-            <CheckboxGroup items={terraceInterior} selected={terrace} onChange={setTerrace} />
-          </Accordion>
-
-          <Accordion title="Dates, Budget & Status" icon={<CalendarDays size={16} />} defaultOpen>
-            <div style={{ marginBottom: 14 }}>
-              <div style={{ fontSize: 11, fontWeight: 600, color: "#64748B", letterSpacing: "0.05em", marginBottom: 6, textTransform: "uppercase" }}>Project Timeline</div>
-              <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: 10 }}>
-                <div>
-                  <label style={labelStyle}>Start Date *</label>
-                  <div style={{ position: "relative" }}>
-                    <Calendar size={14} color="#94A3B8" style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)", pointerEvents: "none" }} />
-                    <input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} style={{ ...baseInput, paddingLeft: 34, color: startDate ? "#111827" : "#94A3B8" }} />
-                  </div>
-                </div>
-                <div>
-                  <label style={labelStyle}>Expected End Date</label>
-                  <div style={{ position: "relative" }}>
-                    <Calendar size={14} color="#94A3B8" style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)", pointerEvents: "none" }} />
-                    <input type="date" value={expectedEndDate} onChange={e => setExpectedEndDate(e.target.value)} style={{ ...baseInput, paddingLeft: 34, color: expectedEndDate ? "#111827" : "#94A3B8" }} />
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <div className="tour-budget-inputs" style={{ marginBottom: 14 }}>
-              <div style={{ fontSize: 11, fontWeight: 600, color: "#64748B", letterSpacing: "0.05em", marginBottom: 6, textTransform: "uppercase" }}>Budget Breakdown</div>
-              <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: 10 }}>
-                <div>
-                  <label style={labelStyle}>Materials</label>
-                  <div style={{ display: "flex", alignItems: "center", gap: 6, background: "#fff", border: "1px solid #E5E7EB", borderRadius: 8, padding: "10px 12px" }}>
-                    <IndianRupee size={14} color="var(--ink, #111317)" />
-                    <input value={budgetMaterial} onChange={e => setBudgetMaterial(e.target.value)} placeholder="0" type="number" style={{ flex: 1, border: "none", background: "transparent", outline: "none", fontSize: 14, color: "#111827", fontFamily: "inherit" }} />
-                  </div>
-                </div>
-                <div>
-                  <label style={labelStyle}>Labour</label>
-                  <div style={{ display: "flex", alignItems: "center", gap: 6, background: "#fff", border: "1px solid #E5E7EB", borderRadius: 8, padding: "10px 12px" }}>
-                    <IndianRupee size={14} color="#0EA5E9" />
-                    <input value={budgetLabour} onChange={e => setBudgetLabour(e.target.value)} placeholder="0" type="number" style={{ flex: 1, border: "none", background: "transparent", outline: "none", fontSize: 14, color: "#111827", fontFamily: "inherit" }} />
-                  </div>
-                </div>
-                <div>
-                  <label style={labelStyle}>Equipment</label>
-                  <div style={{ display: "flex", alignItems: "center", gap: 6, background: "#fff", border: "1px solid #E5E7EB", borderRadius: 8, padding: "10px 12px" }}>
-                    <IndianRupee size={14} color="var(--ink, #111317)" />
-                    <input value={budgetEquipment} onChange={e => setBudgetEquipment(e.target.value)} placeholder="0" type="number" style={{ flex: 1, border: "none", background: "transparent", outline: "none", fontSize: 14, color: "#111827", fontFamily: "inherit" }} />
-                  </div>
-                </div>
-                <div>
-                  <label style={labelStyle}>Miscellaneous</label>
-                  <div style={{ display: "flex", alignItems: "center", gap: 6, background: "#fff", border: "1px solid #E5E7EB", borderRadius: 8, padding: "10px 12px" }}>
-                    <IndianRupee size={14} color="#F59E0B" />
-                    <input value={budgetMisc} onChange={e => setBudgetMisc(e.target.value)} placeholder="0" type="number" style={{ flex: 1, border: "none", background: "transparent", outline: "none", fontSize: 14, color: "#111827", fontFamily: "inherit" }} />
-                  </div>
-                </div>
-              </div>
-              {totalBudget > 0 && (
-                <div style={{ marginTop: 8, fontSize: 13, fontWeight: 700, color: "#111827", textAlign: "right" }}>
-                  Total: ₹{totalBudget.toLocaleString("en-IN")}
+            <Banner tone="info" icon={Info}>
+              <strong>Project limits:</strong> you have created <strong className="tnum">{projectCount}</strong> of <strong className="tnum">{limitMaxProjects}</strong> projects on your plan.
+              {projectCount >= limitMaxProjects && (
+                <div style={{ marginTop: 8 }}>
+                  <BtButton variant="primary" size="compact" onClick={() => navigate("/subscription")}>Upgrade Plan</BtButton>
                 </div>
               )}
-            </div>
+            </Banner>
+          )}
 
-            <div>
-              <div style={{ fontSize: 11, fontWeight: 600, color: "#64748B", letterSpacing: "0.05em", marginBottom: 6, textTransform: "uppercase" }}>Project Status</div>
-              <ChipSelect options={statusChips} selected={status} onChange={setStatus} multi={false} />
-            </div>
-          </Accordion>
-
-          <Accordion title="Construction Phases" icon={<ClipboardList size={16} />} defaultOpen>
-            <div style={{ background: "#F8FAFC", borderRadius: 8, border: "1px solid #E5E7EB", padding: "12px 14px", marginBottom: 10 }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-                <span style={{ fontSize: 13, fontWeight: 700, color: "#111827" }}>CONSTRUCTION PHASES</span>
-                <span style={{ fontSize: 12, fontWeight: 600, color: "var(--ink, #111317)", cursor: "pointer" }} onClick={selectAllPhases}>Select All</span>
-                <span style={{ fontSize: 12, color: "#CBD5E1" }}>|</span>
-                <span style={{ fontSize: 12, fontWeight: 600, color: "#94A3B8", cursor: "pointer" }} onClick={clearAllPhases}>Clear</span>
+          <BtCard padding="20px" className="tour-budget-config">
+            <div style={{ display: "flex", alignItems: "center", gap: 14, marginBottom: 16 }}>
+              <BtTile icon={FileText} bg="var(--accent-soft)" fg="var(--accent-ink)" size={44} />
+              <div style={{ minWidth: 0 }}>
+                <div className="bt-eyebrow" style={{ color: "var(--ink-3)", marginBottom: 4 }}>Phases &amp; budget configuration</div>
+                <div style={{ fontSize: 15, fontWeight: 600, color: "var(--ink)" }}>Import or export CSV budgets for all phases.</div>
               </div>
-              <div style={{ fontSize: 12, color: "#64748B", marginTop: 2 }}>Select phases and activities required.</div>
-              <div style={{ fontSize: 13, fontWeight: 700, color: "var(--ink, #111317)", marginTop: 6 }}>{selectedCount} of {totalCount} activities selected</div>
             </div>
-            <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+            <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+              <BtButton variant="secondary" size="small" icon={Download} onClick={downloadPhaseTemplate}>Download Template</BtButton>
+              <BtButton variant="primary" size="small" icon={Upload} loading={isUploadingCsv} onClick={() => csvFileInputRef.current?.click()}>Upload Phase CSV</BtButton>
+              <BtButton variant="secondary" size="small" onClick={exportCurrentPhasesCsv}>Export CSV</BtButton>
+            </div>
+          </BtCard>
+
+          <Section title="Project Setup" icon={ClipboardList} defaultOpen>
+            <div style={grid2}>
+              <BtField
+                className="tour-project-name"
+                label="Project name"
+                required
+                value={projectName}
+                onChange={e => { setProjectName(e.target.value); if (fieldErrors.name) setFieldErrors(f => ({ ...f, name: undefined })); }}
+                placeholder="e.g. Skyline Towers"
+                error={fieldErrors.name}
+              />
+              <BtField
+                className="tour-city"
+                label="City"
+                icon={MapPin}
+                value={city}
+                onChange={e => setCity(e.target.value)}
+                placeholder="e.g. Bengaluru"
+              />
+            </div>
+          </Section>
+
+          <Section title="Basic Information" icon={Info} defaultOpen>
+            <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+              <div style={grid2}>
+                <BtField label="Project code" icon={Hash} value={projectCode} disabled readOnly helperText="Generated automatically." onChange={() => {}} />
+                <BtField label="Map location / address" icon={MapPin} value={mapAddress} onChange={e => setMapAddress(e.target.value)} placeholder="Full site address" />
+              </div>
+
+              <div className="tour-client">
+                <SubHeading icon={User}>Client details</SubHeading>
+                <div style={grid2}>
+                  <BtField label="Client / owner" value={clientName} onChange={e => setClientName(e.target.value)} placeholder="Client or owner name" />
+                  <BtField label="Contact number" icon={Phone} type="tel" inputMode="numeric" value={contactNumber} onChange={e => setContactNumber(e.target.value)} placeholder="10-digit mobile number" maxLength={10} />
+                </div>
+              </div>
+
+              <div className="tour-manager">
+                <SubHeading icon={HardHat}>Site team</SubHeading>
+                <div style={grid2}>
+                  <BtField label="Engineer in charge" value={siteEngineer} onChange={e => setSiteEngineer(e.target.value)} placeholder="Engineer name" />
+                  <BtField label="Main contractor" value={contractorName} onChange={e => setContractorName(e.target.value)} placeholder="Contractor name" />
+                </div>
+              </div>
+            </div>
+          </Section>
+
+          <Section title="Building Type" icon={Building2} defaultOpen className="tour-building-type">
+            <div style={grid2}>
+              <BtSelect label="Main type" value={mainType} onChange={e => { setMainType(e.target.value); setSubType("Select Sub Type"); }}>
+                {Object.keys(buildingTypes).map(t => <option key={t}>{t}</option>)}
+              </BtSelect>
+              <BtSelect label="Sub type" value={showSubTypeCustom ? "Other (Custom)" : subType} onChange={e => setSubType(e.target.value)}>
+                {subTypes.map(t => <option key={t}>{t}</option>)}
+              </BtSelect>
+            </div>
+            {showSubTypeCustom && (
+              <div style={{ marginTop: 16 }}>
+                <BtField label="Custom sub type" value={customSubType} onChange={e => setCustomSubType(e.target.value)} placeholder="Enter custom sub type" />
+              </div>
+            )}
+          </Section>
+
+          <Section title="Land & Floors" icon={Layers} defaultOpen>
+            <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+              <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 2fr) minmax(0, 1fr)", gap: 12 }}>
+                <BtField label="Total land area" type="number" inputMode="decimal" min="0" value={landArea} onChange={e => setLandArea(e.target.value)} placeholder="2400" />
+                <BtSelect label="Unit" value={landUnit} onChange={e => setLandUnit(e.target.value)}>
+                  {landUnits.map(u => <option key={u}>{u}</option>)}
+                </BtSelect>
+              </div>
+              <div className="tour-floors">
+                <SubHeading>Floors included</SubHeading>
+                <ChipSelect options={floorOptions} selected={selectedFloors} onChange={setSelectedFloors} multi />
+              </div>
+            </div>
+          </Section>
+
+          <Section title="Rooms & Bathrooms" icon={Bed} defaultOpen={false} count={rooms.room1BHK + rooms.room2BHK + rooms.room3BHK + rooms.roomCustom + bathrooms.bathWestern + bathrooms.bathIndian + bathrooms.bathCommon + bathrooms.bathAttached}>
+            <div className="bt-grid-2" style={{ gap: 24 }}>
+              <div>
+                <SubHeading>Room types</SubHeading>
+                <Stepper label="1 BHK" value={rooms.room1BHK} onChange={v => setRooms(p => ({ ...p, room1BHK: v }))} />
+                <Stepper label="2 BHK" value={rooms.room2BHK} onChange={v => setRooms(p => ({ ...p, room2BHK: v }))} />
+                <Stepper label="3 BHK" value={rooms.room3BHK} onChange={v => setRooms(p => ({ ...p, room3BHK: v }))} />
+                <Stepper label="Custom room" value={rooms.roomCustom} onChange={v => setRooms(p => ({ ...p, roomCustom: v }))} />
+              </div>
+              <div>
+                <SubHeading>Bathroom types</SubHeading>
+                <Stepper label="Western toilet" value={bathrooms.bathWestern} onChange={v => setBathrooms(p => ({ ...p, bathWestern: v }))} />
+                <Stepper label="Indian toilet" value={bathrooms.bathIndian} onChange={v => setBathrooms(p => ({ ...p, bathIndian: v }))} />
+                <Stepper label="Common bath" value={bathrooms.bathCommon} onChange={v => setBathrooms(p => ({ ...p, bathCommon: v }))} />
+                <Stepper label="Attached bath" value={bathrooms.bathAttached} onChange={v => setBathrooms(p => ({ ...p, bathAttached: v }))} />
+              </div>
+            </div>
+          </Section>
+
+          <Section title="Additional Configuration" icon={Settings} defaultOpen={false} count={features.length}>
+            <CheckboxGroup items={additionalFeatures} selected={features} onChange={setFeatures} />
+          </Section>
+
+          <Section title="Utility & Services" icon={Zap} defaultOpen={false} count={utilities.length}>
+            <CheckboxGroup items={utilityServices} selected={utilities} onChange={setUtilities} />
+          </Section>
+
+          <Section title="Gas Connection" icon={Flame} defaultOpen={false} count={gas.length}>
+            <CheckboxGroup items={gasConnections} selected={gas} onChange={setGas} />
+          </Section>
+
+          <Section title="Kitchen Requirements" icon={ChefHat} defaultOpen={false} count={kitchen.length}>
+            <CheckboxGroup items={kitchenReqs} selected={kitchen} onChange={setKitchen} />
+          </Section>
+
+          <Section title="Electrical & Plumbing" icon={Zap} defaultOpen={false} count={electrical.length}>
+            <CheckboxGroup items={electricalPlumbing} selected={electrical} onChange={setElectrical} />
+          </Section>
+
+          <Section title="Terrace & Interior" icon={Sun} defaultOpen={false} count={terrace.length}>
+            <CheckboxGroup items={terraceInterior} selected={terrace} onChange={setTerrace} />
+          </Section>
+
+          <Section title="Dates, Budget & Status" icon={CalendarDays} defaultOpen>
+            <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
+              <div>
+                <SubHeading>Project timeline</SubHeading>
+                <div style={grid2}>
+                  <BtField label="Start date" icon={Calendar} type="date" value={startDate} onChange={e => setStartDate(e.target.value)} />
+                  <BtField
+                    label="Expected end date"
+                    icon={Calendar}
+                    type="date"
+                    value={expectedEndDate}
+                    onChange={e => { setExpectedEndDate(e.target.value); if (fieldErrors.endDate) setFieldErrors(f => ({ ...f, endDate: undefined })); }}
+                    error={fieldErrors.endDate}
+                  />
+                </div>
+              </div>
+
+              <div className="tour-budget-inputs">
+                <SubHeading>Budget breakdown</SubHeading>
+                <div className="bt-grid-2">
+                  <BtField label="Materials" isCurrency type="number" inputMode="decimal" min="0" value={budgetMaterial} onChange={e => setBudgetMaterial(e.target.value)} placeholder="0" />
+                  <BtField label="Labour" isCurrency type="number" inputMode="decimal" min="0" value={budgetLabour} onChange={e => setBudgetLabour(e.target.value)} placeholder="0" />
+                  <BtField label="Equipment" isCurrency type="number" inputMode="decimal" min="0" value={budgetEquipment} onChange={e => setBudgetEquipment(e.target.value)} placeholder="0" />
+                  <BtField label="Miscellaneous" isCurrency type="number" inputMode="decimal" min="0" value={budgetMisc} onChange={e => setBudgetMisc(e.target.value)} placeholder="0" />
+                </div>
+                {totalBudget > 0 && (
+                  <div style={{ marginTop: 14, display: "flex", justifyContent: "space-between", alignItems: "center", padding: "12px 16px", borderRadius: "var(--r-input)", background: "var(--fill)" }}>
+                    <span style={{ fontSize: 14, color: "var(--ink-2)" }}>Total budget</span>
+                    <strong className="tnum" style={{ fontFamily: "var(--font-display)", fontSize: 20, color: "var(--ink)" }}>{formatInr(totalBudget)}</strong>
+                  </div>
+                )}
+              </div>
+
+              <div>
+                <SubHeading>Project status</SubHeading>
+                <ChipSelect options={statusChips} selected={status} onChange={setStatus} multi={false} />
+              </div>
+            </div>
+          </Section>
+
+          <Section title="Construction Phases" icon={ClipboardList} defaultOpen>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap", padding: "12px 14px", borderRadius: "var(--r-input)", background: "var(--fill)", marginBottom: 14 }}>
+              <div>
+                <div className="tnum" style={{ fontSize: 15, fontWeight: 600, color: "var(--ink)" }}>{selectedCount} of {totalCount} activities selected</div>
+                <div style={{ fontSize: 13, color: "var(--ink-2)", marginTop: 2 }}>Select the phases and activities this project needs.</div>
+              </div>
+              <div style={{ display: "flex", gap: 8 }}>
+                <BtButton variant="secondary" size="compact" onClick={selectAllPhases}>Select all</BtButton>
+                <BtButton variant="secondary" size="compact" onClick={clearAllPhases}>Clear</BtButton>
+              </div>
+            </div>
+
+            <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
               {phases.map((phase, idx) => {
                 const actIds = phase.activities.map(a => a.id);
-                const allSel = actIds.every(id => selectedActivityIds.has(id));
+                const allSel = actIds.length > 0 && actIds.every(id => selectedActivityIds.has(id));
                 const someSel = actIds.some(id => selectedActivityIds.has(id));
-                const isExpanded = phasesExpanded[phase.id] !== false;
+                const isExpanded = phasesExpanded[phase.id] === true;
                 return (
-                  <div key={phase.id} style={{ background: "#fff", borderRadius: 8, border: "1px solid #E5E7EB", overflow: "hidden" }}>
-                    <div style={{ display: "flex", alignItems: "center", padding: "10px 14px", gap: 10 }}>
-                      <div onClick={() => togglePhaseSelection(phase.id)}
-                        style={{ width: 20, height: 20, borderRadius: 5, border: `1.5px solid ${allSel ? "var(--ink, #111317)" : "#CBD5E1"}`, background: allSel ? "var(--ink, #111317)" : "transparent", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, cursor: "pointer", transition: "all 0.15s" }}>
-                        {allSel && <Check size={11} color="#fff" strokeWidth={3} />}
-                      </div>
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ fontSize: 14, fontWeight: 600, color: "#111827" }}>{phase.phaseName}</div>
-                      </div>
+                  <div key={phase.id} style={{ background: "var(--card)", borderRadius: "var(--r-tile)", border: "1px solid var(--line)", overflow: "hidden" }}>
+                    <div style={{ display: "flex", alignItems: "center", flexWrap: "wrap", padding: "10px 12px 10px 20px", gap: 12 }}>
+                      <CheckBox checked={allSel} partial={!allSel && someSel} label={`Select all activities in ${phase.phaseName}`} onClick={() => togglePhaseSelection(phase.id)} />
+                      <div style={{ flex: "1 1 120px", minWidth: 0, fontSize: 15, fontWeight: 600, color: "var(--ink)", overflowWrap: "anywhere" }}>{phase.phaseName}</div>
                       <div style={{ display: "flex", gap: 4, alignItems: "center" }}>
-                        <button onClick={(e) => { e.stopPropagation(); handleRenamePhase(phase.id); }} style={{ padding: "2px 6px", fontSize: 11, background: "#F1F5F9", border: "1px solid #CBD5E1", borderRadius: 4, cursor: "pointer", color: "#475569" }}>✎</button>
-                        <button onClick={(e) => { e.stopPropagation(); movePhase(idx, -1); }} disabled={idx === 0} style={{ padding: "2px 6px", fontSize: 11, background: "#F1F5F9", border: "1px solid #CBD5E1", borderRadius: 4, cursor: idx === 0 ? "not-allowed" : "pointer", opacity: idx === 0 ? 0.4 : 1 }}>▲</button>
-                        <button onClick={(e) => { e.stopPropagation(); movePhase(idx, 1); }} disabled={idx === phases.length - 1} style={{ padding: "2px 6px", fontSize: 11, background: "#F1F5F9", border: "1px solid #CBD5E1", borderRadius: 4, cursor: idx === phases.length - 1 ? "not-allowed" : "pointer", opacity: idx === phases.length - 1 ? 0.4 : 1 }}>▼</button>
-                      </div>
-                      <div onClick={() => setPhasesExpanded(prev => ({ ...prev, [phase.id]: !isExpanded }))} style={{ cursor: "pointer", display: "flex", color: "#94A3B8" }}>
-                        <ChevronDown size={16} style={{ transform: isExpanded ? "rotate(180deg)" : "none", transition: "transform 0.18s" }} />
+                        <BtIconButton icon={Pencil} size={36} label={`Rename ${phase.phaseName}`} onClick={() => handleRenamePhase(phase.id)} />
+                        <BtIconButton icon={ChevronUp} size={36} label={`Move ${phase.phaseName} up`} onClick={() => movePhase(idx, -1)} disabled={idx === 0} />
+                        <BtIconButton icon={ChevronDown} size={36} label={`Move ${phase.phaseName} down`} onClick={() => movePhase(idx, 1)} disabled={idx === phases.length - 1} />
+                        <BtIconButton
+                          icon={isExpanded ? Minus : Plus}
+                          size={36}
+                          label={`${isExpanded ? "Collapse" : "Expand"} ${phase.phaseName}`}
+                          onClick={() => setPhasesExpanded(prev => ({ ...prev, [phase.id]: !isExpanded }))}
+                        />
                       </div>
                     </div>
                     {isExpanded && (
-                      <div style={{ borderTop: "1px solid #F1F5F9" }}>
+                      <div style={{ borderTop: "1px solid var(--line)", background: "var(--ground)" }}>
                         {phase.activities.map(act => {
                           const isSel = selectedActivityIds.has(act.id);
                           return (
-                            <div key={act.id} onClick={() => toggleActivitySelection(act.id)}
-                              style={{ display: "flex", alignItems: "center", padding: "8px 14px 8px 18px", gap: 8, cursor: "pointer", borderTop: "1px solid #F8FAFC" }}>
-                              <div style={{ width: 18, height: 18, borderRadius: 4, border: `1.5px solid ${isSel ? "var(--ink, #111317)" : "#CBD5E1"}`, background: isSel ? "var(--ink, #111317)" : "transparent", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, transition: "all 0.15s" }}>
-                                {isSel && <Check size={10} color="#fff" strokeWidth={3} />}
-                              </div>
-                              <span style={{ flex: 1, fontSize: 13, fontWeight: isSel ? 500 : 400, color: isSel ? "#111827" : "#64748B" }}>{act.name}</span>
+                            <div key={act.id} className="bt-hover-row" onClick={() => toggleActivitySelection(act.id)}
+                              style={{ display: "flex", alignItems: "center", minHeight: 44, padding: "0 16px 0 32px", gap: 12, cursor: "pointer", borderBottom: "1px solid var(--line)" }}>
+                              <CheckBox checked={isSel} size={20} label={`Include ${act.name}`} onClick={(e) => { e.stopPropagation(); toggleActivitySelection(act.id); }} />
+                              <span style={{ flex: 1, fontSize: 14, fontWeight: isSel ? 600 : 400, color: isSel ? "var(--ink)" : "var(--ink-2)" }}>{act.name}</span>
                             </div>
                           );
                         })}
-                        <div onClick={() => handleAddCustomActivity(phase.id)} style={{ padding: "6px 14px 10px 18px", cursor: "pointer" }}>
-                          <span style={{ fontSize: 13, fontWeight: 600, color: "var(--ink, #111317)" }}>+ Add Custom Activity</span>
+                        <div style={{ padding: "8px 16px 8px 24px" }}>
+                          <BtButton variant="ghost" size="compact" icon={Plus} onClick={() => handleAddCustomActivity(phase.id)}>Add custom activity</BtButton>
                         </div>
                       </div>
                     )}
@@ -1174,109 +1122,111 @@ export default function NewProjectPage() {
                 );
               })}
             </div>
-            <div onClick={handleAddCustomPhase} style={{ marginTop: 10, cursor: "pointer", padding: "4px 0" }}>
-              <span style={{ fontSize: 14, fontWeight: 600, color: "var(--ink, #111317)" }}>+ Add Custom Phase</span>
+            <div style={{ marginTop: 14 }}>
+              <BtButton variant="secondary" size="small" icon={Plus} onClick={handleAddCustomPhase}>Add custom phase</BtButton>
             </div>
-          </Accordion>
+          </Section>
 
-          <Accordion title="Site Photo" icon={<Camera size={16} />}>
+          <Section title="Site Photo" icon={Camera} defaultOpen={false}>
             <div className="tour-site-photos">
               <input ref={fileInputRef} type="file" accept="image/png, image/jpeg, image/gif, image/webp" style={{ display: "none" }} onChange={e => handlePhotoFile(e.target.files[0])} />
-            <div onClick={() => fileInputRef.current.click()} style={{ border: `2px dashed ${photoPreview ? "var(--ink, #111317)" : "#E5E7EB"}`, borderRadius: 8, padding: photoPreview ? 0 : "24px 20px", background: photoPreview ? "transparent" : "#F8FAFC", display: "flex", flexDirection: "column", alignItems: "center", gap: 10, cursor: "pointer", transition: "all 0.2s", overflow: "hidden", minHeight: 100, justifyContent: "center" }}>
-              {photoPreview ? (
-                <div style={{ position: "relative", width: "100%" }}>
-                  <img src={photoPreview} alt="preview" style={{ width: "100%", maxHeight: 180, objectFit: "cover", display: "block", borderRadius: 8 }} />
-                  <button onClick={removePhoto} style={{ position: "absolute", top: 6, right: 6, background: "rgba(0,0,0,0.55)", color: "#fff", border: "none", borderRadius: 6, padding: "3px 8px", fontSize: 12, cursor: "pointer", fontWeight: 600, fontFamily: 'inherit' }}>
-                    <X size={12} /> Remove
-                  </button>
-                </div>
-              ) : (
-                <>
-                  <div style={{ width: 40, height: 40, borderRadius: "50%", background: "#FFF5F0", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                    <Upload size={18} color="var(--ink, #111317)" />
+              <div
+                role="button"
+                tabIndex={0}
+                aria-label={photoPreview ? "Replace site photo" : "Upload site photo"}
+                onClick={() => fileInputRef.current.click()}
+                onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); fileInputRef.current.click(); } }}
+                style={{
+                  border: `2px dashed ${photoPreview ? "var(--ink)" : "var(--input-border)"}`, borderRadius: "var(--r-input)",
+                  padding: photoPreview ? 0 : "28px 20px", background: photoPreview ? "transparent" : "var(--fill)",
+                  display: "flex", flexDirection: "column", alignItems: "center", gap: 10, cursor: "pointer", overflow: "hidden", minHeight: 120, justifyContent: "center",
+                }}
+              >
+                {photoPreview ? (
+                  <div style={{ position: "relative", width: "100%" }}>
+                    <img src={photoPreview} alt="Site preview" style={{ width: "100%", maxHeight: 220, objectFit: "cover", display: "block" }} />
+                    <BtButton variant="onDark" size="compact" icon={X} onClick={removePhoto} style={{ position: "absolute", top: 10, right: 10, background: "var(--noir)" }}>Remove</BtButton>
                   </div>
-                  <div style={{ textAlign: "center" }}>
-                    <div style={{ fontSize: 14, fontWeight: 600, color: "#475569" }}>Click to upload site photo</div>
-                    <div style={{ fontSize: 12, color: "#94A3B8", marginTop: 4 }}>PNG, JPG, GIF, WebP up to 10MB</div>
-                  </div>
-                </>
-              )}
+                ) : (
+                  <>
+                    <BtTile icon={Upload} bg="var(--card)" fg="var(--ink)" size={44} />
+                    <div style={{ textAlign: "center" }}>
+                      <div style={{ fontSize: 15, fontWeight: 600, color: "var(--ink)" }}>Click to upload a site photo</div>
+                      <div style={{ fontSize: 13, color: "var(--ink-2)", marginTop: 4 }}>PNG, JPG, GIF, WebP up to 10MB</div>
+                    </div>
+                  </>
+                )}
+              </div>
             </div>
-            </div>
-          </Accordion>
+          </Section>
 
-          <Accordion title="Project Documents & Blueprints" icon={<FileText size={16} />} count={documentFiles.length + documents.length}>
+          <Section title="Project Documents & Blueprints" icon={FileText} defaultOpen={false} count={documentFiles.length + documents.length}>
             <input type="file" multiple accept=".pdf,image/*,.doc,.docx" onChange={handleDocumentFiles} style={{ display: "none" }} id="doc-upload-input" />
-            <label htmlFor="doc-upload-input" style={{ border: "2px dashed #E5E7EB", borderRadius: 8, padding: "16px", background: "#F8FAFC", display: "flex", alignItems: "center", justifyContent: "center", gap: 8, cursor: "pointer", marginBottom: 12 }}>
-              <Upload size={16} color="var(--ink, #111317)" />
-              <span style={{ fontSize: 13, fontWeight: 600, color: "var(--ink, #111317)" }}>Upload Documents / Blueprints (PDF, Images)</span>
+            <label htmlFor="doc-upload-input" style={{ border: "2px dashed var(--input-border)", borderRadius: "var(--r-input)", minHeight: 64, padding: 16, background: "var(--fill)", display: "flex", alignItems: "center", justifyContent: "center", gap: 10, cursor: "pointer", marginBottom: 12, color: "var(--ink)", fontSize: 14, fontWeight: 600 }}>
+              <Upload size={18} />
+              Upload documents / blueprints (PDF, images)
             </label>
 
             {(documents.length > 0 || documentFiles.length > 0) && (
-              <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                 {documents.map((doc, idx) => (
-                  <div key={idx} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", background: "#F1F5F9", padding: "8px 12px", borderRadius: 6, fontSize: 13 }}>
-                    <span style={{ color: "#334155", fontWeight: 500, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{doc.split("/").pop()}</span>
-                    <button onClick={() => removeExistingDocument(doc)} style={{ border: "none", background: "none", color: "#DC2626", cursor: "pointer" }}><X size={14} /></button>
+                  <div key={idx} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, background: "var(--fill)", padding: "4px 6px 4px 14px", borderRadius: "var(--r-tile)", fontSize: 14 }}>
+                    <span style={{ color: "var(--ink)", fontWeight: 500, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{doc.split("/").pop()}</span>
+                    <BtIconButton icon={X} size={36} label={`Remove ${doc.split("/").pop()}`} onClick={() => removeExistingDocument(doc)} />
                   </div>
                 ))}
                 {documentFiles.map((file, idx) => (
-                  <div key={idx} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", background: "#FFF5F0", padding: "8px 12px", borderRadius: 6, fontSize: 13 }}>
-                    <span style={{ color: "var(--ink, #111317)", fontWeight: 500, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{file.name} (New)</span>
-                    <button onClick={() => removeDocumentFile(idx)} style={{ border: "none", background: "none", color: "#DC2626", cursor: "pointer" }}><X size={14} /></button>
+                  <div key={idx} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, background: "var(--accent-soft)", padding: "4px 6px 4px 14px", borderRadius: "var(--r-tile)", fontSize: 14 }}>
+                    <span style={{ color: "var(--ink)", fontWeight: 500, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{file.name} (new)</span>
+                    <BtIconButton icon={X} size={36} label={`Remove ${file.name}`} onClick={() => removeDocumentFile(idx)} />
                   </div>
                 ))}
               </div>
             )}
-          </Accordion>
+          </Section>
 
-          <Accordion title="Project Scope" icon={<FileText size={16} />}>
-            <textarea value={scope} onChange={(e) => setScope(e.target.value)}
+          <Section title="Project Scope" icon={FileText} defaultOpen={false}>
+            <BtTextarea
+              label="Scope of work"
+              value={scope}
+              onChange={(e) => setScope(e.target.value)}
               placeholder="Describe the primary objectives and key milestones of the project..."
               rows={4}
-              style={{ ...baseInput, resize: "vertical", lineHeight: 1.6, width: "100%", fontFamily: 'inherit' }} />
-          </Accordion>
-          {errMsg && (
-            <div style={{ padding: "10px 14px", background: "#FEF2F2", border: "1px solid #FCA5A5", borderRadius: 8, color: "#991B1B", fontSize: 13, fontWeight: 600, marginTop: 12 }}>
-              ⚠️ {errMsg}
-            </div>
-          )}
-          {successMsg && (
-            <div style={{ padding: "10px 14px", background: "#F0FDF4", border: "1px solid #86EFAC", borderRadius: 8, color: "#166534", fontSize: 13, fontWeight: 600, marginTop: 12 }}>
-              ✓ {successMsg}
-            </div>
-          )}
+            />
+          </Section>
 
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginTop: 12 }}>
-            <button className="tour-save-btn" onClick={handleSubmit} disabled={saving}
-              style={{ minHeight: 46, padding: "12px 0", background: "var(--ink, #111317)", color: "#fff", border: "none", borderRadius: 8, fontWeight: 700, fontSize: 14, cursor: saving ? "not-allowed" : "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 8, opacity: saving ? 0.6 : 1, transition: "background 0.2s", fontFamily: 'inherit' }}>
-              {saving ? <><SpinnerIcon /> Saving...</> : isEditMode ? <><Check size={16} /> Update Project</> : <><Plus size={16} /> Create Project</>}
-            </button>
-            <button onClick={() => navigate("/projects")} disabled={saving}
-              style={{ minHeight: 46, padding: "12px 0", background: "#fff", color: "#475569", border: "1px solid #E5E7EB", borderRadius: 8, fontWeight: 600, fontSize: 14, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: 'inherit' }}>
-              Cancel
-            </button>
-          </div>
+          {/* Sticky submit bar: messages + actions stay in reach while scrolling the long form */}
+          <div
+            style={{
+              position: "sticky", bottom: 12, zIndex: 20, display: "flex", flexDirection: "column", gap: 12,
+              padding: 12, borderRadius: "var(--r-card)", background: "var(--card)", border: "1px solid var(--line)", boxShadow: "var(--shadow-raised)",
+            }}
+          >
+            {errMsg && <Banner tone="error" icon={AlertCircle}>{errMsg}</Banner>}
+            {successMsg && <Banner tone="success" icon={CheckCircle2}>{successMsg}</Banner>}
+            <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+              <BtButton variant="secondary" onClick={() => navigate("/projects")} disabled={saving} style={{ flex: "1 1 120px" }}>Cancel</BtButton>
+              <span className="tour-save-btn" style={{ flex: "2 1 200px", display: "flex" }}>
+                <BtButton variant="primary" fullWidth loading={saving} onClick={handleSubmit} icon={isEditMode ? Check : Plus}>
+                  {isEditMode ? "Update Project" : "Create Project"}
+                </BtButton>
+              </span>
+            </div>
           </div>
         </div>
       </BtSheet>
+
+      {nameDialog && (
+        <NameDialog
+          key={`${nameDialog.mode}-${nameDialog.phaseId || ""}`}
+          title={nameDialog.mode === "addPhase" ? "Add custom phase" : nameDialog.mode === "renamePhase" ? "Rename phase" : "Add custom activity"}
+          label={nameDialog.mode === "addActivity" ? "Activity name" : "Phase name"}
+          initial={nameDialog.initial || ""}
+          confirmLabel={nameDialog.mode === "renamePhase" ? "Save name" : "Add"}
+          onSubmit={submitNameDialog}
+          onClose={() => setNameDialog(null)}
+        />
+      )}
     </div>
-  );
-}
-
-function InfoIcon() {
-  return (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <circle cx="12" cy="12" r="10" /><line x1="12" y1="16" x2="12" y2="12" /><line x1="12" y1="8" x2="12.01" y2="8" />
-    </svg>
-  );
-}
-
-function SpinnerIcon() {
-  return (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ animation: "spin 0.7s linear infinite" }}>
-      <circle cx="12" cy="12" r="10" stroke="currentColor" opacity="0.3" />
-      <path d="M12 2a10 10 0 0 1 10 10" />
-    </svg>
   );
 }

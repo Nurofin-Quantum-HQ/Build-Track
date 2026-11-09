@@ -88,6 +88,7 @@
   --shadow-card: 0 1px 2px rgba(12, 14, 18, 0.04), 0 12px 32px -16px rgba(12, 14, 18, 0.12);
   --shadow-raised: 0 2px 4px rgba(12, 14, 18, 0.05), 0 28px 56px -24px rgba(12, 14, 18, 0.22);
   --shadow-glow: 0 0 48px -12px var(--accent);
+  --shadow-float: 0 1px 0 rgba(255, 255, 255, 0.07) inset, 0 0 0 1px rgba(255, 255, 255, 0.07), 0 12px 24px -12px rgba(0, 0, 0, 0.7), 0 32px 64px -24px rgba(0, 0, 0, 0.85);
 
   /* ── Motion & Timing ── */
   --ease: cubic-bezier(0.16, 1, 0.3, 1);
@@ -116,6 +117,32 @@
   --danger-light: var(--status-danger-soft);
   --warning: var(--status-warning);
   --warning-light: var(--status-warning-soft);
+
+  /* Names screens use that were never defined — mapped onto Noir tokens */
+  --ink-soft: var(--ink-2);
+  --ink-secondary: var(--ink-2);
+  --font-serif: var(--font-display);
+  --rose-ember: var(--status-danger);
+  --gold-brass: var(--accent);
+  --jade: var(--status-success-bright);
+  --tone-green: var(--status-success);
+  --tone-green-bg: var(--status-success-soft);
+  --tone-amber: var(--status-warning);
+  --tone-amber-bg: var(--status-warning-soft);
+  --tone-red-bg: var(--status-danger-soft);
+  --tone-brand: var(--accent-ink);
+  --tone-brand-bg: var(--accent-soft);
+  --success-soft: var(--status-success-soft);
+  --danger-soft: var(--status-danger-soft);
+  --surface-sunken: var(--fill);
+  --surface-ground: var(--ground);
+  --surface-subtle: var(--bone);
+  --card-bg: var(--card);
+  --border-subtle: var(--line);
+  --accent-glow: color-mix(in srgb, var(--accent) 45%, transparent);
+  --shadow-modal: var(--shadow-raised);
+  --r-btn: var(--r-button);
+  --radius: var(--r-tile);
 }
 
 /* ── Typography Utilities ── */

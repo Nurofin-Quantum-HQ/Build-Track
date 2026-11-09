@@ -1,15 +1,11 @@
 import { useEffect } from "react";
+import { CheckCircle2, AlertCircle, Info, X } from "lucide-react";
+import BtConfirmDialog from "./ui/ConfirmDialog";
 
-const TOAST_STYLES = {
-  success: {
-    bg: "#dcfce7", border: "#86efac", color: "#166534", icon: "✅",
-  },
-  error: {
-    bg: "#fee2e2", border: "#fca5a5", color: "#991b1b", icon: "⚠️",
-  },
-  info: {
-    bg: "var(--surface-subtle, #F8FAFC)", border: "var(--border, #E2E8F0)", color: "var(--ink, #111317)", icon: "ℹ️",
-  },
+const TONES = {
+  success: { icon: CheckCircle2, iconColor: "var(--status-success-bright)" },
+  error: { icon: AlertCircle, iconColor: "var(--status-danger-bright)" },
+  info: { icon: Info, iconColor: "var(--accent)" },
 };
 
 export function Toast({ message, type = "info", onClose, duration = 4000 }) {
@@ -21,29 +17,59 @@ export function Toast({ message, type = "info", onClose, duration = 4000 }) {
 
   if (!message) return null;
 
-  const s = TOAST_STYLES[type] || TOAST_STYLES.info;
+  const tone = TONES[type] || TONES.info;
+  const Icon = tone.icon;
 
   return (
-    <div style={{
-      position: "fixed", top: 24, right: 24, zIndex: 9999,
-      display: "flex", alignItems: "center", gap: 10,
-      padding: "14px 22px", borderRadius: 12,
-      background: s.bg, border: `1px solid ${s.border}`, color: s.color,
-      fontSize: 14, fontWeight: 600, boxShadow: "0 8px 32px rgba(0,0,0,0.12)",
-      animation: "toastSlideIn 0.3s ease",
-      fontFamily: "'Segoe UI', sans-serif",
-      maxWidth: 420,
-    }}>
-      <span style={{ fontSize: 16 }}>{s.icon}</span>
-      <span style={{ flex: 1 }}>{message}</span>
-      <span
+    <div
+      role={type === "error" ? "alert" : "status"}
+      aria-live="polite"
+      style={{
+        position: "fixed",
+        bottom: 24,
+        left: "50%",
+        transform: "translateX(-50%)",
+        zIndex: 9999,
+        display: "flex",
+        alignItems: "center",
+        gap: 10,
+        padding: "12px 12px 12px 16px",
+        borderRadius: "var(--r-input)",
+        background: "var(--noir)",
+        color: "var(--on-noir)",
+        border: "1px solid var(--noir-line)",
+        boxShadow: "var(--shadow-raised)",
+        fontFamily: "var(--font-ui)",
+        fontSize: 14,
+        fontWeight: 500,
+        maxWidth: "min(460px, calc(100vw - 32px))",
+        animation: "btToastIn 260ms var(--ease)",
+      }}
+    >
+      <Icon size={18} color={tone.iconColor} style={{ flexShrink: 0 }} />
+      <span style={{ flex: 1, lineHeight: 1.4 }}>{message}</span>
+      <button
+        type="button"
+        aria-label="Dismiss"
         onClick={() => onClose?.()}
-        style={{ cursor: "pointer", fontSize: 16, opacity: 0.6, marginLeft: 8 }}
-      >✕</span>
+        className="bt-icon-btn on-dark"
+        style={{
+          width: 28,
+          height: 28,
+          borderRadius: 8,
+          display: "inline-flex",
+          alignItems: "center",
+          justifyContent: "center",
+          color: "var(--on-noir-3)",
+          flexShrink: 0,
+        }}
+      >
+        <X size={15} />
+      </button>
       <style>{`
-        @keyframes toastSlideIn {
-          from { opacity: 0; transform: translateX(60px); }
-          to   { opacity: 1; transform: translateX(0); }
+        @keyframes btToastIn {
+          from { opacity: 0; transform: translate(-50%, 12px); }
+          to   { opacity: 1; transform: translate(-50%, 0); }
         }
       `}</style>
     </div>
@@ -51,66 +77,15 @@ export function Toast({ message, type = "info", onClose, duration = 4000 }) {
 }
 
 export function ConfirmDialog({ message, onConfirm, onCancel, confirmLabel = "Confirm", cancelLabel = "Cancel", danger = false }) {
-  if (!message) return null;
-
   return (
-    <div style={{
-      position: "fixed", inset: 0, zIndex: 10000,
-      display: "flex", alignItems: "center", justifyContent: "center",
-      background: "rgba(0,0,0,0.4)",
-      animation: "cdFadeIn 0.15s ease",
-    }}>
-      <div style={{
-        background: "#fff", borderRadius: 16, padding: "32px 28px 24px",
-        maxWidth: 420, width: "90%",
-        boxShadow: "0 20px 60px rgba(0,0,0,0.2)",
-        animation: "cdSlideUp 0.25s ease",
-        fontFamily: "'Segoe UI', sans-serif",
-      }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 16 }}>
-          <div style={{
-            width: 44, height: 44, borderRadius: 12,
-            background: danger ? "#fee2e2" : "rgba(224, 169, 59, 0.12)",
-            display: "flex", alignItems: "center", justifyContent: "center",
-            fontSize: 22, flexShrink: 0,
-          }}>
-            {danger ? "⚠️" : "❓"}
-          </div>
-          <div style={{ fontSize: 16, fontWeight: 700, color: "#1a1a1a", lineHeight: 1.4 }}>
-            {message}
-          </div>
-        </div>
-        <div style={{ display: "flex", gap: 12, justifyContent: "flex-end", marginTop: 24 }}>
-          <button
-            onClick={onCancel}
-            style={{
-              padding: "10px 22px", background: "#fff", color: "#555",
-              border: "1px solid #e5e5e5", borderRadius: 10,
-              fontWeight: 600, fontSize: 14, cursor: "pointer",
-            }}
-          >
-            {cancelLabel}
-          </button>
-          <button
-            onClick={onConfirm}
-            style={{
-              padding: "10px 22px",
-              background: danger ? "#dc2626" : "var(--ink, #111317)",
-              color: "#fff", border: "none", borderRadius: 10,
-              fontWeight: 700, fontSize: 14, cursor: "pointer",
-              boxShadow: danger
-                ? "0 4px 14px rgba(220,38,38,0.3)"
-                : "0 4px 14px rgba(249,115,22,0.3)",
-            }}
-          >
-            {confirmLabel}
-          </button>
-        </div>
-      </div>
-      <style>{`
-        @keyframes cdFadeIn  { from { opacity: 0; } to { opacity: 1; } }
-        @keyframes cdSlideUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
-      `}</style>
-    </div>
+    <BtConfirmDialog
+      open={!!message}
+      message={message}
+      onConfirm={onConfirm}
+      onCancel={onCancel}
+      confirmLabel={confirmLabel}
+      cancelLabel={cancelLabel}
+      danger={danger}
+    />
   );
 }

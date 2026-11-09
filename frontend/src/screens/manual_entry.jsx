@@ -1,45 +1,33 @@
-import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { transactionAPI } from '../api';
 import useProjectStore from '../stores/projectStore';
-import { Toast } from '../components/Toast';
 import {
   BtHero,
   BtSheet,
   BtButton,
   BtCard,
   BtBadge,
-  BtCountUp,
+  BtChip,
+  BtField,
+  BtSelect,
+  BtTextarea,
+  BtSegmented,
+  BtPageHeader,
+  BtIconButton,
   formatInr,
   showBtSuccess,
   btToast,
 } from '../components/ui';
-import {
-  Building2,
-  ChevronDown,
-  HelpCircle,
-  CheckCircle2,
-  X,
-  Trash2,
-  ArrowLeft,
-  IndianRupee,
-  Layers,
-  Paperclip,
-  Check,
-  CreditCard,
-  FileText,
-  Clock,
-  Sparkles,
-  Camera,
-} from 'lucide-react';
+import { Building2, HelpCircle, X, Paperclip, Camera, Package, Users, Truck, Receipt, CreditCard, FileText, AlertCircle } from 'lucide-react';
 import ModuleTour from '../components/ModuleTour';
 import PayNowSheet from '../components/PayNowSheet';
 import { useAuth } from '../contexts/AuthContext';
 
 const ENTRY_TYPES = [
-  { key: 'material', label: 'Material' },
-  { key: 'labour', label: 'Labour' },
-  { key: 'equipment', label: 'Equipment' },
+  { value: 'material', label: 'Material' },
+  { value: 'labour', label: 'Labour' },
+  { value: 'equipment', label: 'Equipment' },
 ];
 
 const UNIT_OPTIONS = {
@@ -51,48 +39,85 @@ const UNIT_OPTIONS = {
 const GST_PERCENTAGES = [0, 5, 12, 18, 28];
 const PAYMENT_METHODS = ['Cash', 'UPI', 'Bank Transfer', 'Card', 'Cheque', 'Credit'];
 
-const FIELDS = {
-  material: [
-    { key: 'itemName', label: 'Material / Item Name', required: true, type: 'text', placeholder: 'e.g. Cement, Sand, Steel' },
-    { key: 'quantity', label: 'Quantity', required: true, type: 'number', min: 0.01 },
-    { key: 'rate', label: 'Rate (₹)', required: true, type: 'number', prefix: '₹', min: 0.01 },
-    { key: 'brand', label: 'Brand', required: false, type: 'text', placeholder: 'e.g. ACC, UltraTech' },
-    { key: 'supplier', label: 'Supplier / Vendor', required: false, type: 'text', placeholder: 'e.g. BuildMart' },
-  ],
-  labour: [
-    { key: 'workerName', label: 'Worker / Team Name', required: true, type: 'text', placeholder: 'e.g. Ramesh, Team A' },
-    { key: 'quantity', label: 'Number of Workers', required: true, type: 'number', min: 1 },
-    { key: 'rate', label: 'Rate per Worker (₹)', required: true, type: 'number', prefix: '₹', min: 0.01 },
-    { key: 'workType', label: 'Trade / Work Type', required: false, type: 'text', placeholder: 'e.g. Mason, Carpenter' },
-    { key: 'contractor', label: 'Contractor / Team', required: false, type: 'text', placeholder: 'e.g. Kumar Contractors' },
-    { key: 'overtime', label: 'Overtime Hours', required: false, type: 'number', min: 0, placeholder: '0' },
-  ],
-  equipment: [
-    { key: 'equipmentName', label: 'Equipment Name', required: true, type: 'text', placeholder: 'e.g. JCB, Crane, Mixer' },
-    { key: 'quantity', label: 'Quantity (Hours/Days)', required: true, type: 'number', min: 0.01 },
-    { key: 'rate', label: 'Rate (₹)', required: true, type: 'number', prefix: '₹', min: 0.01 },
-    { key: 'model', label: 'Model / Sub-Class', required: false, type: 'text', placeholder: 'e.g. CAT 320' },
-    { key: 'operator', label: 'Operator / Vendor', required: false, type: 'text', placeholder: 'e.g. Raj Equipment' },
-  ],
+const NAME_KEY = { material: 'itemName', labour: 'workerName', equipment: 'equipmentName' };
+const NAME_LABEL = { material: 'Material / item name', labour: 'Worker / team name', equipment: 'Equipment name' };
+const NAME_PLACEHOLDER = {
+  material: 'e.g. 53-Grade OPC Cement, Steel TMT Bars, River Sand',
+  labour: 'e.g. Ramesh Masons, Plastering Crew Team 1',
+  equipment: 'e.g. JCB 3DX Backhoe, Concrete Mixer 10/7',
 };
+const SECTION_ICON = { material: Package, labour: Users, equipment: Truck };
+const SECTION_TITLE = { material: 'Material details', labour: 'Labour and crew shift', equipment: 'Equipment and machinery' };
+const QTY_LABEL = { material: 'Quantity', labour: 'Number of workers', equipment: 'Quantity (hours or days)' };
 
 const AUTOCOMPLETE_FIELDS = {
   material: {
     itemName: ['Cement', 'Sand', 'Gravel', 'Steel', 'Bricks', 'Blocks', 'Tiles', 'Pipes', 'Wires', 'Paint'],
-    brand: ['ACC', 'UltraTech', 'Ambuja', 'Shree Cement', 'Tata Tiscon', 'Jindal Panther'],
-    supplier: ['BuildMart', 'MaterialHub', 'Local Depot', 'National Steel'],
   },
   labour: {
     workerName: ['Team A', 'Team B', 'Mason Team', 'Ramesh & Co.', 'Shankar Masons'],
-    workType: ['Mason', 'Carpenter', 'Electrician', 'Plumber', 'Painter', 'Bar Bender'],
-    contractor: ['Kumar Contractors', 'Reddy Builders', 'City Labour Force'],
   },
   equipment: {
     equipmentName: ['JCB Excavator', 'Tower Crane', 'Concrete Mixer', 'Bulldozer', 'Compactor', 'Generator'],
-    model: ['CAT 320', 'Komatsu PC200', 'Hitachi ZX200', 'Ashok Leyland 250kVA'],
-    operator: ['Raj Equipment', 'ABC Rentals', 'Heavy Machinery Fleet'],
   },
 };
+
+const money = (v) => '₹' + (Number(v) || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+const fileToDataUri = (file) =>
+  new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = () => reject(reader.error);
+    reader.readAsDataURL(file);
+  });
+
+function CardTitle({ icon: Icon, children, right }) {
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 18 }}>
+      {Icon && (
+        <span
+          style={{
+            width: 32,
+            height: 32,
+            borderRadius: 'var(--r-chip)',
+            background: 'var(--fill)',
+            color: 'var(--ink)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            flexShrink: 0,
+          }}
+        >
+          <Icon size={16} strokeWidth={1.9} />
+        </span>
+      )}
+      <h2 style={{ margin: 0, flex: 1, fontFamily: 'var(--font-display)', fontSize: 18, fontWeight: 700, letterSpacing: '-0.02em', color: 'var(--ink)' }}>
+        {children}
+      </h2>
+      {right}
+    </div>
+  );
+}
+
+function Eyebrow({ children, style }) {
+  return (
+    <div className="bt-eyebrow" style={{ color: 'var(--ink-3)', marginBottom: 8, ...style }}>
+      {children}
+    </div>
+  );
+}
+
+function SummaryRow({ label, value, strong, tone }) {
+  return (
+    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 16, fontSize: 14, color: tone || 'var(--ink-2)' }}>
+      <span style={{ overflowWrap: 'anywhere' }}>{label}</span>
+      <span className="tnum" style={{ fontWeight: strong ? 700 : 600, color: tone || 'var(--ink)', whiteSpace: 'nowrap' }}>
+        {value}
+      </span>
+    </div>
+  );
+}
 
 export default function ManualEntryPage() {
   const navigate = useNavigate();
@@ -101,11 +126,13 @@ export default function ManualEntryPage() {
 
   const allowedTypes = useMemo(() => {
     const types = [];
-    if (isAdmin || can('manage_expenses')) types.push('material');
+    if (isAdmin || can('manage_expenses') || can('add_entries')) types.push('material');
     if (isAdmin || can('add_entries') || can('submit_daily_update')) types.push('labour');
     if (isAdmin || can('manage_equipment_master')) types.push('equipment');
     return types;
   }, [can, isAdmin]);
+
+  const canMarkPaid = isAdmin || can('approve_payments') || can('mark_paid');
 
   const [entryType, setEntryType] = useState(() => (allowedTypes.length > 0 ? allowedTypes[0] : 'material'));
   const [projects, setProjects] = useState([]);
@@ -116,13 +143,12 @@ export default function ManualEntryPage() {
   const [notes, setNotes] = useState('');
   const [saving, setSaving] = useState(false);
   const [errMsg, setErrMsg] = useState('');
-  const [toast, setToast] = useState({ msg: '', type: 'info' });
-  const clearToast = useCallback(() => setToast({ msg: '', type: 'info' }), []);
+  const [errors, setErrors] = useState({});
 
   const [isEditing, setIsEditing] = useState(false);
   const [editingId, setEditingId] = useState(null);
   const [isDuplicate, setIsDuplicate] = useState(false);
-  const [sourceTransactionId, setSourceTransactionId] = useState(null);
+  const [, setSourceTransactionId] = useState(null);
   const [runTour, setRunTour] = useState(false);
 
   const [selectedFloor, setSelectedFloor] = useState('');
@@ -283,18 +309,22 @@ export default function ManualEntryPage() {
 
   // Default unit if not set
   useEffect(() => {
-    if (!unit && UNIT_OPTIONS[entryType]) {
-      setUnit(UNIT_OPTIONS[entryType][0]);
+    const opts = UNIT_OPTIONS[entryType];
+    if (!opts) return;
+    if (!unit || (!isEditing && !opts.includes(unit))) {
+      setUnit(opts[0]);
     }
-  }, [entryType, unit]);
+  }, [entryType, unit, isEditing]);
 
   const handleFieldChange = (key, val) => {
     setValues((prev) => ({ ...prev, [key]: val }));
+    if (errors[key]) setErrors((prev) => ({ ...prev, [key]: undefined }));
   };
 
   const handleFileSelect = (e) => {
     const files = Array.from(e.target.files || []);
     setAttachments((prev) => [...prev, ...files]);
+    e.target.value = '';
   };
 
   const handleRemoveAttachment = (idx) => {
@@ -312,27 +342,40 @@ export default function ManualEntryPage() {
   const gstAmount = isWithGst ? (baseBeforeTax * gstPercentage) / 100 : 0;
   const totalAmount = baseBeforeTax + gstAmount;
 
+  const nameKey = NAME_KEY[entryType];
+  const alreadyPaid = useMemo(
+    () => (paymentHistory || []).reduce((sum, p) => sum + (Number(p?.amount) || 0), 0),
+    [paymentHistory]
+  );
+  const paidNow = paymentResult ? Number(paymentResult.amount) || 0 : 0;
+  const balanceDue = Math.max(0, totalAmount - alreadyPaid - paidNow);
+
+  const validate = () => {
+    const next = {};
+    if (!selectedProject) next.project = 'Select a project for this entry';
+    if (!values[nameKey] || !values[nameKey].trim()) {
+      next[nameKey] = `Enter the ${nameKey === 'itemName' ? 'item' : nameKey === 'workerName' ? 'worker' : 'equipment'} name`;
+    }
+    if (qty <= 0) next.quantity = 'Enter a quantity greater than 0';
+    if (rate <= 0) next.rate = 'Enter a rate greater than 0';
+    return next;
+  };
+
+  const FIELD_IDS = { project: 'me-project', [nameKey]: 'me-name', quantity: 'me-quantity', rate: 'me-rate' };
+
   const handleSubmit = async (e) => {
     e?.preventDefault();
     setErrMsg('');
 
-    if (!selectedProject) {
-      setErrMsg('Please select a project.');
-      return;
-    }
-
-    const nameKey = entryType === 'material' ? 'itemName' : entryType === 'labour' ? 'workerName' : 'equipmentName';
-    if (!values[nameKey] || !values[nameKey].trim()) {
-      setErrMsg(`Please enter the ${nameKey === 'itemName' ? 'item' : nameKey === 'workerName' ? 'worker' : 'equipment'} name.`);
-      return;
-    }
-
-    if (qty <= 0) {
-      setErrMsg('Please enter a valid quantity.');
-      return;
-    }
-    if (rate <= 0) {
-      setErrMsg('Please enter a valid rate.');
+    const found = validate();
+    setErrors(found);
+    const firstKey = ['project', nameKey, 'quantity', 'rate'].find((k) => found[k]);
+    if (firstKey) {
+      const el = document.getElementById(FIELD_IDS[firstKey]);
+      if (el) {
+        el.scrollIntoView({ block: 'center', behavior: 'smooth' });
+        el.focus({ preventScroll: true });
+      }
       return;
     }
 
@@ -388,12 +431,28 @@ export default function ManualEntryPage() {
         totalAmount: totalAmount,
         overtime: overtimeHours,
         overtimeAmount: overtimeAmount,
-        isPaid: Boolean(paymentResult),
-        paymentMethod: paymentResult?.method || paymentMethod,
-        paymentDate: paymentResult?.paymentDate
-          ? paymentResult.paymentDate.split('T')[0]
-          : new Date().toISOString().split('T')[0],
-        paymentHistory: paymentHistory,
+      });
+
+      // Payment fields the server actually reads (paidAmount / paymentStatus / paymentMode / paymentDate).
+      if (paymentResult) {
+        payload.paidAmount = alreadyPaid + paidNow;
+        payload.paymentStatus = paymentResult.status;
+        payload.paymentMode = paymentResult.apiMode;
+        payload.paymentDate = paymentResult.paymentDate;
+        if (paymentResult.note) payload.paymentNote = paymentResult.note;
+        if (paymentResult.requestEsign && paymentResult.clientEmail) {
+          payload.requestEsign = true;
+          payload.clientEmail = paymentResult.clientEmail;
+        }
+        if (paymentResult.receiptFile) {
+          payload.paymentReceipt = await fileToDataUri(paymentResult.receiptFile);
+        }
+      } else if (paymentMethod !== 'Credit') {
+        payload.paymentMode = paymentMethod;
+      }
+
+      Object.keys(payload).forEach((k) => {
+        if (payload[k] === undefined) delete payload[k];
       });
 
       const hasFiles = attachments.length > 0;
@@ -402,30 +461,28 @@ export default function ManualEntryPage() {
       if (hasFiles) {
         const formData = new FormData();
         Object.keys(payload).forEach((key) => {
-          if (key === 'paymentHistory') {
-            formData.append(key, JSON.stringify(payload[key]));
-          } else {
-            formData.append(key, payload[key]);
-          }
+          formData.append(key, payload[key]);
         });
-        attachments.forEach((file, idx) => {
-          formData.append(`attachment_${idx}`, file);
+        attachments.forEach((file) => {
+          formData.append('attachments', file);
         });
         finalData = formData;
       }
 
       if (isEditing) {
         await transactionAPI.update(editingId, finalData);
-        btToast.success('Entry updated successfully!');
+        btToast('Entry updated.');
         setTimeout(() => navigate(-1), 1000);
       } else {
         await transactionAPI.create(finalData);
 
-        // Trigger celebratory success modal
+        const typeName = entryType.charAt(0).toUpperCase() + entryType.slice(1);
+        const recordedPayment = paidNow > 0;
         showBtSuccess({
-          kind: 'money',
-          title: `${entryType.charAt(0).toUpperCase() + entryType.slice(1)} Entry Saved!`,
-          message: `${values[nameKey]} for ₹${totalAmount.toLocaleString('en-IN', { maximumFractionDigits: 2 })} has been logged to your site ledger.`,
+          kind: recordedPayment ? 'money' : entryType === 'material' ? 'bags' : 'check',
+          title: `${typeName} saved`,
+          message: `${values[nameKey]} for ${formatInr(totalAmount)} has been logged to your site ledger.`,
+          label: 'Entry saved',
           onDismiss: () => {
             if (window.history.state && window.history.state.idx > 0) {
               navigate(-1);
@@ -438,863 +495,405 @@ export default function ManualEntryPage() {
     } catch (err) {
       const msg = err.response?.data?.message || `Failed to ${isEditing ? 'update' : 'save'} entry.`;
       setErrMsg(msg);
-      btToast.error(msg);
+      btToast(msg, { error: true });
     } finally {
       setSaving(false);
     }
   };
 
-  const labelStyle = {
-    fontFamily: 'var(--font-mono)',
-    fontSize: '10.5px',
-    fontWeight: 700,
-    color: 'var(--ink-3)',
-    letterSpacing: '0.06em',
-    marginBottom: '6px',
-    textTransform: 'uppercase',
-    display: 'block',
+  const openPayNow = () => {
+    if (totalAmount <= 0) {
+      const next = { ...errors };
+      if (qty <= 0) next.quantity = 'Enter a quantity greater than 0';
+      if (rate <= 0) next.rate = 'Enter a rate greater than 0';
+      setErrors(next);
+      btToast('Enter quantity and rate first, so there is an amount to settle.', { error: true });
+      return;
+    }
+    setShowPayNow(true);
   };
 
-  const inputStyle = {
-    width: '100%',
-    height: '48px',
-    padding: '0 14px',
-    borderRadius: 'var(--r-input)',
-    border: '1px solid var(--line)',
-    background: 'var(--fill)',
-    color: 'var(--ink)',
-    fontFamily: 'var(--font-ui)',
-    fontSize: '14px',
-    fontWeight: 500,
-    outline: 'none',
-    boxSizing: 'border-box',
-    transition: 'border-color 150ms ease, background 150ms ease',
-  };
+  const lockedType = isEditing || isDuplicate;
+  const typeOptions = ENTRY_TYPES.filter((t) => allowedTypes.includes(t.value));
 
-  const selectStyle = {
-    ...inputStyle,
-    cursor: 'pointer',
-    appearance: 'none',
-    background: 'var(--card)',
-  };
+  const vendorName = values.supplier || values.operator || values.contractor || '';
 
   return (
     <div style={{ width: '100%', minHeight: '100%', display: 'flex', flexDirection: 'column' }}>
       <ModuleTour steps={tourSteps} run={runTour} setRun={setRunTour} moduleName="ManualEntry" />
-      <Toast message={toast.msg} type={toast.type} onClose={clearToast} />
 
-      {/* ══════════════════════════════════════════════════════════
-          HERO (Blueprint Noir Header)
-         ══════════════════════════════════════════════════════════ */}
-      <BtHero padding="28px 32px 56px">
-        <div style={{ maxWidth: 840, margin: '0 auto', width: '100%' }}>
-          {/* Back nav & help */}
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
-            <button
-              type="button"
-              onClick={() => navigate(-1)}
-              style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '6px',
-                padding: '6px 12px',
-                borderRadius: '16px',
-                background: 'rgba(255, 255, 255, 0.08)',
-                border: '1px solid rgba(255, 255, 255, 0.14)',
-                color: 'var(--bone)',
-                fontFamily: 'var(--font-ui)',
-                fontSize: '13px',
-                fontWeight: 600,
-                cursor: 'pointer',
-              }}
+      <div className="tour-header">
+        <BtHero>
+          <div style={{ maxWidth: 960, margin: '0 auto', width: '100%' }}>
+            <BtPageHeader
+              back={{ label: 'Back', onClick: () => navigate(-1) }}
+              eyebrow={isEditing ? 'Edit transaction' : isDuplicate ? 'Repeat entry' : 'Manual entry'}
+              title={isEditing ? 'Edit entry' : isDuplicate ? 'Repeat entry' : 'Manual entry'}
+              subtitle="Record site spend with tax and payment tracking."
+              size="md"
+              actions={<BtIconButton icon={HelpCircle} label="Page tour" onDark onClick={() => setRunTour(true)} />}
             >
-              <ArrowLeft size={14} />
-              <span>Back</span>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => setRunTour(true)}
-              title="Help"
-              style={{
-                width: '36px',
-                height: '36px',
-                borderRadius: '18px',
-                background: 'rgba(255, 255, 255, 0.08)',
-                border: '1px solid rgba(255, 255, 255, 0.14)',
-                color: 'var(--on-noir-2)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                cursor: 'pointer',
-              }}
-            >
-              <HelpCircle size={16} />
-            </button>
+              <div
+                className="tour-entry-types"
+                style={{ opacity: lockedType ? 0.6 : 1, pointerEvents: lockedType ? 'none' : 'auto', maxWidth: 420 }}
+                aria-disabled={lockedType || undefined}
+              >
+                <BtSegmented options={typeOptions} value={entryType} onChange={setEntryType} style={{ width: '100%' }} />
+              </div>
+            </BtPageHeader>
           </div>
+        </BtHero>
+      </div>
 
-          <div
-            style={{
-              fontFamily: 'var(--font-mono)',
-              fontSize: '11px',
-              letterSpacing: '0.09em',
-              textTransform: 'uppercase',
-              color: 'var(--on-noir-3)',
-              marginBottom: '6px',
-            }}
-          >
-            {isEditing ? 'EDIT TRANSACTION' : isDuplicate ? 'REPEAT ENTRY' : 'MANUAL ENTRY'}
-          </div>
-
-          <h1
-            style={{
-              margin: 0,
-              fontFamily: 'var(--font-display)',
-              fontSize: 'clamp(28px, 4vw, 38px)',
-              fontWeight: 800,
-              letterSpacing: '-0.03em',
-              color: 'var(--bone)',
-            }}
-          >
-            {isEditing ? 'Edit Entry' : isDuplicate ? 'Repeat Entry' : 'Manual Entry'}
-          </h1>
-
-          <p
-            style={{
-              margin: '6px 0 20px',
-              fontFamily: 'var(--font-ui)',
-              fontSize: '14px',
-              color: 'var(--on-noir-2)',
-            }}
-          >
-            Record granular site expenses with tax computation and payment tracking.
-          </p>
-
-          {/* Type Selector Tabs on Dark */}
-          <div
-            className="tour-entry-types"
-            style={{
-              display: 'inline-flex',
-              background: 'rgba(255, 255, 255, 0.08)',
-              padding: '4px',
-              borderRadius: 'var(--r-button)',
-              border: '1px solid rgba(255, 255, 255, 0.12)',
-              gap: '4px',
-            }}
-          >
-            {ENTRY_TYPES.filter((t) => allowedTypes.includes(t.key)).map((t) => {
-              const isSelected = entryType === t.key;
-              return (
-                <button
-                  key={t.key}
-                  type="button"
-                  onClick={() => !isEditing && !isDuplicate && setEntryType(t.key)}
-                  disabled={isEditing || isDuplicate}
-                  style={{
-                    padding: '8px 20px',
-                    borderRadius: 'calc(var(--r-button) - 4px)',
-                    border: 'none',
-                    background: isSelected ? 'var(--bone)' : 'transparent',
-                    color: isSelected ? 'var(--ink)' : 'var(--on-noir-2)',
-                    fontFamily: 'var(--font-ui)',
-                    fontSize: '13px',
-                    fontWeight: 700,
-                    cursor: isEditing || isDuplicate ? 'not-allowed' : 'pointer',
-                    transition: 'all 150ms ease',
-                  }}
-                >
-                  {t.label}
-                </button>
-              );
-            })}
-          </div>
-        </div>
-      </BtHero>
-
-      {/* ══════════════════════════════════════════════════════════
-          SHEET (Bone Form Container)
-         ══════════════════════════════════════════════════════════ */}
-      <BtSheet overlap={26} padding="28px 32px 64px">
+      <BtSheet padding="28px 28px 64px">
         <form
           onSubmit={handleSubmit}
-          style={{
-            maxWidth: 840,
-            margin: '0 auto',
-            width: '100%',
-            display: 'flex',
-            flexDirection: 'column',
-            gap: '20px',
-          }}
+          noValidate
+          style={{ maxWidth: 960, margin: '0 auto', width: '100%', display: 'flex', flexDirection: 'column', gap: 20 }}
         >
           {errMsg && (
             <div
+              role="alert"
               style={{
-                background: 'var(--tone-red-bg)',
-                border: '1px solid rgba(239, 68, 68, 0.25)',
+                display: 'flex',
+                gap: 10,
+                alignItems: 'flex-start',
+                background: 'var(--status-danger-soft)',
                 borderRadius: 'var(--r-input)',
-                padding: '14px 18px',
-                color: 'var(--status-danger-bright)',
-                fontSize: '13px',
+                padding: '14px 16px',
+                color: 'var(--status-danger)',
+                fontSize: 14,
                 fontWeight: 600,
               }}
             >
-              {errMsg}
+              <AlertCircle size={18} style={{ flexShrink: 0, marginTop: 1 }} />
+              <span>{errMsg}</span>
             </div>
           )}
 
-          {/* ── CARD 1: Project Scoping & Execution Context ── */}
-          <BtCard padding="24px" className="tour-project-context">
-            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '16px' }}>
-              <div
-                style={{
-                  width: '32px',
-                  height: '32px',
-                  borderRadius: '8px',
-                  background: 'var(--fill)',
-                  color: 'var(--ink)',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
+          {/* ── Project context ── */}
+          <BtCard padding="24px" className="tour-project-context" style={{ overflow: 'visible' }}>
+            <CardTitle icon={Building2}>Project context</CardTitle>
+            <div className="bt-grid-2">
+              <BtSelect
+                id="me-project"
+                label="Project"
+                required
+                value={selectedProject}
+                error={errors.project}
+                onChange={(e) => {
+                  setSelectedProject(e.target.value);
+                  setSelectedFloor('');
+                  setSelectedPhaseId('');
+                  setSelectedActivityName('');
+                  setErrors((prev) => ({ ...prev, project: undefined }));
                 }}
               >
-                <Building2 size={16} />
-              </div>
-              <div
-                style={{
-                  fontFamily: 'var(--font-display)',
-                  fontSize: '16px',
-                  fontWeight: 700,
-                  color: 'var(--ink)',
+                <option value="">Select project</option>
+                {projects.map((p) => (
+                  <option key={p._id || p.id} value={p._id || p.id}>
+                    {p.projectName || p.name}
+                  </option>
+                ))}
+              </BtSelect>
+
+              <BtField label="Date" type="date" value={date} onChange={(e) => setDate(e.target.value)} />
+
+              <BtSelect
+                label="Floor"
+                disabled={!selectedProject || floors.length === 0}
+                value={selectedFloor}
+                helperText={selectedProject && floors.length === 0 ? 'This project has no floors set up' : undefined}
+                onChange={(e) => setSelectedFloor(e.target.value)}
+              >
+                <option value="">All floors</option>
+                {floors.map((f, i) => (
+                  <option key={i} value={f}>
+                    {f}
+                  </option>
+                ))}
+              </BtSelect>
+
+              <BtSelect
+                label="Phase"
+                disabled={!selectedProject || phases.length === 0}
+                value={selectedPhaseId}
+                helperText={selectedProject && phases.length === 0 ? 'This project has no phases set up' : undefined}
+                onChange={(e) => {
+                  setSelectedPhaseId(e.target.value);
+                  setSelectedActivityName('');
                 }}
               >
-                Project Context
-              </div>
-            </div>
+                <option value="">Select phase</option>
+                {phases.map((ph) => (
+                  <option key={ph.id} value={String(ph.id)}>
+                    {ph.phaseName}
+                  </option>
+                ))}
+              </BtSelect>
 
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '14px' }}>
-              {/* Project Select */}
-              <div>
-                <label style={labelStyle}>
-                  Project <span style={{ color: 'var(--status-danger-bright)' }}>*</span>
-                </label>
-                <div style={{ position: 'relative' }}>
-                  <select
-                    value={selectedProject}
-                    onChange={(e) => {
-                      setSelectedProject(e.target.value);
-                      setSelectedFloor('');
-                      setSelectedPhaseId('');
-                      setSelectedActivityName('');
-                    }}
-                    style={selectStyle}
-                  >
-                    <option value="">Select Project</option>
-                    {projects.map((p) => (
-                      <option key={p._id || p.id} value={p._id || p.id}>
-                        {p.projectName || p.name}
-                      </option>
-                    ))}
-                  </select>
-                  <ChevronDown
-                    size={14}
-                    color="var(--ink-3)"
-                    style={{ position: 'absolute', right: 14, top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }}
-                  />
-                </div>
-              </div>
-
-              {/* Date */}
-              <div>
-                <label style={labelStyle}>Date</label>
-                <input
-                  type="date"
-                  value={date}
-                  onChange={(e) => setDate(e.target.value)}
-                  style={inputStyle}
-                />
-              </div>
-
-              {/* Floor */}
-              <div>
-                <label style={labelStyle}>Floor</label>
-                <div style={{ position: 'relative' }}>
-                  <select
-                    disabled={!selectedProject || floors.length === 0}
-                    value={selectedFloor}
-                    onChange={(e) => setSelectedFloor(e.target.value)}
-                    style={{ ...selectStyle, opacity: !selectedProject || floors.length === 0 ? 0.6 : 1 }}
-                  >
-                    <option value="">All Floors</option>
-                    {floors.map((f, i) => (
-                      <option key={i} value={f}>
-                        {f}
-                      </option>
-                    ))}
-                  </select>
-                  <ChevronDown
-                    size={14}
-                    color="var(--ink-3)"
-                    style={{ position: 'absolute', right: 14, top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }}
-                  />
-                </div>
-              </div>
-
-              {/* Phase */}
-              <div>
-                <label style={labelStyle}>Phase</label>
-                <div style={{ position: 'relative' }}>
-                  <select
-                    disabled={!selectedProject || phases.length === 0}
-                    value={selectedPhaseId}
-                    onChange={(e) => {
-                      setSelectedPhaseId(e.target.value);
-                      setSelectedActivityName('');
-                    }}
-                    style={{ ...selectStyle, opacity: !selectedProject || phases.length === 0 ? 0.6 : 1 }}
-                  >
-                    <option value="">Select Phase</option>
-                    {phases.map((ph) => (
-                      <option key={ph.id} value={String(ph.id)}>
-                        {ph.phaseName}
-                      </option>
-                    ))}
-                  </select>
-                  <ChevronDown
-                    size={14}
-                    color="var(--ink-3)"
-                    style={{ position: 'absolute', right: 14, top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }}
-                  />
-                </div>
-              </div>
+              {uniqueActivityNames.length > 0 && (
+                <BtSelect label="Activity" value={selectedActivityName} onChange={(e) => setSelectedActivityName(e.target.value)}>
+                  <option value="">Select activity</option>
+                  {uniqueActivityNames.map((a) => (
+                    <option key={a} value={a}>
+                      {a}
+                    </option>
+                  ))}
+                </BtSelect>
+              )}
             </div>
           </BtCard>
 
-          {/* ── CARD 2: Item Information & Quantities ── */}
-          <BtCard padding="24px" className="tour-field-item">
-            <div
-              style={{
-                fontFamily: 'var(--font-display)',
-                fontSize: '16px',
-                fontWeight: 700,
-                color: 'var(--ink)',
-                marginBottom: '16px',
-              }}
-            >
-              {entryType === 'material'
-                ? 'Material Details'
-                : entryType === 'labour'
-                ? 'Labour & Crew Shift'
-                : 'Equipment & Machinery'}
-            </div>
+          {/* ── Item details ── */}
+          <BtCard padding="24px" className="tour-field-item" style={{ overflow: 'visible' }}>
+            <CardTitle icon={SECTION_ICON[entryType]}>{SECTION_TITLE[entryType]}</CardTitle>
 
-            {/* Item Name / Worker / Equipment with Autocomplete Chips */}
-            <div style={{ marginBottom: '16px' }}>
-              <label style={labelStyle}>
-                {entryType === 'material'
-                  ? 'Material / Item Name'
-                  : entryType === 'labour'
-                  ? 'Worker / Team Name'
-                  : 'Equipment Name'}{' '}
-                <span style={{ color: 'var(--status-danger-bright)' }}>*</span>
-              </label>
-
-              <input
-                type="text"
-                value={
-                  values[
-                    entryType === 'material'
-                      ? 'itemName'
-                      : entryType === 'labour'
-                      ? 'workerName'
-                      : 'equipmentName'
-                  ] || ''
-                }
-                onChange={(e) =>
-                  handleFieldChange(
-                    entryType === 'material'
-                      ? 'itemName'
-                      : entryType === 'labour'
-                      ? 'workerName'
-                      : 'equipmentName',
-                    e.target.value
-                  )
-                }
-                placeholder={
-                  entryType === 'material'
-                    ? 'e.g. 53-Grade OPC Cement, Steel TMT Bars, River Sand'
-                    : entryType === 'labour'
-                    ? 'e.g. Ramesh Masons, Plastering Crew Team 1'
-                    : 'e.g. JCB 3DX Backhoe, Concrete Mixer 10/7'
-                }
-                style={inputStyle}
+            <div style={{ marginBottom: 18 }}>
+              <BtField
+                id="me-name"
+                label={NAME_LABEL[entryType]}
+                required
+                value={values[nameKey] || ''}
+                error={errors[nameKey]}
+                onChange={(e) => handleFieldChange(nameKey, e.target.value)}
+                placeholder={NAME_PLACEHOLDER[entryType]}
               />
-
-              {/* Autocomplete chips */}
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginTop: '8px' }}>
-                {(AUTOCOMPLETE_FIELDS[entryType]?.[
-                  entryType === 'material'
-                    ? 'itemName'
-                    : entryType === 'labour'
-                    ? 'workerName'
-                    : 'equipmentName'
-                ] || []).map((sugg) => (
-                  <button
-                    key={sugg}
-                    type="button"
-                    onClick={() =>
-                      handleFieldChange(
-                        entryType === 'material'
-                          ? 'itemName'
-                          : entryType === 'labour'
-                          ? 'workerName'
-                          : 'equipmentName',
-                        sugg
-                      )
-                    }
-                    style={{
-                      background: 'var(--fill)',
-                      border: '1px solid var(--line)',
-                      borderRadius: '12px',
-                      padding: '3px 10px',
-                      fontFamily: 'var(--font-ui)',
-                      fontSize: '12px',
-                      color: 'var(--ink-2)',
-                      cursor: 'pointer',
-                    }}
-                  >
-                    + {sugg}
-                  </button>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 10 }}>
+                {(AUTOCOMPLETE_FIELDS[entryType]?.[nameKey] || []).map((sugg) => (
+                  <BtChip key={sugg} label={`+ ${sugg}`} onClick={() => handleFieldChange(nameKey, sugg)} style={{ height: 32, padding: '0 12px', fontSize: 13 }} />
                 ))}
               </div>
             </div>
 
-            {/* Quantity, Unit, Rate Row */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '14px', marginBottom: '16px' }}>
-              <div>
-                <label style={labelStyle}>
-                  Quantity <span style={{ color: 'var(--status-danger-bright)' }}>*</span>
-                </label>
-                <input
-                  type="number"
-                  step="any"
-                  value={values.quantity || ''}
-                  onChange={(e) => handleFieldChange('quantity', e.target.value)}
-                  placeholder="0.00"
-                  style={inputStyle}
-                />
-              </div>
-
-              <div>
-                <label style={labelStyle}>Unit</label>
-                <div style={{ position: 'relative' }}>
-                  <select
-                    value={unit}
-                    onChange={(e) => setUnit(e.target.value)}
-                    style={selectStyle}
-                  >
-                    {(UNIT_OPTIONS[entryType] || []).map((u) => (
-                      <option key={u} value={u}>
-                        {u}
-                      </option>
-                    ))}
-                  </select>
-                  <ChevronDown
-                    size={14}
-                    color="var(--ink-3)"
-                    style={{ position: 'absolute', right: 14, top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }}
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label style={labelStyle}>
-                  Rate per Unit (₹) <span style={{ color: 'var(--status-danger-bright)' }}>*</span>
-                </label>
-                <div style={{ position: 'relative' }}>
-                  <span
-                    style={{
-                      position: 'absolute',
-                      left: '14px',
-                      top: '50%',
-                      transform: 'translateY(-50%)',
-                      fontFamily: 'var(--font-display)',
-                      fontWeight: 700,
-                      color: 'var(--ink-3)',
-                    }}
-                  >
-                    ₹
-                  </span>
-                  <input
-                    type="number"
-                    step="any"
-                    value={values.rate || ''}
-                    onChange={(e) => handleFieldChange('rate', e.target.value)}
-                    placeholder="0.00"
-                    style={{ ...inputStyle, paddingLeft: '32px' }}
-                  />
-                </div>
-              </div>
+            <div className="bt-grid-3" style={{ marginBottom: 18 }}>
+              <BtField
+                id="me-quantity"
+                label={QTY_LABEL[entryType]}
+                required
+                type="number"
+                step="any"
+                value={values.quantity || ''}
+                error={errors.quantity}
+                onChange={(e) => handleFieldChange('quantity', e.target.value)}
+                placeholder="0"
+              />
+              <BtSelect label="Unit" value={unit} onChange={(e) => setUnit(e.target.value)}>
+                {(UNIT_OPTIONS[entryType] || []).map((u) => (
+                  <option key={u} value={u}>
+                    {u}
+                  </option>
+                ))}
+              </BtSelect>
+              <BtField
+                id="me-rate"
+                label={entryType === 'labour' ? 'Rate per worker' : 'Rate per unit'}
+                required
+                isCurrency
+                type="number"
+                step="any"
+                value={values.rate || ''}
+                error={errors.rate}
+                onChange={(e) => handleFieldChange('rate', e.target.value)}
+                placeholder="0.00"
+              />
             </div>
 
-            {/* Extra Category Fields */}
             {entryType === 'material' && (
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
-                <div>
-                  <label style={labelStyle}>Brand / Manufacturer</label>
-                  <input
-                    type="text"
-                    value={values.brand || ''}
-                    onChange={(e) => handleFieldChange('brand', e.target.value)}
-                    placeholder="e.g. UltraTech, Tata Steel"
-                    style={inputStyle}
-                  />
-                </div>
-                <div>
-                  <label style={labelStyle}>Supplier / Vendor</label>
-                  <input
-                    type="text"
-                    value={values.supplier || ''}
-                    onChange={(e) => handleFieldChange('supplier', e.target.value)}
-                    placeholder="e.g. Local Builders Mart"
-                    style={inputStyle}
-                  />
-                </div>
+              <div className="bt-grid-2">
+                <BtField label="Brand / manufacturer" value={values.brand || ''} onChange={(e) => handleFieldChange('brand', e.target.value)} placeholder="e.g. UltraTech, Tata Steel" />
+                <BtField label="Supplier / vendor" value={values.supplier || ''} onChange={(e) => handleFieldChange('supplier', e.target.value)} placeholder="e.g. Local Builders Mart" />
               </div>
             )}
 
             {entryType === 'labour' && (
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '14px' }}>
-                <div>
-                  <label style={labelStyle}>Trade / Work Type</label>
-                  <input
-                    type="text"
-                    value={values.workType || ''}
-                    onChange={(e) => handleFieldChange('workType', e.target.value)}
-                    placeholder="e.g. Mason, Plasterer"
-                    style={inputStyle}
-                  />
-                </div>
-                <div>
-                  <label style={labelStyle}>Contractor / Agency</label>
-                  <input
-                    type="text"
-                    value={values.contractor || ''}
-                    onChange={(e) => handleFieldChange('contractor', e.target.value)}
-                    placeholder="e.g. Sub-contractor name"
-                    style={inputStyle}
-                  />
-                </div>
-                <div>
-                  <label style={labelStyle}>Overtime Hours</label>
-                  <input
-                    type="number"
-                    step="any"
-                    value={values.overtime || ''}
-                    onChange={(e) => handleFieldChange('overtime', e.target.value)}
-                    placeholder="0"
-                    style={inputStyle}
-                  />
-                </div>
+              <div className="bt-grid-3">
+                <BtField label="Trade / work type" value={values.workType || ''} onChange={(e) => handleFieldChange('workType', e.target.value)} placeholder="e.g. Mason, Plasterer" />
+                <BtField label="Contractor / agency" value={values.contractor || ''} onChange={(e) => handleFieldChange('contractor', e.target.value)} placeholder="e.g. Sub-contractor name" />
+                <BtField label="Overtime hours" type="number" step="any" value={values.overtime || ''} onChange={(e) => handleFieldChange('overtime', e.target.value)} placeholder="0" />
               </div>
             )}
 
             {entryType === 'equipment' && (
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
-                <div>
-                  <label style={labelStyle}>Model / Capacity</label>
-                  <input
-                    type="text"
-                    value={values.model || ''}
-                    onChange={(e) => handleFieldChange('model', e.target.value)}
-                    placeholder="e.g. 200HP, 10 Tonne"
-                    style={inputStyle}
-                  />
-                </div>
-                <div>
-                  <label style={labelStyle}>Operator / Rental Provider</label>
-                  <input
-                    type="text"
-                    value={values.operator || ''}
-                    onChange={(e) => handleFieldChange('operator', e.target.value)}
-                    placeholder="e.g. Raj Machinery Fleet"
-                    style={inputStyle}
-                  />
-                </div>
+              <div className="bt-grid-2">
+                <BtField label="Model / capacity" value={values.model || ''} onChange={(e) => handleFieldChange('model', e.target.value)} placeholder="e.g. 200HP, 10 Tonne" />
+                <BtField label="Operator / rental provider" value={values.operator || ''} onChange={(e) => handleFieldChange('operator', e.target.value)} placeholder="e.g. Raj Machinery Fleet" />
               </div>
             )}
           </BtCard>
 
-          {/* ── CARD 3: GST & Amount Calculation ── */}
+          {/* ── Taxes and total ── */}
           <BtCard padding="24px" className="tour-amount-calc">
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
-              <div
-                style={{
-                  fontFamily: 'var(--font-display)',
-                  fontSize: '16px',
-                  fontWeight: 700,
-                  color: 'var(--ink)',
-                }}
-              >
-                Taxes & Total Valuation
-              </div>
+            <CardTitle
+              icon={Receipt}
+              right={
+                <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', userSelect: 'none', minHeight: 40 }}>
+                  <input
+                    type="checkbox"
+                    checked={isWithGst}
+                    onChange={(e) => setIsWithGst(e.target.checked)}
+                    style={{ width: 18, height: 18, accentColor: 'var(--ink)', cursor: 'pointer' }}
+                  />
+                  <span style={{ fontFamily: 'var(--font-ui)', fontSize: 14, fontWeight: 600, color: 'var(--ink)' }}>Apply GST</span>
+                </label>
+              }
+            >
+              Taxes and total
+            </CardTitle>
 
-              {/* GST Toggle */}
-              <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', userSelect: 'none' }}>
-                <input
-                  type="checkbox"
-                  checked={isWithGst}
-                  onChange={(e) => setIsWithGst(e.target.checked)}
-                  style={{ width: '18px', height: '18px', accentColor: 'var(--ink)' }}
-                />
-                <span style={{ fontFamily: 'var(--font-ui)', fontSize: '13px', fontWeight: 600, color: 'var(--ink)' }}>
-                  Apply GST
-                </span>
-              </label>
-            </div>
-
-            {/* GST Percentage Options */}
             {isWithGst && (
-              <div style={{ marginBottom: '18px' }}>
-                <label style={labelStyle}>GST RATE</label>
-                <div style={{ display: 'flex', gap: '8px' }}>
+              <div style={{ marginBottom: 18 }}>
+                <Eyebrow>GST rate</Eyebrow>
+                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
                   {GST_PERCENTAGES.map((pct) => (
-                    <button
-                      key={pct}
-                      type="button"
-                      onClick={() => setGstPercentage(pct)}
-                      style={{
-                        padding: '6px 14px',
-                        borderRadius: 'var(--r-button)',
-                        border: `1px solid ${gstPercentage === pct ? 'var(--ink)' : 'var(--line)'}`,
-                        background: gstPercentage === pct ? 'var(--ink)' : 'var(--card)',
-                        color: gstPercentage === pct ? 'var(--bone)' : 'var(--ink)',
-                        fontFamily: 'var(--font-mono)',
-                        fontSize: '12px',
-                        fontWeight: 700,
-                        cursor: 'pointer',
-                      }}
-                    >
-                      {pct}%
-                    </button>
+                    <BtChip key={pct} label={`${pct}%`} selected={gstPercentage === pct} onClick={() => setGstPercentage(pct)} aria-pressed={gstPercentage === pct} />
                   ))}
                 </div>
               </div>
             )}
 
-            {/* Calculation Breakdown Lines */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', paddingBottom: '16px', borderBottom: '1px solid var(--line)' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', color: 'var(--ink-2)' }}>
-                <span>Subtotal ({qty} {unit} × ₹{rate})</span>
-                <span className="tnum" style={{ fontWeight: 600 }}>₹{subtotal.toLocaleString('en-IN', { maximumFractionDigits: 2 })}</span>
+            {/* Receipt-style summary */}
+            <div style={{ background: 'var(--ground)', border: '1px solid var(--line)', borderRadius: 'var(--r-input)', padding: '16px 18px' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                <SummaryRow label={`Subtotal (${qty} ${unit} × ₹${rate})`} value={money(subtotal)} />
+                {overtimeAmount > 0 && <SummaryRow label={`Overtime (${overtimeHours} hrs)`} value={`+${money(overtimeAmount)}`} />}
+                {isWithGst && <SummaryRow label={`GST (${gstPercentage}%)`} value={`+${money(gstAmount)}`} />}
               </div>
-
-              {overtimeAmount > 0 && (
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', color: 'var(--ink-2)' }}>
-                  <span>Overtime ({overtimeHours} hrs)</span>
-                  <span className="tnum" style={{ fontWeight: 600 }}>+₹{overtimeAmount.toLocaleString('en-IN', { maximumFractionDigits: 2 })}</span>
+              <div style={{ borderTop: '1.5px dashed var(--input-border)', margin: '14px 0' }} />
+              <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 12 }}>
+                <div>
+                  <div style={{ fontFamily: 'var(--font-ui)', fontSize: 15, fontWeight: 700, color: 'var(--ink)' }}>Total</div>
+                  <div style={{ fontFamily: 'var(--font-ui)', fontSize: 13, color: 'var(--ink-3)' }}>Added to the site ledger</div>
                 </div>
-              )}
-
-              {isWithGst && (
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', color: 'var(--ink-2)' }}>
-                  <span>GST ({gstPercentage}%)</span>
-                  <span className="tnum" style={{ fontWeight: 600 }}>+₹{gstAmount.toLocaleString('en-IN', { maximumFractionDigits: 2 })}</span>
+                <div
+                  className="tnum"
+                  style={{ fontFamily: 'var(--font-display)', fontSize: 'clamp(28px, 4vw, 36px)', fontWeight: 700, color: 'var(--ink)', letterSpacing: '-0.03em' }}
+                >
+                  {money(totalAmount)}
                 </div>
+              </div>
+              {(paidNow > 0 || alreadyPaid > 0) && (
+                <>
+                  <div style={{ borderTop: '1px solid var(--line)', margin: '14px 0' }} />
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                    {alreadyPaid > 0 && <SummaryRow label="Already paid" value={money(alreadyPaid)} />}
+                    {paidNow > 0 && <SummaryRow label="Paid with this entry" value={money(paidNow)} tone="var(--status-success)" />}
+                    <SummaryRow label="Balance due" value={money(balanceDue)} strong />
+                  </div>
+                </>
               )}
             </div>
+          </BtCard>
 
-            {/* Big Total Amount */}
-            <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', marginTop: '16px' }}>
-              <div>
-                <div style={labelStyle}>TOTAL CALCULATED VALUE</div>
-                <div style={{ fontFamily: 'var(--font-ui)', fontSize: '12px', color: 'var(--ink-3)' }}>
-                  Ledger impact
-                </div>
+          {/* ── Payment ── */}
+          <BtCard padding="24px" className="tour-payment">
+            <CardTitle icon={CreditCard}>Payment and settlement</CardTitle>
+
+            <div style={{ marginBottom: 18 }}>
+              <Eyebrow>Payment method</Eyebrow>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                {PAYMENT_METHODS.map((method) => (
+                  <BtChip key={method} label={method} selected={paymentMethod === method} onClick={() => setPaymentMethod(method)} aria-pressed={paymentMethod === method} />
+                ))}
               </div>
+            </div>
 
+            {canMarkPaid ? (
               <div
-                className="tnum"
                 style={{
-                  fontFamily: 'var(--font-display)',
-                  fontSize: 'clamp(28px, 4vw, 36px)',
-                  fontWeight: 800,
-                  color: 'var(--ink)',
-                  letterSpacing: '-0.03em',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  gap: 14,
+                  flexWrap: 'wrap',
+                  padding: '14px 16px',
+                  background: paymentResult ? 'var(--status-success-soft)' : 'var(--fill)',
+                  borderRadius: 'var(--r-input)',
                 }}
               >
-                ₹{totalAmount.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                <div style={{ minWidth: 0 }}>
+                  <div style={{ fontFamily: 'var(--font-ui)', fontSize: 15, fontWeight: 600, color: 'var(--ink)' }}>Settle now</div>
+                  <div style={{ fontSize: 13, color: 'var(--ink-2)', marginTop: 2 }}>
+                    {paymentResult
+                      ? `${money(paymentResult.amount)} recorded as ${paymentResult.status.toLowerCase()} via ${paymentResult.method}`
+                      : 'Record a payment, receipt or e-signature with this entry'}
+                  </div>
+                </div>
+                <BtButton variant={paymentResult ? 'secondary' : 'primary'} size="small" onClick={openPayNow}>
+                  {paymentResult ? 'Edit payment' : 'Pay / settle'}
+                </BtButton>
               </div>
-            </div>
+            ) : (
+              <div style={{ fontSize: 14, color: 'var(--ink-2)', background: 'var(--fill)', borderRadius: 'var(--r-input)', padding: '14px 16px', lineHeight: 1.5 }}>
+                Payments are recorded by an admin once this entry is approved.
+              </div>
+            )}
           </BtCard>
 
-          {/* ── CARD 4: Payment Details ── */}
-          <BtCard padding="24px" className="tour-payment">
-            <div
-              style={{
-                fontFamily: 'var(--font-display)',
-                fontSize: '16px',
-                fontWeight: 700,
-                color: 'var(--ink)',
-                marginBottom: '16px',
-              }}
-            >
-              Payment & Settlement
-            </div>
-
-            <div style={{ marginBottom: '16px' }}>
-              <label style={labelStyle}>PAYMENT METHOD</label>
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
-                {PAYMENT_METHODS.map((method) => {
-                  const isSelected = paymentMethod === method;
-                  return (
-                    <button
-                      key={method}
-                      type="button"
-                      onClick={() => setPaymentMethod(method)}
-                      style={{
-                        padding: '8px 14px',
-                        borderRadius: 'var(--r-button)',
-                        border: `1px solid ${isSelected ? 'var(--ink)' : 'var(--line)'}`,
-                        background: isSelected ? 'var(--ink)' : 'var(--card)',
-                        color: isSelected ? 'var(--bone)' : 'var(--ink)',
-                        fontFamily: 'var(--font-ui)',
-                        fontSize: '13px',
-                        fontWeight: 600,
-                        cursor: 'pointer',
-                        transition: 'all 140ms ease',
-                      }}
-                    >
-                      {method}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-
-            {/* Settle Now shortcut */}
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px', background: 'var(--fill)', borderRadius: 'var(--r-input)' }}>
-              <div>
-                <div style={{ fontFamily: 'var(--font-ui)', fontSize: '13px', fontWeight: 700, color: 'var(--ink)' }}>
-                  Direct Instant Settlement
-                </div>
-                <div style={{ fontSize: '12px', color: 'var(--ink-3)', marginTop: '2px' }}>
-                  {paymentResult ? `Recorded as Paid via ${paymentResult.method}` : 'Record payment receipt or sign e-voucher now'}
-                </div>
-              </div>
-
-              <BtButton
-                variant={paymentResult ? 'secondary' : 'primary'}
-                small
-                onPress={() => setShowPayNow(true)}
-              >
-                {paymentResult ? 'Edit Payment' : 'Pay / Settle'}
-              </BtButton>
-            </div>
-          </BtCard>
-
-          {/* ── CARD 5: Notes & Attachments ── */}
+          {/* ── Notes and attachments ── */}
           <BtCard padding="24px" className="tour-attachments">
-            <div style={{ marginBottom: '18px' }}>
-              <label style={labelStyle}>NOTES & SITE REMARKS</label>
-              <textarea
+            <CardTitle icon={FileText}>Notes and attachments</CardTitle>
+            <div style={{ marginBottom: 20 }}>
+              <BtTextarea
+                label="Notes and site remarks"
                 rows={3}
                 value={notes}
                 onChange={(e) => setNotes(e.target.value)}
-                placeholder="Add delivery vehicle number, quality observations, or verification notes…"
-                style={{
-                  ...inputStyle,
-                  height: 'auto',
-                  padding: '12px 14px',
-                  resize: 'vertical',
-                }}
+                placeholder="Delivery vehicle number, quality observations, or verification notes"
               />
             </div>
 
             <div>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
-                <label style={labelStyle}>RECEIPTS & BILL ATTACHMENTS</label>
-                <input
-                  type="file"
-                  multiple
-                  ref={attachmentInputRef}
-                  onChange={handleFileSelect}
-                  style={{ display: 'none' }}
-                />
-                <button
-                  type="button"
-                  onClick={() => attachmentInputRef.current?.click()}
-                  style={{
-                    background: 'none',
-                    border: 'none',
-                    color: 'var(--accent)',
-                    fontFamily: 'var(--font-ui)',
-                    fontSize: '13px',
-                    fontWeight: 700,
-                    cursor: 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '4px',
-                  }}
-                >
-                  <Paperclip size={14} /> + Attach Files
-                </button>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, marginBottom: 10 }}>
+                <span style={{ fontFamily: 'var(--font-ui)', fontSize: 13, fontWeight: 600, color: 'var(--ink-2)' }}>Receipts and bill attachments</span>
+                <input type="file" multiple ref={attachmentInputRef} onChange={handleFileSelect} style={{ display: 'none' }} aria-label="Attach files" />
+                <BtButton variant="secondary" size="compact" icon={Paperclip} onClick={() => attachmentInputRef.current?.click()}>
+                  Attach files
+                </BtButton>
               </div>
 
               {attachments.length === 0 ? (
-                <div
+                <button
+                  type="button"
                   onClick={() => attachmentInputRef.current?.click()}
+                  className="bt-hover-row"
                   style={{
-                    border: '1.5px dashed var(--line)',
+                    width: '100%',
+                    font: 'inherit',
+                    boxSizing: 'border-box',
+                    border: '1.5px dashed var(--input-border)',
                     borderRadius: 'var(--r-input)',
-                    padding: '24px',
+                    padding: '22px 16px',
                     textAlign: 'center',
                     cursor: 'pointer',
-                    background: 'var(--fill)',
+                    background: 'var(--ground)',
+                    color: 'var(--ink)',
                   }}
                 >
-                  <Camera size={22} color="var(--ink-3)" style={{ margin: '0 auto 6px' }} />
-                  <div style={{ fontFamily: 'var(--font-ui)', fontSize: '13px', fontWeight: 600, color: 'var(--ink)' }}>
-                    Upload bill photo or PDF
-                  </div>
-                  <div style={{ fontSize: '11px', color: 'var(--ink-3)', marginTop: '2px' }}>
-                    Click to select receipts, bills, or verification photos
-                  </div>
-                </div>
+                  <Camera size={22} color="var(--ink-3)" style={{ margin: '0 auto 6px', display: 'block' }} />
+                  <span style={{ display: 'block', fontSize: 14, fontWeight: 600 }}>Upload a bill photo or PDF</span>
+                  <span style={{ display: 'block', fontSize: 13, color: 'var(--ink-3)', marginTop: 2 }}>Receipts, bills or verification photos</span>
+                </button>
               ) : (
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
                   {attachments.map((file, i) => (
                     <div
                       key={i}
                       style={{
-                        padding: '6px 12px',
-                        borderRadius: 'var(--r-button)',
+                        padding: '4px 4px 4px 12px',
+                        borderRadius: 'var(--r-full)',
                         background: 'var(--fill)',
-                        border: '1px solid var(--line)',
                         display: 'flex',
                         alignItems: 'center',
-                        gap: '8px',
+                        gap: 8,
                         fontFamily: 'var(--font-ui)',
-                        fontSize: '12px',
+                        fontSize: 13,
                         color: 'var(--ink)',
                       }}
                     >
-                      <Paperclip size={12} />
-                      <span style={{ maxWidth: '160px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                        {file.name}
-                      </span>
-                      <button
-                        type="button"
-                        onClick={() => handleRemoveAttachment(i)}
-                        style={{
-                          background: 'none',
-                          border: 'none',
-                          color: 'var(--ink-3)',
-                          cursor: 'pointer',
-                          padding: 2,
-                        }}
-                      >
-                        <X size={13} />
-                      </button>
+                      <Paperclip size={13} />
+                      <span style={{ maxWidth: 180, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{file.name}</span>
+                      <BtIconButton icon={X} label={`Remove ${file.name}`} size={32} onClick={() => handleRemoveAttachment(i)} style={{ border: 'none', background: 'transparent' }} />
                     </div>
                   ))}
                 </div>
@@ -1302,35 +901,32 @@ export default function ManualEntryPage() {
             </div>
           </BtCard>
 
-          {/* ── Submit Action ── */}
-          <div className="tour-save-btn" style={{ marginTop: '8px' }}>
-            <BtButton
-              type="submit"
-              variant="primary"
-              loading={saving}
-              style={{
-                width: '100%',
-                height: '52px',
-                fontSize: '16px',
-                fontWeight: 700,
-              }}
-            >
-              {isEditing ? 'Update Entry' : 'Save Entry'}
+          {/* ── Submit ── */}
+          <div className="tour-save-btn" style={{ display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap', justifyContent: 'space-between' }}>
+            <div className="tnum" style={{ fontFamily: 'var(--font-ui)', fontSize: 14, color: 'var(--ink-2)' }}>
+              Total <strong style={{ color: 'var(--ink)', fontFamily: 'var(--font-display)', fontSize: 18 }}>{money(totalAmount)}</strong>
+              {paymentResult && <BtBadge tone={paymentResult.status === 'Paid' ? 'success' : paymentResult.status === 'Partial' ? 'warning' : 'neutral'} label={paymentResult.status} style={{ marginLeft: 10 }} />}
+            </div>
+            <BtButton type="submit" variant="primary" loading={saving} style={{ flex: '1 1 240px', maxWidth: 420, fontWeight: 700 }}>
+              {isEditing ? 'Update entry' : 'Save entry'}
             </BtButton>
           </div>
         </form>
       </BtSheet>
 
-      {/* PayNow Bottom Sheet Modal */}
       {showPayNow && (
         <PayNowSheet
           open={showPayNow}
+          entryTitle={values[nameKey] || ''}
+          typeLabel={ENTRY_TYPES.find((t) => t.value === entryType)?.label || ''}
+          vendorName={vendorName}
           totalAmount={totalAmount}
+          alreadyPaid={alreadyPaid}
           onClose={() => setShowPayNow(false)}
-          onPaid={(res) => {
-            setPaymentResult(res);
+          onConfirm={(res) => {
+            setPaymentResult(res.amount > 0 ? res : null);
             setShowPayNow(false);
-            btToast.success('Settlement details applied');
+            btToast(res.amount > 0 ? 'Payment details added to this entry.' : 'No payment recorded.');
           }}
         />
       )}

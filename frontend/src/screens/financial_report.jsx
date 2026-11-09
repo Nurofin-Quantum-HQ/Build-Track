@@ -1,11 +1,11 @@
 import React, { useState, useEffect, useCallback, useRef, useMemo } from "react";
+import { createPortal } from "react-dom";
 import { useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
-import { projectAPI, transactionAPI, userAPI } from "../api";
+import { transactionAPI, userAPI } from "../api";
 import useProjectStore from "../stores/projectStore";
 import useTransactionStore from "../stores/transactionStore";
 import perfLogger from "../utils/performanceLogger";
-import { Toast } from "../components/Toast";
 import { jsPDF } from "jspdf";
 import autoTable from "jspdf-autotable";
 import RecordPaymentSheet from "../components/RecordPaymentSheet";
@@ -44,6 +44,9 @@ import {
   FileSpreadsheet,
   ArrowUpDown,
   Building2,
+  ChevronUp,
+  ArrowUp,
+  ArrowDown,
 } from "lucide-react";
 import ModuleTour from "../components/ModuleTour";
 import { SpendVsBudgetChart } from "../components/Charts";
@@ -55,13 +58,18 @@ import {
 } from "../utils/reportCalculations";
 import BtHero from "../components/ui/BtHero";
 import BtSheet from "../components/ui/BtSheet";
+import BtPageHeader from "../components/ui/BtPageHeader";
 import BtCard from "../components/ui/BtCard";
 import BtChip from "../components/ui/BtChip";
 import BtSegmented from "../components/ui/BtSegmented";
 import BtBadge from "../components/ui/BtBadge";
-import BtEmpty from "../components/ui/BtEmpty";
+import BtEmpty, { BtErrorCard } from "../components/ui/BtEmpty";
 import BtButton from "../components/ui/BtButton";
-import BtPressable from "../components/ui/BtPressable";
+import BtIconButton from "../components/ui/BtIconButton";
+import BtField, { BtSelect, BtTextarea } from "../components/ui/BtField";
+import BtSkeleton from "../components/ui/BtSkeleton";
+import btToast from "../components/ui/BtToast";
+import { formatInr } from "../components/ui/BtCountUp";
 
 const isValidDate = (d) => d instanceof Date && !isNaN(d.getTime());
 
@@ -126,6 +134,50 @@ function formatDateLong(dt) {
   const minute = String(dateObj.getMinutes()).padStart(2, "0");
   return `${day} ${month} ${year} ${hour}:${minute} ${ampm}`;
 }
+
+// "Created At": the saved timestamp, or the one embedded in the Mongo id.
+function formatCreatedAt(createdAt, rawId) {
+  let d = createdAt ? new Date(createdAt) : null;
+  if (
+    (!d || isNaN(d.getTime()) || d.toISOString().endsWith("T00:00:00.000Z")) &&
+    rawId &&
+    String(rawId).length === 24
+  ) {
+    d = new Date(parseInt(String(rawId).substring(0, 8), 16) * 1000);
+  }
+  if (!d || isNaN(d.getTime())) return "\u2014";
+  return formatDateLong(d);
+}
+
+const TYPE_LABELS = { material: "Material", labour: "Labour", equipment: "Equipment" };
+
+const statusTone = (label) =>
+  label === "Fully Paid" ? "success" : label === "Partial" ? "warning" : "danger";
+
+const approvalTone = (status) =>
+  status === "Approved" ? "success" : status === "Rejected" ? "danger" : "warning";
+
+const COLUMN_WIDTHS = {
+  "Created At": 170,
+  "Purchased Date": 124,
+  "Payment Date": 124,
+  Project: 180,
+  Type: 118,
+  Description: 190,
+  Material: 190,
+  "Worker Type": 170,
+  Equipment: 190,
+  Brand: 120,
+  Floor: 96,
+  Phase: 130,
+  Activity: 140,
+  Unit: 84,
+  Status: 128,
+  Approval: 150,
+};
+
+const MONEY_COLS = new Set(["Amount", "Paid", "Remaining", "Rate", "Rate/Day", "Rent Rate"]);
+const NUMBER_COLS = new Set(["Qty", "Days", "Duration"]);
 
 const DEFAULT_COLS = {
   All: [
@@ -265,7 +317,11 @@ export default function FinancialReportPage() {
   const [transactions, setTransactions] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const [toast, setToast] = useState({ msg: "", type: "info" });
+  // App-wide toast (components/ui/BtToast); the page keeps its {msg, type} call shape.
+  const setToast = useCallback(
+    ({ msg, type }) => btToast(msg, { error: type === "error" }),
+    []
+  );
 
   const [showExportModal, setShowExportModal] = useState(false);
   const [showImportModal, setShowImportModal] = useState(false);
@@ -362,7 +418,9 @@ export default function FinancialReportPage() {
   const [paymentSheetOpen, setPaymentSheetOpen] = useState(false);
   const [paymentItem, setPaymentItem] = useState(null);
 
-  const clearToast = useCallback(() => setToast({ msg: "", type: "info" }), []);
+  const [rejectTarget, setRejectTarget] = useState(null);
+  const [rejectReason, setRejectReason] = useState("");
+  const [rejectBusy, setRejectBusy] = useState(false);
 
   useEffect(() => {
     sessionStorage.setItem("fr_proj", selectedProjectId);
@@ -482,7 +540,7 @@ export default function FinancialReportPage() {
   const getProjectName = useCallback(
     (id) => {
       const match = projects.find((p) => String(p._id) === String(id));
-      return match ? match.projectName || match.name : "Unknown Project";
+      return match ? match.projectName || match.name : "No project";
     },
     [projects]
   );
@@ -929,8 +987,14 @@ export default function FinancialReportPage() {
     const sourceId =
       entry.id || (entry.rawTx ? entry.rawTx._id || entry.rawTx.id : "");
     const returnUrl = encodeURIComponent("/reports");
+    // Entries saved without a project carry a placeholder id: don't pass it on.
+    const knownProject = projects.some(
+      (p) => String(p._id) === String(entry.projectId)
+    )
+      ? entry.projectId
+      : "";
     navigate(
-      `/manualentry?type=${activeKey}&project=${entry.projectId}&name=${entry.description}&unit=${entry.unit}&brand=${entry.brand || ""}&isDuplicate=true&sourceTransactionId=${sourceId}&returnUrl=${returnUrl}`
+      `/manualentry?type=${activeKey}&project=${encodeURIComponent(knownProject)}&name=${encodeURIComponent(entry.description || "")}&unit=${encodeURIComponent(entry.unit || "")}&brand=${encodeURIComponent(entry.brand || "")}&isDuplicate=true&sourceTransactionId=${sourceId}&returnUrl=${returnUrl}`
     );
   };
 
@@ -989,7 +1053,10 @@ export default function FinancialReportPage() {
         const dateStr = formatLocal(entry.date);
         const projectName = getProjectName(entry.projectId);
         const amountStr = entry.amount.toFixed(2);
-        const statusStr = getPaymentStatusLabel(entry.paymentStatus);
+        const statusStr = getPaymentStatusLabel(entry.paymentStatus, {
+          amount: entry.amount,
+          paidAmount: entry.paidAmount,
+        });
         const payDateStr = formatLocal(entry.paymentDate);
 
         const formatDateTime = (dStr, rawTxId) => {
@@ -1165,7 +1232,9 @@ export default function FinancialReportPage() {
       const body = filteredEntries.map((entry) => {
         const row = [];
         for (const col of activeCols) {
-          if (col === "Purchased Date") {
+          if (col === "Created At") {
+            row.push(formatCreatedAt(entry.rawTx?.createdAt, entry.rawTx?._id));
+          } else if (col === "Purchased Date") {
             row.push(formatDateShort(entry.date));
           } else if (col === "Payment Date") {
             row.push(entry.paymentDate ? formatDateShort(entry.paymentDate) : "—");
@@ -1240,7 +1309,7 @@ export default function FinancialReportPage() {
 
   const activeCols =
     (activeColumns && activeColumns[activeTab]) || DEFAULT_COLS[activeTab] || [];
-  const uiActiveCols = [...activeCols, "Add More", "Record Payment", "Actions"];
+  const uiActiveCols = [...activeCols, "Actions"];
 
   const canRecordPayment =
     can("mark_paid") || can("approve_payments") || user?.role === "Admin";
@@ -1260,19 +1329,45 @@ export default function FinancialReportPage() {
     }
   };
 
-  const handleInlineReject = async (entry) => {
-    const reason = window.prompt("Enter rejection reason:");
-    if (reason === null) return;
+  const handleInlineReject = (entry) => {
+    setRejectReason("");
+    setRejectTarget(entry);
+  };
+
+  const confirmInlineReject = async () => {
+    const entry = rejectTarget;
+    if (!entry) return;
+    setRejectBusy(true);
     try {
-      await transactionAPI.reject(entry.rawTx?._id || entry.id, reason);
+      await transactionAPI.reject(
+        entry.rawTx?._id || entry.id,
+        rejectReason.trim()
+      );
       setToast({ msg: "Entry rejected", type: "info" });
+      setRejectTarget(null);
       loadData();
     } catch (err) {
       setToast({
         msg: err.response?.data?.message || "Failed to reject entry",
         type: "error",
       });
+    } finally {
+      setRejectBusy(false);
     }
+  };
+
+  const resetAllFilters = () => {
+    setSelectedProjectId("all");
+    setSelectedFloor("");
+    setSelectedPhaseId("");
+    setSelectedActivityName("");
+    setDatePreset("All Time");
+    setStartDate(null);
+    setEndDate(null);
+    setSearchQuery("");
+    setSelectedItemName("");
+    setSelectedPaymentStatus("All");
+    setCurrentPage(1);
   };
 
   const extraFiltersCount = [
@@ -1289,6 +1384,388 @@ export default function FinancialReportPage() {
     { label: "Equipment", value: "Equipment" },
   ];
 
+  const hasActiveFilters =
+    selectedProjectId !== "all" ||
+    datePreset !== "All Time" ||
+    extraFiltersCount > 0 ||
+    searchQuery.trim().length > 0;
+
+  const projectLabel = (entry) => {
+    const name = getProjectName(entry.projectId);
+    return { name, none: name === "No project" };
+  };
+
+  const isFirstLoad = loading && transactions.length === 0;
+
+  const sortHint =
+    sortColumn === "date"
+      ? sortAscending
+        ? "Date: Oldest"
+        : "Date: Newest"
+      : sortColumn === "amount"
+        ? sortAscending
+          ? "Amount: Low"
+          : "Amount: High"
+        : sortAscending
+          ? "Project: A–Z"
+          : "Project: Z–A";
+
+  const sortKeyForColumn = (colName) =>
+    colName === "Purchased Date" || colName === "Date"
+      ? "date"
+      : colName === "Project"
+        ? "project"
+        : colName === "Amount"
+          ? "amount"
+          : null;
+
+  const handleSortClick = (colName) => {
+    const key = sortKeyForColumn(colName);
+    if (!key) return;
+    setSortColumn(key);
+    setSortAscending(!sortAscending);
+  };
+
+  const emptyState = (
+    <BtEmpty
+      icon={Search}
+      title="No entries match these filters"
+      message="Try a wider date range, another project, or a different search."
+      actionLabel={hasActiveFilters ? "Reset filters" : undefined}
+      onAction={hasActiveFilters ? resetAllFilters : undefined}
+    />
+  );
+
+  const paginationBar = totalCount > 0 && (
+    <div
+      style={{
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "space-between",
+        gap: 16,
+        flexWrap: "wrap",
+        padding: "14px 20px",
+        borderTop: "1px solid var(--line)",
+        background: "var(--card)",
+      }}
+    >
+      <div style={{ display: "flex", alignItems: "center", gap: 16, flexWrap: "wrap" }}>
+        <span style={{ fontSize: 14, color: "var(--ink-2)" }}>
+          Showing{" "}
+          <b className="tnum" style={{ color: "var(--ink)" }}>
+            {(safeCurrentPage - 1) * rowsPerPage + 1}&ndash;
+            {Math.min(safeCurrentPage * rowsPerPage, totalCount)}
+          </b>{" "}
+          of <b className="tnum" style={{ color: "var(--ink)" }}>{totalCount}</b> entries
+        </span>
+        <BtSelect
+          aria-label="Rows per page"
+          size="compact"
+          value={rowsPerPage}
+          onChange={(e) => {
+            setRowsPerPage(Number(e.target.value));
+            setCurrentPage(1);
+          }}
+          style={{ width: 140 }}
+        >
+          <option value={10}>10 rows</option>
+          <option value={20}>20 rows</option>
+          <option value={50}>50 rows</option>
+          <option value={100}>100 rows</option>
+        </BtSelect>
+      </div>
+
+      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+        <BtIconButton
+          icon={ChevronLeft}
+          label="Previous page"
+          disabled={safeCurrentPage <= 1}
+          onClick={() => setCurrentPage(safeCurrentPage - 1)}
+        />
+        <span className="tnum" style={{ fontSize: 14, fontWeight: 600, color: "var(--ink)", minWidth: 96, textAlign: "center" }}>
+          Page {safeCurrentPage} of {totalPages}
+        </span>
+        <BtIconButton
+          icon={ChevronRight}
+          label="Next page"
+          disabled={safeCurrentPage >= totalPages}
+          onClick={() => setCurrentPage(safeCurrentPage + 1)}
+        />
+      </div>
+    </div>
+  );
+
+  const renderCell = (colName, entry) => {
+    const none = (
+      <span style={{ color: "var(--ink-3)" }}>{"—"}</span>
+    );
+    const text = (val, extra = {}) => (
+      <td
+        key={colName}
+        className="txt"
+        title={val || undefined}
+        style={{
+          minWidth: COLUMN_WIDTHS[colName],
+          maxWidth: Math.max(COLUMN_WIDTHS[colName] || 0, 260),
+          ...extra,
+        }}
+      >
+        {val || none}
+      </td>
+    );
+    const rem = Math.max(0, (entry.amount || 0) - (entry.paidAmount || 0));
+
+    switch (colName) {
+      case "Created At":
+        return text(formatCreatedAt(entry.rawTx?.createdAt, entry.rawTx?._id));
+      case "Purchased Date":
+        return <td key={colName} style={{ minWidth: COLUMN_WIDTHS[colName] }}>{formatDateShort(entry.date)}</td>;
+      case "Payment Date":
+        return (
+          <td key={colName} style={{ minWidth: COLUMN_WIDTHS[colName] }}>
+            {entry.paymentDate ? formatDateShort(entry.paymentDate) : none}
+          </td>
+        );
+      case "Project": {
+        const { name, none: noProj } = projectLabel(entry);
+        return text(name, {
+          fontWeight: noProj ? 500 : 600,
+          color: noProj ? "var(--ink-3)" : "var(--ink)",
+        });
+      }
+      case "Type":
+        return (
+          <td key={colName} style={{ minWidth: COLUMN_WIDTHS[colName] }}>
+            <BtBadge tone={entry.type} label={TYPE_LABELS[entry.type] || entry.type} />
+          </td>
+        );
+      case "Description":
+      case "Material":
+      case "Worker Type":
+      case "Equipment":
+        return text(entry.description, { fontWeight: colName === "Description" ? 400 : 500 });
+      case "Brand":
+        return text(entry.brand);
+      case "Floor":
+        return text(entry.floor);
+      case "Phase":
+        return text(entry.phase);
+      case "Activity":
+        return text(entry.activity);
+      case "Unit":
+        return text(entry.unit);
+      case "Status": {
+        const label = getPaymentStatusLabel(entry.paymentStatus, {
+          amount: entry.amount,
+          paidAmount: entry.paidAmount,
+        });
+        return (
+          <td key={colName} style={{ minWidth: COLUMN_WIDTHS[colName] }}>
+            <BtBadge tone={statusTone(label)} label={label} />
+          </td>
+        );
+      }
+      case "Approval": {
+        const appStatus = (entry.rawTx || {}).approvalStatus || "Approved";
+        const isPendingApproval = appStatus === "Pending";
+        return (
+          <td key={colName} style={{ minWidth: COLUMN_WIDTHS[colName] }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <BtBadge tone={approvalTone(appStatus)} label={appStatus} />
+              {isPendingApproval && canApprove && (
+                <div style={{ display: "flex", gap: 6 }}>
+                  <BtIconButton
+                    icon={Check}
+                    label="Approve entry"
+                    size={32}
+                    onClick={() => handleInlineApprove(entry)}
+                    style={{ color: "var(--status-success)", background: "var(--status-success-soft)", borderColor: "transparent" }}
+                  />
+                  <BtIconButton
+                    icon={X}
+                    label="Reject entry"
+                    size={32}
+                    onClick={() => handleInlineReject(entry)}
+                    style={{ color: "var(--status-danger)", background: "var(--status-danger-soft)", borderColor: "transparent" }}
+                  />
+                </div>
+              )}
+            </div>
+          </td>
+        );
+      }
+      case "Amount":
+        return (
+          <td key={colName} className="num" style={{ fontWeight: 700, color: "var(--ink)", minWidth: 112 }}>
+            {formatInr(entry.amount)}
+          </td>
+        );
+      case "Paid":
+        return (
+          <td key={colName} className="num" style={{ fontWeight: 600, color: "var(--status-success)", minWidth: 104 }}>
+            {formatInr(entry.paidAmount || 0)}
+          </td>
+        );
+      case "Remaining":
+        return (
+          <td
+            key={colName}
+            className="num"
+            style={{ fontWeight: 600, color: rem > 0 ? "var(--status-danger)" : "var(--status-success)", minWidth: 112 }}
+          >
+            {formatInr(rem)}
+          </td>
+        );
+      case "Rate":
+      case "Rate/Day":
+      case "Rent Rate":
+        return (
+          <td key={colName} className="num" style={{ minWidth: 100 }}>
+            {formatInr(entry.ratePerUnit)}
+          </td>
+        );
+      case "Qty":
+      case "Days":
+      case "Duration": {
+        const rate = entry.ratePerUnit || 0;
+        const val = rate === 0 ? 0 : entry.amount / rate;
+        return (
+          <td key={colName} className="num" style={{ minWidth: 80 }}>
+            {val.toFixed(1)}
+          </td>
+        );
+      }
+      case "Actions":
+        return (
+          <td key={colName} className="fr-sr" style={{ paddingTop: 8, paddingBottom: 8 }}>
+            {canAddEdit || canRecordPayment ? (
+              <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                {canRecordPayment && (
+                  <BtIconButton
+                    icon={CreditCard}
+                    label="Record payment"
+                    size={34}
+                    onClick={() => handleRecordPaymentClick(entry)}
+                  />
+                )}
+                {canAddEdit && (
+                  <>
+                    <BtIconButton
+                      icon={PlusCircle}
+                      label="Add more like this"
+                      size={34}
+                      onClick={() => handleAddMore(entry)}
+                    />
+                    <BtIconButton
+                      icon={Edit2}
+                      label="Edit entry"
+                      size={34}
+                      onClick={() => handleEditEntry(entry)}
+                    />
+                  </>
+                )}
+              </div>
+            ) : (
+              none
+            )}
+          </td>
+        );
+      default:
+        return <td key={colName}>{none}</td>;
+    }
+  };
+
+  const hubStyles = `
+    .fr-chip {
+      display: inline-flex; align-items: center; gap: 8px; height: 36px; padding: 0 14px;
+      border-radius: var(--r-chip); background: rgba(255, 255, 255, 0.08);
+      border: 1px solid var(--noir-line); color: var(--on-noir);
+      font-family: var(--font-ui); font-size: 13px; font-weight: 600; cursor: pointer;
+      max-width: 100%; white-space: nowrap; transition: background 150ms ease, border-color 150ms ease;
+    }
+    .fr-chip:hover { background: rgba(255, 255, 255, 0.14); }
+    .fr-chip[data-active="true"] {
+      background: color-mix(in srgb, var(--accent) 18%, transparent);
+      border-color: color-mix(in srgb, var(--accent) 45%, transparent);
+      color: var(--accent);
+    }
+    .fr-chip .fr-chip-label { overflow: hidden; text-overflow: ellipsis; }
+    .fr-reset { background: color-mix(in srgb, var(--status-danger-bright) 14%, transparent);
+      border-color: color-mix(in srgb, var(--status-danger-bright) 35%, transparent);
+      color: var(--status-danger-bright); }
+    .fr-reset:hover { background: color-mix(in srgb, var(--status-danger-bright) 24%, transparent); }
+    .fr-menu {
+      position: absolute; top: calc(100% + 6px); left: 0; z-index: 200;
+      max-width: calc(100vw - 48px); padding: 6px; border-radius: 14px;
+      background: var(--noir-2); border: 1px solid var(--noir-line);
+      box-shadow: var(--shadow-raised); animation: fadeIn 120ms ease;
+    }
+    .fr-menu-title { color: var(--on-noir-3); padding: 6px 10px 8px; border-bottom: 1px solid var(--noir-line); margin-bottom: 4px; }
+    .fr-menu-list { max-height: 340px; overflow-y: auto; }
+    .fr-menu-item {
+      display: flex; width: 100%; align-items: center; justify-content: space-between; gap: 10px;
+      min-height: 40px; padding: 0 11px; border: none; border-radius: 10px; background: transparent;
+      color: var(--on-noir-2); font-family: var(--font-ui); font-size: 14px; font-weight: 500;
+      cursor: pointer; text-align: left;
+    }
+    .fr-menu-item:hover { background: rgba(255, 255, 255, 0.07); color: var(--on-noir); }
+    .fr-menu-item[aria-selected="true"] { background: rgba(255, 255, 255, 0.11); color: var(--on-noir); font-weight: 600; }
+    .fr-menu-item > span { display: inline-flex; align-items: center; gap: 9px; min-width: 0; }
+    .fr-menu-item > span > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+    .fr-scroll { overflow: auto; max-height: min(660px, calc(100vh - 150px)); position: relative; }
+    .fr-table { width: max-content; min-width: 100%; }
+    .fr-table th, .fr-table td { white-space: nowrap; }
+    .fr-table th { padding: 12px 14px; }
+    .fr-table td { padding: 12px 14px; font-size: 14px; }
+    .fr-table td.txt { overflow: hidden; text-overflow: ellipsis; }
+    .fr-table th.num { text-align: right; }
+    .fr-table tbody tr { cursor: pointer; }
+    .fr-table tbody tr:focus-visible { outline: 2px solid var(--ink); outline-offset: -2px; }
+    .fr-table th[data-sort] { cursor: pointer; user-select: none; }
+    .fr-table th[data-sort]:hover { color: var(--ink); }
+    .fr-sl, .fr-sr { position: sticky; z-index: 2; background: var(--card); }
+    .fr-sl { left: 0; border-right: 1px solid var(--line); text-align: center; padding-left: 10px !important; padding-right: 10px !important; width: 52px; min-width: 52px; }
+    .fr-sr { right: 0; border-left: 1px solid var(--line); box-shadow: -8px 0 10px -8px color-mix(in srgb, var(--ink) 22%, transparent); }
+    .fr-table th.fr-sl, .fr-table th.fr-sr { background: var(--bone); z-index: 4; }
+    .fr-table tbody tr:hover td.fr-sl, .fr-table tbody tr:hover td.fr-sr { background: var(--bone); }
+
+    .fr-scrim {
+      position: fixed; inset: 0; z-index: 1000; background: var(--scrim);
+      backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px);
+      display: flex; align-items: center; justify-content: center; padding: 24px;
+    }
+    .fr-modal {
+      background: var(--card); border-radius: var(--r-sheet); width: 100%; max-height: 90vh;
+      display: flex; flex-direction: column; box-shadow: var(--shadow-raised); overflow: hidden;
+      font-family: var(--font-ui); color: var(--ink);
+    }
+    .fr-modal-body { padding: 0 24px 24px; overflow-y: auto; }
+    .fr-drawer-scrim { align-items: stretch; justify-content: flex-end; padding: 0; }
+    .fr-drawer {
+      background: var(--card); width: 100%; max-width: 460px; height: 100%;
+      display: flex; flex-direction: column; box-shadow: var(--shadow-raised);
+      border-radius: var(--r-sheet) 0 0 var(--r-sheet); overflow: hidden;
+      font-family: var(--font-ui); color: var(--ink);
+    }
+    .fr-option {
+      display: flex; width: 100%; align-items: center; gap: 14px; padding: 16px; text-align: left;
+      border-radius: var(--r-card); border: 1px solid var(--line); background: var(--card);
+      cursor: pointer; font-family: var(--font-ui); transition: border-color 150ms ease, background 150ms ease;
+    }
+    .fr-option:hover { border-color: var(--ink); background: var(--bone); }
+    .fr-toolbar { display: flex; align-items: flex-end; justify-content: space-between; flex-wrap: wrap; gap: 12px; }
+    @media (max-width: 640px) {
+      .fr-scrim { align-items: flex-end; padding: 0; }
+      .fr-modal { border-radius: var(--r-sheet) var(--r-sheet) 0 0; max-height: 94vh; }
+      .fr-drawer { border-radius: 0; max-width: 100%; }
+      .fr-modal-body { padding: 0 18px 20px; }
+      .fr-scroll { max-height: min(560px, calc(100vh - 150px)); }
+      .fr-sr { position: static; box-shadow: none; }
+      .fr-table th.fr-sr { z-index: 1; }
+    }
+  `;
+
   return (
     <div
       style={{
@@ -1301,547 +1778,190 @@ export default function FinancialReportPage() {
         color: "var(--ink)",
       }}
     >
+      <style>{hubStyles}</style>
       <ModuleTour
         steps={tourSteps}
         run={runTour}
         setRun={setRunTour}
         moduleName="FinancialReportPage"
       />
-      <Toast message={toast.msg} type={toast.type} onClose={clearToast} />
 
-      {/* ── TOP HERO (Deep Noir with blueprint grid & glow) ── */}
+      {/* ── HERO ── */}
       <BtHero padding="24px 32px 48px">
-        {/* Row 1: Eyebrow + Title + Header Actions */}
-        <div
-          style={{
-            display: "flex",
-            alignItems: "flex-start",
-            justifyContent: "space-between",
-            gap: 16,
-            flexWrap: "wrap",
-            marginBottom: 20,
-          }}
-        >
-          <div>
+        <BtPageHeader
+          eyebrow="Analytics"
+          title="Reports"
+          subtitle={`What you've billed, paid and still owe. ${totalCount} ${totalCount === 1 ? "entry" : "entries"} · ${datePreset || "All Time"}.`}
+          actions={
             <div
-              style={{
-                fontFamily: "var(--font-mono)",
-                fontSize: 11,
-                letterSpacing: "0.08em",
-                color: "var(--on-noir-2)",
-                textTransform: "uppercase",
-                fontWeight: 600,
-                marginBottom: 4,
-              }}
+              className="tour-export-btns"
+              style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", maxWidth: "calc(100vw - 64px)" }}
             >
-              {totalCount} {totalCount === 1 ? "ENTRY" : "ENTRIES"} ·{" "}
-              {(datePreset || "All Time").toUpperCase()}
+              <BtIconButton
+                icon={HelpCircle}
+                label="Page tour"
+                onDark
+                onClick={() => setRunTour(true)}
+              />
+              <BtButton
+                variant="onDark"
+                size="small"
+                icon={Sparkles}
+                onClick={() => navigate("/ai-chat")}
+              >
+                Ask AI
+              </BtButton>
+              <BtButton
+                variant="onDark"
+                size="small"
+                icon={FileSpreadsheet}
+                onClick={() => setShowImportModal(true)}
+              >
+                Import CSV
+              </BtButton>
+              <BtButton
+                variant="accent"
+                size="small"
+                icon={Download}
+                disabled={filteredEntries.length === 0}
+                onClick={() => setShowExportModal(true)}
+              >
+                Export
+              </BtButton>
             </div>
-            <h1
-              style={{
-                fontFamily: "var(--font-display)",
-                fontSize: 34,
-                fontWeight: 700,
-                letterSpacing: "-0.02em",
-                color: "var(--bone)",
-                margin: 0,
-                lineHeight: 1.15,
-              }}
-            >
-              Reports
-            </h1>
-            <p
-              style={{
-                fontSize: 13,
-                color: "var(--on-noir-2)",
-                margin: "4px 0 0",
-              }}
-            >
-              Financial analytics &amp; transaction log audit
-            </p>
-          </div>
-
-          {/* Action buttons on dark hero */}
-          <div
-            className="tour-export-btns"
-            style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}
-          >
-            <button
-              onClick={() => setRunTour(true)}
-              title="Tour &amp; Guidelines"
-              style={{
-                width: 38,
-                height: 38,
-                borderRadius: "var(--r-btn, 12px)",
-                background: "rgba(255, 255, 255, 0.08)",
-                border: "1px solid rgba(255, 255, 255, 0.12)",
-                color: "var(--bone)",
-                display: "grid",
-                placeItems: "center",
-                cursor: "pointer",
-                transition: "background 150ms ease",
-              }}
-              onMouseEnter={(e) =>
-                (e.currentTarget.style.background = "rgba(255, 255, 255, 0.14)")
-              }
-              onMouseLeave={(e) =>
-                (e.currentTarget.style.background = "rgba(255, 255, 255, 0.08)")
-              }
-            >
-              <HelpCircle size={17} />
-            </button>
-
-            <button
-              onClick={() => navigate("/ai-chat")}
-              style={{
-                display: "inline-flex",
-                alignItems: "center",
-                gap: 7,
-                height: 38,
-                padding: "0 14px",
-                borderRadius: "var(--r-btn, 12px)",
-                background: "rgba(255, 255, 255, 0.08)",
-                border: "1px solid rgba(255, 255, 255, 0.12)",
-                color: "var(--bone)",
-                fontSize: 13,
-                fontWeight: 600,
-                cursor: "pointer",
-                transition: "background 150ms ease",
-              }}
-              onMouseEnter={(e) =>
-                (e.currentTarget.style.background = "rgba(255, 255, 255, 0.14)")
-              }
-              onMouseLeave={(e) =>
-                (e.currentTarget.style.background = "rgba(255, 255, 255, 0.08)")
-              }
-            >
-              <Sparkles size={15} color="var(--accent)" />
-              <span>Ask AI</span>
-            </button>
-
-            <button
-              onClick={() => setShowImportModal(true)}
-              style={{
-                display: "inline-flex",
-                alignItems: "center",
-                gap: 7,
-                height: 38,
-                padding: "0 14px",
-                borderRadius: "var(--r-btn, 12px)",
-                background: "rgba(255, 255, 255, 0.08)",
-                border: "1px solid rgba(255, 255, 255, 0.12)",
-                color: "var(--bone)",
-                fontSize: 13,
-                fontWeight: 600,
-                cursor: "pointer",
-                transition: "background 150ms ease",
-              }}
-              onMouseEnter={(e) =>
-                (e.currentTarget.style.background = "rgba(255, 255, 255, 0.14)")
-              }
-              onMouseLeave={(e) =>
-                (e.currentTarget.style.background = "rgba(255, 255, 255, 0.08)")
-              }
-            >
-              <FileSpreadsheet size={15} />
-              <span>Import CSV</span>
-            </button>
-
-            <button
-              onClick={() => setShowExportModal(true)}
-              disabled={filteredEntries.length === 0}
-              style={{
-                display: "inline-flex",
-                alignItems: "center",
-                gap: 7,
-                height: 38,
-                padding: "0 16px",
-                borderRadius: "var(--r-btn, 12px)",
-                background: "#FFFFFF",
-                border: "none",
-                color: "var(--ink)",
-                fontSize: 13,
-                fontWeight: 700,
-                cursor: filteredEntries.length === 0 ? "not-allowed" : "pointer",
-                opacity: filteredEntries.length === 0 ? 0.6 : 1,
-                boxShadow: "0 2px 8px rgba(0,0,0,0.15)",
-                transition: "transform 150ms ease",
-              }}
-              onMouseEnter={(e) => (e.currentTarget.style.transform = "scale(1.02)")}
-              onMouseLeave={(e) => (e.currentTarget.style.transform = "scale(1)")}
-            >
-              <Download size={15} />
-              <span>Export</span>
-            </button>
-          </div>
-        </div>
-
-        {/* Row 2: Horizontal Filter Chips on Dark */}
-        <div
-          className="tour-project-filter"
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: 8,
-            overflowX: "auto",
-            scrollbarWidth: "none",
-            paddingBottom: 4,
-          }}
+          }
         >
-          {/* Project selector dropdown (Blueprint Noir) */}
-          <div ref={projectDropdownRef} style={{ position: "relative" }}>
-            <button
-              type="button"
-              onClick={() => {
+          <div
+            className="tour-project-filter"
+            style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}
+          >
+            <HeroMenu
+              icon={Building2}
+              label={selectedProjectId === "all" ? "All projects" : getProjectName(selectedProjectId)}
+              active={selectedProjectId !== "all"}
+              open={projectDropdownOpen}
+              onToggle={() => {
                 setProjectDropdownOpen((v) => !v);
                 setDateDropdownOpen(false);
               }}
-              style={{
-                display: "inline-flex",
-                alignItems: "center",
-                gap: 7,
-                padding: "7px 12px",
-                borderRadius: "var(--r-btn, 12px)",
-                background: selectedProjectId !== "all" ? "rgba(224, 169, 59, 0.16)" : "rgba(255, 255, 255, 0.08)",
-                border: selectedProjectId !== "all" ? "1px solid rgba(224, 169, 59, 0.38)" : "1px solid rgba(255, 255, 255, 0.14)",
-                color: selectedProjectId !== "all" ? "var(--accent, #E0A93B)" : "var(--bone, #F6F4EF)",
-                fontSize: 12.5,
-                fontWeight: 600,
-                fontFamily: "var(--font-ui)",
-                cursor: "pointer",
-                transition: "all 140ms ease",
-                whiteSpace: "nowrap",
-                backdropFilter: "blur(8px)",
-              }}
+              menuRef={projectDropdownRef}
+              title="Project"
+              width={290}
             >
-              <Building2 size={14} color={selectedProjectId !== "all" ? "var(--accent)" : "rgba(255, 255, 255, 0.75)"} />
-              <span>
-                {selectedProjectId === "all" ? "All projects" : getProjectName(selectedProjectId)}
-              </span>
-              <ChevronDown
-                size={13}
-                style={{
-                  transform: projectDropdownOpen ? "rotate(180deg)" : "rotate(0deg)",
-                  transition: "transform 180ms ease",
-                  opacity: 0.7,
-                }}
-              />
-            </button>
-
-            {projectDropdownOpen && (
-              <div
-                style={{
-                  position: "absolute",
-                  top: "calc(100% + 6px)",
-                  left: 0,
-                  width: "280px",
-                  background: "var(--noir-2, #14171D)",
-                  border: "1px solid rgba(255, 255, 255, 0.14)",
-                  borderRadius: "14px",
-                  boxShadow: "0 18px 45px rgba(0, 0, 0, 0.7)",
-                  zIndex: 200,
-                  padding: "6px",
-                  backdropFilter: "blur(20px)",
-                  animation: "fadeIn 120ms ease",
+              <HeroMenuItem
+                selected={selectedProjectId === "all"}
+                icon={Building2}
+                onClick={() => {
+                  setSelectedProjectId("all");
+                  setSelectedFloor("");
+                  setSelectedPhaseId("");
+                  setSelectedActivityName("");
+                  setCurrentPage(1);
+                  setProjectDropdownOpen(false);
                 }}
               >
-                <div
-                  style={{
-                    padding: "6px 10px 6px",
-                    fontSize: "10.5px",
-                    fontFamily: "var(--font-mono)",
-                    color: "rgba(246, 244, 239, 0.45)",
-                    letterSpacing: "0.08em",
-                    textTransform: "uppercase",
-                    borderBottom: "1px solid rgba(255, 255, 255, 0.08)",
-                    marginBottom: "4px",
-                  }}
-                >
-                  Select Project
-                </div>
-
-                <div
-                  onClick={() => {
-                    setSelectedProjectId("all");
-                    setSelectedFloor("");
-                    setSelectedPhaseId("");
-                    setSelectedActivityName("");
-                    setCurrentPage(1);
-                    setProjectDropdownOpen(false);
-                  }}
-                  style={{
-                    padding: "9px 11px",
-                    borderRadius: "9px",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "space-between",
-                    cursor: "pointer",
-                    background: selectedProjectId === "all" ? "rgba(255, 255, 255, 0.10)" : "transparent",
-                    color: selectedProjectId === "all" ? "var(--bone, #F6F4EF)" : "rgba(246, 244, 239, 0.8)",
-                    fontSize: 13,
-                    fontWeight: selectedProjectId === "all" ? 600 : 500,
-                    transition: "background 100ms ease",
-                  }}
-                  onMouseEnter={(e) => {
-                    if (selectedProjectId !== "all") e.currentTarget.style.background = "rgba(255, 255, 255, 0.06)";
-                  }}
-                  onMouseLeave={(e) => {
-                    if (selectedProjectId !== "all") e.currentTarget.style.background = "transparent";
-                  }}
-                >
-                  <div style={{ display: "flex", alignItems: "center", gap: 9 }}>
-                    <Building2 size={14} color="var(--accent, #E0A93B)" />
-                    <span>All projects</span>
-                  </div>
-                  {selectedProjectId === "all" && <Check size={14} color="var(--accent, #E0A93B)" />}
-                </div>
-
-                {projects.length > 0 && (
-                  <div
-                    style={{
-                      maxHeight: "220px",
-                      overflowY: "auto",
-                      marginTop: "4px",
-                      paddingTop: "4px",
-                      borderTop: "1px solid rgba(255, 255, 255, 0.08)",
+                All projects
+              </HeroMenuItem>
+              {projects.map((p) => {
+                const pid = p._id || p.id;
+                return (
+                  <HeroMenuItem
+                    key={pid}
+                    selected={selectedProjectId === pid}
+                    icon={Building2}
+                    onClick={() => {
+                      setSelectedProjectId(pid);
+                      setSelectedFloor("");
+                      setSelectedPhaseId("");
+                      setSelectedActivityName("");
+                      setCurrentPage(1);
+                      setProjectDropdownOpen(false);
                     }}
                   >
-                    {projects.map((p) => {
-                      const pid = p._id || p.id;
-                      const isSel = selectedProjectId === pid;
-                      return (
-                        <div
-                          key={pid}
-                          onClick={() => {
-                            setSelectedProjectId(pid);
-                            setSelectedFloor("");
-                            setSelectedPhaseId("");
-                            setSelectedActivityName("");
-                            setCurrentPage(1);
-                            setProjectDropdownOpen(false);
-                          }}
-                          style={{
-                            padding: "9px 11px",
-                            borderRadius: "9px",
-                            display: "flex",
-                            alignItems: "center",
-                            justifyContent: "space-between",
-                            cursor: "pointer",
-                            background: isSel ? "rgba(255, 255, 255, 0.10)" : "transparent",
-                            color: isSel ? "var(--bone, #F6F4EF)" : "rgba(246, 244, 239, 0.8)",
-                            fontSize: 13,
-                            fontWeight: isSel ? 600 : 500,
-                            transition: "background 100ms ease",
-                          }}
-                          onMouseEnter={(e) => {
-                            if (!isSel) e.currentTarget.style.background = "rgba(255, 255, 255, 0.06)";
-                          }}
-                          onMouseLeave={(e) => {
-                            if (!isSel) e.currentTarget.style.background = "transparent";
-                          }}
-                        >
-                          <div style={{ display: "flex", alignItems: "center", gap: 9, minWidth: 0, flex: 1 }}>
-                            <Building2 size={14} color={isSel ? "var(--accent)" : "rgba(255, 255, 255, 0.45)"} />
-                            <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                              {p.projectName || p.name}
-                            </span>
-                          </div>
-                          {isSel && <Check size={14} color="var(--accent, #E0A93B)" />}
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
+                    {p.projectName || p.name}
+                  </HeroMenuItem>
+                );
+              })}
+            </HeroMenu>
 
-          {/* Date preset selector dropdown (Blueprint Noir) */}
-          <div ref={dateDropdownRef} style={{ position: "relative" }}>
-            <button
-              type="button"
-              onClick={() => {
+            <HeroMenu
+              icon={Calendar}
+              label={
+                datePreset === "Custom" && (startDate || endDate)
+                  ? `${startDate ? formatDateShort(startDate) : "…"} – ${endDate ? formatDateShort(endDate) : "…"}`
+                  : datePreset
+              }
+              active={datePreset !== "All Time"}
+              open={dateDropdownOpen}
+              onToggle={() => {
                 setDateDropdownOpen((v) => !v);
                 setProjectDropdownOpen(false);
               }}
-              style={{
-                display: "inline-flex",
-                alignItems: "center",
-                gap: 7,
-                padding: "7px 12px",
-                borderRadius: "var(--r-btn, 12px)",
-                background: datePreset !== "All Time" ? "rgba(224, 169, 59, 0.16)" : "rgba(255, 255, 255, 0.08)",
-                border: datePreset !== "All Time" ? "1px solid rgba(224, 169, 59, 0.38)" : "1px solid rgba(255, 255, 255, 0.14)",
-                color: datePreset !== "All Time" ? "var(--accent, #E0A93B)" : "var(--bone, #F6F4EF)",
-                fontSize: 12.5,
-                fontWeight: 600,
-                fontFamily: "var(--font-ui)",
-                cursor: "pointer",
-                transition: "all 140ms ease",
-                whiteSpace: "nowrap",
-                backdropFilter: "blur(8px)",
-              }}
+              menuRef={dateDropdownRef}
+              title="Date range"
+              width={230}
             >
-              <Calendar size={14} color={datePreset !== "All Time" ? "var(--accent)" : "rgba(255, 255, 255, 0.75)"} />
-              <span>
-                {datePreset === "Custom" && (startDate || endDate)
-                  ? `${startDate ? formatDateShort(startDate) : "…"} – ${endDate ? formatDateShort(endDate) : "…"}`
-                  : datePreset}
-              </span>
-              <ChevronDown
-                size={13}
-                style={{
-                  transform: dateDropdownOpen ? "rotate(180deg)" : "rotate(0deg)",
-                  transition: "transform 180ms ease",
-                  opacity: 0.7,
-                }}
-              />
+              {["All Time", "Today", "This Week", "This Month", "Last 30 Days", "This Year", "Custom"].map(
+                (preset) => (
+                  <HeroMenuItem
+                    key={preset}
+                    selected={datePreset === preset}
+                    onClick={() => {
+                      handleDatePreset(preset);
+                      setDateDropdownOpen(false);
+                      if (preset === "Custom") setShowFiltersDrawer(true);
+                    }}
+                  >
+                    {preset}
+                  </HeroMenuItem>
+                )
+              )}
+            </HeroMenu>
+
+            <button
+              type="button"
+              className="fr-chip"
+              data-active={extraFiltersCount > 0 || showFiltersDrawer}
+              aria-expanded={showFiltersDrawer}
+              onClick={() => setShowFiltersDrawer(!showFiltersDrawer)}
+            >
+              <Filter size={15} />
+              <span>{extraFiltersCount === 0 ? "Filter" : `Filter · ${extraFiltersCount}`}</span>
             </button>
 
-            {dateDropdownOpen && (
-              <div
-                style={{
-                  position: "absolute",
-                  top: "calc(100% + 6px)",
-                  left: 0,
-                  width: "220px",
-                  background: "var(--noir-2, #14171D)",
-                  border: "1px solid rgba(255, 255, 255, 0.14)",
-                  borderRadius: "14px",
-                  boxShadow: "0 18px 45px rgba(0, 0, 0, 0.7)",
-                  zIndex: 200,
-                  padding: "6px",
-                  backdropFilter: "blur(20px)",
-                  animation: "fadeIn 120ms ease",
-                }}
-              >
-                <div
-                  style={{
-                    padding: "6px 10px 6px",
-                    fontSize: "10.5px",
-                    fontFamily: "var(--font-mono)",
-                    color: "rgba(246, 244, 239, 0.45)",
-                    letterSpacing: "0.08em",
-                    textTransform: "uppercase",
-                    borderBottom: "1px solid rgba(255, 255, 255, 0.08)",
-                    marginBottom: "4px",
-                  }}
-                >
-                  Date Preset
-                </div>
+            <button
+              type="button"
+              className="fr-chip"
+              data-active={showChart}
+              aria-expanded={showChart}
+              onClick={() => setShowChart(!showChart)}
+            >
+              <SlidersHorizontal size={15} />
+              <span>{showChart ? "Hide chart" : "Analytics Chart"}</span>
+            </button>
 
-                {[
-                  "All Time",
-                  "Today",
-                  "This Week",
-                  "This Month",
-                  "Last 30 Days",
-                  "This Year",
-                  "Custom",
-                ].map((preset) => {
-                  const isSel = datePreset === preset;
-                  return (
-                    <div
-                      key={preset}
-                      onClick={() => {
-                        handleDatePreset(preset);
-                        setDateDropdownOpen(false);
-                      }}
-                      style={{
-                        padding: "8px 11px",
-                        borderRadius: "9px",
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "space-between",
-                        cursor: "pointer",
-                        background: isSel ? "rgba(255, 255, 255, 0.10)" : "transparent",
-                        color: isSel ? "var(--bone, #F6F4EF)" : "rgba(246, 244, 239, 0.8)",
-                        fontSize: 13,
-                        fontWeight: isSel ? 600 : 500,
-                        transition: "background 100ms ease",
-                      }}
-                      onMouseEnter={(e) => {
-                        if (!isSel) e.currentTarget.style.background = "rgba(255, 255, 255, 0.06)";
-                      }}
-                      onMouseLeave={(e) => {
-                        if (!isSel) e.currentTarget.style.background = "transparent";
-                      }}
-                    >
-                      <span>{preset}</span>
-                      {isSel && <Check size={14} color="var(--accent, #E0A93B)" />}
-                    </div>
-                  );
-                })}
-              </div>
+            {hasActiveFilters && (
+              <button type="button" className="fr-chip fr-reset" onClick={resetAllFilters}>
+                <RotateCcw size={14} />
+                <span>Reset</span>
+              </button>
             )}
           </div>
-
-          {/* Scoping Filters toggle chip */}
-          <BtChip
-            label={
-              extraFiltersCount === 0
-                ? "Filter"
-                : `Filter · ${extraFiltersCount}`
-            }
-            onDark={true}
-            selected={extraFiltersCount > 0 || showFiltersDrawer}
-            icon={Filter}
-            onClick={() => setShowFiltersDrawer(!showFiltersDrawer)}
-          />
-
-          {/* Chart Toggle Chip */}
-          <BtChip
-            label={showChart ? "Hide Chart" : "Analytics Chart"}
-            onDark={true}
-            selected={showChart}
-            icon={SlidersHorizontal}
-            onClick={() => setShowChart(!showChart)}
-          />
-
-          {/* Reset Filters chip */}
-          {(selectedProjectId !== "all" ||
-            datePreset !== "All Time" ||
-            extraFiltersCount > 0 ||
-            searchQuery.trim().length > 0) && (
-            <button
-              onClick={() => {
-                setSelectedProjectId("all");
-                setSelectedFloor("");
-                setSelectedPhaseId("");
-                setSelectedActivityName("");
-                setDatePreset("All Time");
-                setStartDate(null);
-                setEndDate(null);
-                setSearchQuery("");
-                setSelectedItemName("");
-                setSelectedPaymentStatus("All");
-                setCurrentPage(1);
-              }}
-              style={{
-                display: "inline-flex",
-                alignItems: "center",
-                gap: 5,
-                height: 36,
-                padding: "0 12px",
-                borderRadius: "var(--r-chip)",
-                background: "rgba(239, 68, 68, 0.15)",
-                border: "1px solid rgba(239, 68, 68, 0.3)",
-                color: "#FCA5A5",
-                fontSize: 12.5,
-                fontWeight: 600,
-                cursor: "pointer",
-              }}
-            >
-              <RotateCcw size={13} />
-              <span>Reset</span>
-            </button>
-          )}
-        </div>
+        </BtPageHeader>
       </BtHero>
 
-      {/* ── MAIN CONTENT (Overlapping BtSheet) ── */}
+      {/* ── SHEET ── */}
       <BtSheet overlap={26} padding="24px 32px 64px">
-        {/* Category Tabs: All | Materials | Labour | Equipment */}
+        {error && (
+          <BtErrorCard
+            title="Couldn't load the report"
+            message={error}
+            onRetry={() => loadData(true)}
+            style={{ marginBottom: 20 }}
+          />
+        )}
+
+        {/* Category tabs + view toggle */}
         <div
           className="tour-report-tabs"
           style={{
@@ -1849,7 +1969,7 @@ export default function FinancialReportPage() {
             alignItems: "center",
             justifyContent: "space-between",
             flexWrap: "wrap",
-            gap: 16,
+            gap: 12,
             marginBottom: 20,
           }}
         >
@@ -1860,673 +1980,247 @@ export default function FinancialReportPage() {
               setActiveTab(val);
               setCurrentPage(1);
             }}
+            style={{ maxWidth: "100%", overflowX: "auto" }}
           />
-
-          {/* View Toggle: Table vs Cards */}
-          <div
-            style={{
-              display: "inline-flex",
-              alignItems: "center",
-              background: "var(--fill)",
-              borderRadius: "var(--r-tile)",
-              padding: 3,
-            }}
-          >
-            <button
-              onClick={() => setViewMode("table")}
-              style={{
-                display: "inline-flex",
-                alignItems: "center",
-                gap: 6,
-                padding: "6px 14px",
-                height: 32,
-                borderRadius: 10,
-                background: viewMode === "table" ? "#FFFFFF" : "transparent",
-                color: viewMode === "table" ? "var(--ink)" : "var(--ink-soft)",
-                boxShadow:
-                  viewMode === "table"
-                    ? "0 1px 3px rgba(12, 14, 18, 0.08)"
-                    : "none",
-                fontSize: 12.5,
-                fontWeight: viewMode === "table" ? 700 : 500,
-                cursor: "pointer",
-                border: "none",
-              }}
-            >
-              <TableIcon size={14} />
-              <span>Table</span>
-            </button>
-            <button
-              onClick={() => setViewMode("cards")}
-              style={{
-                display: "inline-flex",
-                alignItems: "center",
-                gap: 6,
-                padding: "6px 14px",
-                height: 32,
-                borderRadius: 10,
-                background: viewMode === "cards" ? "#FFFFFF" : "transparent",
-                color: viewMode === "cards" ? "var(--ink)" : "var(--ink-soft)",
-                boxShadow:
-                  viewMode === "cards"
-                    ? "0 1px 3px rgba(12, 14, 18, 0.08)"
-                    : "none",
-                fontSize: 12.5,
-                fontWeight: viewMode === "cards" ? 700 : 500,
-                cursor: "pointer",
-                border: "none",
-              }}
-            >
-              <LayoutGrid size={14} />
-              <span>Cards</span>
-            </button>
-          </div>
+          <BtSegmented
+            options={[
+              { label: "Table", value: "table", icon: TableIcon },
+              { label: "Cards", value: "cards", icon: LayoutGrid },
+            ]}
+            value={viewMode}
+            onChange={setViewMode}
+          />
         </div>
 
-        {/* Expandable Scoping Filters Bar */}
+        {/* Granular filters */}
         {showFiltersDrawer && (
-          <div
-            style={{
-              background: "var(--card)",
-              borderRadius: "var(--r-card)",
-              border: "1px solid var(--line)",
-              padding: 20,
-              marginBottom: 20,
-              boxShadow: "var(--shadow-card)",
-            }}
-          >
-            <div
-              style={{
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "space-between",
-                marginBottom: 14,
-              }}
-            >
-              <span
-                style={{
-                  fontFamily: "var(--font-mono)",
-                  fontSize: 11,
-                  letterSpacing: "0.08em",
-                  color: "var(--ink-soft)",
-                  textTransform: "uppercase",
-                  fontWeight: 600,
-                }}
-              >
-                Granular Scoping Filters
-              </span>
-              <button
-                onClick={() => setShowFiltersDrawer(false)}
-                style={{
-                  background: "none",
-                  border: "none",
-                  cursor: "pointer",
-                  color: "var(--ink-soft)",
-                }}
-              >
-                <X size={16} />
-              </button>
+          <BtCard padding="20px 22px" style={{ marginBottom: 20 }}>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
+              <h3 style={{ margin: 0, fontSize: 16, fontWeight: 600 }}>Filters</h3>
+              <BtIconButton icon={X} label="Close filters" size={36} onClick={() => setShowFiltersDrawer(false)} />
             </div>
 
-            <div
-              style={{
-                display: "grid",
-                gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
-                gap: 12,
-              }}
-            >
-              {/* Floor */}
-              <div>
-                <label
-                  style={{
-                    display: "block",
-                    fontSize: 12,
-                    fontWeight: 600,
-                    color: "var(--ink-soft)",
-                    marginBottom: 5,
-                  }}
-                >
-                  Floor
-                </label>
-                <div style={{ position: "relative" }}>
-                  <select
-                    disabled={selectedProjectId === "all" || floors.length === 0}
-                    value={floors.length === 0 ? "" : selectedFloor || "Select Floor"}
-                    onChange={(e) => {
-                      setSelectedFloor(
-                        e.target.value === "Select Floor" ? "" : e.target.value
-                      );
-                      setCurrentPage(1);
-                    }}
-                    style={{
-                      width: "100%",
-                      padding: "8px 12px",
-                      borderRadius: 8,
-                      border: "1px solid var(--line)",
-                      background:
-                        selectedProjectId === "all" || floors.length === 0
-                          ? "var(--fill)"
-                          : "#FFFFFF",
-                      fontSize: 13,
-                      fontWeight: 600,
-                      color: "var(--ink)",
-                      outline: "none",
-                    }}
-                  >
-                    <option value={floors.length === 0 ? "" : "Select Floor"}>
-                      {floors.length === 0 ? "No floors" : "All Floors"}
-                    </option>
-                    {floors.map((fl, idx) => (
-                      <option
-                        key={idx}
-                        value={typeof fl === "string" ? fl : fl.name}
-                      >
-                        {typeof fl === "string" ? fl : fl.name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              </div>
+            <div className="bt-grid-4">
+              <BtSelect
+                label="Floor"
+                size="compact"
+                disabled={selectedProjectId === "all" || floors.length === 0}
+                helperText={selectedProjectId === "all" ? "Pick a project first" : undefined}
+                value={floors.length === 0 ? "" : selectedFloor || "Select Floor"}
+                onChange={(e) => {
+                  setSelectedFloor(e.target.value === "Select Floor" ? "" : e.target.value);
+                  setCurrentPage(1);
+                }}
+              >
+                <option value={floors.length === 0 ? "" : "Select Floor"}>
+                  {floors.length === 0 ? "No floors" : "All floors"}
+                </option>
+                {floors.map((fl, idx) => (
+                  <option key={idx} value={typeof fl === "string" ? fl : fl.name}>
+                    {typeof fl === "string" ? fl : fl.name}
+                  </option>
+                ))}
+              </BtSelect>
 
-              {/* Phase */}
-              <div>
-                <label
-                  style={{
-                    display: "block",
-                    fontSize: 12,
-                    fontWeight: 600,
-                    color: "var(--ink-soft)",
-                    marginBottom: 5,
-                  }}
-                >
-                  Phase
-                </label>
-                <select
-                  disabled={selectedProjectId === "all" || phases.length === 0}
-                  value={selectedPhaseId || "Select Phase"}
-                  onChange={(e) => {
-                    const val =
-                      e.target.value === "Select Phase" ? "" : e.target.value;
-                    setSelectedPhaseId(val);
-                    setSelectedActivityName("");
-                    setCurrentPage(1);
-                  }}
-                  style={{
-                    width: "100%",
-                    padding: "8px 12px",
-                    borderRadius: 8,
-                    border: "1px solid var(--line)",
-                    background:
-                      selectedProjectId === "all" || phases.length === 0
-                        ? "var(--fill)"
-                        : "#FFFFFF",
-                    fontSize: 13,
-                    fontWeight: 600,
-                    color: "var(--ink)",
-                    outline: "none",
-                  }}
-                >
-                  <option value="Select Phase">All Phases</option>
-                  {phases.map((ph) => (
-                    <option key={ph.id} value={ph.id}>
-                      {ph.phaseName}
-                    </option>
-                  ))}
-                </select>
-              </div>
+              <BtSelect
+                label="Phase"
+                size="compact"
+                disabled={selectedProjectId === "all" || phases.length === 0}
+                helperText={selectedProjectId === "all" ? "Pick a project first" : undefined}
+                value={selectedPhaseId || "Select Phase"}
+                onChange={(e) => {
+                  setSelectedPhaseId(e.target.value === "Select Phase" ? "" : e.target.value);
+                  setSelectedActivityName("");
+                  setCurrentPage(1);
+                }}
+              >
+                <option value="Select Phase">All phases</option>
+                {phases.map((ph) => (
+                  <option key={ph.id} value={ph.id}>
+                    {ph.phaseName}
+                  </option>
+                ))}
+              </BtSelect>
 
-              {/* Activity */}
-              <div>
-                <label
-                  style={{
-                    display: "block",
-                    fontSize: 12,
-                    fontWeight: 600,
-                    color: "var(--ink-soft)",
-                    marginBottom: 5,
-                  }}
-                >
-                  Activity
-                </label>
-                <select
-                  disabled={
-                    selectedProjectId === "all" ||
-                    uniqueActivityNames.length === 0
-                  }
-                  value={selectedActivityName || "Select Activity"}
-                  onChange={(e) => {
-                    setSelectedActivityName(
-                      e.target.value === "Select Activity" ? "" : e.target.value
-                    );
-                    setCurrentPage(1);
-                  }}
-                  style={{
-                    width: "100%",
-                    padding: "8px 12px",
-                    borderRadius: 8,
-                    border: "1px solid var(--line)",
-                    background:
-                      selectedProjectId === "all" ||
-                      uniqueActivityNames.length === 0
-                        ? "var(--fill)"
-                        : "#FFFFFF",
-                    fontSize: 13,
-                    fontWeight: 600,
-                    color: "var(--ink)",
-                    outline: "none",
-                  }}
-                >
-                  <option value="Select Activity">All Activities</option>
-                  {uniqueActivityNames.map((actName, idx) => (
-                    <option key={idx} value={actName}>
-                      {actName}
-                    </option>
-                  ))}
-                </select>
-              </div>
+              <BtSelect
+                label="Activity"
+                size="compact"
+                disabled={selectedProjectId === "all" || uniqueActivityNames.length === 0}
+                helperText={selectedProjectId === "all" ? "Pick a project first" : undefined}
+                value={selectedActivityName || "Select Activity"}
+                onChange={(e) => {
+                  setSelectedActivityName(e.target.value === "Select Activity" ? "" : e.target.value);
+                  setCurrentPage(1);
+                }}
+              >
+                <option value="Select Activity">All activities</option>
+                {uniqueActivityNames.map((actName, idx) => (
+                  <option key={idx} value={actName}>
+                    {actName}
+                  </option>
+                ))}
+              </BtSelect>
 
-              {/* Payment Status */}
-              <div>
-                <label
-                  style={{
-                    display: "block",
-                    fontSize: 12,
-                    fontWeight: 600,
-                    color: "var(--ink-soft)",
-                    marginBottom: 5,
-                  }}
-                >
-                  Payment Status
-                </label>
-                <select
-                  value={selectedPaymentStatus}
-                  onChange={(e) => {
-                    setSelectedPaymentStatus(e.target.value);
-                    setCurrentPage(1);
-                  }}
-                  style={{
-                    width: "100%",
-                    padding: "8px 12px",
-                    borderRadius: 8,
-                    border: "1px solid var(--line)",
-                    background: "#FFFFFF",
-                    fontSize: 13,
-                    fontWeight: 600,
-                    color: "var(--ink)",
-                    outline: "none",
-                  }}
-                >
-                  <option value="All">All Statuses</option>
-                  <option value="Fully Paid">Fully Paid</option>
-                  <option value="Partial">Partial</option>
-                  <option value="Not Paid">Not Paid</option>
-                </select>
-              </div>
+              <BtSelect
+                label="Payment status"
+                size="compact"
+                value={selectedPaymentStatus}
+                onChange={(e) => {
+                  setSelectedPaymentStatus(e.target.value);
+                  setCurrentPage(1);
+                }}
+              >
+                <option value="All">All statuses</option>
+                <option value="Fully Paid">Fully paid</option>
+                <option value="Partial">Partial</option>
+                <option value="Not Paid">Not paid</option>
+              </BtSelect>
 
-              {/* Custom Date Range if Custom Selected */}
               {datePreset === "Custom" && (
                 <>
-                  <div>
-                    <label
-                      style={{
-                        display: "block",
-                        fontSize: 12,
-                        fontWeight: 600,
-                        color: "var(--ink-soft)",
-                        marginBottom: 5,
-                      }}
-                    >
-                      Start Date
-                    </label>
-                    <input
-                      type="date"
-                      value={isValidDate(startDate) ? startDate.toISOString().split("T")[0] : ""}
-                      onChange={(e) => {
-                        const d = e.target.value ? new Date(e.target.value) : null;
-                        setStartDate(isValidDate(d) ? d : null);
-                      }}
-                      style={{
-                        width: "100%",
-                        padding: "8px 12px",
-                        borderRadius: 8,
-                        border: "1px solid var(--line)",
-                        background: "#FFFFFF",
-                        fontSize: 13,
-                        color: "var(--ink)",
-                        outline: "none",
-                      }}
-                    />
-                  </div>
-                  <div>
-                    <label
-                      style={{
-                        display: "block",
-                        fontSize: 12,
-                        fontWeight: 600,
-                        color: "var(--ink-soft)",
-                        marginBottom: 5,
-                      }}
-                    >
-                      End Date
-                    </label>
-                    <input
-                      type="date"
-                      value={isValidDate(endDate) ? endDate.toISOString().split("T")[0] : ""}
-                      onChange={(e) => {
-                        const d = e.target.value ? new Date(e.target.value) : null;
-                        setEndDate(isValidDate(d) ? d : null);
-                      }}
-                      style={{
-                        width: "100%",
-                        padding: "8px 12px",
-                        borderRadius: 8,
-                        border: "1px solid var(--line)",
-                        background: "#FFFFFF",
-                        fontSize: 13,
-                        color: "var(--ink)",
-                        outline: "none",
-                      }}
-                    />
-                  </div>
+                  <BtField
+                    label="Start date"
+                    type="date"
+                    size="compact"
+                    value={isValidDate(startDate) ? startDate.toISOString().split("T")[0] : ""}
+                    onChange={(e) => {
+                      const d = e.target.value ? new Date(e.target.value) : null;
+                      setStartDate(isValidDate(d) ? d : null);
+                    }}
+                  />
+                  <BtField
+                    label="End date"
+                    type="date"
+                    size="compact"
+                    value={isValidDate(endDate) ? endDate.toISOString().split("T")[0] : ""}
+                    onChange={(e) => {
+                      const d = e.target.value ? new Date(e.target.value) : null;
+                      setEndDate(isValidDate(d) ? d : null);
+                    }}
+                  />
                 </>
               )}
             </div>
+          </BtCard>
+        )}
+
+        {/* ── KPI strip ── */}
+        {isFirstLoad ? (
+          <div className="bt-grid-3" style={{ marginBottom: 20 }}>
+            {[0, 1, 2].map((i) => (
+              <BtSkeleton key={i} height="128px" borderRadius="var(--r-card)" />
+            ))}
+          </div>
+        ) : (
+          <div className="bt-grid-3" style={{ marginBottom: 20 }}>
+            <BtCard
+              padding="20px 24px"
+              style={{ background: "var(--noir)", color: "var(--on-noir)", border: "1px solid var(--noir-line)", minHeight: 128 }}
+            >
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <span className="bt-eyebrow" style={{ color: "var(--on-noir-2)" }}>Total billed</span>
+                <CreditCard size={18} color="var(--accent)" />
+              </div>
+              <div
+                className="tnum"
+                style={{ fontFamily: "var(--font-display)", fontSize: 32, fontWeight: 700, letterSpacing: "-0.03em", color: "var(--on-noir)", marginTop: 8 }}
+              >
+                {formatInr(costSummary.totalBilled, { compact: true })}
+              </div>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: 10, marginTop: 12 }}>
+                {[
+                  ["Material", costSummary.material],
+                  ["Labour", costSummary.labour],
+                  ["Equipment", costSummary.equipment],
+                ].map(([label, val]) => (
+                  <div key={label} style={{ minWidth: 0 }}>
+                    <div style={{ fontSize: 12.5, color: "var(--on-noir-3)" }}>{label}</div>
+                    <div className="tnum" style={{ fontSize: 14, fontWeight: 600, color: "var(--on-noir)" }}>
+                      {formatInr(val, { compact: true })}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </BtCard>
+
+            <BtCard padding="20px 24px" style={{ minHeight: 128 }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <span className="bt-eyebrow" style={{ color: "var(--ink-3)" }}>Paid out</span>
+                <span style={{ width: 30, height: 30, borderRadius: 9, background: "var(--status-success-soft)", color: "var(--status-success)", display: "grid", placeItems: "center" }}>
+                  <CheckCircle size={16} />
+                </span>
+              </div>
+              <div
+                className="tnum"
+                style={{ fontFamily: "var(--font-display)", fontSize: 32, fontWeight: 700, letterSpacing: "-0.03em", color: "var(--status-success)", marginTop: 8 }}
+              >
+                {formatInr(costSummary.paid, { compact: true })}
+              </div>
+              <div style={{ fontSize: 13, color: "var(--ink-2)", marginTop: 6 }}>
+                {costSummary.totalBilled > 0
+                  ? `${Math.round((costSummary.paid / costSummary.totalBilled) * 100)}% of the billed amount is cleared`
+                  : "No bills recorded"}
+              </div>
+            </BtCard>
+
+            <BtCard padding="20px 24px" style={{ minHeight: 128 }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <span className="bt-eyebrow" style={{ color: "var(--ink-3)" }}>Remaining due</span>
+                <span
+                  style={{
+                    width: 30,
+                    height: 30,
+                    borderRadius: 9,
+                    background: costSummary.remaining > 0 ? "var(--status-warning-soft)" : "var(--status-success-soft)",
+                    color: costSummary.remaining > 0 ? "var(--status-warning)" : "var(--status-success)",
+                    display: "grid",
+                    placeItems: "center",
+                  }}
+                >
+                  <Clock size={16} />
+                </span>
+              </div>
+              <div
+                className="tnum"
+                style={{
+                  fontFamily: "var(--font-display)",
+                  fontSize: 32,
+                  fontWeight: 700,
+                  letterSpacing: "-0.03em",
+                  color: costSummary.remaining > 0 ? "var(--status-warning)" : "var(--status-success)",
+                  marginTop: 8,
+                }}
+              >
+                {formatInr(costSummary.remaining, { compact: true })}
+              </div>
+              <div style={{ fontSize: 13, color: "var(--ink-2)", marginTop: 6 }}>
+                {costSummary.remaining > 0 ? "Waiting to be paid" : "All approved bills are cleared"}
+              </div>
+            </BtCard>
           </div>
         )}
 
-        {/* ── SUMMARY STRIP (Total Billed · Paid · Remaining) ── */}
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))",
-            gap: 14,
-            marginBottom: 20,
-          }}
-        >
-          {/* Card 1: Total Billed */}
-          <div
-            style={{
-              background: "var(--ink)",
-              color: "#FFFFFF",
-              borderRadius: "var(--r-card)",
-              padding: "20px 24px",
-              boxShadow: "var(--shadow-card)",
-              display: "flex",
-              flexDirection: "column",
-              justifyContent: "space-between",
-              minHeight: 110,
-            }}
-          >
-            <div
-              style={{
-                display: "flex",
-                justifyContent: "space-between",
-                alignItems: "center",
-              }}
-            >
-              <span
-                style={{
-                  fontFamily: "var(--font-mono)",
-                  fontSize: 11,
-                  letterSpacing: "0.08em",
-                  color: "var(--on-noir-2)",
-                  textTransform: "uppercase",
-                  fontWeight: 600,
-                }}
-              >
-                Total Billed
-              </span>
-              <CreditCard size={18} color="var(--accent)" />
-            </div>
-            <div
-              style={{
-                fontFamily: "var(--font-display)",
-                fontSize: 26,
-                fontWeight: 700,
-                letterSpacing: "-0.02em",
-                fontVariantNumeric: "tabular-nums",
-                color: "var(--bone)",
-                marginTop: 6,
-              }}
-            >
-              {formatINR(costSummary.totalBilled)}
-            </div>
-            <div
-              style={{
-                display: "flex",
-                gap: 10,
-                fontSize: 12,
-                color: "var(--on-noir-2)",
-                marginTop: 4,
-              }}
-            >
-              <span>Mat: {formatINR(costSummary.material)}</span>
-              <span>·</span>
-              <span>Lab: {formatINR(costSummary.labour)}</span>
-              <span>·</span>
-              <span>Eq: {formatINR(costSummary.equipment)}</span>
-            </div>
-          </div>
-
-          {/* Card 2: Total Paid */}
-          <div
-            style={{
-              background: "var(--card)",
-              borderRadius: "var(--r-card)",
-              border: "1px solid var(--line)",
-              padding: "20px 24px",
-              boxShadow: "var(--shadow-card)",
-              display: "flex",
-              flexDirection: "column",
-              justifyContent: "space-between",
-              minHeight: 110,
-            }}
-          >
-            <div
-              style={{
-                display: "flex",
-                justifyContent: "space-between",
-                alignItems: "center",
-              }}
-            >
-              <span
-                style={{
-                  fontFamily: "var(--font-mono)",
-                  fontSize: 11,
-                  letterSpacing: "0.08em",
-                  color: "var(--ink-soft)",
-                  textTransform: "uppercase",
-                  fontWeight: 600,
-                }}
-              >
-                Paid Out
-              </span>
-              <span
-                style={{
-                  width: 28,
-                  height: 28,
-                  borderRadius: 8,
-                  background: "var(--success-soft)",
-                  color: "var(--success)",
-                  display: "grid",
-                  placeItems: "center",
-                }}
-              >
-                <CheckCircle size={16} />
-              </span>
-            </div>
-            <div
-              style={{
-                fontFamily: "var(--font-display)",
-                fontSize: 26,
-                fontWeight: 700,
-                letterSpacing: "-0.02em",
-                color: "var(--success)",
-                fontVariantNumeric: "tabular-nums",
-                marginTop: 6,
-              }}
-            >
-              {formatINR(costSummary.paid)}
-            </div>
-            <div style={{ fontSize: 12, color: "var(--ink-soft)", marginTop: 4 }}>
-              {costSummary.totalBilled > 0
-                ? `${Math.round((costSummary.paid / costSummary.totalBilled) * 100)}% of billed amount cleared`
-                : "No bills recorded"}
-            </div>
-          </div>
-
-          {/* Card 3: Remaining / Due */}
-          <div
-            style={{
-              background: "var(--card)",
-              borderRadius: "var(--r-card)",
-              border: "1px solid var(--line)",
-              padding: "20px 24px",
-              boxShadow: "var(--shadow-card)",
-              display: "flex",
-              flexDirection: "column",
-              justifyContent: "space-between",
-              minHeight: 110,
-            }}
-          >
-            <div
-              style={{
-                display: "flex",
-                justifyContent: "space-between",
-                alignItems: "center",
-              }}
-            >
-              <span
-                style={{
-                  fontFamily: "var(--font-mono)",
-                  fontSize: 11,
-                  letterSpacing: "0.08em",
-                  color: "var(--ink-soft)",
-                  textTransform: "uppercase",
-                  fontWeight: 600,
-                }}
-              >
-                Remaining Due
-              </span>
-              <span
-                style={{
-                  width: 28,
-                  height: 28,
-                  borderRadius: 8,
-                  background:
-                    costSummary.remaining > 0
-                      ? "var(--warn-soft)"
-                      : "var(--success-soft)",
-                  color:
-                    costSummary.remaining > 0 ? "var(--warn)" : "var(--success)",
-                  display: "grid",
-                  placeItems: "center",
-                }}
-              >
-                <Clock size={16} />
-              </span>
-            </div>
-            <div
-              style={{
-                fontFamily: "var(--font-display)",
-                fontSize: 26,
-                fontWeight: 700,
-                letterSpacing: "-0.02em",
-                color:
-                  costSummary.remaining > 0 ? "var(--warn)" : "var(--success)",
-                fontVariantNumeric: "tabular-nums",
-                marginTop: 6,
-              }}
-            >
-              {formatINR(costSummary.remaining)}
-            </div>
-            <div style={{ fontSize: 12, color: "var(--ink-soft)", marginTop: 4 }}>
-              {costSummary.remaining > 0
-                ? "Pending payment settlement"
-                : "All approved bills cleared"}
-            </div>
-          </div>
-        </div>
-
-        {/* Visual Analytics Chart: Spend vs Budget (collapsible) */}
+        {/* Spend vs budget chart */}
         {showChart && (
-          <div
-            style={{
-              background: "var(--card)",
-              borderRadius: "var(--r-card)",
-              border: "1px solid var(--line)",
-              padding: "20px 24px",
-              marginBottom: 20,
-              boxShadow: "var(--shadow-card)",
-            }}
-          >
-            <div
-              style={{
-                display: "flex",
-                justifyContent: "space-between",
-                alignItems: "center",
-                marginBottom: 12,
-              }}
-            >
-              <div>
-                <h3
-                  style={{
-                    margin: 0,
-                    fontSize: 16,
-                    fontWeight: 700,
-                    color: "var(--ink)",
-                  }}
-                >
-                  Spend vs Budget by Category
-                </h3>
-                <p
-                  style={{
-                    margin: "2px 0 0",
-                    fontSize: 12.5,
-                    color: "var(--ink-soft)",
-                  }}
-                >
-                  Compare actual expenses against allocated category budgets
-                </p>
-              </div>
-            </div>
+          <BtCard padding="20px 24px" style={{ marginBottom: 20 }}>
+            <h3 style={{ margin: 0, fontSize: 16, fontWeight: 600 }}>Spend vs budget by category</h3>
+            <p style={{ margin: "4px 0 12px", fontSize: 14, color: "var(--ink-2)" }}>
+              Actual spend against each category's budget.
+            </p>
             <div style={{ width: "100%", height: 260 }}>
               <SpendVsBudgetChart data={chartData} />
             </div>
-          </div>
+          </BtCard>
         )}
 
-        {/* ── TOOLBAR (Search · Suggestions · Edit Columns · Sort) ── */}
-        <div
-          style={{
-            background: "var(--card)",
-            borderRadius: "var(--r-card)",
-            border: "1px solid var(--line)",
-            padding: "14px 18px",
-            marginBottom: 16,
-            boxShadow: "var(--shadow-card)",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-            flexWrap: "wrap",
-            gap: 12,
-          }}
-        >
-          {/* Live Search Bar */}
-          <div style={{ position: "relative", flex: "1 1 280px", maxWidth: 440 }}>
-            <div
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: 10,
-                background: "var(--fill)",
-                borderRadius: "var(--r-btn, 12px)",
-                padding: "8px 14px",
-                border: "1px solid transparent",
-              }}
-            >
-              <Search size={16} color="var(--ink-soft)" />
-              <input
+        {/* ── Toolbar ── */}
+        <BtCard padding="14px 18px" style={{ marginBottom: 16, overflow: "visible" }}>
+          <div className="fr-toolbar">
+            <div style={{ position: "relative", flex: "1 1 300px", maxWidth: 460 }}>
+              <BtField
+                label="Search"
+                size="compact"
+                icon={Search}
                 value={searchQuery}
                 onFocus={() => setShowSuggestions(true)}
                 onBlur={() => setTimeout(() => setShowSuggestions(false), 200)}
@@ -2536,1667 +2230,455 @@ export default function FinancialReportPage() {
                   setShowSuggestions(true);
                   setCurrentPage(1);
                 }}
-                placeholder="Search description, contractor, brand, amount..."
-                style={{
-                  border: "none",
-                  background: "transparent",
-                  width: "100%",
-                  outline: "none",
-                  fontSize: 13,
-                  fontFamily: "var(--font-ui)",
-                  color: "var(--ink)",
-                }}
+                placeholder="Description, contractor, brand, amount"
+                suffix={
+                  searchQuery.trim().length > 0 ? (
+                    <button
+                      type="button"
+                      aria-label="Clear search"
+                      onClick={() => {
+                        setSearchQuery("");
+                        setSelectedItemName("");
+                        setShowSuggestions(false);
+                        setCurrentPage(1);
+                      }}
+                      style={{ background: "none", border: "none", cursor: "pointer", color: "var(--ink-3)", display: "flex", padding: 6, margin: -6 }}
+                    >
+                      <X size={16} />
+                    </button>
+                  ) : undefined
+                }
               />
-              {searchQuery.trim().length > 0 && (
-                <button
-                  onClick={() => {
-                    setSearchQuery("");
-                    setSelectedItemName("");
-                    setShowSuggestions(false);
-                    setCurrentPage(1);
-                  }}
+
+              {showSuggestions && textQuerySuggestions.length > 0 && (
+                <div
+                  role="listbox"
+                  aria-label="Search suggestions"
                   style={{
-                    background: "none",
-                    border: "none",
-                    cursor: "pointer",
-                    color: "var(--ink-soft)",
-                    display: "flex",
-                    alignItems: "center",
-                    padding: 0,
+                    position: "absolute",
+                    top: "calc(100% + 4px)",
+                    left: 0,
+                    right: 0,
+                    background: "var(--card)",
+                    border: "1px solid var(--line)",
+                    borderRadius: "var(--r-input)",
+                    boxShadow: "var(--shadow-raised)",
+                    zIndex: 50,
+                    maxHeight: 240,
+                    overflowY: "auto",
+                    padding: 6,
                   }}
                 >
-                  <X size={15} />
-                </button>
+                  {textQuerySuggestions.map((name) => (
+                    <button
+                      type="button"
+                      role="option"
+                      aria-selected={false}
+                      key={name}
+                      className="bt-hover-row"
+                      onMouseDown={() => {
+                        setSearchQuery(name);
+                        setSelectedItemName(name);
+                        setShowSuggestions(false);
+                      }}
+                      style={{
+                        display: "flex",
+                        width: "100%",
+                        alignItems: "center",
+                        gap: 8,
+                        minHeight: 40,
+                        padding: "0 12px",
+                        border: "none",
+                        background: "transparent",
+                        borderRadius: 10,
+                        fontFamily: "var(--font-ui)",
+                        fontSize: 14,
+                        color: "var(--ink)",
+                        cursor: "pointer",
+                        textAlign: "left",
+                      }}
+                    >
+                      <Search size={14} color="var(--ink-3)" />
+                      <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{name}</span>
+                    </button>
+                  ))}
+                </div>
               )}
             </div>
 
-            {/* Suggestions Popup */}
-            {showSuggestions && textQuerySuggestions.length > 0 && (
-              <div
-                style={{
-                  position: "absolute",
-                  top: "calc(100% + 4px)",
-                  left: 0,
-                  right: 0,
-                  background: "#FFFFFF",
-                  border: "1px solid var(--line)",
-                  borderRadius: "var(--r-card)",
-                  boxShadow: "0 10px 25px rgba(0,0,0,0.1)",
-                  zIndex: 50,
-                  maxHeight: 180,
-                  overflowY: "auto",
-                }}
+            <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+              <BtButton variant="secondary" size="small" icon={SlidersHorizontal} onClick={openCustomizeModal}>
+                Edit Columns
+              </BtButton>
+              <BtButton
+                variant="secondary"
+                size="small"
+                icon={ArrowUpDown}
+                aria-label={`Sort order, currently ${sortHint}. Click to reverse.`}
+                onClick={() => setSortAscending(!sortAscending)}
               >
-                {textQuerySuggestions.map((name) => (
-                  <div
-                    key={name}
-                    onMouseDown={() => {
-                      setSearchQuery(name);
-                      setSelectedItemName(name);
-                      setShowSuggestions(false);
-                    }}
-                    style={{
-                      padding: "10px 14px",
-                      fontSize: 13,
-                      color: "var(--ink)",
-                      cursor: "pointer",
-                      display: "flex",
-                      alignItems: "center",
-                      gap: 8,
-                    }}
-                    onMouseEnter={(e) =>
-                      (e.currentTarget.style.background = "var(--fill)")
-                    }
-                    onMouseLeave={(e) =>
-                      (e.currentTarget.style.background = "transparent")
-                    }
-                  >
-                    <span style={{ color: "var(--accent-ink)" }}>↳</span>
-                    <span>{name}</span>
-                  </div>
-                ))}
-              </div>
-            )}
+                {sortHint}
+              </BtButton>
+            </div>
           </div>
+        </BtCard>
 
-          {/* Toolbar actions on right: Edit Columns, Sort */}
-          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-            {/* Edit Columns */}
-            <button
-              onClick={() => openCustomizeModal()}
-              style={{
-                display: "inline-flex",
-                alignItems: "center",
-                gap: 6,
-                height: 36,
-                padding: "0 14px",
-                borderRadius: "var(--r-btn, 12px)",
-                border: "1px solid var(--line)",
-                background: "#FFFFFF",
-                color: "var(--ink)",
-                fontSize: 12.5,
-                fontWeight: 600,
-                cursor: "pointer",
-                transition: "background 150ms ease",
-              }}
-              onMouseEnter={(e) =>
-                (e.currentTarget.style.background = "var(--fill)")
-              }
-              onMouseLeave={(e) =>
-                (e.currentTarget.style.background = "#FFFFFF")
-              }
-            >
-              <SlidersHorizontal size={14} />
-              <span>Edit Columns</span>
-            </button>
-
-            {/* Sort Toggle */}
-            <button
-              onClick={() => setSortAscending(!sortAscending)}
-              style={{
-                display: "inline-flex",
-                alignItems: "center",
-                gap: 6,
-                height: 36,
-                padding: "0 14px",
-                borderRadius: "var(--r-btn, 12px)",
-                border: "1px solid var(--line)",
-                background: "#FFFFFF",
-                color: "var(--ink)",
-                fontSize: 12.5,
-                fontWeight: 600,
-                cursor: "pointer",
-                transition: "background 150ms ease",
-              }}
-              onMouseEnter={(e) =>
-                (e.currentTarget.style.background = "var(--fill)")
-              }
-              onMouseLeave={(e) =>
-                (e.currentTarget.style.background = "#FFFFFF")
-              }
-            >
-              <ArrowUpDown size={14} />
-              <span>
-                {sortColumn === "date"
-                  ? sortAscending
-                    ? "Date: Oldest"
-                    : "Date: Newest"
-                  : sortColumn === "amount"
-                    ? sortAscending
-                      ? "Amount: Low"
-                      : "Amount: High"
-                    : sortAscending
-                      ? "Project: A–Z"
-                      : "Project: Z–A"}
-              </span>
-            </button>
-          </div>
-        </div>
-
-        {/* ── REPORT ENTRIES (Table View or Card View) ── */}
-        {viewMode === "table" ? (
-          <div
-            style={{
-              background: "var(--card)",
-              borderRadius: "var(--r-card)",
-              border: "1px solid var(--line)",
-              overflow: "hidden",
-              boxShadow: "var(--shadow-card)",
-            }}
-          >
-            <div style={{ overflowX: "auto", position: "relative" }}>
-              <table style={{ width: "100%", borderCollapse: "separate", borderSpacing: 0 }}>
-                {/* Sticky Header */}
+        {/* ── Entries ── */}
+        {isFirstLoad ? (
+          <BtCard padding="20px">
+            <div style={{ display: "flex", flexDirection: "column", gap: 12 }} aria-busy="true" aria-label="Loading entries">
+              <BtSkeleton height="36px" borderRadius="var(--r-tile)" />
+              {[0, 1, 2, 3, 4].map((i) => (
+                <BtSkeleton key={i} height="44px" borderRadius="var(--r-tile)" />
+              ))}
+            </div>
+          </BtCard>
+        ) : viewMode === "table" && paginatedEntries.length === 0 ? (
+          <BtCard padding="8px">{emptyState}</BtCard>
+        ) : viewMode === "table" ? (
+          <BtCard padding="0" style={{ overflow: "hidden" }}>
+            <div className="fr-scroll">
+              <table className="bt-table fr-table">
                 <thead>
-                  <tr style={{ background: "var(--fill)" }}>
-                    {/* Pinned first column: row # */}
-                    <th
-                      style={{
-                        position: "sticky",
-                        left: 0,
-                        zIndex: 11,
-                        background: "var(--fill)",
-                        borderRight: "1px solid var(--line)",
-                        borderBottom: "1px solid var(--line)",
-                        padding: "12px 14px",
-                        fontSize: 11,
-                        fontWeight: 700,
-                        fontFamily: "var(--font-mono)",
-                        color: "var(--ink-soft)",
-                        letterSpacing: "0.06em",
-                        textAlign: "center",
-                        width: 44,
-                      }}
-                    >
-                      #
-                    </th>
+                  <tr>
+                    <th className="fr-sl" scope="col">#</th>
                     {uiActiveCols.map((colName) => {
-                      const isSortable = [
-                        "Date",
-                        "Purchased Date",
-                        "Project",
-                        "Amount",
-                      ].includes(colName);
-                      const isAmount = colName === "Amount" || colName === "Paid" || colName === "Remaining" || colName === "Rate" || colName === "Rate/Day" || colName === "Rent Rate";
-
-                      const handleSortClick = () => {
-                        if (colName === "Date" || colName === "Purchased Date") {
-                          setSortColumn("date");
-                          setSortAscending(!sortAscending);
-                        } else if (colName === "Project") {
-                          setSortColumn("project");
-                          setSortAscending(!sortAscending);
-                        } else if (colName === "Amount") {
-                          setSortColumn("amount");
-                          setSortAscending(!sortAscending);
-                        }
-                      };
-
+                      const sortKey = sortKeyForColumn(colName);
+                      const isSorted = sortKey && sortColumn === sortKey;
                       return (
                         <th
                           key={colName}
-                          onClick={isSortable ? handleSortClick : undefined}
-                          style={{
-                            padding: "12px 16px",
-                            fontSize: 11,
-                            fontWeight: 700,
-                            fontFamily: "var(--font-mono)",
-                            color: "var(--ink-soft)",
-                            letterSpacing: "0.06em",
-                            textAlign: isAmount ? "right" : "left",
-                            whiteSpace: "nowrap",
-                            cursor: isSortable ? "pointer" : "default",
-                            borderBottom: "1px solid var(--line)",
-                          }}
+                          scope="col"
+                          className={`${MONEY_COLS.has(colName) || NUMBER_COLS.has(colName) ? "num" : ""} ${colName === "Actions" ? "fr-sr" : ""}`}
+                          data-sort={sortKey || undefined}
+                          aria-sort={isSorted ? (sortAscending ? "ascending" : "descending") : undefined}
+                          tabIndex={sortKey ? 0 : undefined}
+                          onClick={sortKey ? () => handleSortClick(colName) : undefined}
+                          onKeyDown={
+                            sortKey
+                              ? (e) => {
+                                  if (e.key === "Enter" || e.key === " ") {
+                                    e.preventDefault();
+                                    handleSortClick(colName);
+                                  }
+                                }
+                              : undefined
+                          }
                         >
-                          {colName === "Amount"
-                            ? "AMOUNT (INR)"
-                            : colName.toUpperCase()}
-                          {isSortable &&
-                            sortColumn ===
-                              (colName === "Project"
-                                ? "project"
-                                : colName === "Amount"
-                                  ? "amount"
-                                  : "date") && (
-                              <span style={{ marginLeft: 4, color: "var(--ink)" }}>
-                                {sortAscending ? "▲" : "▼"}
-                              </span>
-                            )}
+                          <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
+                            {colName === "Amount" ? "Amount (INR)" : colName}
+                            {isSorted && (sortAscending ? <ArrowUp size={12} /> : <ArrowDown size={12} />)}
+                          </span>
                         </th>
                       );
                     })}
                   </tr>
                 </thead>
-
-                {/* Table Body */}
                 <tbody>
-                  {paginatedEntries.length === 0 ? (
-                    <tr>
-                      <td
-                        colSpan={uiActiveCols.length + 1}
-                        style={{ padding: 48, textAlign: "center" }}
-                      >
-                        <BtEmpty
-                          title="No transaction logs match filters"
-                          message="Try adjusting your dates, project selection, or search keywords."
-                        />
-                      </td>
-                    </tr>
-                  ) : (
-                    paginatedEntries.map((entry, rowIdx) => {
-                      const projectName = getProjectName(entry.projectId);
+                  {                    paginatedEntries.map((entry, rowIdx) => {
                       const globalRowIdx = (safeCurrentPage - 1) * rowsPerPage + rowIdx + 1;
-
                       return (
                         <tr
                           key={entry.id || rowIdx}
-                          style={{
-                            borderBottom: "1px solid var(--line)",
-                            cursor: "pointer",
-                            transition: "background 120ms ease",
-                          }}
+                          tabIndex={0}
+                          aria-label={`Open details for ${entry.description || "entry"}`}
                           onClick={(e) => {
                             if (e.target.closest("button")) return;
                             setDetailsEntry(entry);
                           }}
-                          onMouseEnter={(e) =>
-                            (e.currentTarget.style.background = "var(--fill)")
-                          }
-                          onMouseLeave={(e) =>
-                            (e.currentTarget.style.background = "transparent")
-                          }
+                          onKeyDown={(e) => {
+                            if (e.target !== e.currentTarget) return;
+                            if (e.key === "Enter" || e.key === " ") {
+                              e.preventDefault();
+                              setDetailsEntry(entry);
+                            }
+                          }}
                         >
-                          {/* Pinned row number */}
-                          <td
-                            style={{
-                              position: "sticky",
-                              left: 0,
-                              zIndex: 5,
-                              background: "#FFFFFF",
-                              borderRight: "1px solid var(--line)",
-                              borderBottom: "1px solid var(--line)",
-                              padding: "14px 12px",
-                              fontSize: 12,
-                              fontFamily: "var(--font-mono)",
-                              color: "var(--ink-soft)",
-                              textAlign: "center",
-                              fontWeight: 600,
-                            }}
-                          >
+                          <td className="fr-sl" style={{ fontFamily: "var(--font-mono)", fontSize: 12, fontWeight: 600, color: "var(--ink-3)" }}>
                             {globalRowIdx}
                           </td>
-
-                          {uiActiveCols.map((colName) => {
-                            const valStyle = {
-                              padding: "14px 16px",
-                              fontSize: 13,
-                              color: "var(--ink)",
-                              borderBottom: "1px solid var(--line)",
-                              whiteSpace: "nowrap",
-                            };
-
-                            if (colName === "Purchased Date") {
-                              return (
-                                <td key={colName} style={valStyle}>
-                                  {formatDateShort(entry.date)}
-                                </td>
-                              );
-                            } else if (colName === "Payment Date") {
-                              return (
-                                <td key={colName} style={valStyle}>
-                                  {entry.paymentDate
-                                    ? formatDateShort(entry.paymentDate)
-                                    : "—"}
-                                </td>
-                              );
-                            } else if (colName === "Project") {
-                              return (
-                                <td
-                                  key={colName}
-                                  style={{ ...valStyle, fontWeight: 600 }}
-                                >
-                                  {projectName}
-                                </td>
-                              );
-                            } else if (colName === "Type") {
-                              const typeTones = {
-                                material: "info",
-                                labour: "warn",
-                                equipment: "good",
-                              };
-                              return (
-                                <td key={colName} style={valStyle}>
-                                  <BtBadge tone={typeTones[entry.type] || "muted"}>
-                                    {entry.type.toUpperCase()}
-                                  </BtBadge>
-                                </td>
-                              );
-                            } else if (colName === "Description") {
-                              return (
-                                <td key={colName} style={valStyle}>
-                                  {entry.description || "—"}
-                                </td>
-                              );
-                            } else if (
-                              colName === "Material" ||
-                              colName === "Worker Type" ||
-                              colName === "Equipment"
-                            ) {
-                              return (
-                                <td key={colName} style={{ ...valStyle, fontWeight: 500 }}>
-                                  {entry.description}
-                                </td>
-                              );
-                            } else if (colName === "Brand") {
-                              return (
-                                <td key={colName} style={valStyle}>
-                                  {entry.brand || "—"}
-                                </td>
-                              );
-                            } else if (colName === "Floor") {
-                              return (
-                                <td key={colName} style={valStyle}>
-                                  {entry.floor || "—"}
-                                </td>
-                              );
-                            } else if (colName === "Phase") {
-                              return (
-                                <td key={colName} style={valStyle}>
-                                  {entry.phase || "—"}
-                                </td>
-                              );
-                            } else if (colName === "Activity") {
-                              return (
-                                <td key={colName} style={valStyle}>
-                                  {entry.activity || "—"}
-                                </td>
-                              );
-                            } else if (colName === "Unit") {
-                              return (
-                                <td key={colName} style={valStyle}>
-                                  {entry.unit || "—"}
-                                </td>
-                              );
-                            } else if (colName === "Status") {
-                              const payStatus = getPaymentStatusLabel(
-                                entry.paymentStatus
-                              );
-                              const tone =
-                                payStatus === "Fully Paid"
-                                  ? "good"
-                                  : payStatus === "Partial"
-                                    ? "warn"
-                                    : "bad";
-                              return (
-                                <td key={colName} style={valStyle}>
-                                  <BtBadge tone={tone}>{payStatus}</BtBadge>
-                                </td>
-                              );
-                            } else if (colName === "Approval") {
-                              const raw = entry.rawTx || {};
-                              const appStatus = raw.approvalStatus || "Approved";
-                              const tone =
-                                appStatus === "Approved"
-                                  ? "good"
-                                  : appStatus === "Rejected"
-                                    ? "bad"
-                                    : "warn";
-                              const isPendingApproval = appStatus === "Pending";
-                              return (
-                                <td key={colName} style={valStyle}>
-                                  <div
-                                    style={{
-                                      display: "flex",
-                                      alignItems: "center",
-                                      gap: 6,
-                                    }}
-                                  >
-                                    <BtBadge tone={tone}>{appStatus}</BtBadge>
-                                    {isPendingApproval && canApprove && (
-                                      <div style={{ display: "flex", gap: 4 }}>
-                                        <button
-                                          onClick={() => handleInlineApprove(entry)}
-                                          title="Approve Entry"
-                                          style={{
-                                            border: "none",
-                                            background: "var(--success-soft)",
-                                            color: "var(--success)",
-                                            borderRadius: 6,
-                                            padding: "2px 8px",
-                                            cursor: "pointer",
-                                            fontWeight: 700,
-                                            fontSize: 12,
-                                          }}
-                                        >
-                                          ✓
-                                        </button>
-                                        <button
-                                          onClick={() => handleInlineReject(entry)}
-                                          title="Reject Entry"
-                                          style={{
-                                            border: "none",
-                                            background: "var(--danger-soft)",
-                                            color: "var(--danger)",
-                                            borderRadius: 6,
-                                            padding: "2px 8px",
-                                            cursor: "pointer",
-                                            fontWeight: 700,
-                                            fontSize: 12,
-                                          }}
-                                        >
-                                          ✕
-                                        </button>
-                                      </div>
-                                    )}
-                                  </div>
-                                </td>
-                              );
-                            } else if (colName === "Amount") {
-                              return (
-                                <td
-                                  key={colName}
-                                  style={{
-                                    ...valStyle,
-                                    textAlign: "right",
-                                    fontWeight: 700,
-                                    fontFamily: "var(--font-display)",
-                                    fontVariantNumeric: "tabular-nums",
-                                  }}
-                                >
-                                  {formatINR(entry.amount)}
-                                </td>
-                              );
-                            } else if (colName === "Paid") {
-                              return (
-                                <td
-                                  key={colName}
-                                  style={{
-                                    ...valStyle,
-                                    textAlign: "right",
-                                    fontWeight: 600,
-                                    color: "var(--success)",
-                                    fontFamily: "var(--font-display)",
-                                    fontVariantNumeric: "tabular-nums",
-                                  }}
-                                >
-                                  {formatINR(entry.paidAmount || 0)}
-                                </td>
-                              );
-                            } else if (colName === "Remaining") {
-                              const rem = Math.max(
-                                0,
-                                (entry.amount || 0) - (entry.paidAmount || 0)
-                              );
-                              return (
-                                <td
-                                  key={colName}
-                                  style={{
-                                    ...valStyle,
-                                    textAlign: "right",
-                                    fontWeight: 600,
-                                    color: rem > 0 ? "var(--danger)" : "var(--success)",
-                                    fontFamily: "var(--font-display)",
-                                    fontVariantNumeric: "tabular-nums",
-                                  }}
-                                >
-                                  {formatINR(rem)}
-                                </td>
-                              );
-                            } else if (
-                              colName === "Rate" ||
-                              colName === "Rate/Day" ||
-                              colName === "Rent Rate"
-                            ) {
-                              return (
-                                <td
-                                  key={colName}
-                                  style={{
-                                    ...valStyle,
-                                    textAlign: "right",
-                                    fontFamily: "var(--font-display)",
-                                    fontVariantNumeric: "tabular-nums",
-                                  }}
-                                >
-                                  {formatINR(entry.ratePerUnit)}
-                                </td>
-                              );
-                            } else if (
-                              colName === "Qty" ||
-                              colName === "Days" ||
-                              colName === "Duration"
-                            ) {
-                              const rate = entry.ratePerUnit || 0;
-                              const val = rate === 0 ? 0 : entry.amount / rate;
-                              return (
-                                <td
-                                  key={colName}
-                                  style={{
-                                    ...valStyle,
-                                    textAlign: "right",
-                                    fontFamily: "var(--font-mono)",
-                                  }}
-                                >
-                                  {val.toFixed(1)}
-                                </td>
-                              );
-                            } else if (colName === "Add More") {
-                              return (
-                                <td key={colName} style={valStyle}>
-                                  {canAddEdit ? (
-                                    <button
-                                      onClick={() => handleAddMore(entry)}
-                                      style={{
-                                        padding: "4px 10px",
-                                        border: "1px solid var(--line)",
-                                        background: "#FFFFFF",
-                                        borderRadius: 8,
-                                        fontSize: 11.5,
-                                        fontWeight: 600,
-                                        color: "var(--ink)",
-                                        cursor: "pointer",
-                                        display: "inline-flex",
-                                        alignItems: "center",
-                                        gap: 4,
-                                      }}
-                                    >
-                                      <PlusCircle size={12} />
-                                      <span>Add More</span>
-                                    </button>
-                                  ) : (
-                                    <span style={{ color: "var(--ink-soft)" }}>—</span>
-                                  )}
-                                </td>
-                              );
-                            } else if (colName === "Record Payment") {
-                              return (
-                                <td key={colName} style={valStyle}>
-                                  {canRecordPayment ? (
-                                    <button
-                                      onClick={() => handleRecordPaymentClick(entry)}
-                                      style={{
-                                        padding: "4px 10px",
-                                        border: "1px solid var(--accent)",
-                                        background: "var(--accent-soft)",
-                                        borderRadius: 8,
-                                        fontSize: 11.5,
-                                        fontWeight: 700,
-                                        color: "var(--accent-ink)",
-                                        cursor: "pointer",
-                                        display: "inline-flex",
-                                        alignItems: "center",
-                                        gap: 4,
-                                      }}
-                                    >
-                                      <CreditCard size={12} />
-                                      <span>Pay Log</span>
-                                    </button>
-                                  ) : (
-                                    <span style={{ color: "var(--ink-soft)" }}>—</span>
-                                  )}
-                                </td>
-                              );
-                            } else if (colName === "Actions") {
-                              return (
-                                <td key={colName} style={valStyle}>
-                                  {canAddEdit && (
-                                    <button
-                                      onClick={() => handleEditEntry(entry)}
-                                      style={{
-                                        padding: "4px 10px",
-                                        border: "1px solid var(--line)",
-                                        background: "#FFFFFF",
-                                        borderRadius: 8,
-                                        fontSize: 11.5,
-                                        fontWeight: 600,
-                                        color: "var(--ink)",
-                                        cursor: "pointer",
-                                        display: "inline-flex",
-                                        alignItems: "center",
-                                        gap: 4,
-                                      }}
-                                    >
-                                      <Edit2 size={12} />
-                                      <span>Edit</span>
-                                    </button>
-                                  )}
-                                </td>
-                              );
-                            } else {
-                              return (
-                                <td key={colName} style={valStyle}>
-                                  —
-                                </td>
-                              );
-                            }
-                          })}
+                          {uiActiveCols.map((colName) => renderCell(colName, entry))}
                         </tr>
                       );
-                    })
-                  )}
+                    })}
                 </tbody>
               </table>
             </div>
-
-            {/* Pagination Bar */}
-            {totalCount > 0 && (
-              <div
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "space-between",
-                  padding: "14px 20px",
-                  borderTop: "1px solid var(--line)",
-                  background: "#FFFFFF",
-                  flexWrap: "wrap",
-                  gap: 12,
-                }}
-              >
-                <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
-                  <span
-                    style={{
-                      fontSize: 12.5,
-                      fontFamily: "var(--font-mono)",
-                      color: "var(--ink-soft)",
-                    }}
-                  >
-                    Showing{" "}
-                    <b>
-                      {(safeCurrentPage - 1) * rowsPerPage + 1}–
-                      {Math.min(safeCurrentPage * rowsPerPage, totalCount)}
-                    </b>{" "}
-                    of <b>{totalCount}</b> entries
-                  </span>
-
-                  <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                    <span style={{ fontSize: 12, color: "var(--ink-soft)" }}>
-                      Rows:
-                    </span>
-                    <select
-                      value={rowsPerPage}
-                      onChange={(e) => {
-                        setRowsPerPage(Number(e.target.value));
-                        setCurrentPage(1);
-                      }}
-                      style={{
-                        padding: "3px 8px",
-                        borderRadius: 6,
-                        border: "1px solid var(--line)",
-                        fontSize: 12,
-                        fontWeight: 600,
-                        color: "var(--ink)",
-                        outline: "none",
-                      }}
-                    >
-                      <option value={10}>10</option>
-                      <option value={20}>20</option>
-                      <option value={50}>50</option>
-                      <option value={100}>100</option>
-                    </select>
-                  </div>
-                </div>
-
-                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                  <button
-                    disabled={safeCurrentPage <= 1}
-                    onClick={() => setCurrentPage(safeCurrentPage - 1)}
-                    style={{
-                      border: "1px solid var(--line)",
-                      background: safeCurrentPage <= 1 ? "var(--fill)" : "#FFFFFF",
-                      cursor: safeCurrentPage <= 1 ? "not-allowed" : "pointer",
-                      padding: "6px 10px",
-                      borderRadius: 8,
-                      color:
-                        safeCurrentPage <= 1 ? "var(--ink-soft)" : "var(--ink)",
-                      display: "flex",
-                      alignItems: "center",
-                    }}
-                  >
-                    <ChevronLeft size={16} />
-                  </button>
-                  <span
-                    style={{
-                      fontSize: 12.5,
-                      fontWeight: 600,
-                      fontFamily: "var(--font-ui)",
-                      color: "var(--ink)",
-                    }}
-                  >
-                    Page {safeCurrentPage} of {totalPages}
-                  </span>
-                  <button
-                    disabled={safeCurrentPage >= totalPages}
-                    onClick={() => setCurrentPage(safeCurrentPage + 1)}
-                    style={{
-                      border: "1px solid var(--line)",
-                      background:
-                        safeCurrentPage >= totalPages ? "var(--fill)" : "#FFFFFF",
-                      cursor:
-                        safeCurrentPage >= totalPages ? "not-allowed" : "pointer",
-                      padding: "6px 10px",
-                      borderRadius: 8,
-                      color:
-                        safeCurrentPage >= totalPages
-                          ? "var(--ink-soft)"
-                          : "var(--ink)",
-                      display: "flex",
-                      alignItems: "center",
-                    }}
-                  >
-                    <ChevronRight size={16} />
-                  </button>
-                </div>
-              </div>
-            )}
-          </div>
+            {paginationBar}
+          </BtCard>
         ) : (
-          /* ── CARDS VIEW ── */
+          /* ── Cards view ── */
           <div>
             {paginatedEntries.length === 0 ? (
-              <BtEmpty
-                title="No transaction logs match filters"
-                message="Try adjusting your dates, project selection, or search keywords."
-              />
+              <BtCard padding="8px">{emptyState}</BtCard>
             ) : (
-              <div
-                style={{
-                  display: "grid",
-                  gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))",
-                  gap: 16,
-                }}
-              >
-                {paginatedEntries.map((entry) => {
-                  const projectName = getProjectName(entry.projectId);
-                  const payStatus = getPaymentStatusLabel(entry.paymentStatus);
-                  const tone =
-                    payStatus === "Fully Paid"
-                      ? "good"
-                      : payStatus === "Partial"
-                        ? "warn"
-                        : "bad";
-                  const rem = Math.max(
-                    0,
-                    (entry.amount || 0) - (entry.paidAmount || 0)
-                  );
+              <>
+                <div
+                  style={{
+                    display: "grid",
+                    gridTemplateColumns: "repeat(auto-fill, minmax(min(100%, 320px), 1fr))",
+                    gap: 16,
+                  }}
+                >
+                  {paginatedEntries.map((entry) => {
+                    const { name: projectName, none: noProj } = projectLabel(entry);
+                    const payStatus = getPaymentStatusLabel(entry.paymentStatus, {
+                      amount: entry.amount,
+                      paidAmount: entry.paidAmount,
+                    });
+                    const rem = Math.max(0, (entry.amount || 0) - (entry.paidAmount || 0));
+                    const typeKey = TYPE_LABELS[entry.type] ? entry.type : "material";
 
-                  return (
-                    <BtCard
-                      key={entry.id}
-                      onClick={() => setDetailsEntry(entry)}
-                      style={{ cursor: "pointer", position: "relative" }}
-                    >
-                      <div
-                        style={{
-                          display: "flex",
-                          justifyContent: "space-between",
-                          alignItems: "flex-start",
-                          marginBottom: 10,
+                    return (
+                      <BtCard
+                        key={entry.id}
+                        padding="18px 20px"
+                        className="bt-hover-card"
+                        role="button"
+                        tabIndex={0}
+                        aria-label={`Open details for ${entry.description || "entry"}`}
+                        onClick={() => setDetailsEntry(entry)}
+                        onKeyDown={(e) => {
+                          if (e.target !== e.currentTarget) return;
+                          if (e.key === "Enter" || e.key === " ") {
+                            e.preventDefault();
+                            setDetailsEntry(entry);
+                          }
                         }}
+                        style={{ display: "flex", flexDirection: "column", gap: 12 }}
                       >
-                        <div>
-                          <div
-                            style={{
-                              fontSize: 12,
-                              color: "var(--ink-soft)",
-                              fontWeight: 500,
-                            }}
-                          >
+                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8 }}>
+                          <BtBadge tone={typeKey} label={TYPE_LABELS[typeKey]} />
+                          <BtBadge tone={statusTone(payStatus)} label={payStatus} />
+                        </div>
+
+                        <div style={{ minWidth: 0 }}>
+                          <div style={{ fontSize: 16, fontWeight: 600, color: "var(--ink)", overflowWrap: "anywhere" }}>
+                            {entry.description || "Entry"}
+                          </div>
+                          <div style={{ fontSize: 13, color: noProj ? "var(--ink-3)" : "var(--ink-2)", marginTop: 2 }}>
                             {projectName}
                           </div>
-                          <div
-                            style={{
-                              fontSize: 15,
-                              fontWeight: 700,
-                              color: "var(--ink)",
-                              marginTop: 2,
-                            }}
-                          >
-                            {entry.description || "Entry Log"}
-                          </div>
-                        </div>
-                        <BtBadge tone={tone}>{payStatus}</BtBadge>
-                      </div>
-
-                      <div
-                        style={{
-                          display: "flex",
-                          justifyContent: "space-between",
-                          alignItems: "baseline",
-                          margin: "12px 0 8px",
-                        }}
-                      >
-                        <div>
-                          <div
-                            style={{
-                              fontSize: 11,
-                              fontFamily: "var(--font-mono)",
-                              color: "var(--ink-soft)",
-                              textTransform: "uppercase",
-                            }}
-                          >
-                            Amount
-                          </div>
-                          <div
-                            style={{
-                              fontFamily: "var(--font-display)",
-                              fontSize: 22,
-                              fontWeight: 700,
-                              color: "var(--ink)",
-                              fontVariantNumeric: "tabular-nums",
-                            }}
-                          >
-                            {formatINR(entry.amount)}
-                          </div>
                         </div>
 
-                        {rem > 0 && (
-                          <div style={{ textAlign: "right" }}>
-                            <div
-                              style={{
-                                fontSize: 11,
-                                fontFamily: "var(--font-mono)",
-                                color: "var(--ink-soft)",
-                                textTransform: "uppercase",
-                              }}
-                            >
-                              Balance Due
-                            </div>
-                            <div
-                              style={{
-                                fontFamily: "var(--font-display)",
-                                fontSize: 16,
-                                fontWeight: 700,
-                                color: "var(--danger)",
-                                fontVariantNumeric: "tabular-nums",
-                              }}
-                            >
-                              {formatINR(rem)}
+                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", gap: 12 }}>
+                          <div>
+                            <div className="bt-eyebrow" style={{ color: "var(--ink-3)" }}>Amount</div>
+                            <div className="tnum" style={{ fontFamily: "var(--font-display)", fontSize: 24, fontWeight: 700, letterSpacing: "-0.02em", color: "var(--ink)" }}>
+                              {formatInr(entry.amount)}
                             </div>
                           </div>
-                        )}
-                      </div>
+                          {rem > 0 && (
+                            <div style={{ textAlign: "right" }}>
+                              <div className="bt-eyebrow" style={{ color: "var(--ink-3)" }}>Balance due</div>
+                              <div className="tnum" style={{ fontFamily: "var(--font-display)", fontSize: 17, fontWeight: 700, color: "var(--status-danger)" }}>
+                                {formatInr(rem)}
+                              </div>
+                            </div>
+                          )}
+                        </div>
 
-                      <div
-                        style={{
-                          display: "flex",
-                          justifyContent: "space-between",
-                          alignItems: "center",
-                          borderTop: "1px solid var(--line)",
-                          paddingTop: 10,
-                          marginTop: 6,
-                          fontSize: 12,
-                          color: "var(--ink-soft)",
-                        }}
-                      >
-                        <span>{formatDateShort(entry.date)}</span>
-                        {canRecordPayment && rem > 0 && (
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleRecordPaymentClick(entry);
-                            }}
-                            style={{
-                              border: "none",
-                              background: "var(--accent-soft)",
-                              color: "var(--accent-ink)",
-                              padding: "4px 10px",
-                              borderRadius: 6,
-                              fontSize: 12,
-                              fontWeight: 700,
-                              cursor: "pointer",
-                            }}
-                          >
-                            Record Payment
-                          </button>
-                        )}
-                      </div>
-                    </BtCard>
-                  );
-                })}
-              </div>
+                        <div
+                          style={{
+                            display: "flex",
+                            justifyContent: "space-between",
+                            alignItems: "center",
+                            gap: 8,
+                            borderTop: "1px solid var(--line)",
+                            paddingTop: 12,
+                            fontSize: 13,
+                            color: "var(--ink-3)",
+                            minHeight: 44,
+                          }}
+                        >
+                          <span>{formatDateShort(entry.date)}</span>
+                          {canRecordPayment && rem > 0 && (
+                            <BtButton
+                              variant="secondary"
+                              size="compact"
+                              icon={CreditCard}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleRecordPaymentClick(entry);
+                              }}
+                            >
+                              Record payment
+                            </BtButton>
+                          )}
+                        </div>
+                      </BtCard>
+                    );
+                  })}
+                </div>
+                <BtCard padding="0" style={{ marginTop: 16 }}>{paginationBar}</BtCard>
+              </>
             )}
           </div>
         )}
       </BtSheet>
 
-      {/* ── CUSTOMIZE COLUMNS MODAL ── */}
+      {/* ── Edit columns ── */}
       {showCustomizeModal && (
-        <div
-          style={{
-            position: "fixed",
-            inset: 0,
-            background: "rgba(12, 14, 18, 0.45)",
-            backdropFilter: "blur(4px)",
-            zIndex: 1000,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            padding: 20,
-          }}
+        <ModalShell
+          title="Edit columns"
+          subtitle="Tick the columns to show and use the arrows to reorder them."
+          onClose={() => setShowCustomizeModal(false)}
+          maxWidth={420}
         >
-          <div
-            style={{
-              background: "#FFFFFF",
-              borderRadius: "var(--r-sheet)",
-              width: "100%",
-              maxWidth: 380,
-              padding: 24,
-              boxShadow: "0 25px 50px rgba(0,0,0,0.2)",
-              position: "relative",
-            }}
-          >
-            <div
-              style={{
-                display: "flex",
-                justifyContent: "space-between",
-                alignItems: "center",
-                marginBottom: 12,
-              }}
-            >
-              <h3
-                style={{
-                  margin: 0,
-                  fontSize: 17,
-                  fontWeight: 700,
-                  fontFamily: "var(--font-ui)",
-                  color: "var(--ink)",
-                }}
-              >
-                Customize Columns
-              </h3>
-              <button
-                onClick={() => setShowCustomizeModal(false)}
-                style={{
-                  background: "none",
-                  border: "none",
-                  cursor: "pointer",
-                  color: "var(--ink-soft)",
-                }}
-              >
-                <X size={18} />
-              </button>
-            </div>
-
-            <p
-              style={{
-                margin: "0 0 14px",
-                fontSize: 12.5,
-                color: "var(--ink-soft)",
-                lineHeight: 1.4,
-              }}
-            >
-              Check columns to display and use arrows to change column order.
-            </p>
-
-            <div
-              style={{
-                display: "flex",
-                flexDirection: "column",
-                gap: 6,
-                maxHeight: 320,
-                overflowY: "auto",
-                paddingRight: 4,
-              }}
-            >
-              {tempAllCols.map((col, idx) => {
-                const isChecked = tempActiveCols.includes(col);
-                return (
-                  <div
-                    key={col}
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "space-between",
-                      padding: "8px 12px",
-                      background: "var(--fill)",
-                      borderRadius: 8,
-                    }}
-                  >
-                    <label
-                      style={{
-                        display: "flex",
-                        alignItems: "center",
-                        gap: 10,
-                        cursor: "pointer",
-                        fontSize: 13,
-                        fontWeight: 600,
-                        color: "var(--ink)",
-                      }}
-                    >
-                      <input
-                        type="checkbox"
-                        checked={isChecked}
-                        onChange={() => handleToggleColumn(col)}
-                        style={{ accentColor: "var(--ink)" }}
-                      />
-                      <span>{col}</span>
-                    </label>
-
-                    <div style={{ display: "flex", gap: 4 }}>
-                      <button
-                        disabled={idx === 0}
-                        onClick={() => handleMoveColumn(idx, -1)}
-                        style={{
-                          border: "none",
-                          background: "none",
-                          cursor: idx === 0 ? "not-allowed" : "pointer",
-                          color: idx === 0 ? "#CBD5E1" : "var(--ink)",
-                          fontSize: 12,
-                          fontWeight: "bold",
-                        }}
-                      >
-                        ▲
-                      </button>
-                      <button
-                        disabled={idx === tempAllCols.length - 1}
-                        onClick={() => handleMoveColumn(idx, 1)}
-                        style={{
-                          border: "none",
-                          background: "none",
-                          cursor:
-                            idx === tempAllCols.length - 1
-                              ? "not-allowed"
-                              : "pointer",
-                          color:
-                            idx === tempAllCols.length - 1
-                              ? "#CBD5E1"
-                              : "var(--ink)",
-                          fontSize: 12,
-                          fontWeight: "bold",
-                        }}
-                      >
-                        ▼
-                      </button>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-
-            <div
-              style={{
-                display: "flex",
-                gap: 10,
-                marginTop: 20,
-                borderTop: "1px solid var(--line)",
-                paddingTop: 16,
-              }}
-            >
-              <button
-                onClick={saveCustomizeColumns}
-                style={{
-                  flex: 1,
-                  padding: "10px",
-                  borderRadius: "var(--r-btn, 12px)",
-                  background: "var(--ink)",
-                  color: "#FFFFFF",
-                  border: "none",
-                  fontWeight: 700,
-                  fontSize: 13,
-                  cursor: "pointer",
-                }}
-              >
-                Save Preferences
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* ── ENTRY DETAILS MODAL / DRAWER ── */}
-      {detailsEntry && (
-        <div
-          onClick={() => setDetailsEntry(null)}
-          style={{
-            position: "fixed",
-            inset: 0,
-            background: "rgba(12, 14, 18, 0.45)",
-            backdropFilter: "blur(4px)",
-            zIndex: 900,
-            display: "flex",
-            alignItems: "flex-start",
-            justifyContent: "flex-end",
-          }}
-        >
-          <div
-            onClick={(e) => e.stopPropagation()}
-            style={{
-              background: "#FFFFFF",
-              width: "100%",
-              maxWidth: 440,
-              height: "100vh",
-              padding: "28px 32px",
-              boxShadow: "-4px 0 25px rgba(0,0,0,0.15)",
-              overflowY: "auto",
-            }}
-          >
-            <div
-              style={{
-                display: "flex",
-                justifyContent: "space-between",
-                alignItems: "center",
-                marginBottom: 20,
-              }}
-            >
-              <h3
-                style={{
-                  margin: 0,
-                  fontSize: 20,
-                  fontWeight: 700,
-                  fontFamily: "var(--font-ui)",
-                  color: "var(--ink)",
-                }}
-              >
-                Entry Details
-              </h3>
-              <button
-                onClick={() => setDetailsEntry(null)}
-                style={{
-                  background: "none",
-                  border: "none",
-                  cursor: "pointer",
-                  color: "var(--ink-soft)",
-                }}
-              >
-                <X size={20} />
-              </button>
-            </div>
-
-            <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-              {[
-                { label: "Project", val: getProjectName(detailsEntry.projectId) },
-                { label: "Type", val: detailsEntry.type.toUpperCase() },
-                { label: "Date", val: formatDateLong(detailsEntry.date) },
-                {
-                  label: "Total Amount",
-                  val: formatINR(
-                    detailsEntry.rawTx?.amount || detailsEntry.amount
-                  ),
-                  bold: true,
-                },
-                {
-                  label: "Paid Amount",
-                  val: formatINR(detailsEntry.rawTx?.paidAmount || 0),
-                  bold: true,
-                  textColor: "var(--success)",
-                },
-                {
-                  label: "Balance",
-                  val: formatINR(
-                    detailsEntry.rawTx?.remainingAmount ??
-                      (detailsEntry.rawTx?.amount || detailsEntry.amount) -
-                        (detailsEntry.rawTx?.paidAmount || 0)
-                  ),
-                  bold: true,
-                  textColor: "var(--danger)",
-                },
-                {
-                  label: "Status",
-                  val: getPaymentStatusLabel(
-                    detailsEntry.paymentStatus,
-                    detailsEntry.rawTx
-                  ),
-                },
-                { label: "Description", val: detailsEntry.description || "—" },
-                { label: "Brand", val: detailsEntry.brand || "—" },
-                { label: "Floor", val: detailsEntry.floor || "—" },
-                { label: "Phase", val: detailsEntry.phase || "—" },
-                { label: "Unit", val: detailsEntry.unit || "—" },
-                {
-                  label: "Rejection Reason",
-                  val: detailsEntry.rejectionReason,
-                  isWarning: true,
-                },
-              ].map((row) => {
-                if (!row.val && row.val !== 0 && row.val !== "₹0") return null;
-                return (
-                  <div
-                    key={row.label}
-                    style={{
-                      display: "flex",
-                      fontSize: 13,
-                      borderBottom: "1px solid var(--fill)",
-                      paddingBottom: 6,
-                    }}
-                  >
-                    <span
-                      style={{
-                        width: 120,
-                        fontWeight: 600,
-                        color: "var(--ink-soft)",
-                      }}
-                    >
-                      {row.label}
-                    </span>
-                    <span
-                      style={{
-                        flex: 1,
-                        fontWeight: row.bold ? 700 : 500,
-                        color: row.textColor
-                          ? row.textColor
-                          : row.isWarning
-                            ? "var(--danger)"
-                            : "var(--ink)",
-                      }}
-                    >
-                      {row.val}
-                    </span>
-                  </div>
-                );
-              })}
-            </div>
-
-            {/* Payment History */}
-            {detailsEntry?.rawTx?.paymentHistory?.length > 0 && (
-              <div style={{ marginTop: 20 }}>
+          <div style={{ display: "flex", flexDirection: "column", gap: 6, maxHeight: "50vh", overflowY: "auto", margin: "0 -4px", padding: "0 4px" }}>
+            {tempAllCols.map((col, idx) => {
+              const isChecked = tempActiveCols.includes(col);
+              return (
                 <div
-                  style={{
-                    fontFamily: "var(--font-mono)",
-                    fontSize: 11,
-                    fontWeight: 700,
-                    letterSpacing: "0.08em",
-                    color: "var(--ink-soft)",
-                    textTransform: "uppercase",
-                    marginBottom: 10,
-                  }}
-                >
-                  Payment History
-                </div>
-                <div
+                  key={col}
                   style={{
                     display: "flex",
-                    flexDirection: "column",
+                    alignItems: "center",
+                    justifyContent: "space-between",
                     gap: 8,
-                    maxHeight: 160,
-                    overflowY: "auto",
+                    padding: "4px 6px 4px 14px",
+                    background: isChecked ? "var(--bone)" : "var(--card)",
+                    border: "1px solid var(--line)",
+                    borderRadius: "var(--r-tile)",
+                    minHeight: 48,
                   }}
                 >
-                  {detailsEntry.rawTx.paymentHistory.map((ph, idx) => (
-                    <div
-                      key={idx}
-                      style={{
-                        padding: "10px 12px",
-                        borderRadius: 8,
-                        background: "var(--fill)",
-                        border: "1px solid var(--line)",
-                        display: "flex",
-                        flexDirection: "column",
-                        gap: 4,
-                      }}
-                    >
-                      <div
-                        style={{
-                          display: "flex",
-                          justifyContent: "space-between",
-                          alignItems: "center",
-                        }}
-                      >
-                        <span
-                          style={{
-                            fontSize: 13,
-                            fontWeight: 700,
-                            fontFamily: "var(--font-display)",
-                            color: "var(--ink)",
-                          }}
-                        >
-                          {formatINR(ph.amount)}
-                        </span>
-                        <BtBadge tone="muted">{ph.method || "Cash"}</BtBadge>
-                      </div>
-                      <div style={{ fontSize: 11, color: "var(--ink-soft)" }}>
-                        {formatDateLong(ph.date)}
-                      </div>
-                    </div>
-                  ))}
+                  <label style={{ display: "flex", alignItems: "center", gap: 12, cursor: "pointer", fontSize: 15, fontWeight: 600, flex: 1, minHeight: 40 }}>
+                    <input
+                      type="checkbox"
+                      checked={isChecked}
+                      onChange={() => handleToggleColumn(col)}
+                      style={{ accentColor: "var(--ink)", width: 18, height: 18 }}
+                    />
+                    <span>{col}</span>
+                  </label>
+                  <div style={{ display: "flex", gap: 4 }}>
+                    <BtIconButton icon={ChevronUp} label={`Move ${col} up`} size={36} disabled={idx === 0} onClick={() => handleMoveColumn(idx, -1)} />
+                    <BtIconButton icon={ChevronDown} label={`Move ${col} down`} size={36} disabled={idx === tempAllCols.length - 1} onClick={() => handleMoveColumn(idx, 1)} />
+                  </div>
                 </div>
-              </div>
-            )}
-
-            {/* Quick Action Buttons */}
-            <div
-              style={{
-                display: "flex",
-                gap: 8,
-                marginTop: 24,
-                borderTop: "1px solid var(--line)",
-                paddingTop: 16,
-              }}
-            >
-              <button
-                onClick={() => {
-                  const entry = detailsEntry;
-                  setDetailsEntry(null);
-                  handleAddMore(entry);
-                }}
-                style={{
-                  flex: 1,
-                  padding: "9px 0",
-                  borderRadius: 8,
-                  border: "1px solid var(--line)",
-                  background: "#FFFFFF",
-                  fontSize: 12,
-                  fontWeight: 600,
-                  cursor: "pointer",
-                }}
-              >
-                Add More
-              </button>
-
-              <button
-                onClick={() => {
-                  const entry = detailsEntry;
-                  setDetailsEntry(null);
-                  handleRecordPaymentClick(entry);
-                }}
-                style={{
-                  flex: 1,
-                  padding: "9px 0",
-                  borderRadius: 8,
-                  border: "1px solid var(--accent)",
-                  background: "var(--accent-soft)",
-                  color: "var(--accent-ink)",
-                  fontSize: 12,
-                  fontWeight: 700,
-                  cursor: "pointer",
-                }}
-              >
-                Record Payment
-              </button>
-
-              <button
-                onClick={() => {
-                  const entry = detailsEntry;
-                  setDetailsEntry(null);
-                  handleEditEntry(entry);
-                }}
-                style={{
-                  flex: 1,
-                  padding: "9px 0",
-                  borderRadius: 8,
-                  border: "1px solid var(--line)",
-                  background: "#FFFFFF",
-                  fontSize: 12,
-                  fontWeight: 600,
-                  cursor: "pointer",
-                }}
-              >
-                Edit
-              </button>
-            </div>
+              );
+            })}
           </div>
-        </div>
+          <div style={{ marginTop: 20 }}>
+            <BtButton variant="primary" size="normal" fullWidth onClick={saveCustomizeColumns}>
+              Save columns
+            </BtButton>
+          </div>
+        </ModalShell>
       )}
 
-      {/* ── IMPORT CSV MODAL ── */}
+      {/* ── Entry details drawer ── */}
+      {detailsEntry && (
+        <DetailsDrawer
+          entry={detailsEntry}
+          projectInfo={projectLabel(detailsEntry)}
+          canAddEdit={canAddEdit}
+          canRecordPayment={canRecordPayment}
+          onClose={() => setDetailsEntry(null)}
+          onAddMore={() => {
+            const entry = detailsEntry;
+            setDetailsEntry(null);
+            handleAddMore(entry);
+          }}
+          onRecordPayment={() => {
+            const entry = detailsEntry;
+            setDetailsEntry(null);
+            handleRecordPaymentClick(entry);
+          }}
+          onEdit={() => {
+            const entry = detailsEntry;
+            setDetailsEntry(null);
+            handleEditEntry(entry);
+          }}
+        />
+      )}
+
+      {/* ── Import CSV ── */}
       {showImportModal && (
-        <div
-          style={{
-            position: "fixed",
-            inset: 0,
-            zIndex: 1100,
-            background: "rgba(12, 14, 18, 0.45)",
-            backdropFilter: "blur(4px)",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            padding: 20,
-          }}
+        <ModalShell
+          title="Import or revert CSV"
+          subtitle="Bring entries in from a spreadsheet, or undo a previous import."
+          onClose={() => setShowImportModal(false)}
+          maxWidth={860}
+          zIndex={1100}
         >
-          <div
-            style={{
-              background: "#FFFFFF",
-              borderRadius: "var(--r-sheet)",
-              width: "100%",
-              maxWidth: 860,
-              maxHeight: "90vh",
-              overflowY: "auto",
-              position: "relative",
-              padding: 24,
-            }}
-          >
-            <div
-              style={{
-                display: "flex",
-                justifyContent: "space-between",
-                alignItems: "center",
-                marginBottom: 16,
-              }}
-            >
-              <h2
-                style={{
-                  margin: 0,
-                  fontSize: 18,
-                  fontWeight: 700,
-                  fontFamily: "var(--font-ui)",
-                }}
-              >
-                Import or Revert CSV
-              </h2>
-              <button
-                onClick={() => setShowImportModal(false)}
-                style={{
-                  background: "none",
-                  border: "none",
-                  cursor: "pointer",
-                  color: "var(--ink-soft)",
-                }}
-              >
-                <X size={20} />
-              </button>
-            </div>
-            <CsvImport onComplete={() => window.location.reload()} />
-          </div>
-        </div>
+          <CsvImport onComplete={() => window.location.reload()} />
+        </ModalShell>
       )}
 
-      {/* ── EXPORT OPTIONS MODAL ── */}
+      {/* ── Export ── */}
       {showExportModal && (
-        <div
-          style={{
-            position: "fixed",
-            inset: 0,
-            zIndex: 1200,
-            background: "rgba(12, 14, 18, 0.45)",
-            backdropFilter: "blur(4px)",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            padding: 20,
-          }}
+        <ModalShell
+          title="Export report"
+          subtitle="Choose a format for the entries you are viewing."
+          onClose={() => setShowExportModal(false)}
+          maxWidth={440}
+          zIndex={1200}
         >
-          <div
-            style={{
-              background: "#FFFFFF",
-              borderRadius: "var(--r-sheet)",
-              width: "100%",
-              maxWidth: 440,
-              padding: 24,
-              boxShadow: "0 25px 50px rgba(0,0,0,0.25)",
-              display: "flex",
-              flexDirection: "column",
-            }}
-          >
-            <div
-              style={{
-                display: "flex",
-                justifyContent: "space-between",
-                alignItems: "center",
-                marginBottom: 14,
+          <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+            <button
+              type="button"
+              className="fr-option"
+              onClick={() => {
+                setShowExportModal(false);
+                handleExportPDF();
               }}
             >
-              <div>
-                <h3
-                  style={{
-                    margin: 0,
-                    fontSize: 18,
-                    fontWeight: 700,
-                    fontFamily: "var(--font-ui)",
-                    color: "var(--ink)",
-                  }}
-                >
-                  Export Report
-                </h3>
-                <p
-                  style={{
-                    margin: "2px 0 0",
-                    fontSize: 13,
-                    color: "var(--ink-soft)",
-                  }}
-                >
-                  Select your export format
-                </p>
-              </div>
-              <button
-                onClick={() => setShowExportModal(false)}
-                style={{
-                  background: "none",
-                  border: "none",
-                  cursor: "pointer",
-                  color: "var(--ink-soft)",
-                }}
-              >
-                <X size={18} />
-              </button>
-            </div>
+              <span style={{ width: 44, height: 44, borderRadius: "var(--r-tile)", background: "var(--ink)", color: "#FFFFFF", display: "grid", placeItems: "center", fontWeight: 700, fontSize: 12, flexShrink: 0 }}>
+                PDF
+              </span>
+              <span>
+                <span style={{ display: "block", fontWeight: 600, fontSize: 15, color: "var(--ink)" }}>Download PDF report</span>
+                <span style={{ display: "block", fontSize: 13, color: "var(--ink-3)", marginTop: 2 }}>Ready to print or share with clients</span>
+              </span>
+            </button>
 
-            <div
-              style={{
-                display: "flex",
-                flexDirection: "column",
-                gap: 12,
-                marginTop: 10,
+            <button
+              type="button"
+              className="fr-option"
+              onClick={() => {
+                setShowExportModal(false);
+                handleExportCSV(false);
               }}
             >
-              {/* PDF Export Card */}
-              <button
-                onClick={() => {
-                  setShowExportModal(false);
-                  handleExportPDF();
-                }}
-                style={{
-                  textAlign: "left",
-                  padding: 16,
-                  borderRadius: "var(--r-card)",
-                  border: "1px solid var(--line)",
-                  background: "#FFFFFF",
-                  cursor: "pointer",
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 14,
-                  transition: "all 150ms ease",
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.borderColor = "var(--ink)";
-                  e.currentTarget.style.background = "var(--fill)";
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.borderColor = "var(--line)";
-                  e.currentTarget.style.background = "#FFFFFF";
-                }}
-              >
-                <div
-                  style={{
-                    width: 40,
-                    height: 40,
-                    borderRadius: 10,
-                    background: "var(--ink)",
-                    color: "#FFFFFF",
-                    display: "grid",
-                    placeItems: "center",
-                    fontWeight: 800,
-                    fontSize: 12,
-                  }}
-                >
-                  PDF
-                </div>
-                <div>
-                  <div
-                    style={{ fontWeight: 700, fontSize: 14, color: "var(--ink)" }}
-                  >
-                    Download PDF Report
-                  </div>
-                  <div style={{ fontSize: 12.5, color: "var(--ink-soft)" }}>
-                    Ready to print or share with clients
-                  </div>
-                </div>
-              </button>
-
-              {/* CSV Export Card */}
-              <button
-                onClick={() => {
-                  setShowExportModal(false);
-                  handleExportCSV(false);
-                }}
-                style={{
-                  textAlign: "left",
-                  padding: 16,
-                  borderRadius: "var(--r-card)",
-                  border: "1px solid var(--line)",
-                  background: "#FFFFFF",
-                  cursor: "pointer",
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 14,
-                  transition: "all 150ms ease",
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.borderColor = "var(--ink)";
-                  e.currentTarget.style.background = "var(--fill)";
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.borderColor = "var(--line)";
-                  e.currentTarget.style.background = "#FFFFFF";
-                }}
-              >
-                <div
-                  style={{
-                    width: 40,
-                    height: 40,
-                    borderRadius: 10,
-                    background: "var(--success-soft)",
-                    color: "var(--success)",
-                    display: "grid",
-                    placeItems: "center",
-                    fontWeight: 800,
-                    fontSize: 12,
-                  }}
-                >
-                  CSV
-                </div>
-                <div>
-                  <div
-                    style={{ fontWeight: 700, fontSize: 14, color: "var(--ink)" }}
-                  >
-                    Download CSV Spreadsheet
-                  </div>
-                  <div style={{ fontSize: 12.5, color: "var(--ink-soft)" }}>
-                    Opens cleanly in Excel or Google Sheets
-                  </div>
-                </div>
-              </button>
-            </div>
+              <span style={{ width: 44, height: 44, borderRadius: "var(--r-tile)", background: "var(--status-success-soft)", color: "var(--status-success)", display: "grid", placeItems: "center", fontWeight: 700, fontSize: 12, flexShrink: 0 }}>
+                CSV
+              </span>
+              <span>
+                <span style={{ display: "block", fontWeight: 600, fontSize: 15, color: "var(--ink)" }}>Download CSV spreadsheet</span>
+                <span style={{ display: "block", fontSize: 13, color: "var(--ink-3)", marginTop: 2 }}>Opens cleanly in Excel or Google Sheets</span>
+              </span>
+            </button>
           </div>
-        </div>
+        </ModalShell>
+      )}
+
+      {/* ── Reject reason ── */}
+      {rejectTarget && (
+        <ModalShell
+          title="Reject this entry?"
+          subtitle={rejectTarget.description || "Entry"}
+          onClose={() => !rejectBusy && setRejectTarget(null)}
+          maxWidth={440}
+          zIndex={1300}
+        >
+          <BtTextarea
+            label="Reason"
+            rows={3}
+            placeholder="Tell the team why this entry is being rejected"
+            value={rejectReason}
+            onChange={(e) => setRejectReason(e.target.value)}
+          />
+          <div style={{ display: "flex", gap: 10, marginTop: 20 }}>
+            <BtButton variant="secondary" size="normal" disabled={rejectBusy} onClick={() => setRejectTarget(null)} style={{ flex: 1 }}>
+              Cancel
+            </BtButton>
+            <BtButton variant="destructive" size="normal" loading={rejectBusy} onClick={confirmInlineReject} style={{ flex: 1 }}>
+              Reject entry
+            </BtButton>
+          </div>
+        </ModalShell>
       )}
 
       {/* Record Payment Sheet */}
@@ -4215,4 +2697,212 @@ export default function FinancialReportPage() {
       />
     </div>
   );
+}
+
+/* ───────────────────────── local building blocks ───────────────────────── */
+
+function HeroMenu({ icon, label, active, open, onToggle, menuRef, title, width, children }) {
+  const Icon = icon;
+  return (
+    <div ref={menuRef} style={{ position: "relative", maxWidth: "100%" }}>
+      <button
+        type="button"
+        className="fr-chip"
+        data-active={active}
+        aria-haspopup="listbox"
+        aria-expanded={open}
+        onClick={onToggle}
+      >
+        <Icon size={15} />
+        <span className="fr-chip-label">{label}</span>
+        <ChevronDown
+          size={14}
+          style={{ transform: open ? "rotate(180deg)" : "none", transition: "transform 180ms ease", opacity: 0.7, flexShrink: 0 }}
+        />
+      </button>
+      {open && (
+        <div className="fr-menu" style={{ width }}>
+          <div className="bt-eyebrow fr-menu-title">{title}</div>
+          <div className="fr-menu-list" role="listbox" aria-label={title}>
+            {children}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function HeroMenuItem({ selected, icon: Icon, onClick, children }) {
+  return (
+    <button type="button" role="option" aria-selected={selected} className="fr-menu-item" onClick={onClick}>
+      <span>
+        {Icon && <Icon size={15} color={selected ? "var(--accent)" : "var(--on-noir-3)"} style={{ flexShrink: 0 }} />}
+        <span>{children}</span>
+      </span>
+      {selected && <Check size={15} color="var(--accent)" style={{ flexShrink: 0 }} />}
+    </button>
+  );
+}
+
+function ModalShell({ title, subtitle, onClose, maxWidth = 440, zIndex = 1000, children }) {
+  useEffect(() => {
+    const onKey = (e) => {
+      if (e.key === "Escape") onClose?.();
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [onClose]);
+
+  return createPortal(
+    <div
+      className="fr-scrim"
+      role="presentation"
+      style={{ zIndex }}
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onClose?.();
+      }}
+    >
+      <div role="dialog" aria-modal="true" aria-label={title} className="fr-modal" style={{ maxWidth }}>
+        <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12, padding: "22px 24px 16px" }}>
+          <div style={{ minWidth: 0 }}>
+            <h2 style={{ margin: 0, fontFamily: "var(--font-display)", fontSize: 22, fontWeight: 700, letterSpacing: "-0.02em" }}>
+              {title}
+            </h2>
+            {subtitle && <p style={{ margin: "4px 0 0", fontSize: 14, color: "var(--ink-2)" }}>{subtitle}</p>}
+          </div>
+          <BtIconButton icon={X} label="Close" onClick={onClose} />
+        </div>
+        <div className="fr-modal-body">{children}</div>
+      </div>
+    </div>
+  , document.body);
+}
+
+function DetailsDrawer({ entry, projectInfo, canAddEdit, canRecordPayment, onClose, onAddMore, onRecordPayment, onEdit }) {
+  useEffect(() => {
+    const onKey = (e) => {
+      if (e.key === "Escape") onClose?.();
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [onClose]);
+
+  const total = Number(entry.rawTx?.amount || entry.amount || 0);
+  const paid = Number(entry.rawTx?.paidAmount || 0);
+  const balance = Number(entry.rawTx?.remainingAmount ?? total - paid);
+  const status = getPaymentStatusLabel(entry.paymentStatus, entry.rawTx);
+  const typeKey = TYPE_LABELS[entry.type] ? entry.type : "material";
+  const history = entry.rawTx?.paymentHistory || [];
+
+  const rows = [
+    { label: "Project", val: projectInfo.name, dim: projectInfo.none },
+    { label: "Date", val: formatDateLong(entry.date) },
+    { label: "Description", val: entry.description },
+    { label: "Brand", val: entry.brand },
+    { label: "Floor", val: entry.floor },
+    { label: "Phase", val: entry.phase },
+    { label: "Unit", val: entry.unit },
+    { label: "Rejection reason", val: entry.rejectionReason, danger: true },
+  ].filter((r) => r.val);
+
+  return createPortal(
+    <div
+      className="fr-scrim fr-drawer-scrim"
+      role="presentation"
+      style={{ zIndex: 900 }}
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onClose?.();
+      }}
+    >
+      <div role="dialog" aria-modal="true" aria-label="Entry details" className="fr-drawer">
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, padding: "22px 24px 12px" }}>
+          <div>
+            <div className="bt-eyebrow" style={{ color: "var(--ink-3)" }}>Entry details</div>
+            <h2 style={{ margin: "4px 0 0", fontFamily: "var(--font-display)", fontSize: 22, fontWeight: 700, letterSpacing: "-0.02em", overflowWrap: "anywhere" }}>
+              {entry.description || "Entry"}
+            </h2>
+          </div>
+          <BtIconButton icon={X} label="Close details" onClick={onClose} />
+        </div>
+
+        <div style={{ flex: 1, overflowY: "auto", padding: "4px 24px 16px" }}>
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 16 }}>
+            <BtBadge tone={typeKey} label={TYPE_LABELS[typeKey]} />
+            <BtBadge tone={statusTone(status)} label={status} />
+          </div>
+
+          <div className="bt-grid-3" style={{ gap: 10, marginBottom: 20 }}>
+            {[
+              { label: "Total", val: total, color: "var(--ink)" },
+              { label: "Paid", val: paid, color: "var(--status-success)" },
+              { label: "Balance", val: balance, color: balance > 0 ? "var(--status-danger)" : "var(--status-success)" },
+            ].map((k) => (
+              <div key={k.label} style={{ background: "var(--bone)", border: "1px solid var(--line)", borderRadius: "var(--r-tile)", padding: "10px 12px", minWidth: 0 }}>
+                <div className="bt-eyebrow" style={{ color: "var(--ink-3)" }}>{k.label}</div>
+                <div className="tnum" style={{ fontFamily: "var(--font-display)", fontSize: 17, fontWeight: 700, color: k.color, marginTop: 2, overflowWrap: "anywhere" }}>
+                  {formatInr(k.val)}
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <div style={{ display: "flex", flexDirection: "column" }}>
+            {rows.map((row) => (
+              <div
+                key={row.label}
+                style={{ display: "grid", gridTemplateColumns: "128px minmax(0, 1fr)", gap: 12, padding: "11px 0", borderTop: "1px solid var(--line)", fontSize: 14 }}
+              >
+                <span style={{ color: "var(--ink-3)" }}>{row.label}</span>
+                <span style={{ color: row.danger ? "var(--status-danger)" : row.dim ? "var(--ink-3)" : "var(--ink)", fontWeight: 500, overflowWrap: "anywhere" }}>
+                  {row.val}
+                </span>
+              </div>
+            ))}
+          </div>
+
+          {history.length > 0 && (
+            <div style={{ marginTop: 20 }}>
+              <div className="bt-eyebrow" style={{ color: "var(--ink-3)", marginBottom: 10 }}>Payment history</div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                {history.map((ph, idx) => (
+                  <div
+                    key={idx}
+                    style={{ padding: "10px 14px", borderRadius: "var(--r-tile)", background: "var(--bone)", border: "1px solid var(--line)", display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12 }}
+                  >
+                    <div>
+                      <div className="tnum" style={{ fontFamily: "var(--font-display)", fontSize: 16, fontWeight: 700 }}>
+                        {formatInr(ph.amount)}
+                      </div>
+                      <div style={{ fontSize: 13, color: "var(--ink-3)" }}>{formatDateLong(ph.date)}</div>
+                    </div>
+                    <BtBadge tone="neutral" showDot={false} label={ph.method || "Cash"} />
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+
+        {(canAddEdit || canRecordPayment) && (
+          <div style={{ display: "flex", gap: 8, padding: "14px 24px 20px", borderTop: "1px solid var(--line)", flexWrap: "wrap" }}>
+            {canAddEdit && (
+              <BtButton variant="secondary" size="small" icon={PlusCircle} onClick={onAddMore} style={{ flex: "1 1 auto" }}>
+                Add more
+              </BtButton>
+            )}
+            {canRecordPayment && (
+              <BtButton variant="primary" size="small" icon={CreditCard} onClick={onRecordPayment} style={{ flex: "1 1 auto" }}>
+                Record payment
+              </BtButton>
+            )}
+            {canAddEdit && (
+              <BtButton variant="secondary" size="small" icon={Edit2} onClick={onEdit} style={{ flex: "1 1 auto" }}>
+                Edit entry
+              </BtButton>
+            )}
+          </div>
+        )}
+      </div>
+    </div>
+  , document.body);
 }

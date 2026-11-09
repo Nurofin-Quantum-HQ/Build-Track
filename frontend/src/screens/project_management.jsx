@@ -7,95 +7,213 @@ import { resolveImageUrl } from '../utils/imageUrl';
 import {
   BtHero,
   BtSheet,
+  BtPageHeader,
   BtButton,
+  BtIconButton,
   BtCard,
   BtBadge,
   BtBricks,
-  BtProgress,
-  BtCountUp,
+  BtChip,
+  BtField,
   formatInr,
   BtEmpty,
-  BtPageLoader,
+  BtErrorCard,
   BtSkeleton,
 } from '../components/ui';
 import {
-  Search,
   Plus,
   Building2,
   ChevronRight,
-  Edit3,
+  Pencil,
   RefreshCw,
   HelpCircle,
-  ArrowRight,
   MapPin,
-  Clock,
-  Briefcase,
-  AlertTriangle,
+  Search,
 } from 'lucide-react';
 import ModuleTour from '../components/ModuleTour';
 import { Toast, ConfirmDialog } from '../components/Toast';
 
 const TABS = ['All Projects', 'Active', 'On Hold', 'Review Needed', 'Completed'];
 
+// Labels deliberately match the filter tab names (Active, On Hold, …).
 function getProjectStatus(raw) {
   const s = (raw || '').toLowerCase().replace(/[\s_]+/g, '');
   if (s === 'planning') return { label: 'Planning', tone: 'neutral' };
-  if (s === 'onhold') return { label: 'On Hold', tone: 'amber' };
-  if (s === 'completed') return { label: 'Completed', tone: 'green' };
-  if (s === 'cancelled' || s === 'reviewneeded') return { label: 'Review Needed', tone: 'red' };
-  return { label: 'In Progress', tone: 'brand' };
+  if (s === 'onhold') return { label: 'On Hold', tone: 'warning' };
+  if (s === 'completed') return { label: 'Completed', tone: 'success' };
+  if (s === 'cancelled' || s === 'reviewneeded') return { label: 'Review Needed', tone: 'danger' };
+  return { label: 'Active', tone: 'brand' };
 }
 
-function ProjectPhoto({ photo, small = false }) {
-  const imgSrc = photo ? resolveImageUrl(photo) : '';
+// progress arrives either as a fraction (0–1) or as a percent (0–100); 1 means 1 %, not 100 %.
+function progressPercent(p, spent, budget) {
+  let raw = p.progress;
+  if (raw === undefined || raw === null || raw === '') raw = budget > 0 ? Math.min(spent / budget, 1) * 100 : 0;
+  raw = Number(raw) || 0;
+  if (raw > 0 && raw < 1) raw *= 100;
+  return Math.max(0, Math.min(100, Math.round(raw)));
+}
 
-  if (imgSrc) {
-    return (
-      <img
-        src={imgSrc}
-        alt="Project Site"
-        style={{
-          width: '100%',
-          height: '100%',
-          objectFit: 'cover',
-          display: 'block',
-        }}
-      />
-    );
-  }
-
+function ProjectThumb({ photo }) {
+  const src = photo ? resolveImageUrl(photo) : '';
   return (
     <div
       style={{
-        width: '100%',
-        height: '100%',
-        background: 'linear-gradient(135deg, #1C2029 0%, #0C0E12 100%)',
+        width: 56,
+        height: 56,
+        borderRadius: 'var(--r-tile)',
+        overflow: 'hidden',
+        flexShrink: 0,
+        background: 'var(--fill)',
+        color: 'var(--ink-3)',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        position: 'relative',
-        overflow: 'hidden',
       }}
     >
-      <div className="blueprint-grid-canvas" style={{ opacity: 0.18 }} />
+      {src ? (
+        <img src={src} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+      ) : (
+        <Building2 size={24} strokeWidth={1.75} />
+      )}
+    </div>
+  );
+}
+
+function ProjectCard({ project: p, canEdit, onOpen, onEdit }) {
+  const st = getProjectStatus(p.status);
+  const name = p.projectName || p.name || 'Untitled project';
+  const spent = Number(p.spentAmount || 0);
+  const budget = Number(p.totalBudget || p.budget?.total || 0);
+  const pct = progressPercent(p, spent, budget);
+
+  return (
+    <BtCard
+      className="bt-hover-card"
+      onClick={onOpen}
+      role="link"
+      tabIndex={0}
+      aria-label={`Open ${name}`}
+      onKeyDown={(e) => {
+        if (e.target === e.currentTarget && (e.key === 'Enter' || e.key === ' ')) {
+          e.preventDefault();
+          onOpen();
+        }
+      }}
+      padding="20px"
+      style={{ display: 'flex', flexDirection: 'column', gap: 16, height: '100%' }}
+    >
+      <div style={{ display: 'flex', gap: 14, alignItems: 'flex-start' }}>
+        <ProjectThumb photo={p.photo} />
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <h3
+            title={name}
+            style={{
+              margin: 0,
+              fontFamily: 'var(--font-ui)',
+              fontSize: 16,
+              fontWeight: 600,
+              lineHeight: 1.3,
+              color: 'var(--ink)',
+              display: '-webkit-box',
+              WebkitLineClamp: 2,
+              WebkitBoxOrient: 'vertical',
+              overflow: 'hidden',
+              overflowWrap: 'anywhere',
+            }}
+          >
+            {name}
+          </h3>
+          <div
+            style={{
+              marginTop: 6,
+              display: 'flex',
+              alignItems: 'center',
+              gap: 5,
+              fontFamily: 'var(--font-ui)',
+              fontSize: 13,
+              color: 'var(--ink-2)',
+              minWidth: 0,
+            }}
+          >
+            <MapPin size={13} style={{ flexShrink: 0 }} />
+            <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              {p.location || 'Location not set'}
+            </span>
+          </div>
+        </div>
+        {canEdit && (
+          <BtIconButton
+            icon={Pencil}
+            label={`Edit ${name}`}
+            onClick={(e) => {
+              e.stopPropagation();
+              onEdit();
+            }}
+          />
+        )}
+      </div>
+
+      <div style={{ marginTop: 'auto' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+          <BtBadge label={st.label} tone={st.tone} />
+          <span className="tnum" style={{ fontFamily: 'var(--font-display)', fontSize: 16, fontWeight: 700, color: 'var(--ink)' }}>
+            {pct}%
+          </span>
+        </div>
+        <BtBricks value={pct / 100} height={9} />
+      </div>
+
       <div
         style={{
-          position: 'absolute',
-          top: '-20px',
-          right: '-20px',
-          width: '100px',
-          height: '100px',
-          borderRadius: '50%',
-          background: 'var(--accent)',
-          filter: 'blur(34px)',
-          opacity: 0.15,
+          paddingTop: 14,
+          borderTop: '1px solid var(--line)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          gap: 12,
         }}
-      />
-      <Building2
-        size={small ? 26 : 46}
-        color="var(--bone, #F6F4EF)"
-        style={{ opacity: small ? 0.45 : 0.2, zIndex: 2 }}
-      />
+      >
+        <div className="tnum" style={{ fontFamily: 'var(--font-ui)', fontSize: 14, color: 'var(--ink-2)', minWidth: 0 }}>
+          <strong style={{ color: 'var(--ink)', fontWeight: 700 }}>{formatInr(spent, { compact: true })}</strong>
+          {budget > 0 ? ` of ${formatInr(budget, { compact: true })}` : ' spent · no budget set'}
+        </div>
+        <span
+          style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: 2,
+            fontFamily: 'var(--font-ui)',
+            fontSize: 13,
+            fontWeight: 600,
+            color: 'var(--ink)',
+            flexShrink: 0,
+          }}
+        >
+          Open
+          <ChevronRight size={16} />
+        </span>
+      </div>
+    </BtCard>
+  );
+}
+
+function ProjectSkeletonGrid() {
+  return (
+    <div className="bt-grid-3">
+      {[0, 1, 2].map((i) => (
+        <BtCard key={i} padding="20px" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+          <div style={{ display: 'flex', gap: 14 }}>
+            <BtSkeleton width="56px" height="56px" />
+            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 8 }}>
+              <BtSkeleton width="75%" height="18px" borderRadius="6px" />
+              <BtSkeleton width="45%" height="14px" borderRadius="6px" />
+            </div>
+          </div>
+          <BtSkeleton width="100%" height="24px" borderRadius="8px" />
+          <BtSkeleton width="60%" height="16px" borderRadius="6px" />
+        </BtCard>
+      ))}
     </div>
   );
 }
@@ -112,6 +230,7 @@ export default function ProjectsPage() {
   const [toast, setToast] = useState({ msg: '', type: 'info' });
   const [confirmDlg, setConfirmDlg] = useState(null);
   const [runTour, setRunTour] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
 
   const isAdmin = user?.role?.toLowerCase() === 'admin';
   const canCreate = isAdmin || can('create_project') || can('manage_team');
@@ -136,6 +255,7 @@ export default function ProjectsPage() {
     async (force = false) => {
       try {
         if (allProjects.length === 0) setLoading(true);
+        if (force) setRefreshing(true);
         setError('');
         await storeFetchProjects({}, force);
       } catch (err) {
@@ -143,6 +263,7 @@ export default function ProjectsPage() {
         setError(`Failed to load projects: ${msg}`);
       } finally {
         setLoading(false);
+        setRefreshing(false);
       }
     },
     [allProjects.length, storeFetchProjects]
@@ -166,7 +287,7 @@ export default function ProjectsPage() {
       if (activeTab === 'All Projects') return true;
 
       const st = getProjectStatus(p.status).label;
-      if (activeTab === 'Active') return st === 'In Progress' || st === 'Planning';
+      if (activeTab === 'Active') return st === 'Active' || st === 'Planning';
       if (activeTab === 'On Hold') return st === 'On Hold';
       if (activeTab === 'Review Needed') return st === 'Review Needed';
       if (activeTab === 'Completed') return st === 'Completed';
@@ -175,28 +296,20 @@ export default function ProjectsPage() {
   }, [allProjects, search, activeTab]);
 
   const counts = useMemo(() => {
+    const labelOf = (p) => getProjectStatus(p.status).label;
     return {
       'All Projects': allProjects.length,
-      Active: allProjects.filter((p) => {
-        const s = getProjectStatus(p.status).label;
-        return s === 'In Progress' || s === 'Planning';
-      }).length,
-      'On Hold': allProjects.filter((p) => getProjectStatus(p.status).label === 'On Hold').length,
-      'Review Needed': allProjects.filter((p) => getProjectStatus(p.status).label === 'Review Needed').length,
-      Completed: allProjects.filter((p) => getProjectStatus(p.status).label === 'Completed').length,
+      Active: allProjects.filter((p) => ['Active', 'Planning'].includes(labelOf(p))).length,
+      'On Hold': allProjects.filter((p) => labelOf(p) === 'On Hold').length,
+      'Review Needed': allProjects.filter((p) => labelOf(p) === 'Review Needed').length,
+      Completed: allProjects.filter((p) => labelOf(p) === 'Completed').length,
     };
   }, [allProjects]);
 
-  const openProject = (p) => {
-    navigate('/managesite', { state: { project: p } });
-  };
+  const openProject = (p) => navigate('/managesite', { state: { project: p } });
+  const editProject = (p) => navigate('/newproject', { state: { project: p } });
 
-  const firstProject = filtered[0];
-  const otherProjects = filtered.slice(1);
-
-  if (loading && allProjects.length === 0) {
-    return <BtPageLoader message="Loading projects…" />;
-  }
+  const showSkeleton = loading && allProjects.length === 0;
 
   return (
     <div style={{ width: '100%', minHeight: '100%', display: 'flex', flexDirection: 'column' }}>
@@ -212,595 +325,106 @@ export default function ProjectsPage() {
         />
       )}
 
-      {/* ══════════════════════════════════════════════════════════
-          HERO (Blueprint Noir Header)
-         ══════════════════════════════════════════════════════════ */}
-      <BtHero padding="32px 32px 56px">
-        <div style={{ maxWidth: 1200, margin: '0 auto', width: '100%' }}>
-          {/* Eyebrow & Help */}
-          <div
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              marginBottom: '16px',
-            }}
-          >
-            <div
-              style={{
-                fontFamily: 'var(--font-mono)',
-                fontSize: '11px',
-                letterSpacing: '0.09em',
-                textTransform: 'uppercase',
-                color: 'var(--on-noir-3)',
-              }}
-            >
-              BUILDTRACK • SITES & PHASES
-            </div>
-
-            <button
-              type="button"
-              onClick={() => setRunTour(true)}
-              title="Help Tour"
-              style={{
-                width: '36px',
-                height: '36px',
-                borderRadius: '18px',
-                background: 'rgba(255, 255, 255, 0.08)',
-                border: '1px solid rgba(255, 255, 255, 0.14)',
-                color: 'var(--on-noir-2)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                cursor: 'pointer',
-              }}
-            >
-              <HelpCircle size={16} />
-            </button>
-          </div>
-
-          {/* Title & Action Row */}
-          <div
-            className="tour-header"
-            style={{
-              display: 'flex',
-              alignItems: 'flex-end',
-              justifyContent: 'space-between',
-              flexWrap: 'wrap',
-              gap: '16px',
-            }}
-          >
-            <div>
-              <h1
-                style={{
-                  margin: 0,
-                  fontFamily: 'var(--font-display)',
-                  fontSize: '36px',
-                  fontWeight: 800,
-                  letterSpacing: '-0.03em',
-                  color: 'var(--bone)',
-                }}
-              >
-                Projects
-              </h1>
-              <p
-                style={{
-                  margin: '6px 0 0',
-                  fontFamily: 'var(--font-ui)',
-                  fontSize: '14px',
-                  color: 'var(--on-noir-2)',
-                }}
-              >
-                Active builds • {allProjects.length} {allProjects.length === 1 ? 'project' : 'projects'} total
-              </p>
-            </div>
-
-            {canCreate && (
-              <div className="tour-create-project">
-                <BtButton
-                  variant="accent"
-                  icon={Plus}
-                  onPress={() => navigate('/newproject')}
-                >
-                  New Project
-                </BtButton>
-              </div>
-            )}
-          </div>
+      <BtHero>
+        <div className="tour-header">
+          <BtPageHeader
+            eyebrow="Sites & phases"
+            title="Projects"
+            subtitle={
+              showSkeleton
+                ? 'Loading your sites…'
+                : `${allProjects.length} ${allProjects.length === 1 ? 'project' : 'projects'} across your sites.`
+            }
+            actions={
+              <>
+                <BtIconButton icon={HelpCircle} label="Page tour" onDark onClick={() => setRunTour(true)} />
+                {canCreate && (
+                  <span className="tour-create-project">
+                    <BtButton variant="accent" size="small" icon={Plus} onClick={() => navigate('/newproject')}>
+                      New Project
+                    </BtButton>
+                  </span>
+                )}
+              </>
+            }
+          />
         </div>
       </BtHero>
 
-      {/* ══════════════════════════════════════════════════════════
-          SHEET (Bone Surface)
-         ══════════════════════════════════════════════════════════ */}
-      <BtSheet overlap={26} padding="28px 32px 64px">
-        <div
-          style={{
-            maxWidth: 1200,
-            margin: '0 auto',
-            width: '100%',
-            display: 'flex',
-            flexDirection: 'column',
-            gap: '24px',
-          }}
-        >
-          {/* Controls Bar: Search + Tabs + Refresh */}
-          <div
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              flexWrap: 'wrap',
-              gap: '16px',
-            }}
-          >
-            {/* Status Filter Tabs */}
-            <div
-              className="tour-tabs"
-              style={{
-                display: 'flex',
-                gap: '8px',
-                overflowX: 'auto',
-                paddingBottom: '2px',
-              }}
-            >
-              {TABS.map((tab) => {
-                const isActive = activeTab === tab;
-                return (
-                  <button
-                    key={tab}
-                    type="button"
-                    onClick={() => setActiveTab(tab)}
-                    style={{
-                      height: '38px',
-                      padding: '0 14px',
-                      borderRadius: '19px',
-                      background: isActive ? 'var(--ink)' : 'var(--card)',
-                      color: isActive ? 'var(--bone, #F6F4EF)' : 'var(--ink-2)',
-                      border: `1px solid ${isActive ? 'var(--ink)' : 'var(--line)'}`,
-                      boxShadow: isActive ? '0 2px 8px rgba(17, 19, 23, 0.12)' : 'none',
-                      fontFamily: 'var(--font-ui)',
-                      fontSize: '13px',
-                      fontWeight: 600,
-                      cursor: 'pointer',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '6px',
-                      whiteSpace: 'nowrap',
-                      transition: 'all 150ms ease',
-                    }}
-                  >
-                    <span>{tab}</span>
-                    <span
-                      className="tnum"
-                      style={{
-                        fontSize: '11px',
-                        padding: '1px 6px',
-                        borderRadius: '10px',
-                        background: isActive ? 'rgba(255, 255, 255, 0.22)' : 'var(--fill)',
-                        color: isActive ? 'var(--bone, #F6F4EF)' : 'var(--ink-3)',
-                      }}
-                    >
-                      {counts[tab]}
-                    </span>
-                  </button>
-                );
-              })}
+      <BtSheet>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
+          {/* Filters + search + refresh */}
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12 }}>
+            <div className="tour-tabs" role="tablist" aria-label="Filter by status" style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+              {TABS.map((tab) => (
+                <BtChip
+                  key={tab}
+                  role="tab"
+                  aria-selected={activeTab === tab}
+                  selected={activeTab === tab}
+                  onClick={() => setActiveTab(tab)}
+                  label={
+                    <>
+                      {tab}
+                      <span className="tnum" style={{ marginLeft: 6, opacity: 0.7, fontWeight: 600 }}>
+                        {counts[tab]}
+                      </span>
+                    </>
+                  }
+                />
+              ))}
             </div>
 
-            {/* Search Input & Refresh Button */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-              <div
-                className="tour-search"
-                style={{
-                  position: 'relative',
-                  display: 'flex',
-                  alignItems: 'center',
-                }}
-              >
-                <Search
-                  size={15}
-                  color="var(--ink-3)"
-                  style={{ position: 'absolute', left: '12px', pointerEvents: 'none' }}
-                />
-                <input
-                  type="text"
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, flex: '1 1 260px', maxWidth: 420, minWidth: 0 }}>
+              <div className="tour-search" style={{ flex: 1, minWidth: 0 }}>
+                <BtField
+                  size="compact"
+                  icon={Search}
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
-                  placeholder="Search projects, location, code…"
-                  style={{
-                    height: '38px',
-                    padding: '0 14px 0 34px',
-                    borderRadius: 'var(--r-input)',
-                    border: '1px solid var(--line)',
-                    background: 'var(--card)',
-                    color: 'var(--ink)',
-                    fontFamily: 'var(--font-ui)',
-                    fontSize: '13px',
-                    width: '240px',
-                    outline: 'none',
-                    transition: 'border-color 150ms ease',
-                  }}
-                  onFocus={(e) => (e.currentTarget.style.borderColor = 'var(--accent)')}
-                  onBlur={(e) => (e.currentTarget.style.borderColor = 'var(--line)')}
+                  placeholder="Search name, location, code…"
+                  aria-label="Search projects"
                 />
               </div>
-
-              <button
-                type="button"
+              <BtIconButton
+                icon={RefreshCw}
+                label="Refresh projects"
                 onClick={() => fetchProjects(true)}
-                title="Refresh projects"
-                style={{
-                  width: '38px',
-                  height: '38px',
-                  borderRadius: 'var(--r-input)',
-                  background: 'var(--card)',
-                  border: '1px solid var(--line)',
-                  color: 'var(--ink-2)',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  cursor: 'pointer',
-                  transition: 'background 150ms ease',
-                }}
-              >
-                <RefreshCw size={15} />
-              </button>
+                disabled={refreshing}
+                style={{ height: 40, width: 40 }}
+              />
             </div>
           </div>
 
-          {/* Error Banner */}
-          {error && (
-            <div
-              style={{
-                background: 'var(--tone-red-bg)',
-                border: '1px solid rgba(239, 68, 68, 0.25)',
-                borderRadius: 'var(--r-input)',
-                padding: '12px 16px',
-                color: 'var(--status-danger-bright)',
-                fontSize: '13px',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-              }}
-            >
-              <span>{error}</span>
-              <BtButton variant="secondary" small onPress={() => fetchProjects(true)}>
-                Retry
-              </BtButton>
-            </div>
-          )}
+          {error && <BtErrorCard title="Couldn't load projects" message={error} onRetry={() => fetchProjects(true)} />}
 
-          {/* Project List / Empty State */}
-          {filtered.length === 0 ? (
-            <BtCard padding="48px 24px">
+          {showSkeleton ? (
+            <ProjectSkeletonGrid />
+          ) : filtered.length === 0 && !error ? (
+            <BtCard padding="24px">
               <BtEmpty
                 icon={Building2}
                 title="No projects found"
                 message={
                   allProjects.length === 0
-                    ? 'No projects created yet. Click New Project to initialize your first build site.'
-                    : 'No projects match your current search or filter criteria.'
+                    ? 'No projects created yet. Create your first build site to start tracking costs.'
+                    : 'No projects match your current search or filter.'
                 }
-                action={
-                  allProjects.length === 0 && canCreate ? (
-                    <BtButton variant="primary" icon={Plus} onPress={() => navigate('/newproject')}>
-                      New Project
-                    </BtButton>
-                  ) : null
-                }
+                actionLabel={allProjects.length === 0 && canCreate ? 'New Project' : undefined}
+                onAction={allProjects.length === 0 && canCreate ? () => navigate('/newproject') : undefined}
               />
             </BtCard>
           ) : (
-            <div className="tour-project-list" style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-              {/* Feature Hero Card (First Project) */}
-              {firstProject && (
-                (() => {
-                  const p = firstProject;
-                  const st = getProjectStatus(p.status);
-                  const spent = Number(p.spentAmount || 0);
-                  const budget = Number(p.totalBudget || p.budget?.total || 0);
-                  const progress = p.progress ?? (budget > 0 ? Math.min(spent / budget, 1) : 0);
-                  const pct = Math.round((progress > 1 ? progress / 100 : progress) * 100);
-
-                  return (
-                    <BtCard
-                      onClick={() => openProject(p)}
-                      padding="0"
-                      style={{
-                        display: 'flex',
-                        flexDirection: 'column',
-                        overflow: 'hidden',
-                        boxShadow: 'var(--shadow-card)',
-                      }}
-                    >
-                      {/* Photo Banner with Overlay */}
-                      <div
-                        style={{
-                          height: '200px',
-                          position: 'relative',
-                          overflow: 'hidden',
-                        }}
-                      >
-                        <ProjectPhoto photo={p.photo} />
-                        <div
-                          style={{
-                            position: 'absolute',
-                            inset: 0,
-                            background:
-                              'linear-gradient(to top, rgba(12, 14, 18, 0.88) 0%, rgba(12, 14, 18, 0.25) 50%, rgba(12, 14, 18, 0.05) 100%)',
-                          }}
-                        />
-
-                        {/* Status Badge in Glass Pill */}
-                        <div style={{ position: 'absolute', top: '16px', left: '18px', zIndex: 3 }}>
-                          <BtBadge label={st.label} tone={st.tone} />
-                        </div>
-
-                        {/* Title & Caption Overlaid */}
-                        <div
-                          style={{
-                            position: 'absolute',
-                            bottom: '16px',
-                            left: '20px',
-                            right: '20px',
-                            zIndex: 3,
-                          }}
-                        >
-                          <h2
-                            style={{
-                              margin: 0,
-                              fontFamily: 'var(--font-display)',
-                              fontSize: '24px',
-                              fontWeight: 800,
-                              letterSpacing: '-0.02em',
-                              color: 'var(--bone, #FFFFFF)',
-                              textShadow: '0 2px 8px rgba(0, 0, 0, 0.7)',
-                            }}
-                          >
-                            {p.projectName || p.name}
-                          </h2>
-                          <div
-                            style={{
-                              marginTop: '4px',
-                              display: 'flex',
-                              alignItems: 'center',
-                              gap: '12px',
-                              fontFamily: 'var(--font-ui)',
-                              fontSize: '13px',
-                              color: 'var(--on-noir-2, rgba(246, 244, 239, 0.75))',
-                            }}
-                          >
-                            {p.location && (
-                              <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                                <MapPin size={13} />
-                                {p.location}
-                              </span>
-                            )}
-                            {p.projectCode && (
-                              <span>Code: {p.projectCode}</span>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* Bottom Info Bar */}
-                      <div style={{ padding: '20px 24px' }}>
-                        <div
-                          style={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'space-between',
-                            marginBottom: '8px',
-                          }}
-                        >
-                          <span
-                            style={{
-                              fontFamily: 'var(--font-ui)',
-                              fontSize: '13px',
-                              fontWeight: 600,
-                              color: 'var(--ink-2)',
-                            }}
-                          >
-                            Overall Progress
-                          </span>
-                          <span
-                            className="tnum"
-                            style={{
-                              fontFamily: 'var(--font-display)',
-                              fontSize: '16px',
-                              fontWeight: 800,
-                              color: 'var(--ink)',
-                            }}
-                          >
-                            {pct}%
-                          </span>
-                        </div>
-
-                        <BtBricks value={pct / 100} height={9} />
-
-                        <div
-                          style={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'space-between',
-                            marginTop: '16px',
-                            paddingTop: '14px',
-                            borderTop: '1px solid var(--line)',
-                          }}
-                        >
-                          <div
-                            className="tnum"
-                            style={{
-                              fontFamily: 'var(--font-ui)',
-                              fontSize: '14px',
-                              color: 'var(--ink-2)',
-                            }}
-                          >
-                            <span style={{ fontWeight: 700, color: 'var(--ink)' }}>
-                              {formatInr(spent, { compact: false })}
-                            </span>
-                            {budget > 0 ? (
-                              <span> of {formatInr(budget, { compact: true })} budget</span>
-                            ) : (
-                              <span> spent • no budget set</span>
-                            )}
-                          </div>
-
-                          <div
-                            style={{
-                              display: 'flex',
-                              alignItems: 'center',
-                              gap: '4px',
-                              fontFamily: 'var(--font-ui)',
-                              fontSize: '13px',
-                              fontWeight: 700,
-                              color: 'var(--ink)',
-                            }}
-                          >
-                            <span>View Site Plan</span>
-                            <ChevronRight size={16} />
-                          </div>
-                        </div>
-                      </div>
-                    </BtCard>
-                  );
-                })()
-              )}
-
-              {/* Grid of Other Projects */}
-              {otherProjects.length > 0 && (
-                <div
-                  style={{
-                    display: 'grid',
-                    gridTemplateColumns: 'repeat(auto-fill, minmax(360px, 1fr))',
-                    gap: '16px',
-                  }}
-                >
-                  {otherProjects.map((p) => {
-                    const st = getProjectStatus(p.status);
-                    const spent = Number(p.spentAmount || 0);
-                    const budget = Number(p.totalBudget || p.budget?.total || 0);
-                    const progress = p.progress ?? (budget > 0 ? Math.min(spent / budget, 1) : 0);
-                    const pct = Math.round((progress > 1 ? progress / 100 : progress) * 100);
-
-                    return (
-                      <BtCard
-                        key={p._id || p.id}
-                        onClick={() => openProject(p)}
-                        padding="18px 20px"
-                        style={{
-                          display: 'flex',
-                          flexDirection: 'column',
-                          gap: '12px',
-                        }}
-                      >
-                        <div style={{ display: 'flex', gap: '14px', alignItems: 'flex-start' }}>
-                          <div
-                            style={{
-                              width: '64px',
-                              height: '64px',
-                              borderRadius: 'var(--r-tile)',
-                              overflow: 'hidden',
-                              flexShrink: 0,
-                            }}
-                          >
-                            <ProjectPhoto photo={p.photo} small />
-                          </div>
-
-                          <div style={{ flex: 1, minWidth: 0 }}>
-                            <div
-                              style={{
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'space-between',
-                                gap: '8px',
-                              }}
-                            >
-                              <h3
-                                style={{
-                                  margin: 0,
-                                  fontFamily: 'var(--font-display)',
-                                  fontSize: '16px',
-                                  fontWeight: 700,
-                                  color: 'var(--ink)',
-                                  overflow: 'hidden',
-                                  textOverflow: 'ellipsis',
-                                  whiteSpace: 'nowrap',
-                                }}
-                              >
-                                {p.projectName || p.name}
-                              </h3>
-                              <BtBadge label={st.label} tone={st.tone} />
-                            </div>
-
-                            {p.location && (
-                              <div
-                                style={{
-                                  marginTop: '4px',
-                                  display: 'flex',
-                                  alignItems: 'center',
-                                  gap: '4px',
-                                  fontFamily: 'var(--font-ui)',
-                                  fontSize: '12px',
-                                  color: 'var(--ink-3)',
-                                }}
-                              >
-                                <MapPin size={12} />
-                                {p.location}
-                              </div>
-                            )}
-
-                            <div style={{ marginTop: '8px' }}>
-                              <BtProgress value={pct / 100} thin />
-                            </div>
-                          </div>
-                        </div>
-
-                        <div
-                          style={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'space-between',
-                            paddingTop: '10px',
-                            borderTop: '1px solid var(--line)',
-                            fontFamily: 'var(--font-ui)',
-                            fontSize: '12px',
-                          }}
-                        >
-                          <span className="tnum" style={{ color: 'var(--ink-2)' }}>
-                            <strong style={{ color: 'var(--ink)' }}>{pct}%</strong> •{' '}
-                            {formatInr(spent, { compact: true })} spent
-                          </span>
-
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                            {canEdit && (
-                              <button
-                                type="button"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  navigate('/newproject', { state: { project: p } });
-                                }}
-                                title="Edit project"
-                                style={{
-                                  background: 'none',
-                                  border: 'none',
-                                  color: 'var(--ink-3)',
-                                  cursor: 'pointer',
-                                  padding: '4px',
-                                }}
-                              >
-                                <Edit3 size={14} />
-                              </button>
-                            )}
-                            <ChevronRight size={14} color="var(--ink-3)" />
-                          </div>
-                        </div>
-                      </BtCard>
-                    );
-                  })}
-                </div>
-              )}
+            <div className="tour-project-list bt-grid-3" style={{ alignItems: 'stretch' }}>
+              {filtered.map((p) => (
+                <ProjectCard
+                  key={p._id || p.id}
+                  project={p}
+                  canEdit={canEdit}
+                  onOpen={() => openProject(p)}
+                  onEdit={() => editProject(p)}
+                />
+              ))}
             </div>
           )}
         </div>

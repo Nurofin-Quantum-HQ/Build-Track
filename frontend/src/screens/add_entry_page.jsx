@@ -5,29 +5,21 @@ import useProjectStore from '../stores/projectStore';
 import {
   BtHero,
   BtSheet,
-  BtButton,
   BtCard,
-  BtBadge,
-  BtTile,
   BtTypeTile,
   BtSectionHeader,
-  BtPressable,
+  BtPageHeader,
+  BtIconButton,
 } from '../components/ui';
 import CsvImport from '../components/CsvImport';
 import ModuleTour from '../components/ModuleTour';
-import {
-  Package,
-  Users,
-  Truck,
-  ArrowLeft,
-  Mic,
-  Keyboard,
-  ChevronRight,
-  HelpCircle,
-  FileSpreadsheet,
-  CheckCircle2,
-  Sparkles,
-} from 'lucide-react';
+import { Mic, Keyboard, ChevronRight, HelpCircle, Check } from 'lucide-react';
+
+const TYPE_COLOR = {
+  material: 'var(--type-material)',
+  labour: 'var(--type-labour)',
+  equipment: 'var(--type-equipment)',
+};
 
 export default function AddEntryPage() {
   const navigate = useNavigate();
@@ -37,7 +29,6 @@ export default function AddEntryPage() {
   const project = location.state?.project || selectedProject || null;
 
   const [selectedType, setSelectedType] = useState('material');
-  const [selectedMode, setSelectedMode] = useState(null);
   const [runTour, setRunTour] = useState(false);
 
   const tourSteps = [
@@ -62,36 +53,30 @@ export default function AddEntryPage() {
       types.push({
         id: 'material',
         title: 'Material',
-        short: 'Cement, steel, sand, procurement',
-        subtitle: 'Log concrete, steel, lumber, or site-specific procurement items.',
-        icon: Package,
-        tone: 'brand',
+        subtitle: 'Cement, steel, sand and other site procurement.',
       });
     }
     if (isAdmin || can('add_entries') || can('submit_daily_update')) {
       types.push({
         id: 'labour',
         title: 'Labour',
-        short: 'Masons, carpenters, crew hours',
-        subtitle: 'Track crew hours, specialized trade performance, and site presence.',
-        icon: Users,
-        tone: 'green',
+        subtitle: 'Crew hours, trades and site presence.',
       });
     }
     if (isAdmin || can('manage_equipment_master')) {
       types.push({
         id: 'equipment',
         title: 'Equipment',
-        short: 'Machinery, fuel, JCB, cranes',
-        subtitle: 'Record heavy machinery runtime, fuel logs, and maintenance events.',
-        icon: Truck,
-        tone: 'amber',
+        subtitle: 'Machinery runtime, fuel and maintenance.',
       });
     }
     return types;
   }, [can, isAdmin]);
 
-  const handleProceed = (mode, typeId = selectedType) => {
+  // If the chosen type is not allowed for this role, fall back to the first allowed one.
+  const activeType = entryTypes.some((t) => t.id === selectedType) ? selectedType : entryTypes[0]?.id;
+
+  const handleProceed = (mode, typeId = activeType) => {
     if (mode === 'voice') {
       navigate('/voice', { state: { project, type: typeId } });
     } else {
@@ -103,292 +88,183 @@ export default function AddEntryPage() {
     <div style={{ width: '100%', minHeight: '100%', display: 'flex', flexDirection: 'column' }}>
       <ModuleTour steps={tourSteps} run={runTour} setRun={setRunTour} moduleName="AddEntryPage" />
 
-      {/* ══════════════════════════════════════════════════════════
-          HERO (Blueprint Noir Header)
-         ══════════════════════════════════════════════════════════ */}
-      <BtHero padding="28px 32px 56px">
-        <div style={{ maxWidth: 860, margin: '0 auto', width: '100%' }}>
-          {/* Top navigation & help */}
-          <div
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              marginBottom: '16px',
-            }}
-          >
-            <button
-              type="button"
-              onClick={() => navigate(-1)}
-              style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '6px',
-                padding: '6px 12px',
-                borderRadius: '16px',
-                background: 'rgba(255, 255, 255, 0.08)',
-                border: '1px solid rgba(255, 255, 255, 0.14)',
-                color: 'var(--bone)',
-                fontFamily: 'var(--font-ui)',
-                fontSize: '13px',
-                fontWeight: 600,
-                cursor: 'pointer',
-              }}
-            >
-              <ArrowLeft size={14} />
-              <span>Back</span>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => setRunTour(true)}
-              title="Help Tour"
-              style={{
-                width: '36px',
-                height: '36px',
-                borderRadius: '18px',
-                background: 'rgba(255, 255, 255, 0.08)',
-                border: '1px solid rgba(255, 255, 255, 0.14)',
-                color: 'var(--on-noir-2)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                cursor: 'pointer',
-              }}
-            >
-              <HelpCircle size={16} />
-            </button>
-          </div>
-
-          <div
-            style={{
-              fontFamily: 'var(--font-mono)',
-              fontSize: '11px',
-              letterSpacing: '0.09em',
-              textTransform: 'uppercase',
-              color: 'var(--on-noir-3)',
-              marginBottom: '6px',
-            }}
-          >
-            ADD ENTRY • STEP 1 OF 2
-          </div>
-
-          <h1
-            style={{
-              margin: 0,
-              fontFamily: 'var(--font-display)',
-              fontSize: 'clamp(28px, 4vw, 40px)',
-              fontWeight: 800,
-              letterSpacing: '-0.03em',
-              color: 'var(--bone)',
-              lineHeight: 1.15,
-            }}
-          >
-            What are you
-            <br />
-            adding?
-          </h1>
-
-          <p
-            style={{
-              margin: '8px 0 0',
-              fontFamily: 'var(--font-ui)',
-              fontSize: '14px',
-              color: 'var(--on-noir-2)',
-            }}
-          >
-            Select the entry type to log for the current shift.
-          </p>
+      <BtHero>
+        <div style={{ maxWidth: 960, margin: '0 auto', width: '100%' }}>
+          <BtPageHeader
+            back={{ label: 'Back', onClick: () => navigate(-1) }}
+            eyebrow="Add entry · Step 1 of 2"
+            title="What are you adding?"
+            subtitle="Pick the entry type, then choose how you want to record it."
+            size="md"
+            actions={<BtIconButton icon={HelpCircle} label="Page tour" onDark onClick={() => setRunTour(true)} />}
+          />
         </div>
       </BtHero>
 
-      {/* ══════════════════════════════════════════════════════════
-          SHEET (Bone Surface)
-         ══════════════════════════════════════════════════════════ */}
-      <BtSheet overlap={26} padding="28px 32px 64px">
-        <div
-          style={{
-            maxWidth: 860,
-            margin: '0 auto',
-            width: '100%',
-            display: 'flex',
-            flexDirection: 'column',
-            gap: '28px',
-          }}
-        >
-          {/* Entry Kind Tiles Row */}
-          <div>
-            <BtSectionHeader title="Select Entry Type" caption />
+      <BtSheet padding="28px 28px 64px">
+        <div style={{ maxWidth: 960, margin: '0 auto', width: '100%', display: 'flex', flexDirection: 'column', gap: 32 }}>
+          {/* Entry type */}
+          <section aria-labelledby="entry-type-heading">
+            <BtSectionHeader title={<span id="entry-type-heading">Entry type</span>} />
             <div
-              className="tour-entry-selection"
-              style={{
-                display: 'grid',
-                gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))',
-                gap: '14px',
-              }}
+              className="tour-entry-selection bt-grid-3"
+              role="radiogroup"
+              aria-label="Entry type"
+              style={{ alignItems: 'stretch' }}
             >
               {entryTypes.map((type) => {
-                const isSelected = selectedType === type.id;
-                const Icon = type.icon;
-
+                const isSelected = activeType === type.id;
                 return (
-                  <BtCard
+                  <button
                     key={type.id}
+                    type="button"
+                    role="radio"
+                    aria-checked={isSelected}
                     onClick={() => setSelectedType(type.id)}
-                    padding="20px"
+                    className="bt-hover-card"
                     style={{
-                      border: isSelected ? '2px solid var(--accent)' : '1px solid var(--line)',
-                      background: isSelected ? 'var(--card)' : 'var(--card)',
-                      boxShadow: isSelected
-                        ? '0 0 0 1px var(--accent), var(--shadow-card)'
-                        : 'var(--shadow-card)',
-                      cursor: 'pointer',
+                      font: 'inherit',
+                      margin: 0,
+                      width: '100%',
+                      boxSizing: 'border-box',
                       display: 'flex',
                       flexDirection: 'column',
-                      gap: '14px',
-                      transition: 'all 160ms ease',
+                      gap: 14,
+                      minHeight: 168,
+                      padding: 20,
+                      borderRadius: 'var(--r-card)',
+                      background: 'var(--card)',
+                      border: `2px solid ${isSelected ? 'var(--ink)' : 'var(--line)'}`,
+                      boxShadow: isSelected ? '0 0 0 4px var(--accent-soft), var(--shadow-card)' : 'var(--shadow-card)',
+                      cursor: 'pointer',
+                      textAlign: 'left',
                     }}
                   >
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                       <BtTypeTile type={type.id} size={46} />
-                      {isSelected && (
-                        <div
-                          style={{
-                            width: '24px',
-                            height: '24px',
-                            borderRadius: '12px',
-                            background: 'var(--accent)',
-                            color: 'var(--on-accent, #111317)',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                          }}
-                        >
-                          <CheckCircle2 size={16} strokeWidth={2.5} />
-                        </div>
-                      )}
+                      <span
+                        aria-hidden="true"
+                        style={{
+                          width: 26,
+                          height: 26,
+                          borderRadius: 'var(--r-full)',
+                          border: isSelected ? 'none' : '1.5px solid var(--input-border)',
+                          background: isSelected ? 'var(--ink)' : 'transparent',
+                          color: '#FFFFFF',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                        }}
+                      >
+                        {isSelected && <Check size={15} strokeWidth={3} />}
+                      </span>
                     </div>
-
-                    <div>
-                      <div
-                        style={{
-                          fontFamily: 'var(--font-display)',
-                          fontSize: '18px',
-                          fontWeight: 800,
-                          color: 'var(--ink)',
-                        }}
-                      >
-                        {type.title}
+                    <div style={{ flex: 1 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <span
+                          style={{
+                            width: 8,
+                            height: 8,
+                            borderRadius: '50%',
+                            background: TYPE_COLOR[type.id],
+                            flexShrink: 0,
+                          }}
+                        />
+                        <span style={{ fontFamily: 'var(--font-display)', fontSize: 20, fontWeight: 700, letterSpacing: '-0.02em', color: 'var(--ink)' }}>
+                          {type.title}
+                        </span>
                       </div>
-                      <div
-                        style={{
-                          fontFamily: 'var(--font-ui)',
-                          fontSize: '12.5px',
-                          color: 'var(--ink-3)',
-                          marginTop: '4px',
-                          lineHeight: 1.4,
-                        }}
-                      >
+                      <div style={{ fontFamily: 'var(--font-ui)', fontSize: 14, color: 'var(--ink-2)', marginTop: 6, lineHeight: 1.45 }}>
                         {type.subtitle}
                       </div>
                     </div>
-                  </BtCard>
+                  </button>
                 );
               })}
             </div>
-          </div>
+          </section>
 
-          {/* Mode Selection Choice: Speak it vs Type it */}
-          <div className="tour-mode-selection">
-            <BtSectionHeader title="How do you want to add it?" caption />
-            <div
-              style={{
-                display: 'grid',
-                gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
-                gap: '16px',
-              }}
-            >
-              {/* Option 1: Speak it (Noir Ink Card with Pulsing Mic) */}
-              <div
+          {/* Mode */}
+          <section className="tour-mode-selection" aria-labelledby="entry-mode-heading">
+            <BtSectionHeader title={<span id="entry-mode-heading">How do you want to add it?</span>} />
+            <div className="bt-grid-2" style={{ alignItems: 'stretch' }}>
+              <button
+                type="button"
                 onClick={() => handleProceed('voice')}
+                className="bt-hover-card"
                 style={{
-                  background: 'var(--ink)',
-                  borderRadius: 'var(--r-card)',
-                  padding: '24px',
-                  color: 'var(--bone)',
-                  cursor: 'pointer',
+                  font: 'inherit',
+                  margin: 0,
+                  width: '100%',
+                  boxSizing: 'border-box',
                   display: 'flex',
                   alignItems: 'center',
-                  gap: '16px',
-                  boxShadow: '0 10px 28px rgba(17, 19, 23, 0.16)',
-                  transition: 'transform 180ms ease, box-shadow 180ms ease',
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.transform = 'translateY(-2px)';
-                  e.currentTarget.style.boxShadow = '0 14px 34px rgba(17, 19, 23, 0.22)';
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.transform = 'translateY(0)';
-                  e.currentTarget.style.boxShadow = '0 10px 28px rgba(17, 19, 23, 0.16)';
+                  gap: 16,
+                  minHeight: 112,
+                  textAlign: 'left',
+                  padding: 24,
+                  borderRadius: 'var(--r-card)',
+                  background: 'var(--ink)',
+                  border: '1px solid var(--ink)',
+                  color: 'var(--on-noir)',
+                  cursor: 'pointer',
+                  boxShadow: 'var(--shadow-card)',
                 }}
               >
-                <div
+                <span
                   style={{
-                    width: '52px',
-                    height: '52px',
+                    width: 54,
+                    height: 54,
                     borderRadius: '50%',
                     background: 'var(--accent)',
-                    color: 'var(--on-accent, #111317)',
+                    color: 'var(--on-accent)',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
-                    boxShadow: '0 0 20px var(--accent-glow)',
+                    boxShadow: '0 0 24px var(--accent-glow)',
                     flexShrink: 0,
                   }}
                 >
-                  <Mic size={26} strokeWidth={2.2} />
-                </div>
-
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div
-                    style={{
-                      fontFamily: 'var(--font-display)',
-                      fontSize: '18px',
-                      fontWeight: 800,
-                      color: 'var(--bone)',
-                    }}
-                  >
+                  <Mic size={26} strokeWidth={2} />
+                </span>
+                <span style={{ flex: 1, minWidth: 0 }}>
+                  <span style={{ display: 'block', fontFamily: 'var(--font-display)', fontSize: 20, fontWeight: 700, letterSpacing: '-0.02em' }}>
                     Speak it
-                  </div>
-                  <div
-                    style={{
-                      fontFamily: 'var(--font-ui)',
-                      fontSize: '13px',
-                      color: 'var(--on-noir-2)',
-                      marginTop: '2px',
-                    }}
-                  >
-                    Speak naturally — AI extracts amounts, item, and category.
-                  </div>
-                </div>
-
+                  </span>
+                  <span style={{ display: 'block', fontFamily: 'var(--font-ui)', fontSize: 14, color: 'var(--on-noir-2)', marginTop: 4, lineHeight: 1.45 }}>
+                    Say it naturally. AI picks out the item, amounts and category.
+                  </span>
+                </span>
                 <ChevronRight size={20} color="var(--on-noir-3)" />
-              </div>
+              </button>
 
-              {/* Option 2: Type it (Card with Keyboard) */}
-              <BtCard
+              <button
+                type="button"
                 onClick={() => handleProceed('manual')}
-                padding="24px"
+                className="bt-hover-card"
                 style={{
+                  font: 'inherit',
+                  margin: 0,
+                  width: '100%',
+                  boxSizing: 'border-box',
                   display: 'flex',
                   alignItems: 'center',
-                  gap: '16px',
+                  gap: 16,
+                  minHeight: 112,
+                  textAlign: 'left',
+                  padding: 24,
+                  borderRadius: 'var(--r-card)',
+                  background: 'var(--card)',
+                  border: '1px solid var(--line)',
+                  color: 'var(--ink)',
+                  cursor: 'pointer',
+                  boxShadow: 'var(--shadow-card)',
                 }}
               >
-                <div
+                <span
                   style={{
-                    width: '52px',
-                    height: '52px',
+                    width: 54,
+                    height: 54,
                     borderRadius: 'var(--r-tile)',
                     background: 'var(--fill)',
                     color: 'var(--ink)',
@@ -398,44 +274,28 @@ export default function AddEntryPage() {
                     flexShrink: 0,
                   }}
                 >
-                  <Keyboard size={24} strokeWidth={1.8} />
-                </div>
-
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div
-                    style={{
-                      fontFamily: 'var(--font-display)',
-                      fontSize: '18px',
-                      fontWeight: 800,
-                      color: 'var(--ink)',
-                    }}
-                  >
+                  <Keyboard size={26} strokeWidth={1.75} />
+                </span>
+                <span style={{ flex: 1, minWidth: 0 }}>
+                  <span style={{ display: 'block', fontFamily: 'var(--font-display)', fontSize: 20, fontWeight: 700, letterSpacing: '-0.02em' }}>
                     Type it
-                  </div>
-                  <div
-                    style={{
-                      fontFamily: 'var(--font-ui)',
-                      fontSize: '13px',
-                      color: 'var(--ink-3)',
-                      marginTop: '2px',
-                    }}
-                  >
-                    Fill in the form fields manually with full precision.
-                  </div>
-                </div>
-
+                  </span>
+                  <span style={{ display: 'block', fontFamily: 'var(--font-ui)', fontSize: 14, color: 'var(--ink-2)', marginTop: 4, lineHeight: 1.45 }}>
+                    Fill in the form yourself with full control over every field.
+                  </span>
+                </span>
                 <ChevronRight size={20} color="var(--ink-3)" />
-              </BtCard>
+              </button>
             </div>
-          </div>
+          </section>
 
-          {/* Bulk CSV Upload Card */}
-          <div className="tour-bulk-csv">
-            <BtSectionHeader title="Bulk Import via Spreadsheet" caption />
-            <BtCard padding="20px">
-              <CsvImport onComplete={() => window.location.reload()} />
+          {/* Bulk import */}
+          <section className="tour-bulk-csv" aria-labelledby="entry-bulk-heading">
+            <BtSectionHeader title={<span id="entry-bulk-heading">Bulk import via spreadsheet</span>} />
+            <BtCard padding="24px">
+              <CsvImport />
             </BtCard>
-          </div>
+          </section>
         </div>
       </BtSheet>
     </div>

@@ -25,6 +25,7 @@ export const navItems = [
   { label: "Voice", path: "/voice", icon: Mic },
   { label: "Assign Task", path: "/assign-task", icon: ListTodo },
   { label: "Notifications", path: "/notifications", icon: Bell },
+  { label: "Settings", path: "/settings", icon: Settings },
 ];
 
 export const adminNavItems = [
@@ -34,5 +35,4 @@ export const adminNavItems = [
   { label: "AI Chat", path: "/ai-chat", icon: Bot },
   { label: "Audit Logs", path: "/audit-logs", icon: ScrollText },
   { label: "Subscription", path: "/subscription", icon: CreditCard },
-  { label: "Settings", path: "/settings", icon: Settings },
 ];

@@ -4,23 +4,31 @@ import {
   Bell,
   CheckCheck,
   Trash2,
-  ArrowLeft,
-  CheckCircle,
+  CheckCircle2,
   IndianRupee,
   Building2,
-  User,
-  Shield,
+  Users,
+  ClipboardList,
   RotateCw,
   Clock,
   ChevronRight,
   Sparkles,
 } from 'lucide-react';
 import useNotificationStore from '../stores/notificationStore';
-import BtHero from '../components/ui/BtHero';
-import BtSheet from '../components/ui/BtSheet';
-import BtPressable from '../components/ui/BtPressable';
-import BtCard from '../components/ui/BtCard';
-import BtEmpty from '../components/ui/BtEmpty';
+import {
+  BtHero,
+  BtPageHeader,
+  BtSheet,
+  BtButton,
+  BtIconButton,
+  BtChip,
+  BtCard,
+  BtEmpty,
+  BtErrorCard,
+  BtSkeleton,
+  BtBadge,
+} from '../components/ui';
+import { ConfirmDialog } from '../components/Toast';
 
 function formatTimeAgo(dateStr) {
   if (!dateStr) return 'Just now';
@@ -44,94 +52,42 @@ function formatTimeAgo(dateStr) {
   }
 }
 
+// Every colour comes from the design tokens.
 const TYPE_CONFIG = {
-  approval: {
-    icon: CheckCircle,
-    color: '#2563EB',
-    bg: 'rgba(37, 99, 235, 0.1)',
-    label: 'Approval',
-    route: '/approvals',
-  },
-  payment: {
-    icon: IndianRupee,
-    color: '#16A34A',
-    bg: 'rgba(22, 163, 74, 0.1)',
-    label: 'Payment',
-    route: '/transaction',
-  },
-  transaction: {
-    icon: IndianRupee,
-    color: '#16A34A',
-    bg: 'rgba(22, 163, 74, 0.1)',
-    label: 'Finance',
-    route: '/transaction',
-  },
-  task: {
-    icon: Shield,
-    color: '#4F46E5',
-    bg: 'rgba(79, 70, 229, 0.1)',
-    label: 'Task',
-    route: '/assign-task',
-  },
-  project: {
-    icon: Building2,
-    color: '#7C3AED',
-    bg: 'rgba(124, 58, 237, 0.1)',
-    label: 'Project',
-    route: '/projects',
-  },
-  worker: {
-    icon: User,
-    color: '#D97706',
-    bg: 'rgba(217, 119, 6, 0.1)',
-    label: 'Team',
-    route: '/admin',
-  },
-  subscription: {
-    icon: Sparkles,
-    color: 'var(--accent, #E0A93B)',
-    bg: 'rgba(224, 169, 59, 0.12)',
-    label: 'Billing',
-    route: '/subscription',
-  },
-  system: {
-    icon: Bell,
-    color: '#64748B',
-    bg: 'rgba(100, 116, 139, 0.1)',
-    label: 'System',
-    route: null,
-  },
+  approval: { icon: CheckCircle2, color: 'var(--type-material)', bg: 'var(--type-material-soft)', label: 'Approval', tone: 'material', route: '/approvals' },
+  payment: { icon: IndianRupee, color: 'var(--status-success)', bg: 'var(--type-income-soft)', label: 'Payment', tone: 'income', route: '/transaction' },
+  transaction: { icon: IndianRupee, color: 'var(--status-success)', bg: 'var(--type-income-soft)', label: 'Finance', tone: 'income', route: '/transaction' },
+  task: { icon: ClipboardList, color: 'var(--accent-ink)', bg: 'var(--accent-soft)', label: 'Task', tone: 'brand', route: '/assign-task' },
+  project: { icon: Building2, color: 'var(--ink-2)', bg: 'var(--fill)', label: 'Project', tone: 'neutral', route: '/projects' },
+  worker: { icon: Users, color: 'var(--type-labour)', bg: 'var(--type-labour-soft)', label: 'Team', tone: 'labour', route: '/admin' },
+  subscription: { icon: Sparkles, color: 'var(--accent-ink)', bg: 'var(--accent-soft)', label: 'Billing', tone: 'brand', route: '/subscription' },
+  system: { icon: Bell, color: 'var(--ink-2)', bg: 'var(--fill)', label: 'System', tone: 'neutral', route: null },
 };
+
+const typeOf = (n) => (n.type || n.relatedModel || '').toLowerCase();
 
 export default function NotificationsPage() {
   const navigate = useNavigate();
   const [filter, setFilter] = useState('all'); // 'all' | 'unread' | 'approval' | 'payment' | 'task' | 'project'
+  const [confirmClear, setConfirmClear] = useState(false);
 
-  const {
-    systemNotifications,
-    loading,
-    fetchAll,
-    markAsRead,
-    markAllAsRead,
-    clearAll,
-  } = useNotificationStore();
+  const { systemNotifications, loading, error, fetchAll, markAsRead, markAllAsRead, clearAll } = useNotificationStore();
 
   useEffect(() => {
     fetchAll(true);
   }, [fetchAll]);
 
-  const notifications = useMemo(() => {
-    return Array.isArray(systemNotifications) ? systemNotifications : [];
-  }, [systemNotifications]);
+  const notifications = useMemo(
+    () => (Array.isArray(systemNotifications) ? systemNotifications : []),
+    [systemNotifications]
+  );
 
-  const unreadCount = useMemo(() => {
-    return notifications.filter((n) => !n.read).length;
-  }, [notifications]);
+  const unreadCount = useMemo(() => notifications.filter((n) => !n.read).length, [notifications]);
 
   const countsByType = useMemo(() => {
     const counts = { all: notifications.length, unread: unreadCount, approval: 0, payment: 0, task: 0, project: 0 };
     notifications.forEach((n) => {
-      const type = (n.type || n.relatedModel || '').toLowerCase();
+      const type = typeOf(n);
       if (type.includes('approval')) counts.approval++;
       else if (type.includes('payment') || type.includes('transaction')) counts.payment++;
       else if (type.includes('task')) counts.task++;
@@ -141,36 +97,25 @@ export default function NotificationsPage() {
   }, [notifications, unreadCount]);
 
   const filteredNotifications = useMemo(() => {
-    if (filter === 'unread') {
-      return notifications.filter((n) => !n.read);
-    }
-    if (filter === 'approval') {
-      return notifications.filter((n) => (n.type || n.relatedModel || '').toLowerCase().includes('approval'));
-    }
+    if (filter === 'unread') return notifications.filter((n) => !n.read);
+    if (filter === 'approval') return notifications.filter((n) => typeOf(n).includes('approval'));
     if (filter === 'payment') {
       return notifications.filter((n) => {
-        const t = (n.type || n.relatedModel || '').toLowerCase();
+        const t = typeOf(n);
         return t.includes('payment') || t.includes('transaction');
       });
     }
-    if (filter === 'task') {
-      return notifications.filter((n) => (n.type || n.relatedModel || '').toLowerCase().includes('task'));
-    }
-    if (filter === 'project') {
-      return notifications.filter((n) => (n.type || n.relatedModel || '').toLowerCase().includes('project'));
-    }
+    if (filter === 'task') return notifications.filter((n) => typeOf(n).includes('task'));
+    if (filter === 'project') return notifications.filter((n) => typeOf(n).includes('project'));
     return notifications;
   }, [notifications, filter]);
 
   const handleOpenNotification = useCallback(
     (n) => {
       const id = n._id || n.id;
-      if (id && !n.read) {
-        markAsRead(id);
-      }
+      if (id && !n.read) markAsRead(id);
 
-      // Check target route
-      const type = (n.type || n.relatedModel || '').toLowerCase();
+      const type = typeOf(n);
       let targetRoute = null;
       if (type.includes('approval')) targetRoute = '/approvals';
       else if (type.includes('payment') || type.includes('transaction')) targetRoute = '/transaction';
@@ -178,329 +123,141 @@ export default function NotificationsPage() {
       else if (type.includes('project')) targetRoute = '/projects';
       else if (type.includes('subscription')) targetRoute = '/subscription';
 
-      if (targetRoute) {
-        navigate(targetRoute);
-      }
+      if (targetRoute) navigate(targetRoute);
     },
     [markAsRead, navigate]
   );
 
   const tabs = [
     { id: 'all', label: 'All', count: countsByType.all },
-    { id: 'unread', label: 'Unread', count: countsByType.unread, isAlert: countsByType.unread > 0 },
+    { id: 'unread', label: 'Unread', count: countsByType.unread },
     { id: 'approval', label: 'Approvals', count: countsByType.approval },
     { id: 'payment', label: 'Finance', count: countsByType.payment },
     { id: 'task', label: 'Tasks', count: countsByType.task },
     { id: 'project', label: 'Projects', count: countsByType.project },
   ];
+  const activeTab = tabs.find((t) => t.id === filter);
+
+  const emptyCopy =
+    filter === 'all'
+      ? { title: 'No notifications yet', message: 'Updates about approvals, payments and tasks will show up here.' }
+      : filter === 'unread'
+      ? { title: 'You are all caught up', message: 'Nothing unread. New alerts will appear here.' }
+      : { title: `No ${activeTab.label.toLowerCase()} notifications`, message: 'Nothing in this group yet.' };
 
   return (
-    <div style={{ minHeight: '100vh', background: 'var(--surface-ground, #F2F0EB)' }}>
-      {/* ── TOP HERO BANNER (Blueprint Noir) ── */}
-      <BtHero padding="24px 28px 48px">
-        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 16 }}>
-          <div>
-            {/* Breadcrumb row */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 }}>
-              <BtPressable
-                onClick={() => navigate(-1)}
-                style={{
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: 6,
-                  color: 'rgba(255, 255, 255, 0.72)',
-                  fontSize: 13,
-                  fontWeight: 600,
-                  cursor: 'pointer',
-                  background: 'none',
-                  border: 'none',
-                  padding: 0,
-                }}
-              >
-                <ArrowLeft size={16} />
-                <span>Back</span>
-              </BtPressable>
-              <span style={{ color: 'rgba(255, 255, 255, 0.25)' }}>/</span>
-              <span
-                style={{
-                  fontFamily: 'var(--font-mono)',
-                  fontSize: 11,
-                  letterSpacing: '0.12em',
-                  textTransform: 'uppercase',
-                  color: 'var(--accent, #E0A93B)',
-                  fontWeight: 700,
-                }}
-              >
-                INBOX · ACTIVITY STREAM
-              </span>
-            </div>
+    <div style={{ width: '100%', minHeight: '100%', display: 'flex', flexDirection: 'column' }}>
+      {confirmClear && (
+        <ConfirmDialog
+          message="Clear all notifications? This removes every item from your inbox."
+          confirmLabel="Clear all"
+          cancelLabel="Keep them"
+          danger
+          onConfirm={() => {
+            setConfirmClear(false);
+            clearAll();
+          }}
+          onCancel={() => setConfirmClear(false)}
+        />
+      )}
 
-            {/* Title & Status Badge */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 6 }}>
-              <h1
-                style={{
-                  fontFamily: 'var(--font-serif)',
-                  fontSize: 32,
-                  fontWeight: 700,
-                  color: 'var(--bone)',
-                  margin: 0,
-                  letterSpacing: '-0.02em',
-                }}
-              >
-                Notifications
-              </h1>
-              <span
-                style={{
-                  background: unreadCount > 0 ? 'var(--accent, #E0A93B)' : 'rgba(255, 255, 255, 0.12)',
-                  color: unreadCount > 0 ? 'var(--noir, #0C0E12)' : 'var(--bone)',
-                  fontSize: 11,
-                  padding: '3px 10px',
-                  borderRadius: 20,
-                  fontWeight: 700,
-                  letterSpacing: '0.04em',
-                  textTransform: 'uppercase',
-                  fontFamily: 'var(--font-mono)',
-                }}
-              >
-                {unreadCount > 0 ? `${unreadCount} UNREAD` : 'ALL CAUGHT UP'}
-              </span>
-            </div>
-
-            <p
-              style={{
-                color: 'rgba(255, 255, 255, 0.65)',
-                margin: 0,
-                fontSize: 14,
-                maxWidth: 580,
-                lineHeight: 1.5,
-              }}
-            >
-              Real-time feed for site submissions, supervisor sign-offs, transaction receipts, and milestone dispatches.
-            </p>
-          </div>
-
-          {/* Action buttons on dark hero */}
-          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-            <button
-              onClick={() => fetchAll(true)}
-              disabled={loading}
-              title="Refresh Notifications"
-              style={{
-                border: '1px solid rgba(255, 255, 255, 0.12)',
-                background: 'rgba(255, 255, 255, 0.08)',
-                cursor: loading ? 'not-allowed' : 'pointer',
-                width: 38,
-                height: 38,
-                borderRadius: 'var(--r-btn, 12px)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                color: 'var(--bone)',
-                transition: 'background 120ms ease',
-              }}
-              onMouseEnter={(e) => (e.currentTarget.style.background = 'rgba(255, 255, 255, 0.14)')}
-              onMouseLeave={(e) => (e.currentTarget.style.background = 'rgba(255, 255, 255, 0.08)')}
-            >
-              <RotateCw size={15} style={{ animation: loading ? 'spin 1s linear infinite' : 'none' }} />
-            </button>
-
-            {unreadCount > 0 && (
-              <button
-                onClick={markAllAsRead}
-                style={{
-                  padding: '0 14px',
-                  height: 38,
-                  borderRadius: 'var(--r-btn, 12px)',
-                  background: 'var(--bone, #F6F4EF)',
-                  color: 'var(--noir, #0C0E12)',
-                  border: 'none',
-                  fontSize: 12.5,
-                  fontWeight: 700,
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 6,
-                  fontFamily: 'var(--font-ui)',
-                  boxShadow: '0 2px 8px rgba(0,0,0,0.25)',
-                  transition: 'opacity 120ms ease',
-                }}
-                onMouseEnter={(e) => (e.currentTarget.style.opacity = '0.9')}
-                onMouseLeave={(e) => (e.currentTarget.style.opacity = '1')}
-              >
-                <CheckCheck size={15} />
-                <span>Mark All Read</span>
-              </button>
-            )}
-
-            {notifications.length > 0 && (
-              <button
-                onClick={() => {
-                  if (window.confirm('Clear all notifications?')) {
-                    clearAll();
-                  }
-                }}
-                style={{
-                  padding: '0 12px',
-                  height: 38,
-                  borderRadius: 'var(--r-btn, 12px)',
-                  background: 'rgba(220, 38, 38, 0.14)',
-                  color: '#F87171',
-                  border: '1px solid rgba(220, 38, 38, 0.28)',
-                  fontSize: 12.5,
-                  fontWeight: 700,
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 6,
-                  fontFamily: 'var(--font-ui)',
-                  transition: 'background 120ms ease',
-                }}
-                onMouseEnter={(e) => (e.currentTarget.style.background = 'rgba(220, 38, 38, 0.22)')}
-                onMouseLeave={(e) => (e.currentTarget.style.background = 'rgba(220, 38, 38, 0.14)')}
-              >
-                <Trash2 size={14} />
-                <span>Clear All</span>
-              </button>
-            )}
-          </div>
-        </div>
+      <BtHero padding="24px clamp(16px, 4vw, 28px) 48px">
+        <BtPageHeader
+          back={{ label: 'Back', onClick: () => navigate(-1) }}
+          eyebrow="Inbox"
+          title="Notifications"
+          subtitle={
+            unreadCount > 0
+              ? `${unreadCount} unread ${unreadCount === 1 ? 'update' : 'updates'} from your sites and team.`
+              : 'You are all caught up.'
+          }
+          actions={
+            <>
+              <BtIconButton
+                icon={RotateCw}
+                label="Refresh notifications"
+                onDark
+                disabled={loading}
+                onClick={() => fetchAll(true)}
+              />
+              {unreadCount > 0 && (
+                <BtButton variant="accent" size="small" icon={CheckCheck} onClick={markAllAsRead}>
+                  Mark all read
+                </BtButton>
+              )}
+              {notifications.length > 0 && (
+                <BtButton variant="onDark" size="small" icon={Trash2} onClick={() => setConfirmClear(true)}>
+                  Clear all
+                </BtButton>
+              )}
+            </>
+          }
+        />
       </BtHero>
 
-      {/* ── MAIN CONTENT (Overlapping BtSheet) ── */}
-      <BtSheet overlap={26} padding="24px 28px 64px">
-        <div style={{ maxWidth: 840, margin: '0 auto' }}>
-          {/* Filter Pills */}
+      <BtSheet overlap={26} padding="24px clamp(16px, 4vw, 28px) 64px">
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+          {/* Filters */}
           <div
-            style={{
-              display: 'flex',
-              gap: 8,
-              marginBottom: 20,
-              overflowX: 'auto',
-              scrollbarWidth: 'none',
-              paddingBottom: 4,
-            }}
+            role="group"
+            aria-label="Filter notifications"
+            style={{ display: 'flex', gap: 8, overflowX: 'auto', scrollbarWidth: 'none', paddingBottom: 2 }}
           >
-            {tabs.map((t) => {
-              const isActive = filter === t.id;
-              return (
-                <button
-                  key={t.id}
-                  onClick={() => setFilter(t.id)}
-                  style={{
-                    padding: '8px 14px',
-                    borderRadius: 'var(--r-btn, 12px)',
-                    border: isActive ? '1px solid var(--ink, #111317)' : '1px solid var(--line, rgba(0,0,0,0.08))',
-                    background: isActive ? 'var(--ink, #111317)' : '#FFFFFF',
-                    color: isActive ? '#FFFFFF' : 'var(--ink-2, #475569)',
-                    fontWeight: 600,
-                    fontSize: 13,
-                    cursor: 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 7,
-                    fontFamily: 'var(--font-ui)',
-                    whiteSpace: 'nowrap',
-                    transition: 'all 120ms ease',
-                    boxShadow: isActive ? '0 2px 6px rgba(17, 19, 23, 0.16)' : 'none',
-                  }}
-                >
-                  <span>{t.label}</span>
-                  <span
-                    style={{
-                      background: isActive
-                        ? 'rgba(255, 255, 255, 0.22)'
-                        : t.isAlert
-                        ? 'rgba(224, 169, 59, 0.18)'
-                        : 'var(--fill, #F1F3F5)',
-                      color: isActive
-                        ? '#FFFFFF'
-                        : t.isAlert
-                        ? 'var(--accent, #E0A93B)'
-                        : 'var(--ink-3, #64748B)',
-                      padding: '1px 7px',
-                      borderRadius: 10,
-                      fontSize: 11,
-                      fontWeight: 700,
-                      fontFamily: 'var(--font-mono)',
-                    }}
-                  >
-                    {t.count}
-                  </span>
-                </button>
-              );
-            })}
+            {tabs.map((t) => (
+              <BtChip
+                key={t.id}
+                label={`${t.label} · ${t.count}`}
+                selected={filter === t.id}
+                aria-pressed={filter === t.id}
+                onClick={() => setFilter(t.id)}
+                style={{ height: 40, flexShrink: 0 }}
+              />
+            ))}
           </div>
 
-          {/* Loading Skeleton */}
-          {loading && notifications.length === 0 ? (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+          {error && notifications.length === 0 && !loading ? (
+            <BtErrorCard
+              title="Couldn't load notifications"
+              message="Check your connection and try again."
+              onRetry={() => fetchAll(true)}
+            />
+          ) : loading && notifications.length === 0 ? (
+            <BtCard padding={0}>
               {[1, 2, 3, 4].map((i) => (
                 <div
                   key={i}
                   style={{
-                    background: '#FFFFFF',
-                    borderRadius: 14,
-                    border: '1px solid var(--line, rgba(0,0,0,0.08))',
                     padding: '16px 20px',
                     display: 'flex',
                     alignItems: 'center',
                     gap: 14,
+                    borderBottom: i === 4 ? 'none' : '1px solid var(--line)',
                   }}
                 >
-                  <div
-                    style={{
-                      width: 40,
-                      height: 40,
-                      borderRadius: 12,
-                      background: 'var(--fill, #F1F3F5)',
-                      flexShrink: 0,
-                    }}
-                  />
-                  <div style={{ flex: 1 }}>
-                    <div style={{ width: '35%', height: 14, background: 'var(--fill, #F1F3F5)', borderRadius: 6, marginBottom: 8 }} />
-                    <div style={{ width: '70%', height: 12, background: 'var(--fill, #F1F3F5)', borderRadius: 6 }} />
+                  <BtSkeleton width="42px" height="42px" borderRadius="var(--r-tile)" />
+                  <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 8 }}>
+                    <BtSkeleton width="35%" height="14px" borderRadius="6px" />
+                    <BtSkeleton width="70%" height="12px" borderRadius="6px" />
                   </div>
                 </div>
               ))}
-            </div>
+            </BtCard>
           ) : filteredNotifications.length === 0 ? (
-            /* Empty State */
-            <BtEmpty
-              icon={Bell}
-              title={filter === 'unread' ? 'All Caught Up!' : 'No Notifications'}
-              description={
-                filter === 'unread'
-                  ? 'You have reviewed all incoming items. New alerts will show up here.'
-                  : 'There are no notifications matching the selected filter.'
-              }
-              action={
-                filter !== 'all' ? (
-                  <button
-                    onClick={() => setFilter('all')}
-                    style={{
-                      padding: '8px 16px',
-                      borderRadius: 'var(--r-btn, 12px)',
-                      background: 'var(--ink, #111317)',
-                      color: '#FFFFFF',
-                      border: 'none',
-                      fontSize: 13,
-                      fontWeight: 600,
-                      cursor: 'pointer',
-                      fontFamily: 'var(--font-ui)',
-                    }}
-                  >
-                    View All Notifications
-                  </button>
-                ) : null
-              }
-            />
+            <BtCard>
+              <BtEmpty
+                icon={Bell}
+                title={emptyCopy.title}
+                message={emptyCopy.message}
+                actionLabel={filter !== 'all' ? 'Show all notifications' : undefined}
+                onAction={filter !== 'all' ? () => setFilter('all') : undefined}
+              />
+            </BtCard>
           ) : (
-            /* Notification Cards List */
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-              {filteredNotifications.map((n) => {
+            <BtCard padding={0} style={{ overflow: 'hidden' }}>
+              {filteredNotifications.map((n, idx) => {
                 const id = n._id || n.id;
                 const isRead = n.read === true;
-                const rawType = (n.type || n.relatedModel || '').toLowerCase();
+                const rawType = typeOf(n);
 
                 let config = TYPE_CONFIG.system;
                 for (const k of Object.keys(TYPE_CONFIG)) {
@@ -510,40 +267,36 @@ export default function NotificationsPage() {
                   }
                 }
                 const IconComponent = config.icon;
+                const open = () => handleOpenNotification(n);
 
                 return (
                   <div
-                    key={id}
-                    onClick={() => handleOpenNotification(n)}
+                    key={id || idx}
+                    role="button"
+                    tabIndex={0}
+                    aria-label={`${isRead ? '' : 'Unread. '}${n.title || 'Notification'}`}
+                    className="bt-hover-row"
+                    onClick={open}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        open();
+                      }
+                    }}
                     style={{
-                      background: '#FFFFFF',
-                      borderRadius: 14,
-                      border: isRead
-                        ? '1px solid var(--line, rgba(0,0,0,0.08))'
-                        : '1px solid rgba(224, 169, 59, 0.45)',
-                      padding: '16px 20px',
+                      position: 'relative',
                       display: 'flex',
                       alignItems: 'flex-start',
                       gap: 14,
+                      padding: '16px 20px',
                       cursor: 'pointer',
-                      transition: 'all 140ms ease',
-                      boxShadow: isRead ? '0 1px 3px rgba(0,0,0,0.03)' : '0 3px 12px rgba(224, 169, 59, 0.10)',
-                      position: 'relative',
-                    }}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.transform = 'translateY(-1px)';
-                      e.currentTarget.style.boxShadow = '0 6px 16px rgba(0, 0, 0, 0.06)';
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.transform = 'translateY(0)';
-                      e.currentTarget.style.boxShadow = isRead
-                        ? '0 1px 3px rgba(0,0,0,0.03)'
-                        : '0 3px 12px rgba(224, 169, 59, 0.10)';
+                      borderBottom: idx === filteredNotifications.length - 1 ? 'none' : '1px solid var(--line)',
                     }}
                   >
-                    {/* Unread Accent Indicator on Left edge */}
+                    {/* Unread marker */}
                     {!isRead && (
-                      <div
+                      <span
+                        aria-hidden="true"
                         style={{
                           position: 'absolute',
                           left: 0,
@@ -551,17 +304,16 @@ export default function NotificationsPage() {
                           bottom: 14,
                           width: 4,
                           borderRadius: '0 4px 4px 0',
-                          background: 'var(--accent, #E0A93B)',
+                          background: 'var(--accent)',
                         }}
                       />
                     )}
 
-                    {/* Circular Avatar Icon */}
-                    <div
+                    <span
                       style={{
                         width: 42,
                         height: 42,
-                        borderRadius: 12,
+                        borderRadius: 'var(--r-tile)',
                         background: config.bg,
                         color: config.color,
                         display: 'flex',
@@ -570,100 +322,73 @@ export default function NotificationsPage() {
                         flexShrink: 0,
                       }}
                     >
-                      <IconComponent size={20} />
-                    </div>
+                      <IconComponent size={20} strokeWidth={1.85} />
+                    </span>
 
-                    {/* Notification Content */}
                     <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, marginBottom: 3 }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
-                          <span
-                            style={{
-                              fontSize: 14,
-                              fontWeight: isRead ? 600 : 700,
-                              color: 'var(--ink, #111317)',
-                              fontFamily: 'var(--font-ui)',
-                              overflow: 'hidden',
-                              textOverflow: 'ellipsis',
-                              whiteSpace: 'nowrap',
-                            }}
-                          >
-                            {n.title || 'Notification'}
-                          </span>
-                          {!isRead && (
-                            <span
-                              style={{
-                                width: 7,
-                                height: 7,
-                                borderRadius: '50%',
-                                background: 'var(--accent, #E0A93B)',
-                                flexShrink: 0,
-                              }}
-                              title="Unread"
-                            />
-                          )}
-                        </div>
-
-                        {/* Relative Time */}
-                        <div
+                      <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 12 }}>
+                        <span
                           style={{
-                            fontSize: 11.5,
-                            color: 'var(--ink-3, #8C92A0)',
-                            fontFamily: 'var(--font-mono)',
-                            display: 'flex',
+                            fontFamily: 'var(--font-ui)',
+                            fontSize: 15,
+                            fontWeight: isRead ? 500 : 700,
+                            color: 'var(--ink)',
+                            minWidth: 0,
+                            overflow: 'hidden',
+                            textOverflow: 'ellipsis',
+                            whiteSpace: 'nowrap',
+                          }}
+                        >
+                          {n.title || 'Notification'}
+                        </span>
+                        <span
+                          style={{
+                            fontFamily: 'var(--font-ui)',
+                            fontSize: 13,
+                            color: 'var(--ink-3)',
+                            display: 'inline-flex',
                             alignItems: 'center',
                             gap: 4,
                             flexShrink: 0,
                           }}
                         >
-                          <Clock size={11} />
-                          <span>{formatTimeAgo(n.createdAt)}</span>
-                        </div>
+                          <Clock size={12} />
+                          {formatTimeAgo(n.createdAt)}
+                        </span>
                       </div>
 
-                      {/* Body Message */}
-                      <p
-                        style={{
-                          margin: '0 0 8px',
-                          fontSize: 13,
-                          color: isRead ? 'var(--ink-2, #475569)' : 'var(--ink, #111317)',
-                          lineHeight: 1.45,
-                          fontFamily: 'var(--font-ui)',
-                        }}
-                      >
-                        {n.message || n.body || ''}
-                      </p>
-
-                      {/* Meta Footer */}
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                        <span
+                      {(n.message || n.body) && (
+                        <p
                           style={{
-                            fontSize: 11,
-                            fontWeight: 700,
-                            padding: '2px 8px',
-                            borderRadius: 6,
-                            background: config.bg,
-                            color: config.color,
-                            fontFamily: 'var(--font-mono)',
-                            letterSpacing: '0.04em',
-                            textTransform: 'uppercase',
+                            margin: '3px 0 10px',
+                            fontFamily: 'var(--font-ui)',
+                            fontSize: 14,
+                            lineHeight: 1.45,
+                            color: isRead ? 'var(--ink-3)' : 'var(--ink-2)',
                           }}
                         >
-                          {config.label}
-                        </span>
+                          {n.message || n.body}
+                        </p>
+                      )}
 
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: n.message || n.body ? 0 : 8 }}>
+                        <BtBadge label={config.label} tone={config.tone} showDot={false} />
+                        {!isRead && <BtBadge label="New" tone="brand" />}
                         {config.route && (
                           <span
                             style={{
-                              fontSize: 11.5,
-                              color: 'var(--ink-3, #8C92A0)',
+                              marginLeft: 'auto',
                               display: 'inline-flex',
                               alignItems: 'center',
                               gap: 2,
+                              fontFamily: 'var(--font-ui)',
+                              fontSize: 13,
+                              fontWeight: 600,
+                              color: 'var(--ink-2)',
                             }}
                           >
-                            <span>Open</span>
-                            <ChevronRight size={12} />
+                            Open
+                            <ChevronRight size={14} />
                           </span>
                         )}
                       </div>
@@ -671,7 +396,7 @@ export default function NotificationsPage() {
                   </div>
                 );
               })}
-            </div>
+            </BtCard>
           )}
         </div>
       </BtSheet>

@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from "react";
 import { NavLink, useLocation, useNavigate } from "react-router-dom";
 import { navItems, adminNavItems } from "../navItems";
+import BtIconButton from "./ui/BtIconButton";
+import { canAccessRoute, canAddEntries, canApprove } from "../utils/access";
 import { resolveImageUrl } from "../utils/imageUrl";
 import { LogOut, HelpCircle, Plus, Download } from "lucide-react";
 import { useAuth } from "../contexts/AuthContext";
@@ -47,11 +49,11 @@ export default function Sidebar() {
   }, []);
 
   // Fetch pending approvals count for supervisors/admins
-  const r = (user?.role || "").toLowerCase();
-  const isAdminOrSupervisor = r === "admin" || r === "supervisor";
+  const showApprovals = canApprove(user);
+  const visibleAdminItems = adminNavItems.filter((item) => canAccessRoute(user, item.path));
 
   useEffect(() => {
-    if (!isAdminOrSupervisor) return;
+    if (!showApprovals) return;
 
     let mounted = true;
     const fetchPending = async () => {
@@ -73,7 +75,7 @@ export default function Sidebar() {
       mounted = false;
       clearInterval(interval);
     };
-  }, [isAdminOrSupervisor, location.pathname]);
+  }, [showApprovals, location.pathname]);
 
   const photoUrl = user?.profilePhoto ? resolveImageUrl(user.profilePhoto) : null;
 
@@ -103,19 +105,17 @@ export default function Sidebar() {
 
   return (
     <aside
+      className="bt-float-nav"
       style={{
-        width: 240,
-        minWidth: 240,
-        background: "var(--card)",
-        border: "1px solid var(--line)",
-        borderRadius: "var(--r-card)",
-        boxShadow: "var(--shadow-card)",
+        width: 252,
+        minWidth: 252,
         display: "flex",
         flexDirection: "column",
-        height: "calc(100vh - 32px)",
+        height: "calc(100vh - 24px)",
         position: "sticky",
-        top: 16,
-        margin: "16px 0 16px 16px",
+        top: 12,
+        margin: 12,
+        borderRadius: "var(--r-sheet)",
         zIndex: 30,
         overflow: "hidden",
         boxSizing: "border-box",
@@ -123,12 +123,16 @@ export default function Sidebar() {
     >
       {/* ── Brand Header ── */}
       <div
+        role="link"
+        tabIndex={0}
+        aria-label="Go to dashboard"
         onClick={() => navigate("/")}
+        onKeyDown={(e) => e.key === "Enter" && navigate("/")}
         style={{
           display: "flex",
           alignItems: "center",
           gap: 10,
-          padding: "20px 18px 14px",
+          padding: "18px 18px 12px",
           minWidth: 0,
           cursor: "pointer",
         }}
@@ -143,8 +147,8 @@ export default function Sidebar() {
               borderRadius: "8px",
               objectFit: "contain",
               flexShrink: 0,
-              background: "var(--fill)",
-              border: "1px solid var(--line)",
+              background: "var(--noir-3)",
+              border: "1px solid var(--noir-line)",
             }}
           />
         ) : (
@@ -153,8 +157,8 @@ export default function Sidebar() {
               width: 32,
               height: 32,
               borderRadius: "10px",
-              background: "var(--ink)",
-              color: "#FFFFFF",
+              background: "var(--bone)",
+              color: "var(--ink)",
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
@@ -173,7 +177,7 @@ export default function Sidebar() {
             style={{
               fontSize: 17,
               fontWeight: 700,
-              color: "var(--ink)",
+              color: "var(--on-noir)",
               letterSpacing: "-0.5px",
               fontFamily: FONT_FAMILY_MAP[user?.companyFontStyle] || "var(--font-display)",
               whiteSpace: "nowrap",
@@ -187,7 +191,7 @@ export default function Sidebar() {
           <div
             style={{
               fontSize: 11,
-              color: "var(--ink-3)",
+              color: "var(--on-noir-3)",
               fontFamily: "var(--font-ui)",
               lineHeight: 1.1,
             }}
@@ -198,6 +202,7 @@ export default function Sidebar() {
       </div>
 
       {/* ── Prominent '+ New entry' Ink Button (Section 5) ── */}
+      {canAddEntries(user) && (
       <div style={{ padding: "0 14px 14px" }}>
         <button
           type="button"
@@ -210,8 +215,8 @@ export default function Sidebar() {
             width: "100%",
             height: "46px",
             borderRadius: "14px",
-            background: "var(--ink)",
-            color: "#FFFFFF",
+            background: "var(--accent)",
+            color: "var(--on-accent)",
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
@@ -221,7 +226,7 @@ export default function Sidebar() {
             fontFamily: "var(--font-ui)",
             cursor: "pointer",
             border: "none",
-            boxShadow: "0 2px 6px rgba(12, 14, 18, 0.15)",
+            boxShadow: "none",
             transition: "transform 90ms ease, opacity 150ms ease",
           }}
           onMouseDown={(e) => (e.currentTarget.style.transform = "scale(0.97)")}
@@ -232,6 +237,7 @@ export default function Sidebar() {
           <span>New entry</span>
         </button>
       </div>
+      )}
 
       {/* ── Navigation Items ── */}
       <nav
@@ -249,7 +255,7 @@ export default function Sidebar() {
             fontSize: 10.5,
             fontWeight: 600,
             fontFamily: "var(--font-mono)",
-            color: "var(--ink-3)",
+            color: "var(--on-noir-3)",
             letterSpacing: "0.09em",
             padding: "8px 10px 4px",
             textTransform: "uppercase",
@@ -259,25 +265,7 @@ export default function Sidebar() {
         </div>
 
         {navItems
-          .filter((item) => {
-            if (item.label === "Dashboard") return true;
-            if (item.label === "Projects")
-              return (
-                isAdminOrSupervisor ||
-                user?.permissions?.includes("create_project") ||
-                user?.permissions?.includes("view_assigned_project") ||
-                user?.permissions?.includes("view_projects")
-              );
-            if (item.label === "Voice")
-              return isAdminOrSupervisor || user?.permissions?.includes("add_entries");
-            if (item.label === "Log") return true;
-            if (item.label === "Assign Task")
-              return isAdminOrSupervisor || user?.permissions?.includes("assign_tasks");
-            if (item.label === "Notifications") return true;
-            if (item.label === "Reports")
-              return isAdminOrSupervisor || user?.permissions?.includes("view_reports");
-            return true;
-          })
+          .filter((item) => canAccessRoute(user, item.path))
           .map((item) => {
             const active = isRouteActive(item.path);
             const Icon = item.icon;
@@ -287,11 +275,12 @@ export default function Sidebar() {
                 key={item.label}
                 to={item.path}
                 end={item.path === "/"}
+                className="bt-nav-item"
                 onPointerDown={() => preloadRoute(item.path)}
                 onClick={() => perfLogger.startRoute(item.path)}
                 onMouseEnter={(e) => {
                   preloadRoute(item.path);
-                  if (!active) e.currentTarget.style.background = "var(--fill)";
+                  if (!active) e.currentTarget.style.background = "rgba(255, 255, 255, 0.07)";
                 }}
                 onMouseLeave={(e) => {
                   if (!active) e.currentTarget.style.background = "transparent";
@@ -300,14 +289,14 @@ export default function Sidebar() {
                   display: "flex",
                   alignItems: "center",
                   gap: "10px",
-                  padding: "9px 12px",
+                  padding: "8px 12px",
                   borderRadius: "12px",
                   textDecoration: "none",
                   fontSize: "14px",
                   fontWeight: active ? 600 : 400,
                   fontFamily: "var(--font-ui)",
-                  color: active ? "#FFFFFF" : "var(--ink-2)",
-                  background: active ? "var(--ink)" : "transparent",
+                  color: active ? "var(--ink)" : "var(--on-noir-2)",
+                  background: active ? "var(--bone)" : "transparent",
                   transition: "background 140ms ease, color 140ms ease",
                   userSelect: "none",
                 }}
@@ -321,7 +310,7 @@ export default function Sidebar() {
                   <span
                     style={{
                       marginLeft: "auto",
-                      background: active ? "rgba(255, 255, 255, 0.25)" : "var(--status-danger)",
+                      background: active ? "var(--status-danger)" : "var(--status-danger)",
                       color: "#FFFFFF",
                       fontSize: "10px",
                       fontWeight: 700,
@@ -338,14 +327,14 @@ export default function Sidebar() {
             );
           })}
 
-        {isAdminOrSupervisor && (
+        {visibleAdminItems.length > 0 && (
           <>
             <div
               style={{
                 fontSize: 10.5,
                 fontWeight: 600,
                 fontFamily: "var(--font-mono)",
-                color: "var(--ink-3)",
+                color: "var(--on-noir-3)",
                 letterSpacing: "0.09em",
                 padding: "18px 10px 4px",
                 textTransform: "uppercase",
@@ -354,7 +343,7 @@ export default function Sidebar() {
               Admin & Team
             </div>
 
-            {adminNavItems.map((item) => {
+            {visibleAdminItems.map((item) => {
               const active = isRouteActive(item.path);
               const Icon = item.icon;
 
@@ -362,11 +351,12 @@ export default function Sidebar() {
                 <NavLink
                   key={item.label}
                   to={item.path}
-                  onPointerDown={() => preloadRoute(item.path)}
+                  className="bt-nav-item"
+                onPointerDown={() => preloadRoute(item.path)}
                   onClick={() => perfLogger.startRoute(item.path)}
                   onMouseEnter={(e) => {
                     preloadRoute(item.path);
-                    if (!active) e.currentTarget.style.background = "var(--fill)";
+                    if (!active) e.currentTarget.style.background = "rgba(255, 255, 255, 0.07)";
                   }}
                   onMouseLeave={(e) => {
                     if (!active) e.currentTarget.style.background = "transparent";
@@ -375,14 +365,14 @@ export default function Sidebar() {
                     display: "flex",
                     alignItems: "center",
                     gap: "10px",
-                    padding: "9px 12px",
+                    padding: "8px 12px",
                     borderRadius: "12px",
                     textDecoration: "none",
                     fontSize: "14px",
                     fontWeight: active ? 600 : 400,
                     fontFamily: "var(--font-ui)",
-                    color: active ? "#FFFFFF" : "var(--ink-2)",
-                    background: active ? "var(--ink)" : "transparent",
+                    color: active ? "var(--ink)" : "var(--on-noir-2)",
+                    background: active ? "var(--bone)" : "transparent",
                     transition: "background 140ms ease, color 140ms ease",
                     userSelect: "none",
                   }}
@@ -396,8 +386,8 @@ export default function Sidebar() {
                     <span
                       style={{
                         marginLeft: "auto",
-                        background: active ? "rgba(255, 255, 255, 0.25)" : "var(--status-warning-bright)",
-                        color: active ? "#FFFFFF" : "var(--noir)",
+                        background: "var(--status-warning-bright)",
+                        color: "var(--noir)",
                         fontSize: "11px",
                         fontWeight: 700,
                         padding: "1px 7px",
@@ -418,30 +408,28 @@ export default function Sidebar() {
       {/* ── User & Utilities Footer ── */}
       <div
         style={{
-          borderTop: "1px solid var(--line)",
-          padding: "14px 14px 12px",
-          background: "var(--card)",
-          display: "flex",
-          flexDirection: "column",
-          gap: "8px",
+          borderTop: "1px solid var(--noir-line)",
+          padding: "12px 12px 12px 14px",
+          background: "transparent",
         }}
       >
-        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
           <div
             style={{
-              width: 36,
-              height: 36,
+              width: 34,
+              height: 34,
+              marginRight: 4,
               borderRadius: "50%",
-              background: "var(--fill)",
+              background: "var(--noir-3)",
               overflow: "hidden",
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
               fontSize: 14,
               fontWeight: 700,
-              color: "var(--ink-2)",
+              color: "var(--on-noir-2)",
               flexShrink: 0,
-              border: "1px solid var(--line)",
+              border: "1px solid var(--noir-line)",
             }}
           >
             {photoUrl ? (
@@ -453,10 +441,11 @@ export default function Sidebar() {
 
           <div style={{ minWidth: 0, flex: 1 }}>
             <div
+              title={user?.name || "User"}
               style={{
                 fontSize: 13.5,
                 fontWeight: 600,
-                color: "var(--ink)",
+                color: "var(--on-noir)",
                 overflow: "hidden",
                 textOverflow: "ellipsis",
                 whiteSpace: "nowrap",
@@ -468,7 +457,7 @@ export default function Sidebar() {
             <div
               style={{
                 fontSize: 11.5,
-                color: "var(--ink-3)",
+                color: "var(--on-noir-3)",
                 textTransform: "capitalize",
                 fontFamily: "var(--font-ui)",
               }}
@@ -476,83 +465,36 @@ export default function Sidebar() {
               {user?.role || "Member"}
             </div>
           </div>
-        </div>
 
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "6px" }}>
-          <button
+          <BtIconButton
+            icon={HelpCircle}
+            label="Replay app tour"
+            size={30}
+            onDark
             onClick={() => window.dispatchEvent(new Event("replay-app-tour"))}
-            style={{
-              height: "32px",
-              padding: "0 8px",
-              borderRadius: "8px",
-              fontSize: "12px",
-              fontWeight: 500,
-              color: "var(--ink-2)",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              gap: 5,
-              cursor: "pointer",
-              border: "1px solid var(--line)",
-              background: "var(--fill)",
-              fontFamily: "var(--font-ui)",
-            }}
-          >
-            <HelpCircle size={13} />
-            Tour
-          </button>
-
-          <button
+          />
+          <BtIconButton
+            icon={Download}
+            label="Get the mobile app"
+            size={30}
+            onDark
+            onClick={() =>
+              window.open(
+                "https://github.com/Nurofin-Quantum-HQ/Build-Track-App/releases/latest/download/app-release.apk",
+                "_blank",
+                "noopener"
+              )
+            }
+          />
+          <BtIconButton
+            icon={LogOut}
+            label="Sign out"
+            size={30}
+            onDark
             onClick={handleLogout}
-            style={{
-              height: "32px",
-              padding: "0 8px",
-              borderRadius: "8px",
-              fontSize: "12px",
-              fontWeight: 500,
-              color: "var(--status-danger)",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              gap: 5,
-              cursor: "pointer",
-              border: "1px solid rgba(190, 42, 48, 0.15)",
-              background: "var(--status-danger-soft)",
-              fontFamily: "var(--font-ui)",
-            }}
-          >
-            <LogOut size={13} />
-            Exit
-          </button>
+            style={{ color: "var(--status-danger-bright)" }}
+          />
         </div>
-
-        <button
-          onClick={() =>
-            window.open(
-              "https://github.com/Nurofin-Quantum-HQ/Build-Track-App/releases/latest/download/app-release.apk",
-              "_blank"
-            )
-          }
-          style={{
-            height: "32px",
-            padding: "0 8px",
-            borderRadius: "8px",
-            fontSize: "12px",
-            fontWeight: 600,
-            color: "var(--ink-2)",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            gap: 6,
-            cursor: "pointer",
-            border: "1px solid var(--line)",
-            background: "transparent",
-            fontFamily: "var(--font-ui)",
-          }}
-        >
-          <Download size={13} />
-          Get Mobile App
-        </button>
       </div>
     </aside>
   );

@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { isFullMotion } from '../../utils/motion';
 
 /**
  * BtBricks: Progress bar rendered as a wall of 20 segmented bricks.
@@ -14,7 +15,8 @@ export default function BtBricks({
   style = {},
   ...props
 }) {
-  const [mounted, setMounted] = useState(false);
+  // Reduced/Off: bricks appear already laid, no fill animation
+  const [mounted, setMounted] = useState(() => !isFullMotion());
 
   useEffect(() => {
     const timer = setTimeout(() => setMounted(true), 40);

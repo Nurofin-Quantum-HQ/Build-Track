@@ -1,30 +1,45 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { projectAPI, transactionAPI } from "../api";
-import { SpendVsBudgetChart } from "../components/Charts";
-import { CategoryBudgetBar } from "../components/MetricCards";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
-import { ArrowLeft, FileText, Download } from "lucide-react";
-import BtHero from "../components/ui/BtHero";
-import BtSheet from "../components/ui/BtSheet";
-import BtBrickLoader from "../components/ui/BtBrickLoader";
+import {
+  ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, LabelList,
+} from "recharts";
+import { FileText, Download, MapPin, Calendar, Receipt, IndianRupee, Wallet, PiggyBank, Gauge } from "lucide-react";
+import {
+  BtHero, BtGlassTile, BtSheet, BtPageHeader, BtButton, BtCard, BtBadge, BtBricks, BtProgress,
+  BtSectionHeader, BtEmpty, BtErrorCard, BtSkeleton, formatInr,
+} from "../components/ui";
 
-const TYPE_DOT = {
-  Materials: "#2A78D6",
-  Wages: "#EB6834",
-  Expense: "#199E70",
-  Equipment: "#199E70",
-  Income: "#10B981",
-};
+const TYPE_LABEL = { Materials: "Material", Wages: "Labour", Expense: "Equipment", Equipment: "Equipment", Income: "Income" };
+const TYPE_TONE = { Materials: "material", Wages: "labour", Expense: "equipment", Equipment: "equipment", Income: "income" };
 
-const TYPE_BADGE = {
-  Materials: { bg: "rgba(42, 120, 214, 0.12)", color: "#2A78D6" },
-  Wages: { bg: "rgba(235, 104, 52, 0.12)", color: "#EB6834" },
-  Expense: { bg: "rgba(25, 158, 112, 0.12)", color: "#199E70" },
-  Equipment: { bg: "rgba(25, 158, 112, 0.12)", color: "#199E70" },
-  Income: { bg: "rgba(16, 185, 129, 0.12)", color: "#10B981" },
-};
+const fmtDate = (d) => d ? new Date(d).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" }) : "—";
+
+function statusOf(raw) {
+  const s = (raw || "").toLowerCase().replace(/[\s_]+/g, "");
+  if (s === "planning") return { label: "Planning", tone: "neutral" };
+  if (s === "onhold") return { label: "On Hold", tone: "warning" };
+  if (s === "completed") return { label: "Completed", tone: "success" };
+  if (s === "cancelled" || s === "reviewneeded") return { label: "Review Needed", tone: "danger" };
+  return { label: "Active", tone: "brand" };
+}
+
+function ChartTooltip({ active, payload, label }) {
+  if (!active || !payload?.length) return null;
+  return (
+    <div style={{ background: "var(--card)", border: "1px solid var(--line)", borderRadius: "var(--r-tile)", boxShadow: "var(--shadow-raised)", padding: "10px 14px", fontFamily: "var(--font-ui)", fontSize: 13 }}>
+      <div style={{ fontWeight: 600, color: "var(--ink)", marginBottom: 6 }}>{label}</div>
+      {payload.map((p) => (
+        <div key={p.dataKey} className="tnum" style={{ display: "flex", justifyContent: "space-between", gap: 16, color: "var(--ink-2)" }}>
+          <span>{p.name}</span>
+          <strong style={{ color: "var(--ink)" }}>{formatInr(p.value)}</strong>
+        </div>
+      ))}
+    </div>
+  );
+}
 
 export default function ProjectReportPage() {
   const { id } = useParams();
@@ -33,79 +48,82 @@ export default function ProjectReportPage() {
   const [transactions, setTransactions] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
 
-  useEffect(() => {
-    const onResize = () => setIsMobile(window.innerWidth < 768);
-    window.addEventListener("resize", onResize);
-    return () => window.removeEventListener("resize", onResize);
-  }, []);
-
-  useEffect(() => {
-    const load = async () => {
-      try {
-        setLoading(true);
-        const [projRes, txRes] = await Promise.all([
-          projectAPI.getById(id),
-          transactionAPI.getAll({ project: id }),
-        ]);
-        setProject(projRes.data.project);
-        setTransactions(txRes.data.transactions || []);
-      } catch (err) {
-        setError(err.response?.data?.message || "Failed to load report");
-      } finally {
-        setLoading(false);
-      }
-    };
-    load();
+  const load = useCallback(async () => {
+    try {
+      setLoading(true);
+      setError("");
+      const [projRes, txRes] = await Promise.all([
+        projectAPI.getById(id),
+        transactionAPI.getAll({ project: id }),
+      ]);
+      setProject(projRes.data.project);
+      setTransactions(txRes.data.transactions || []);
+    } catch (err) {
+      setError(err.response?.data?.message || "Failed to load report");
+    } finally {
+      setLoading(false);
+    }
   }, [id]);
 
-  const fmtINR = (n) => n ? `₹${Number(n).toLocaleString("en-IN")}` : "₹0";
-  const fmtDate = (d) => d ? new Date(d).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" }) : "—";
+  useEffect(() => { load(); }, [load]);
 
-  if (loading) {
+  const backToProject = () => (project ? navigate("/managesite", { state: { project } }) : navigate("/projects"));
+
+  if (loading || error || !project) {
     return (
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "center", minHeight: "100vh", background: "var(--bg, #0B0D10)" }}>
-        <BtBrickLoader label="Loading project report..." />
+      <div style={{ display: "flex", flexDirection: "column", width: "100%", minHeight: "100%" }}>
+        <BtHero>
+          <BtPageHeader
+            back={{ label: "Projects", onClick: () => navigate("/projects") }}
+            eyebrow="Project report"
+            size="md"
+            title={error ? "Report unavailable" : "Loading report…"}
+            subtitle="Budget, spend and recent entries for this project."
+          />
+        </BtHero>
+        <BtSheet>
+          {error ? (
+            <BtErrorCard title="Couldn't load the report" message={error} onRetry={load} />
+          ) : (
+            <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+              <BtSkeleton height="110px" borderRadius="var(--r-card)" />
+              <BtSkeleton height="320px" borderRadius="var(--r-card)" />
+              <BtSkeleton height="260px" borderRadius="var(--r-card)" />
+            </div>
+          )}
+        </BtSheet>
       </div>
     );
   }
 
-  if (error) {
-    return (
-      <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", minHeight: "100vh", background: "#f7f7f8" }}>
-        <div style={{ background: "#fee2e2", border: "1px solid #fca5a5", borderRadius: 10, padding: "12px 16px", color: "#991b1b", fontSize: 13, marginBottom: 16 }}>⚠️ {error}</div>
-        <button onClick={() => navigate("/projects")} style={{ padding: "10px 20px", background: "var(--color-primary-hover, #EA580C)", color: "#fff", border: "none", borderRadius: 10, fontWeight: 600, cursor: "pointer" }}>Back to Projects</button>
-      </div>
-    );
-  }
-
-  if (!project) return null;
-
+  const isEquip = (t) => t.type === "Expense" || t.type === "Equipment";
   const stats = {
     material: transactions.filter(t => t.type === "Materials").reduce((s, t) => s + (t.amount || 0), 0),
     labour: transactions.filter(t => t.type === "Wages").reduce((s, t) => s + (t.amount || 0), 0),
-    equipment: transactions.filter(t => t.type === "Expense" || t.type === "Equipment").reduce((s, t) => s + (t.amount || 0), 0),
+    equipment: transactions.filter(isEquip).reduce((s, t) => s + (t.amount || 0), 0),
     total: transactions.filter(t => t.type !== "Income").reduce((s, t) => s + (t.amount || 0), 0),
   };
-  const budget = Number(project.budget || project.totalBudget) || 0;
+  const budget = Number(project.budget?.total || project.totalBudget || (typeof project.budget === "number" ? project.budget : 0)) || 0;
   const remaining = budget - stats.total;
+  const overBudget = budget > 0 && stats.total > budget;
+  const st = statusOf(project.status);
+  let prog = Number(project.progress) || 0;
+  if (prog > 0 && prog < 1) prog *= 100;
+  prog = Math.max(0, Math.min(100, prog));
 
-  const statusStyle = {
-    Active: { bg: "#f0fdf4", color: "#166534" },
-    Completed: { bg: "#eff6ff", color: "#1d4ed8" },
-    "On Hold": { bg: "#fefce8", color: "#854d0e" },
-  }[project.status] || { bg: "#f3f4f6", color: "#666" };
-
-  const chartData = [
-    { name: "Material", budget: Number(project.budgetMaterial || project.budget?.material || 0), spent: stats.material },
-    { name: "Labour", budget: Number(project.budgetLabour || project.budget?.labour || 0), spent: stats.labour },
-    { name: "Equipment", budget: Number(project.budgetEquipment || project.budget?.equipment || 0), spent: stats.equipment },
+  const categories = [
+    { category: "Material", budget: Number(project.budgetMaterial || project.budget?.material || 0), actual: stats.material, color: "var(--type-material)" },
+    { category: "Labour", budget: Number(project.budgetLabour || project.budget?.labour || 0), actual: stats.labour, color: "var(--type-labour)" },
+    { category: "Equipment", budget: Number(project.budgetEquipment || project.budget?.equipment || 0), actual: stats.equipment, color: "var(--type-equipment)" },
   ];
+  const hasChartData = categories.some(c => c.budget > 0 || c.actual > 0);
 
-  const matEntries = transactions.filter(t => t.type === "Materials").slice(0, 5);
-  const labEntries = transactions.filter(t => t.type === "Wages").slice(0, 5);
-  const eqpEntries = transactions.filter(t => t.type === "Expense" || t.type === "Equipment").slice(0, 5);
+  const latest = {
+    Material: transactions.filter(t => t.type === "Materials").slice(0, 5),
+    Labour: transactions.filter(t => t.type === "Wages").slice(0, 5),
+    Equipment: transactions.filter(isEquip).slice(0, 5),
+  };
   const recentTx = transactions.slice(0, 10);
 
   const exportPdf = () => {
@@ -151,178 +169,174 @@ export default function ProjectReportPage() {
     URL.revokeObjectURL(url);
   };
 
-  const cardStyle = { background: "#fff", borderRadius: 16, border: "1px solid #ebebeb", padding: 20, boxShadow: "0 1px 6px rgba(0,0,0,0.04)" };
+  const meta = (
+    <>
+      <BtBadge label={st.label} tone={st.tone} />
+      {project.location && (
+        <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}><MapPin size={14} />{project.location}</span>
+      )}
+      {project.startDate && (
+        <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}><Calendar size={14} />Started {fmtDate(project.startDate)}</span>
+      )}
+    </>
+  );
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", width: "100%", minHeight: "100vh", background: "var(--bg, #0B0D10)" }}>
-      <BtHero
-        eyebrow="PORTFOLIO · PROJECT AUDIT"
-        title={project.projectName}
-        subtitle={`Budget: ${fmtINR(budget)} · Spent: ${fmtINR(stats.total)} · Remaining: ${fmtINR(remaining)}`}
-        actions={
-          <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-            <button
-              onClick={() => navigate("/projects")}
-              style={{
-                display: "inline-flex",
-                alignItems: "center",
-                gap: 6,
-                padding: "8px 14px",
-                background: "rgba(255, 255, 255, 0.08)",
-                border: "1px solid rgba(255, 255, 255, 0.15)",
-                borderRadius: 10,
-                fontSize: 13,
-                fontWeight: 600,
-                color: "#F6F4EF",
-                cursor: "pointer",
-                fontFamily: "inherit",
-              }}
-            >
-              <ArrowLeft size={15} />
-              <span>Back</span>
-            </button>
-            <button
-              onClick={exportPdf}
-              style={{
-                display: "inline-flex",
-                alignItems: "center",
-                gap: 6,
-                padding: "8px 16px",
-                background: "var(--ink, #111317)",
-                border: "1px solid rgba(255, 255, 255, 0.2)",
-                borderRadius: 10,
-                fontSize: 13,
-                fontWeight: 700,
-                color: "#F6F4EF",
-                cursor: "pointer",
-                boxShadow: "0 2px 8px rgba(0,0,0,0.3)",
-              }}
-            >
-              <FileText size={15} />
-              <span>Export PDF</span>
-            </button>
-            <button
-              onClick={exportCsv}
-              style={{
-                display: "inline-flex",
-                alignItems: "center",
-                gap: 6,
-                padding: "8px 14px",
-                background: "rgba(255, 255, 255, 0.08)",
-                border: "1px solid rgba(255, 255, 255, 0.15)",
-                borderRadius: 10,
-                fontSize: 13,
-                fontWeight: 600,
-                color: "#F6F4EF",
-                cursor: "pointer",
-              }}
-            >
-              <Download size={15} />
-              <span>Export CSV</span>
-            </button>
+    <div style={{ display: "flex", flexDirection: "column", width: "100%", minHeight: "100%" }}>
+      <BtHero>
+        <BtPageHeader
+          back={{ label: "Project", onClick: backToProject }}
+          eyebrow="Project report"
+          size="md"
+          title={project.projectName || project.name || "Project"}
+          meta={meta}
+          actions={
+            <>
+              <BtButton variant="onDark" size="small" icon={Download} onClick={exportCsv}>Export CSV</BtButton>
+              <BtButton variant="accent" size="small" icon={FileText} onClick={exportPdf}>Export PDF</BtButton>
+            </>
+          }
+        >
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 12 }}>
+            <BtGlassTile label="Budget" value={formatInr(budget, { compact: true })} icon={Wallet} />
+            <BtGlassTile label="Spent" value={formatInr(stats.total, { compact: true })} icon={IndianRupee} valueColor={overBudget ? "var(--status-danger-bright)" : undefined} />
+            <BtGlassTile label="Remaining" value={formatInr(remaining, { compact: true })} icon={PiggyBank} valueColor={remaining < 0 ? "var(--status-danger-bright)" : undefined} />
+            <BtGlassTile label="Progress" value={`${Math.round(prog)}%`} icon={Gauge} />
           </div>
-        }
-      />
+        </BtPageHeader>
+      </BtHero>
 
-      <BtSheet overlap={26}>
-        <div style={{ padding: "24px 28px", display: "flex", flexDirection: "column", gap: 20 }}>
-        <div style={{ ...cardStyle, marginBottom: 20 }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 16 }}>
-            <div>
-              <div style={{ fontSize: 18, fontWeight: 700, color: "#1a1a1a" }}>{project.projectName}</div>
-              <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 4 }}>
-                <span style={{ padding: "3px 10px", borderRadius: 6, fontSize: 11, fontWeight: 700, background: statusStyle.bg, color: statusStyle.color }}>{(project.status || "Active").toUpperCase()}</span>
-                {project.location && <span style={{ fontSize: 12, color: "#888" }}>📍 {project.location}</span>}
-                {project.startDate && <span style={{ fontSize: 12, color: "#888" }}>📅 Started {fmtDate(project.startDate)}</span>}
-              </div>
+      <BtSheet>
+        <div style={{ maxWidth: 1200, margin: "0 auto", display: "flex", flexDirection: "column", gap: 24 }}>
+          <BtCard padding="20px">
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 12 }}>
+              <span className="bt-eyebrow" style={{ color: "var(--ink-3)" }}>Overall progress</span>
+              <span className="tnum" style={{ fontFamily: "var(--font-display)", fontSize: 22, fontWeight: 700, color: "var(--ink)" }}>{Math.round(prog)}%</span>
             </div>
-          </div>
-          <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
-            <span style={{ fontSize: 13, fontWeight: 600, color: "#444" }}>Progress</span>
-            <span style={{ fontSize: 13, fontWeight: 700, color: "var(--color-primary-hover, #EA580C)" }}>{project.progress || 0}%</span>
-          </div>
-          <div style={{ height: 8, background: "#f0f0f0", borderRadius: 4, overflow: "hidden" }}>
-            <div style={{ width: `${project.progress || 0}%`, height: "100%", background: "var(--color-primary-hover, #EA580C)", borderRadius: 4, transition: "width 0.4s ease" }} />
-          </div>
-        </div>
+            <BtBricks value={prog / 100} height={10} />
+          </BtCard>
 
-        <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr 1fr", gap: 16, marginBottom: 20 }}>
-          <div style={{ ...cardStyle, textAlign: "center" }}>
-            <div style={{ fontSize: 12, fontWeight: 700, color: "#aaa", letterSpacing: "0.06em", marginBottom: 8 }}>BUDGET</div>
-            <div style={{ fontSize: 22, fontWeight: 700, color: "#1a1a1a" }}>{fmtINR(budget)}</div>
-          </div>
-          <div style={{ ...cardStyle, textAlign: "center" }}>
-            <div style={{ fontSize: 12, fontWeight: 700, color: "#aaa", letterSpacing: "0.06em", marginBottom: 8 }}>SPENT</div>
-            <div style={{ fontSize: 22, fontWeight: 700, color: stats.total > budget ? "#dc2626" : "#1a1a1a" }}>{fmtINR(stats.total)}</div>
-          </div>
-          <div style={{ ...cardStyle, textAlign: "center" }}>
-            <div style={{ fontSize: 12, fontWeight: 700, color: "#aaa", letterSpacing: "0.06em", marginBottom: 8 }}>REMAINING</div>
-            <div style={{ fontSize: 22, fontWeight: 700, color: remaining >= 0 ? "#16a34a" : "#dc2626" }}>{fmtINR(remaining)}</div>
-          </div>
-        </div>
-
-        <div style={{ ...cardStyle, marginBottom: 20 }}>
-          <div style={{ fontSize: 15, fontWeight: 700, color: "#1a1a1a", marginBottom: 12 }}>Spend vs Budget</div>
-          <SpendVsBudgetChart data={chartData} />
-        </div>
-
-        <div style={{ ...cardStyle, marginBottom: 20 }}>
-          <div style={{ fontSize: 15, fontWeight: 700, color: "#1a1a1a", marginBottom: 16 }}>Category Breakdown</div>
-          <CategoryBudgetBar name="Material" spent={stats.material} budget={project.budgetMaterial || project.budget?.material || 0} color="#2A78D6" />
-          <CategoryBudgetBar name="Labour" spent={stats.labour} budget={project.budgetLabour || project.budget?.labour || 0} color="#EB6834" />
-          <CategoryBudgetBar name="Equipment" spent={stats.equipment} budget={project.budgetEquipment || project.budget?.equipment || 0} color="#199E70" />
-        </div>
-
-        <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr 1fr", gap: 16, marginBottom: 20 }}>
-          {[
-            { title: "Top Material Entries", entries: matEntries },
-            { title: "Top Labour Entries", entries: labEntries },
-            { title: "Top Equipment Entries", entries: eqpEntries },
-          ].map(section => (
-            <div key={section.title} style={cardStyle}>
-              <div style={{ fontSize: 14, fontWeight: 700, color: "#1a1a1a", marginBottom: 12 }}>{section.title}</div>
-              {section.entries.length === 0 ? (
-                <div style={{ padding: 20, textAlign: "center", color: "#aaa", fontSize: 13 }}>No entries</div>
-              ) : section.entries.map(t => (
-                <div key={t._id} style={{ padding: "10px 0", borderBottom: "1px solid #f5f5f5" }}>
-                  <div style={{ fontSize: 13, fontWeight: 600, color: "#1a1a1a", marginBottom: 2 }}>{t.title || "Untitled"}</div>
-                  <div style={{ display: "flex", justifyContent: "space-between" }}>
-                    <span style={{ fontSize: 12, color: "#888" }}>{fmtDate(t.date)}</span>
-                    <span style={{ fontSize: 13, fontWeight: 600, color: "#dc2626" }}>{fmtINR(t.amount)}</span>
-                  </div>
+          <div className="bt-grid-2" style={{ alignItems: "stretch" }}>
+            <BtCard padding="20px">
+              <BtSectionHeader title="Budget vs spent by category" />
+              {hasChartData ? (
+                <div style={{ width: "100%", height: 280 }}>
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={categories} margin={{ top: 8, right: 8, left: 0, bottom: 0 }} barGap={6}>
+                      <CartesianGrid vertical={false} stroke="var(--line)" />
+                      <XAxis dataKey="category" tickLine={false} axisLine={false} tick={{ fill: "var(--ink-2)", fontSize: 13 }} />
+                      <YAxis tickLine={false} axisLine={false} width={64} tick={{ fill: "var(--ink-2)", fontSize: 12 }} tickFormatter={(v) => formatInr(v, { compact: true })} />
+                      <Tooltip content={<ChartTooltip />} cursor={{ fill: "var(--fill)" }} />
+                      <Legend
+                        iconType="circle"
+                        wrapperStyle={{ fontSize: 13 }}
+                        payload={[
+                          { value: "Budget", type: "circle", color: "var(--slate)" },
+                          { value: "Spent", type: "circle", color: "var(--steel)" },
+                        ]}
+                        formatter={(v) => <span style={{ color: "var(--ink-2)" }}>{v}</span>}
+                      />
+                      <Bar dataKey="budget" name="Budget" fill="var(--slate)" radius={[6, 6, 0, 0]} maxBarSize={40} minPointSize={3} />
+                      <Bar dataKey="actual" name="Spent" fill="var(--steel)" radius={[6, 6, 0, 0]} maxBarSize={40} minPointSize={3}>
+                        <LabelList
+                          dataKey="actual"
+                          content={({ x, y, width, value }) => (
+                            <text x={Number(x) + Number(width) / 2} y={Number(y) - 6} textAnchor="middle" style={{ fill: "var(--ink)", fontSize: 12, fontWeight: 600 }}>
+                              {formatInr(value, { compact: true })}
+                            </text>
+                          )}
+                        />
+                      </Bar>
+                    </BarChart>
+                  </ResponsiveContainer>
                 </div>
-              ))}
-            </div>
-          ))}
-        </div>
+              ) : (
+                <BtEmpty icon={Wallet} title="No category budgets yet" message="Set category budgets on the project to compare them with spend." />
+              )}
+            </BtCard>
 
-        <div style={cardStyle}>
-          <div style={{ fontSize: 15, fontWeight: 700, color: "#1a1a1a", marginBottom: 16 }}>Activity Timeline</div>
-          <div style={{ position: "relative", paddingLeft: 24 }}>
-            <div style={{ position: "absolute", left: 5, top: 0, bottom: 0, width: 2, background: "#e5e5e5" }} />
-            {recentTx.map((t, i) => (
-              <div key={t._id} style={{ position: "relative", marginBottom: i < recentTx.length - 1 ? 20 : 0 }}>
-                <div style={{ position: "absolute", left: -24, top: 4, width: 12, height: 12, borderRadius: "50%", background: TYPE_DOT[t.type] || "#888", border: "2px solid #fff", zIndex: 1 }} />
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
-                  <div>
-                    <div style={{ fontSize: 13, fontWeight: 600, color: "#1a1a1a" }}>{t.title || "Untitled"}</div>
-                    <div style={{ fontSize: 12, color: "#888", marginTop: 2 }}>
-                      {fmtDate(t.date)}
-                      <span style={{ marginLeft: 8, padding: "2px 6px", borderRadius: 4, fontSize: 10, fontWeight: 600, background: TYPE_BADGE[t.type]?.bg || "#f3f4f6", color: TYPE_BADGE[t.type]?.color || "#888" }}>{t.type === "Wages" ? "Labour" : t.type === "Expense" ? "Equipment" : t.type}</span>
+            <BtCard padding="20px">
+              <BtSectionHeader title="Category breakdown" />
+              <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+                {categories.map((c) => {
+                  const over = c.budget > 0 && c.actual > c.budget;
+                  return (
+                    <div key={c.category}>
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 12, marginBottom: 8 }}>
+                        <span style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 15, fontWeight: 600, color: "var(--ink)" }}>
+                          <span style={{ width: 10, height: 10, borderRadius: "50%", background: c.color }} />
+                          {c.category}
+                        </span>
+                        <span className="tnum" style={{ fontSize: 14, color: "var(--ink-2)" }}>
+                          <strong style={{ color: over ? "var(--status-danger)" : "var(--ink)" }}>{formatInr(c.actual, { compact: true })}</strong>
+                          {" of "}{c.budget > 0 ? formatInr(c.budget, { compact: true }) : "no budget"}
+                        </span>
+                      </div>
+                      <BtProgress value={c.budget > 0 ? c.actual / c.budget : 0} color={c.color} overBudget={over} height={8} />
                     </div>
-                  </div>
-                  <span style={{ fontSize: 13, fontWeight: 600, color: t.type === "Income" ? "#16a34a" : "#dc2626" }}>
-                    {t.type === "Income" ? "+" : "-"}{fmtINR(t.amount)}
-                  </span>
-                </div>
+                  );
+                })}
               </div>
-            ))}
-            {recentTx.length === 0 && (
-              <div style={{ padding: 20, textAlign: "center", color: "#aaa", fontSize: 13 }}>No recent entries</div>
+            </BtCard>
+          </div>
+
+          <div>
+            <BtSectionHeader title="Recent entries" />
+            {recentTx.length === 0 ? (
+              <BtCard padding="24px">
+                <BtEmpty icon={Receipt} title="No entries yet" message="Entries logged for this project will appear here." actionLabel="Back to project" onAction={backToProject} />
+              </BtCard>
+            ) : (
+              <BtCard padding="0">
+                <div style={{ overflowX: "auto" }}>
+                  <table className="bt-table" style={{ minWidth: 680 }}>
+                    <thead>
+                      <tr>
+                        <th>Date</th>
+                        <th>Description</th>
+                        <th>Type</th>
+                        <th>Category</th>
+                        <th className="num">Amount</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {recentTx.map((t) => (
+                        <tr key={t._id}>
+                          <td style={{ whiteSpace: "nowrap", color: "var(--ink-2)" }}>{fmtDate(t.date)}</td>
+                          <td style={{ fontWeight: 600 }}>{t.title || "Untitled"}</td>
+                          <td><BtBadge label={TYPE_LABEL[t.type] || t.type || "Entry"} tone={TYPE_TONE[t.type] || "neutral"} /></td>
+                          <td style={{ color: "var(--ink-2)" }}>{t.category || "—"}</td>
+                          <td className="num" style={{ fontWeight: 600, color: t.type === "Income" ? "var(--status-success)" : "var(--ink)" }}>
+                            {t.type === "Income" ? "+" : ""}{formatInr(t.amount)}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </BtCard>
             )}
           </div>
+
+          <div className="bt-grid-3">
+            {Object.entries(latest).map(([title, entries]) => (
+              <BtCard key={title} padding="20px">
+                <BtSectionHeader title={`Latest ${title.toLowerCase()} entries`} caption />
+                {entries.length === 0 ? (
+                  <div style={{ padding: "16px 0", color: "var(--ink-2)", fontSize: 14 }}>No entries</div>
+                ) : entries.map((t, i) => (
+                  <div key={t._id} style={{ padding: "10px 0", borderTop: i === 0 ? "none" : "1px solid var(--line)" }}>
+                    <div style={{ fontSize: 14, fontWeight: 600, color: "var(--ink)", marginBottom: 2, overflowWrap: "anywhere" }}>{t.title || "Untitled"}</div>
+                    <div style={{ display: "flex", justifyContent: "space-between", gap: 8 }}>
+                      <span style={{ fontSize: 13, color: "var(--ink-2)" }}>{fmtDate(t.date)}</span>
+                      <span className="tnum" style={{ fontSize: 14, fontWeight: 600, color: "var(--ink)" }}>{formatInr(t.amount)}</span>
+                    </div>
+                  </div>
+                ))}
+              </BtCard>
+            ))}
+          </div>
         </div>
-      </div>
       </BtSheet>
     </div>
   );

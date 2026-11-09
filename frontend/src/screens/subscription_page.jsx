@@ -1,9 +1,33 @@
 import { useState, useEffect, useRef } from "react";
-import { subscriptionAPI, userAPI } from "../api";
+import { subscriptionAPI } from "../api";
 import { useAuth } from "../contexts/AuthContext";
-import useAuthStore from "../stores/authStore";
-import { Bell, Star, ClipboardList, AlertTriangle, Lock, Building2, CreditCard, HelpCircle, Phone, X, CheckCircle } from "lucide-react";
+import {
+  AlertCircle,
+  Building2,
+  Check,
+  CreditCard,
+  HelpCircle,
+  Info,
+  Lock,
+  Phone,
+  RefreshCw,
+  Users,
+  X,
+  Zap,
+} from "lucide-react";
 import ModuleTour from "../components/ModuleTour";
+import ConfirmDialog from "../components/ui/ConfirmDialog";
+import BtHero from "../components/ui/BtHero";
+import BtPageHeader from "../components/ui/BtPageHeader";
+import BtSheet from "../components/ui/BtSheet";
+import BtCard from "../components/ui/BtCard";
+import BtBadge from "../components/ui/BtBadge";
+import BtButton from "../components/ui/BtButton";
+import BtIconButton from "../components/ui/BtIconButton";
+import BtSegmented from "../components/ui/BtSegmented";
+import BtSkeleton from "../components/ui/BtSkeleton";
+import BtField from "../components/ui/BtField";
+import btToast from "../components/ui/BtToast";
 
 const PLANS = [
   {
@@ -110,15 +134,14 @@ const PLANS = [
   },
 ];
 
-const CHECKMARK = (
-  <span style={{
-    display: "inline-flex", alignItems: "center", justifyContent: "center",
-    width: 18, height: 18, borderRadius: "50%", background: "#fff5f0",
-    color: "var(--color-primary-hover, #EA580C)", fontSize: 11, fontWeight: 800, flexShrink: 0,
-  }}>✓</span>
-);
+const BILLING_OPTIONS = [
+  { label: "AutoPay", value: "auto", icon: RefreshCw },
+  { label: "One-time", value: "once", icon: Zap },
+];
 
-const TOPBAR_H = 65;
+function formatDate(d) {
+  return new Date(d).toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric" });
+}
 
 /** Phone number modal — shown when Airpay requires buyer_phone */
 function PhoneModal({ planTitle, onSubmit, onCancel, loading }) {
@@ -128,8 +151,11 @@ function PhoneModal({ planTitle, onSubmit, onCancel, loading }) {
   const inputRef = useRef(null);
 
   useEffect(() => {
-    setTimeout(() => inputRef.current?.focus(), 100);
-  }, []);
+    const t = setTimeout(() => inputRef.current?.focus(), 100);
+    const onKey = (e) => { if (e.key === "Escape" && !loading) onCancel(); };
+    window.addEventListener("keydown", onKey);
+    return () => { clearTimeout(t); window.removeEventListener("keydown", onKey); };
+  }, [loading, onCancel]);
 
   function validate(val) {
     const digits = val.replace(/\D/g, "");
@@ -146,99 +172,96 @@ function PhoneModal({ planTitle, onSubmit, onCancel, loading }) {
   }
 
   return (
-    <div style={{
-      position: "fixed", inset: 0, zIndex: 9000,
-      background: "rgba(0,0,0,0.5)", display: "flex",
-      alignItems: "center", justifyContent: "center", padding: 16,
-    }}>
-      <div style={{
-        background: "#fff", borderRadius: 18, padding: "32px 28px",
-        maxWidth: 420, width: "100%", boxShadow: "0 20px 60px rgba(0,0,0,0.2)",
-        position: "relative",
-      }}>
-        <button
-          onClick={onCancel}
-          style={{
-            position: "absolute", top: 14, right: 16, background: "none",
-            border: "none", cursor: "pointer", color: "#888", padding: 4,
-          }}
-        >
-          <X size={18} />
-        </button>
+    <div
+      onClick={() => { if (!loading) onCancel(); }}
+      style={{
+        position: "fixed", inset: 0, zIndex: 9000,
+        background: "var(--scrim)", display: "flex",
+        alignItems: "center", justifyContent: "center", padding: 16,
+      }}
+    >
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="phone-modal-title"
+        onClick={(e) => e.stopPropagation()}
+        style={{
+          background: "var(--card)", borderRadius: "var(--r-sheet)", padding: "28px 28px 24px",
+          maxWidth: 440, width: "100%", boxShadow: "var(--shadow-raised)",
+          position: "relative", boxSizing: "border-box",
+        }}
+      >
+        <div style={{ position: "absolute", top: 14, right: 14 }}>
+          <BtIconButton icon={X} label="Close" size={36} onClick={onCancel} disabled={loading} />
+        </div>
 
-        <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 16 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 14, marginBottom: 14, paddingRight: 40 }}>
           <div style={{
-            width: 44, height: 44, borderRadius: 12, background: "#fff5f0",
-            display: "flex", alignItems: "center", justifyContent: "center",
+            width: 46, height: 46, borderRadius: "var(--r-tile)", background: "var(--accent-soft)",
+            color: "var(--accent-ink)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
           }}>
-            <Phone size={20} color="var(--color-primary-hover, #EA580C)" />
+            <Phone size={20} strokeWidth={1.9} />
           </div>
           <div>
-            <div style={{ fontWeight: 700, fontSize: 16, color: "#1a1a1a" }}>
-              Mobile Number Required
-            </div>
-            <div style={{ fontSize: 12, color: "#888", marginTop: 2 }}>
-              For {planTitle} plan payment
+            <h2 id="phone-modal-title" style={{ margin: 0, fontFamily: "var(--font-display)", fontSize: 20, fontWeight: 700, letterSpacing: "-0.02em", color: "var(--ink)" }}>
+              Mobile number needed
+            </h2>
+            <div style={{ fontSize: 13, color: "var(--ink-3)", marginTop: 2 }}>
+              For the {planTitle} plan payment
             </div>
           </div>
         </div>
 
-        <p style={{ fontSize: 13, color: "#555", lineHeight: 1.6, marginBottom: 20 }}>
+        <p style={{ fontSize: 14, color: "var(--ink-2)", lineHeight: 1.55, margin: "0 0 18px" }}>
           Airpay requires your mobile number to process the payment securely.
-          This will be used only for payment verification.
+          It is used only for payment verification.
         </p>
 
-        <form onSubmit={handleSubmit}>
-          <label style={{ fontSize: 13, fontWeight: 600, color: "#374151", display: "block", marginBottom: 6 }}>
-            Mobile Number <span style={{ color: "var(--color-primary-hover, #EA580C)" }}>*</span>
-          </label>
-          <input
-            ref={inputRef}
+        <form onSubmit={handleSubmit} noValidate style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+          <BtField
+            label="Mobile number"
+            required
             type="tel"
+            inputMode="tel"
+            icon={Phone}
             placeholder="e.g. 9876543210"
             value={phone}
-            onChange={e => { setPhone(e.target.value); setPhoneError(""); }}
-            style={{
-              width: "100%", boxSizing: "border-box",
-              padding: "10px 14px", fontSize: 15, borderRadius: 10,
-              border: phoneError ? "1.5px solid #f87171" : "1.5px solid #e5e7eb",
-              outline: "none", marginBottom: phoneError ? 4 : 16,
-            }}
+            error={phoneError}
+            onChange={(e) => { setPhone(e.target.value); setPhoneError(""); }}
+            ref={inputRef}
           />
-          {phoneError && (
-            <p style={{ fontSize: 12, color: "#dc2626", margin: "0 0 14px" }}>{phoneError}</p>
-          )}
 
-          <label style={{
-            display: "flex", alignItems: "center", gap: 8,
-            fontSize: 13, color: "#555", cursor: "pointer", marginBottom: 20,
-          }}>
+          <label style={{ display: "flex", alignItems: "center", gap: 10, fontSize: 14, color: "var(--ink-2)", cursor: "pointer", minHeight: 40 }}>
             <input
               type="checkbox"
               checked={savePhone}
-              onChange={e => setSavePhone(e.target.checked)}
-              style={{ accentColor: "var(--color-primary-hover, #EA580C)", width: 15, height: 15 }}
+              onChange={(e) => setSavePhone(e.target.checked)}
+              style={{ accentColor: "var(--ink)", width: 18, height: 18, flexShrink: 0 }}
             />
             Save this number to my profile for future payments
           </label>
 
-          <button
-            type="submit"
-            disabled={loading}
-            style={{
-              width: "100%", padding: "12px 0", borderRadius: 12,
-              background: loading ? "#f5f5f5" : "var(--color-primary-hover, #EA580C)",
-              color: loading ? "#999" : "#fff",
-              border: "none", fontWeight: 700, fontSize: 15,
-              cursor: loading ? "not-allowed" : "pointer",
-              boxShadow: loading ? "none" : "0 4px 14px rgba(234,88,12,0.35)",
-            }}
-          >
-            {loading ? "Processing…" : "Continue to Payment"}
-          </button>
+          <BtButton type="submit" variant="primary" fullWidth loading={loading}>
+            Continue to payment
+          </BtButton>
         </form>
       </div>
     </div>
+  );
+}
+
+function PlanCardSkeleton() {
+  return (
+    <BtCard padding="24px" style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+      <BtSkeleton width="40%" height="22px" />
+      <BtSkeleton width="80%" height="14px" />
+      <BtSkeleton width="50%" height="40px" />
+      <BtSkeleton height="56px" />
+      <BtSkeleton width="90%" height="14px" />
+      <BtSkeleton width="75%" height="14px" />
+      <BtSkeleton width="85%" height="14px" />
+      <BtSkeleton height="52px" borderRadius="var(--r-button)" style={{ marginTop: 8 }} />
+    </BtCard>
   );
 }
 
@@ -251,26 +274,20 @@ export default function SubscriptionPage() {
   const [subStatus, setSubStatus]     = useState(null);
   const [processing, setProcessing]   = useState(null);
   const [error, setError]             = useState("");
-  const [isNarrow, setIsNarrow]       = useState(window.innerWidth < 768);
   const [runTour, setRunTour]         = useState(false);
+  const [confirmCancel, setConfirmCancel] = useState(false);
+  const [restoring, setRestoring]     = useState(false);
 
   // Phone modal state
   const [phonePlan, setPhonePlan]     = useState(null); // which plan triggered modal
   const [phoneLoading, setPhoneLoading] = useState(false);
   const [isAutoRenew, setIsAutoRenew]   = useState(true); // true = Monthly AutoPay (default), false = One-Time Payment
 
-
   const tourSteps = [
     { target: '.tour-current-plan', content: 'Here is your current active subscription and its status.', disableBeacon: true },
     { target: '.tour-plans', content: 'Explore our available plans. Upgrade to unlock more projects and users.' },
     { target: '.tour-restore-purchases', content: 'If you have upgraded on another device, use this to sync your purchases.' }
   ];
-
-  useEffect(() => {
-    const onResize = () => setIsNarrow(window.innerWidth < 768);
-    window.addEventListener("resize", onResize);
-    return () => window.removeEventListener("resize", onResize);
-  }, []);
 
   useEffect(() => {
     // Check for payment return status in URL
@@ -408,9 +425,9 @@ export default function SubscriptionPage() {
     }
   };
 
-  /** Cancels the active subscription */
+  /** Cancels the active subscription (called after the user confirms in the dialog) */
   const handleCancelSubscription = async () => {
-    if (!window.confirm("Are you sure you want to cancel your subscription? You will be reverted to the Free plan.")) return;
+    setConfirmCancel(false);
     try {
       setProcessing("cancel");
       const { data } = await subscriptionAPI.cancel();
@@ -424,7 +441,7 @@ export default function SubscriptionPage() {
           setCurrentPlan("free");
           setSubStatus({ hasSubscription: false, plan: "free" });
         }
-        alert("Subscription cancelled successfully.");
+        btToast("Subscription cancelled successfully.");
       }
     } catch (err) {
       setError(err.response?.data?.message || "Failed to cancel subscription.");
@@ -433,448 +450,326 @@ export default function SubscriptionPage() {
     }
   };
 
-  if (loading) {
-    return (
-      <div style={{
-        display: "flex", flexDirection: "column",
-        minHeight: "100vh", flex: 1, minWidth: 0, width: "100%",
-        fontFamily: "'DM Sans', 'Segoe UI', sans-serif",
-      }}>
-        <div style={{
-          height: TOPBAR_H, flexShrink: 0,
-          background: "#fff", borderBottom: "1px solid #ebebeb",
-          padding: "0 24px", display: "flex", alignItems: "center",
-          justifyContent: "space-between",
-        }}>
-          <h1 style={{ margin: 0, fontSize: 20, fontWeight: 700, color: "#1a1a1a" }}>Subscription Plans</h1>
-        </div>
-        <div style={{
-          display: "flex", alignItems: "center", justifyContent: "center",
-          flex: 1, color: "#888", fontSize: 15,
-        }}>
-          Loading subscription plans…
-        </div>
-      </div>
-    );
-  }
+  const handleRestore = async () => {
+    setRestoring(true);
+    try {
+      await subscriptionAPI.getStatus();
+      btToast("Purchases restored successfully!");
+    } catch {
+      btToast("No previous purchases found to restore.", { error: true });
+    } finally {
+      setRestoring(false);
+    }
+  };
+
+  const currentMeta = PLANS.find((p) => p.id === currentPlan) || PLANS[0];
+  const canCancel = subStatus?.status === "active" && isAdmin && currentPlan !== "free";
+  const statusLabel = subStatus?.status
+    ? subStatus.status.charAt(0).toUpperCase() + subStatus.status.slice(1)
+    : null;
+  const statusTone = subStatus?.status === "active" ? "success" : subStatus?.status === "cancelled" ? "danger" : "warning";
 
   return (
-    <div style={{
-      display: "flex", flexDirection: "column",
-      minHeight: "100vh",
-      flex: 1, minWidth: 0, width: "100%",
-      fontFamily: "'DM Sans', 'Segoe UI', sans-serif",
-      background: "#f7f7f8",
-    }}>
+    <div style={{ minHeight: "100vh", background: "var(--ground)" }}>
       <ModuleTour steps={tourSteps} run={runTour} setRun={setRunTour} moduleName="Subscription" />
+
+      <ConfirmDialog
+        open={confirmCancel}
+        danger
+        message="End your subscription? You will be reverted to the Free plan."
+        confirmLabel="End subscription"
+        onConfirm={handleCancelSubscription}
+        onCancel={() => setConfirmCancel(false)}
+      />
 
       {/* Phone capture modal */}
       {phonePlan && (
         <PhoneModal
-          planTitle={PLANS.find(p => p.id === phonePlan)?.title || phonePlan}
+          planTitle={PLANS.find((p) => p.id === phonePlan)?.title || phonePlan}
           loading={phoneLoading}
           onSubmit={handlePhoneSubmit}
           onCancel={() => { setPhonePlan(null); setProcessing(null); }}
         />
       )}
 
-      {/* Top bar */}
-      <div style={{
-        height: TOPBAR_H, flexShrink: 0,
-        background: "#fff", borderBottom: "1px solid #ebebeb",
-        padding: "0 24px", display: "flex", alignItems: "center",
-        justifyContent: "space-between", gap: 12, overflow: "hidden",
-      }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 12, minWidth: 0 }}>
-          <h1 style={{ margin: 0, fontSize: "clamp(16px,2vw,20px)", fontWeight: 700, color: "#1a1a1a", whiteSpace: "nowrap" }}>
-            Subscription & Billing
-          </h1>
-        </div>
-        <div style={{ display: "flex", alignItems: "center", gap: 10, flexShrink: 0 }}>
-          <div style={{ width: 36, height: 36, background: "#f5f5f5", borderRadius: 10, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}><Bell size={16} /></div>
-          <button onClick={() => setRunTour(true)} title="Help" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 36, height: 36, background: '#fff', border: '1px solid #E5E7EB', borderRadius: 8, cursor: 'pointer' }}>
-            <HelpCircle size={16} color={'#94A3B8'} />
-          </button>
-        </div>
-      </div>
-
-      {/* Body */}
-      <div style={{
-        flex: 1,
-        minHeight: 0,
-        overflowY: "auto", overflowX: "hidden", WebkitOverflowScrolling: "touch",
-        padding: "clamp(16px,2.5vw,28px) clamp(16px,3vw,28px) 60px",
-        display: "flex", flexDirection: "column", gap: "clamp(14px,2vw,22px)",
-        boxSizing: "border-box",
-      }}>
-
-        {/* Hero banner */}
-        <div style={{
-          background: "linear-gradient(135deg, var(--color-primary-hover, #EA580C) 0%, var(--color-primary, #F97316) 50%, var(--color-primary-light, #FB923C) 100%)",
-          borderRadius: "clamp(16px,2vw,20px)",
-          padding: isNarrow ? "28px 20px" : "40px 44px",
-          color: "#fff",
-          position: "relative",
-          overflow: "hidden",
-        }}>
-          <div style={{ position: "absolute", top: -60, right: -40, width: 220, height: 220, borderRadius: "50%", background: "rgba(255,255,255,0.08)" }} />
-          <div style={{ position: "absolute", bottom: -80, left: "40%", width: 280, height: 280, borderRadius: "50%", background: "rgba(255,255,255,0.05)" }} />
-          <div style={{ position: "relative", zIndex: 1, maxWidth: 640 }}>
-            <div style={{
-              display: "inline-flex", alignItems: "center", gap: 6,
-              background: "rgba(255,255,255,0.2)", borderRadius: 20,
-              padding: "6px 14px", fontSize: 12, fontWeight: 700,
-              letterSpacing: "0.03em", marginBottom: 16, backdropFilter: "blur(4px)",
-            }}>
-              <Star size={14} /> Unlock Premium Features
-            </div>
-            <h2 style={{
-              margin: "0 0 8px", fontSize: "clamp(22px,3vw,32px)",
-              fontWeight: 800, letterSpacing: "-0.5px", lineHeight: 1.2,
-            }}>
-              Choose the Right Plan for Your Business
-            </h2>
-            <p style={{ margin: 0, fontSize: "clamp(13px,1.4vw,16px)", lineHeight: 1.6, opacity: 0.9 }}>
-              Scale your construction management with powerful tools designed for teams of all sizes.
-              No hidden fees, cancel anytime.
-            </p>
-          </div>
-        </div>
-
-        {/* Current plan badge */}
-        {subStatus && (
-          <div className="tour-current-plan" style={{
-            background: "#fff", borderRadius: 14, border: "1px solid #ebebeb",
-            padding: "14px 20px", display: "flex", alignItems: "center",
-            justifyContent: "space-between", flexWrap: "wrap", gap: 12,
-            boxShadow: "0 1px 4px rgba(0,0,0,0.04)",
-          }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-              <div style={{ width: 36, height: 36, borderRadius: 10, background: "#fff5f0", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                <ClipboardList size={16} />
-              </div>
-              <div>
-                <div style={{ fontSize: 13, fontWeight: 700, color: "#1a1a1a" }}>
-                  Current Plan: <span style={{ color: "var(--color-primary-hover, #EA580C)" }}>{PLANS.find(p => p.id === currentPlan)?.title || "Free"}</span>
-                </div>
-                {subStatus.endDate && (
-                  <div style={{ fontSize: 11, color: "#888", marginTop: 2 }}>
-                    Renews on {new Date(subStatus.endDate).toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric" })}
-                  </div>
-                )}
-              </div>
-            </div>
-            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-              {subStatus.status && subStatus.status !== "cancelled" && (
-                <span style={{
-                  fontSize: 11, fontWeight: 700,
-                  color: subStatus.status === "active" ? "#16a34a" : "var(--color-primary-hover, #EA580C)",
-                  background: subStatus.status === "active" ? "#f0fdf4" : "#fff5f0",
-                  padding: "4px 12px", borderRadius: 20, letterSpacing: "0.03em",
-                  textTransform: "uppercase",
-                }}>
-                  {subStatus.status}
-                </span>
-              )}
-              {subStatus.status === "active" && isAdmin && currentPlan !== "free" && (
-                <button
-                  onClick={handleCancelSubscription}
-                  disabled={processing === "cancel"}
-                  style={{
-                    background: "none", border: "1px solid #ff4d4f",
-                    color: "#ff4d4f", padding: "4px 12px", borderRadius: 20,
-                    fontSize: 11, fontWeight: 700, cursor: "pointer",
-                    textTransform: "uppercase", letterSpacing: "0.03em"
-                  }}
-                >
-                  {processing === "cancel" ? "Cancelling..." : "Cancel Plan"}
-                </button>
-              )}
-            </div>
-          </div>
-        )}
-
-        {/* Error banner */}
-        {error && (
-          <div style={{
-            padding: "12px 16px", background: "#fee2e2",
-            border: "1px solid #fca5a5", borderRadius: 10,
-            color: "#991b1b", fontSize: 13, display: "flex",
-            alignItems: "center", gap: 8,
-          }}>
-            <span><AlertTriangle size={14} /></span>
-            <span>{error}</span>
-            <span onClick={() => setError("")} style={{ marginLeft: "auto", cursor: "pointer", fontWeight: 700, fontSize: 16, lineHeight: 1 }}>×</span>
-          </div>
-        )}
-
-        {/* Managed by admin banner */}
-        {!isAdmin && !loading && (
-          <div style={{
-            padding: "12px 16px", background: "#e0f2fe",
-            border: "1px solid #bae6fd", borderRadius: 10,
-            color: "#0369a1", fontSize: 13, display: "flex",
-            alignItems: "center", gap: 8,
-          }}>
-            <span><AlertTriangle size={14} /></span>
-            <span>Your subscription is managed by your administrator.</span>
-          </div>
-        )}
-
-        {/* Billing Option Selector: User Choice between One-Time & AutoPay */}
-        <div style={{
-          display: "flex",
-          flexDirection: "column",
-          alignItems: "center",
-          gap: 10,
-          margin: "4px 0 16px",
-        }}>
-          <div style={{
-            display: "inline-flex",
-            background: "#ebebeb",
-            padding: 4,
-            borderRadius: 12,
-            gap: 4,
-          }}>
-            <button
-              type="button"
-              onClick={() => setIsAutoRenew(true)}
-              style={{
-                border: "none",
-                background: isAutoRenew ? "#fff" : "transparent",
-                color: isAutoRenew ? "var(--color-primary-hover, #EA580C)" : "#666",
-                fontWeight: isAutoRenew ? 700 : 500,
-                padding: "8px 20px",
-                borderRadius: 8,
-                fontSize: 13,
-                cursor: "pointer",
-                boxShadow: isAutoRenew ? "0 2px 6px rgba(0,0,0,0.08)" : "none",
-                display: "flex",
-                alignItems: "center",
-                gap: 6,
-                transition: "all 0.2s ease",
-              }}
-            >
-              <span>🔄</span> AutoPay (Monthly Auto-Debit)
-            </button>
-            <button
-              type="button"
-              onClick={() => setIsAutoRenew(false)}
-              style={{
-                border: "none",
-                background: !isAutoRenew ? "#fff" : "transparent",
-                color: !isAutoRenew ? "var(--color-primary-hover, #EA580C)" : "#666",
-                fontWeight: !isAutoRenew ? 700 : 500,
-                padding: "8px 20px",
-                borderRadius: 8,
-                fontSize: 13,
-                cursor: "pointer",
-                boxShadow: !isAutoRenew ? "0 2px 6px rgba(0,0,0,0.08)" : "none",
-                display: "flex",
-                alignItems: "center",
-                gap: 6,
-                transition: "all 0.2s ease",
-              }}
-            >
-              <span>⚡</span> One-Time Payment (UPI / QR / Cards)
-            </button>
-          </div>
-          <div style={{ fontSize: 12, color: "#666", textAlign: "center" }}>
-            {isAutoRenew
-              ? "🔄 Pay for this month now. Your plan is then renewed automatically every month via UPI AutoPay. Cancel anytime."
-              : "⚡ Pay once for 30 days. No automatic renewals or recurring charges."}
-          </div>
-        </div>
-
-        {/* Plans grid */}
-        <div className="tour-plans" style={{
-          display: "grid",
-          gridTemplateColumns: isNarrow ? "1fr" : "repeat(3, 1fr)",
-          gap: "clamp(12px,1.5vw,18px)",
-        }}>
-          {PLANS.map((plan) => {
-            const isCurrent    = plan.id === currentPlan;
-            const isProcessing = processing === plan.id;
-
-            return (
-              <div
-                key={plan.id}
-                style={{
-                  background: plan.highlighted ? "linear-gradient(180deg, #fff5f0 0%, #fff 40%)" : "#fff",
-                  borderRadius: "clamp(14px,1.5vw,18px)",
-                  border: plan.highlighted ? "2px solid var(--color-primary-hover, #EA580C)" : "1px solid #ebebeb",
-                  padding: "clamp(20px,2.5vw,28px)",
-                  display: "flex", flexDirection: "column",
-                  position: "relative",
-                  boxShadow: plan.highlighted ? "0 8px 32px rgba(234,88,12,0.12)" : "0 1px 8px rgba(0,0,0,0.04)",
-                  transition: "transform 0.2s, box-shadow 0.2s",
-                }}
-                onMouseEnter={e => {
-                  e.currentTarget.style.transform = "translateY(-3px)";
-                  e.currentTarget.style.boxShadow = plan.highlighted
-                    ? "0 12px 40px rgba(234,88,12,0.18)" : "0 8px 24px rgba(0,0,0,0.08)";
-                }}
-                onMouseLeave={e => {
-                  e.currentTarget.style.transform = "translateY(0)";
-                  e.currentTarget.style.boxShadow = plan.highlighted
-                    ? "0 8px 32px rgba(234,88,12,0.12)" : "0 1px 8px rgba(0,0,0,0.04)";
-                }}
-              >
-                <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 14 }}>
-                  {plan.highlighted && (
-                    <span style={{
-                      fontSize: 10, fontWeight: 800, color: "#fff",
-                      background: "var(--color-primary-hover, #EA580C)", padding: "3px 10px",
-                      borderRadius: 20, letterSpacing: "0.05em", textTransform: "uppercase",
-                    }}>Most Popular</span>
-                  )}
-                  {isCurrent && (
-                    <span style={{
-                      fontSize: 10, fontWeight: 800, color: "#16a34a",
-                      background: "#f0fdf4", border: "1px solid #bbf7d0",
-                      padding: "3px 10px", borderRadius: 20,
-                      letterSpacing: "0.05em", textTransform: "uppercase",
-                    }}>Current Plan</span>
-                  )}
-                </div>
-
-                <div style={{ fontSize: "clamp(16px,1.6vw,20px)", fontWeight: 800, color: "#1a1a1a", marginBottom: 4 }}>
-                  {plan.title}
-                </div>
-                <div style={{ fontSize: "clamp(11px,1.1vw,13px)", color: "#888", marginBottom: 16, lineHeight: 1.4 }}>
-                  {plan.tagline}
-                </div>
-
-                <div style={{ marginBottom: 20 }}>
-                  <span style={{
-                    fontSize: "clamp(28px,3vw,36px)", fontWeight: 800,
-                    color: plan.highlighted ? "var(--color-primary-hover, #EA580C)" : "#1a1a1a", letterSpacing: "-1px",
-                  }}>
-                    {plan.price === 0 ? "₹0" : `₹${plan.price.toLocaleString("en-IN")}`}
-                  </span>
-                  <span style={{ fontSize: 13, color: "#888", fontWeight: 500, marginLeft: 4 }}>
-                    {plan.period}
-                  </span>
-                </div>
-
-                <div style={{ display: "flex", gap: 12, marginBottom: 18, paddingBottom: 16, borderBottom: "1px solid #f0f0f0" }}>
-                  <div style={{ flex: 1, background: "#f7f7f8", borderRadius: 8, padding: "8px 10px", textAlign: "center" }}>
-                    <div style={{ fontSize: 11, color: "#888", fontWeight: 600 }}>Users</div>
-                    <div style={{ fontSize: 13, fontWeight: 700, color: "#1a1a1a", marginTop: 2 }}>{plan.users}</div>
-                  </div>
-                  <div style={{ flex: 1, background: "#f7f7f8", borderRadius: 8, padding: "8px 10px", textAlign: "center" }}>
-                    <div style={{ fontSize: 11, color: "#888", fontWeight: 600 }}>Projects</div>
-                    <div style={{ fontSize: 13, fontWeight: 700, color: "#1a1a1a", marginTop: 2 }}>{plan.projects}</div>
-                  </div>
-                </div>
-
-                <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 10, marginBottom: 20 }}>
-                  {plan.features.map((feat, i) => (
-                    <div key={i} style={{ display: "flex", alignItems: "flex-start", gap: 10 }}>
-                      {CHECKMARK}
-                      <span style={{ fontSize: "clamp(12px,1.1vw,13px)", color: "#555", lineHeight: 1.5, fontWeight: 500 }}>
-                        {feat}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-
-                {isAdmin && (
-                  <button
-                    onClick={() => handleSubscribe(plan.id)}
-                    disabled={isCurrent || isProcessing}
-                    style={{
-                      width: "100%", padding: "12px 0", borderRadius: 12,
-                      border: isCurrent ? "1px solid #e5e5e5" : plan.highlighted ? "none" : "2px solid var(--color-primary-hover, #EA580C)",
-                      background: isCurrent ? "#f5f5f5" : plan.highlighted ? "var(--color-primary-hover, #EA580C)" : "#fff",
-                      color: isCurrent ? "#999" : plan.highlighted ? "#fff" : "var(--color-primary-hover, #EA580C)",
-                      fontWeight: 700, fontSize: 14,
-                      cursor: isCurrent || isProcessing ? "not-allowed" : "pointer",
-                      boxShadow: isCurrent ? "none" : plan.highlighted ? "0 4px 14px rgba(234,88,12,0.35)" : "none",
-                      transition: "all 0.2s ease",
-                      opacity: isProcessing ? 0.7 : 1,
-                      letterSpacing: "0.02em",
-                    }}
-                    onMouseEnter={e => {
-                      if (isCurrent || isProcessing) return;
-                      if (plan.highlighted) {
-                        e.currentTarget.style.background = "#c2410c";
-                        e.currentTarget.style.transform = "translateY(-1px)";
-                        e.currentTarget.style.boxShadow = "0 6px 20px rgba(234,88,12,0.4)";
-                      } else {
-                        e.currentTarget.style.background = "#fff5f0";
-                      }
-                    }}
-                    onMouseLeave={e => {
-                      if (isCurrent || isProcessing) return;
-                      if (plan.highlighted) {
-                        e.currentTarget.style.background = "var(--color-primary-hover, #EA580C)";
-                        e.currentTarget.style.transform = "translateY(0)";
-                        e.currentTarget.style.boxShadow = "0 4px 14px rgba(234,88,12,0.35)";
-                      } else {
-                        e.currentTarget.style.background = "#fff";
-                      }
-                    }}
-                  >
-                    {isCurrent
-                      ? "✓ Current Plan"
-                      : isProcessing
-                        ? "Processing…"
-                        : plan.price === 0
-                          ? "Get Started"
-                          : isAutoRenew
-                          ? `Subscribe with AutoPay (₹${plan.price}/mo)`
-                          : `Pay ₹${plan.price} (One-Time)`}
-                  </button>
-                )}
-              </div>
-            );
-          })}
-        </div>
-
-        {/* Footer */}
-        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 12, marginTop: 8, paddingBottom: 20 }}>
-          <span
+      {/* ── HERO ── */}
+      <BtHero>
+        <BtPageHeader
+          eyebrow="Billing"
+          title="Subscription"
+          subtitle="Your plan, billing and what each tier includes."
+          actions={<BtIconButton onDark icon={HelpCircle} label="Page tour" onClick={() => setRunTour(true)} />}
+        >
+          <div
+            className="tour-current-plan"
             style={{
-              fontSize: 14, color: "var(--color-primary-hover, #EA580C)", fontWeight: 700,
-              cursor: "pointer", padding: "8px 20px", borderRadius: 10,
-              background: "#fff5f0", border: "1px solid #fde8d8",
-              transition: "background 0.15s",
-            }}
-            className="hover-bg-subtle tour-restore-purchases"
-            onClick={async () => {
-              try {
-                await subscriptionAPI.getStatus();
-                alert("Purchases restored successfully!");
-              } catch {
-                alert("No previous purchases found to restore.");
-              }
+              background: "rgba(255, 255, 255, 0.05)",
+              border: "1px solid var(--noir-line)",
+              borderRadius: "var(--r-card)",
+              padding: "20px 24px",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              flexWrap: "wrap",
+              gap: 20,
             }}
           >
-            Restore Purchases
-          </span>
+            {loading ? (
+              <div style={{ display: "flex", flexDirection: "column", gap: 10, flex: "1 1 260px" }}>
+                <BtSkeleton width="120px" height="12px" style={{ opacity: 0.25 }} />
+                <BtSkeleton width="200px" height="30px" style={{ opacity: 0.25 }} />
+                <BtSkeleton width="260px" height="14px" style={{ opacity: 0.25 }} />
+              </div>
+            ) : (
+              <>
+                <div style={{ minWidth: 0 }}>
+                  <div className="bt-eyebrow" style={{ color: "var(--on-noir-3)", marginBottom: 6 }}>
+                    Current plan
+                  </div>
+                  <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+                    <span
+                      style={{
+                        fontFamily: "var(--font-display)", fontSize: 30, fontWeight: 700,
+                        letterSpacing: "-0.025em", color: "var(--on-noir)", lineHeight: 1.1,
+                      }}
+                    >
+                      {currentMeta.title}
+                    </span>
+                    {statusLabel && <BtBadge tone={statusTone} label={statusLabel} />}
+                  </div>
+                  <div style={{ display: "flex", alignItems: "center", gap: 16, flexWrap: "wrap", marginTop: 10, fontSize: 14, color: "var(--on-noir-2)" }}>
+                    {subStatus?.endDate ? (
+                      <span>Renews on <strong style={{ color: "var(--on-noir)", fontWeight: 600 }}>{formatDate(subStatus.endDate)}</strong></span>
+                    ) : (
+                      <span>No renewal date, free forever</span>
+                    )}
+                    <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+                      <Users size={14} strokeWidth={1.9} /> {currentMeta.users}
+                    </span>
+                    <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+                      <Building2 size={14} strokeWidth={1.9} /> {currentMeta.projects}
+                    </span>
+                  </div>
+                </div>
 
-          <p style={{ fontSize: 11, color: "#aaa", textAlign: "center", maxWidth: 520, lineHeight: 1.6, margin: 0 }}>
-            Subscriptions automatically renew at the end of each billing period unless cancelled
-            at least 24 hours before the renewal date. You can manage your subscription from your
-            account settings. Payment is processed securely through our payment partner.
-          </p>
+                {canCancel && (
+                  <BtButton
+                    variant="destructive"
+                    size="small"
+                    loading={processing === "cancel"}
+                    onClick={() => setConfirmCancel(true)}
+                  >
+                    Cancel plan
+                  </BtButton>
+                )}
+              </>
+            )}
+          </div>
+        </BtPageHeader>
+      </BtHero>
 
-          <div style={{ display: "flex", alignItems: "center", gap: 16, marginTop: 4 }}>
-            {[
-              { icon: Lock,      label: "Secure Payment" },
-              { icon: Building2, label: "RBI Compliant" },
-              { icon: CreditCard, label: "UPI / Cards" },
-            ].map(({ icon: Icon, label }) => (
-              <span key={label} style={{ fontSize: 11, color: "#888", fontWeight: 600, display: "flex", alignItems: "center", gap: 4 }}>
-                <Icon size={14} />
-                {label}
-              </span>
-            ))}
+      {/* ── SHEET ── */}
+      <BtSheet overlap={26} padding="28px 32px 64px">
+        <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
+
+          {/* Error banner */}
+          {error && (
+            <div
+              role="alert"
+              style={{
+                padding: "12px 12px 12px 16px", background: "var(--status-danger-soft)",
+                border: "1px solid var(--status-danger)", borderRadius: "var(--r-input)",
+                color: "var(--status-danger)", fontSize: 14, fontWeight: 500,
+                display: "flex", alignItems: "center", gap: 10,
+              }}
+            >
+              <AlertCircle size={18} style={{ flexShrink: 0 }} />
+              <span style={{ flex: 1 }}>{error}</span>
+              <BtIconButton icon={X} label="Dismiss message" size={36} onClick={() => setError("")} style={{ background: "transparent", border: "none", color: "var(--status-danger)" }} />
+            </div>
+          )}
+
+          {/* Managed by admin banner */}
+          {!isAdmin && !loading && (
+            <div
+              style={{
+                padding: "12px 16px", background: "var(--fill)",
+                border: "1px solid var(--line)", borderRadius: "var(--r-input)",
+                color: "var(--ink-2)", fontSize: 14, display: "flex",
+                alignItems: "center", gap: 10,
+              }}
+            >
+              <Info size={18} style={{ flexShrink: 0 }} />
+              <span>Your subscription is managed by your administrator.</span>
+            </div>
+          )}
+
+          {/* Billing option: AutoPay or one-time */}
+          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 12 }}>
+              <h2 style={{ margin: 0, fontFamily: "var(--font-display)", fontSize: 20, fontWeight: 700, letterSpacing: "-0.02em", color: "var(--ink)" }}>
+                Choose a plan
+              </h2>
+              <BtSegmented
+                options={BILLING_OPTIONS}
+                value={isAutoRenew ? "auto" : "once"}
+                onChange={(v) => setIsAutoRenew(v === "auto")}
+                aria-label="Billing method"
+              />
+            </div>
+            <p style={{ margin: 0, fontSize: 14, color: "var(--ink-2)", lineHeight: 1.5 }}>
+              {isAutoRenew
+                ? "Pay for this month now. Your plan then renews automatically every month via UPI AutoPay. Cancel anytime."
+                : "Pay once for 30 days via UPI, QR or card. No automatic renewals or recurring charges."}
+            </p>
+          </div>
+
+          {/* Plans grid */}
+          <div className="tour-plans bt-grid-3" style={{ gap: 20, alignItems: "stretch" }}>
+            {loading
+              ? [1, 2, 3].map((i) => <PlanCardSkeleton key={i} />)
+              : PLANS.map((plan) => {
+                  const isCurrent    = plan.id === currentPlan;
+                  const isProcessing = processing === plan.id;
+                  const busy         = processing !== null;
+
+                  return (
+                    <BtCard
+                      key={plan.id}
+                      padding="24px"
+                      className={isCurrent ? undefined : "bt-hover-card"}
+                      style={{
+                        display: "flex", flexDirection: "column",
+                        border: isCurrent
+                          ? "2px solid var(--ink)"
+                          : plan.highlighted
+                            ? "2px solid var(--accent)"
+                            : "2px solid var(--line)",
+                      }}
+                      aria-current={isCurrent ? "true" : undefined}
+                    >
+                      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, minHeight: 24, marginBottom: 10 }}>
+                        <div style={{ fontFamily: "var(--font-display)", fontSize: 22, fontWeight: 700, letterSpacing: "-0.02em", color: "var(--ink)" }}>
+                          {plan.title}
+                        </div>
+                        {isCurrent ? (
+                          <BtBadge tone="success" label="Current plan" showDot={false} />
+                        ) : plan.highlighted ? (
+                          <BtBadge tone="brand" label="Most popular" showDot={false} />
+                        ) : null}
+                      </div>
+
+                      <div style={{ fontSize: 14, color: "var(--ink-2)", lineHeight: 1.45, minHeight: 40 }}>
+                        {plan.tagline}
+                      </div>
+
+                      <div style={{ margin: "18px 0 18px", display: "flex", alignItems: "baseline", gap: 6 }}>
+                        <span className="tnum" style={{ fontFamily: "var(--font-display)", fontSize: 38, fontWeight: 700, letterSpacing: "-0.03em", color: "var(--ink)", lineHeight: 1 }}>
+                          {`₹${plan.price.toLocaleString("en-IN")}`}
+                        </span>
+                        <span style={{ fontSize: 14, color: "var(--ink-3)", fontWeight: 500 }}>{plan.period}</span>
+                      </div>
+
+                      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 20 }}>
+                        <div style={{ background: "var(--fill)", borderRadius: "var(--r-tile)", padding: "10px 12px", minWidth: 0 }}>
+                          <div className="bt-eyebrow" style={{ color: "var(--ink-3)", display: "flex", alignItems: "center", gap: 5 }}>
+                            <Users size={12} strokeWidth={2} /> Users
+                          </div>
+                          <div style={{ fontSize: 14, fontWeight: 600, color: "var(--ink)", marginTop: 4 }}>{plan.users}</div>
+                        </div>
+                        <div style={{ background: "var(--fill)", borderRadius: "var(--r-tile)", padding: "10px 12px", minWidth: 0 }}>
+                          <div className="bt-eyebrow" style={{ color: "var(--ink-3)", display: "flex", alignItems: "center", gap: 5 }}>
+                            <Building2 size={12} strokeWidth={2} /> Projects
+                          </div>
+                          <div style={{ fontSize: 14, fontWeight: 600, color: "var(--ink)", marginTop: 4 }}>{plan.projects}</div>
+                        </div>
+                      </div>
+
+                      <ul style={{ listStyle: "none", margin: "0 0 24px", padding: 0, flex: 1, display: "flex", flexDirection: "column", gap: 11 }}>
+                        {plan.features.map((feat) => (
+                          <li key={feat} style={{ display: "flex", alignItems: "flex-start", gap: 10 }}>
+                            <span
+                              style={{
+                                width: 20, height: 20, borderRadius: "50%", flexShrink: 0, marginTop: 1,
+                                background: "var(--status-success-soft)", color: "var(--status-success)",
+                                display: "inline-flex", alignItems: "center", justifyContent: "center",
+                              }}
+                            >
+                              <Check size={12} strokeWidth={3} />
+                            </span>
+                            <span style={{ fontSize: 14, color: "var(--ink-2)", lineHeight: 1.45 }}>{feat}</span>
+                          </li>
+                        ))}
+                      </ul>
+
+                      {isAdmin && (
+                        isCurrent ? (
+                          <div
+                            style={{
+                              height: 52, display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
+                              borderRadius: "var(--r-button)", background: "var(--status-success-soft)",
+                              color: "var(--status-success)", fontSize: 15, fontWeight: 600,
+                            }}
+                          >
+                            <Check size={18} strokeWidth={2.4} /> Your current plan
+                          </div>
+                        ) : plan.id === "free" ? (
+                          <div style={{ fontSize: 13, color: "var(--ink-3)", textAlign: "center", lineHeight: 1.45, padding: "6px 0" }}>
+                            Applies automatically if you cancel your plan.
+                          </div>
+                        ) : (
+                          <BtButton
+                            variant={plan.highlighted ? "primary" : "secondary"}
+                            fullWidth
+                            loading={isProcessing}
+                            disabled={busy && !isProcessing}
+                            onClick={() => handleSubscribe(plan.id)}
+                            style={{ fontSize: 15 }}
+                          >
+                            {isAutoRenew
+                              ? "Subscribe with AutoPay"
+                              : `Pay ₹${plan.price.toLocaleString("en-IN")} once`}
+                          </BtButton>
+                        )
+                      )}
+                    </BtCard>
+                  );
+                })}
+          </div>
+
+          {/* Footer */}
+          <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 14, marginTop: 8 }}>
+            <BtButton
+              variant="secondary"
+              size="small"
+              icon={RefreshCw}
+              loading={restoring}
+              className="tour-restore-purchases"
+              onClick={handleRestore}
+            >
+              Restore purchases
+            </BtButton>
+
+            <p style={{ fontSize: 13, color: "var(--ink-3)", textAlign: "center", maxWidth: 560, lineHeight: 1.6, margin: 0 }}>
+              Subscriptions automatically renew at the end of each billing period unless cancelled
+              at least 24 hours before the renewal date. Payment is processed securely through our payment partner.
+            </p>
+
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 20, flexWrap: "wrap" }}>
+              {[
+                { icon: Lock, label: "Secure payment" },
+                { icon: Building2, label: "RBI compliant" },
+                { icon: CreditCard, label: "UPI / Cards" },
+              ].map(({ icon: Icon, label }) => (
+                <span key={label} style={{ fontSize: 13, color: "var(--ink-2)", fontWeight: 500, display: "inline-flex", alignItems: "center", gap: 6 }}>
+                  <Icon size={14} strokeWidth={1.9} />
+                  {label}
+                </span>
+              ))}
+            </div>
           </div>
         </div>
-
-      </div>
+      </BtSheet>
     </div>
   );
 }

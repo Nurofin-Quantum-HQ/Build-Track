@@ -1,0 +1,113 @@
+/* ───────────── Blueprint Noir motion ─────────────
+   Levels come from <html data-motion="full|reduced|off"> (utils/motion.js).
+   Full: rise + stagger. Reduced: fades only. Off: instant. */
+
+@keyframes btRise    { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: none; } }
+@keyframes btFade    { from { opacity: 0; } to { opacity: 1; } }
+@keyframes btSheetUp { from { opacity: 0; transform: translateY(32px); } to { opacity: 1; transform: none; } }
+@keyframes btHeroIn  { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+@keyframes btPop     { 0% { opacity: 0; transform: scale(0.92); } 60% { opacity: 1; transform: scale(1.02); } 100% { transform: scale(1); } }
+@keyframes btGlowDrift { 0%, 100% { transform: translate(0, 0); opacity: 1; } 50% { transform: translate(-18px, 14px); opacity: 0.8; } }
+
+/* Route change: content fades up; the sheet slides over the hero */
+.bt-route { animation: btFade 220ms ease backwards; }
+.bt-hero-content { animation: btHeroIn 480ms var(--ease) backwards; }
+.bt-sheet { animation: btSheetUp 620ms var(--ease) backwards; animation-delay: 60ms; }
+.hero-glow-circle { animation: btGlowDrift 14s ease-in-out infinite; }
+
+/* Staggered reveal: <BtReveal index={i}> or className="bt-reveal" style={{ '--i': i }} */
+.bt-reveal {
+  animation: btRise 640ms var(--ease) backwards;
+  animation-delay: calc(min(var(--i, 0), 10) * 55ms + 120ms);
+}
+.bt-pop { animation: btPop 420ms var(--spring) backwards; }
+
+/* Automatic stagger — every page gets it without per-page wiring */
+.bt-sheet > *,
+:is(.bt-grid-2, .bt-grid-3, .bt-grid-4) > * {
+  animation: btRise 560ms var(--ease) backwards;
+  animation-delay: calc(var(--bt-seq, 0) * 55ms + 120ms);
+}
+.bt-table tbody tr {
+  animation: btFade 320ms ease backwards;
+  animation-delay: calc(var(--bt-seq, 0) * 28ms + 160ms);
+}
+.bt-sheet > :nth-child(1) { --bt-seq: 0; }
+.bt-sheet > :nth-child(2) { --bt-seq: 1; }
+.bt-sheet > :nth-child(3) { --bt-seq: 2; }
+.bt-sheet > :nth-child(4) { --bt-seq: 3; }
+.bt-sheet > :nth-child(5) { --bt-seq: 4; }
+.bt-sheet > :nth-child(6) { --bt-seq: 5; }
+.bt-sheet > :nth-child(7) { --bt-seq: 6; }
+.bt-sheet > :nth-child(8) { --bt-seq: 7; }
+:is(.bt-grid-2, .bt-grid-3, .bt-grid-4) > :nth-child(1) { --bt-seq: 0; }
+:is(.bt-grid-2, .bt-grid-3, .bt-grid-4) > :nth-child(2) { --bt-seq: 1; }
+:is(.bt-grid-2, .bt-grid-3, .bt-grid-4) > :nth-child(3) { --bt-seq: 2; }
+:is(.bt-grid-2, .bt-grid-3, .bt-grid-4) > :nth-child(4) { --bt-seq: 3; }
+:is(.bt-grid-2, .bt-grid-3, .bt-grid-4) > :nth-child(5) { --bt-seq: 4; }
+:is(.bt-grid-2, .bt-grid-3, .bt-grid-4) > :nth-child(6) { --bt-seq: 5; }
+:is(.bt-grid-2, .bt-grid-3, .bt-grid-4) > :nth-child(7) { --bt-seq: 6; }
+:is(.bt-grid-2, .bt-grid-3, .bt-grid-4) > :nth-child(8) { --bt-seq: 7; }
+:is(.bt-grid-2, .bt-grid-3, .bt-grid-4) > :nth-child(9) { --bt-seq: 8; }
+:is(.bt-grid-2, .bt-grid-3, .bt-grid-4) > :nth-child(10) { --bt-seq: 9; }
+:is(.bt-grid-2, .bt-grid-3, .bt-grid-4) > :nth-child(11) { --bt-seq: 10; }
+:is(.bt-grid-2, .bt-grid-3, .bt-grid-4) > :nth-child(12) { --bt-seq: 11; }
+.bt-table tbody tr:nth-child(1) { --bt-seq: 0; }
+.bt-table tbody tr:nth-child(2) { --bt-seq: 1; }
+.bt-table tbody tr:nth-child(3) { --bt-seq: 2; }
+.bt-table tbody tr:nth-child(4) { --bt-seq: 3; }
+.bt-table tbody tr:nth-child(5) { --bt-seq: 4; }
+.bt-table tbody tr:nth-child(6) { --bt-seq: 5; }
+.bt-table tbody tr:nth-child(7) { --bt-seq: 6; }
+.bt-table tbody tr:nth-child(8) { --bt-seq: 7; }
+.bt-table tbody tr:nth-child(9) { --bt-seq: 8; }
+.bt-table tbody tr:nth-child(10) { --bt-seq: 9; }
+.bt-table tbody tr:nth-child(11) { --bt-seq: 10; }
+.bt-table tbody tr:nth-child(12) { --bt-seq: 11; }
+
+/* Button and chip feedback */
+.bt-btn { transition: transform 380ms var(--spring), filter 150ms ease, box-shadow 200ms var(--ease), background 150ms ease; }
+.bt-btn:hover:not(:disabled) { filter: brightness(1.1); box-shadow: 0 6px 18px -8px rgba(12, 14, 18, 0.45); }
+
+/* Sidebar settles in once, on first load */
+@keyframes btFloatIn { from { opacity: 0; transform: translateX(-14px) scale(0.985); } to { opacity: 1; transform: none; } }
+.bt-float-nav { animation: btFloatIn 620ms var(--ease) backwards; }
+
+/* Reduced: fades only, no rises/stagger/looping */
+html[data-motion="reduced"] .bt-reveal,
+html[data-motion="reduced"] .bt-sheet,
+html[data-motion="reduced"] .bt-hero-content,
+html[data-motion="reduced"] .bt-float-nav,
+html[data-motion="reduced"] .bt-pop,
+html[data-motion="reduced"] .bt-sheet > *,
+html[data-motion="reduced"] :is(.bt-grid-2, .bt-grid-3, .bt-grid-4) > *,
+html[data-motion="reduced"] .bt-table tbody tr { animation: btFade 200ms ease backwards; animation-delay: 0ms; }
+html[data-motion="reduced"] .hero-glow-circle { animation: none; }
+html[data-motion="reduced"] .bt-nav-item:hover,
+html[data-motion="reduced"] .bt-hover-card:hover,
+html[data-motion="reduced"] .tx-row:hover,
+html[data-motion="reduced"] .hover-premium-lift:hover { transform: none; }
+
+/* Off: nothing moves */
+html[data-motion="off"] *,
+html[data-motion="off"] *::before,
+html[data-motion="off"] *::after {
+  animation-duration: 0.01ms !important;
+  animation-delay: 0ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.01ms !important;
+}
+
+/* Success scenes (components/ui/BtSuccessModal.jsx) */
+@keyframes btSceneDrop  { 0% { transform: translateY(-90px); opacity: 0; } 55% { transform: translateY(4px); opacity: 1; } 75% { transform: translateY(-3px); } 100% { transform: none; opacity: 1; } }
+@keyframes btSceneNote  { 0% { transform: translateY(-20px); opacity: 0; } 25% { opacity: 1; } 100% { transform: translateY(46px); opacity: 0; } }
+@keyframes btSceneBadge { 0% { transform: scale(0); } 70% { transform: scale(1.15); } 100% { transform: scale(1); } }
+@keyframes btSceneDraw  { from { stroke-dashoffset: 1; } to { stroke-dashoffset: 0; } }
+.bt-scene .bt-scene-drop  { animation: btSceneDrop 620ms var(--ease) both; }
+.bt-scene .bt-scene-note  { animation: btSceneNote 760ms var(--ease) both; }
+.bt-scene .bt-scene-badge { animation: btSceneBadge 420ms var(--spring) both; }
+.bt-scene .bt-scene-ring,
+.bt-scene .bt-scene-tick  { stroke-dasharray: 1; animation: btSceneDraw 520ms var(--ease) both; }
+.bt-scene .bt-scene-badge .bt-scene-tick { stroke-dasharray: 60; stroke-dashoffset: 0; animation: none; }
+.bt-scene-static * { animation: none !important; }
+.bt-scene-static .bt-scene-note { opacity: 0; }

@@ -44,7 +44,7 @@ export default function BtHero({
       </div>
 
       {/* Hero content - higher zIndex so dropdowns render above BtSheet */}
-      <div style={{ position: 'relative', zIndex: 20 }}>{children}</div>
+      <div className="bt-hero-content" style={{ position: 'relative', zIndex: 20 }}>{children}</div>
     </div>
   );
 }

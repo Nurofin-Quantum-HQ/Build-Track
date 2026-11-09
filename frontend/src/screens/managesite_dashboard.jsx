@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { projectAPI, transactionAPI } from '../api';
@@ -6,7 +6,6 @@ import perfLogger from '../utils/performanceLogger';
 import { resolveImageUrl } from '../utils/imageUrl';
 import {
   calcProgress,
-  getPhaseProgress,
   toggleActivity,
   isActivityCompleted,
 } from '../utils/constructionPhases';
@@ -14,7 +13,10 @@ import {
   BtHero,
   BtGlassTile,
   BtSheet,
+  BtPageHeader,
   BtButton,
+  BtIconButton,
+  BtField,
   BtCard,
   BtGroup,
   BtRow,
@@ -22,12 +24,11 @@ import {
   BtChip,
   BtBricks,
   BtProgress,
-  BtCountUp,
   formatInr,
   BtEmpty,
   BtTypeTile,
   BtSectionHeader,
-  BtPageLoader,
+  BtSkeleton,
   btToast,
 } from '../components/ui';
 import CsvImportExportCard from '../components/CsvImportExportCard';
@@ -35,25 +36,18 @@ import useTransactionStore from '../stores/transactionStore';
 import { Toast, ConfirmDialog } from '../components/Toast';
 import {
   ChevronDown,
-  ChevronRight,
   Plus,
   FileDown,
   FileUp,
   Pencil,
   X,
   Check,
-  ArrowRight,
-  ArrowLeft,
+  Eye,
   Building2,
   MapPin,
   Calendar,
   User,
-  Hash,
-  Phone,
-  Code,
-  Wrench,
   Layers,
-  Bed,
   Settings,
   Zap,
   Flame,
@@ -62,15 +56,12 @@ import {
   Clock,
   IndianRupee,
   CreditCard,
-  PiggyBank,
   Target,
   ClipboardCheck,
-  Camera,
   FileText,
   Mic,
   TrendingUp,
   Sparkles,
-  HardHat,
   Info,
 } from 'lucide-react';
 
@@ -91,83 +82,170 @@ const _kTerrace = ['Weathering Course', 'Cool Roof Paint', 'Overhead Tank', 'Sol
 const _getStr = (item) => (typeof item === 'object' ? item?.name || item?.label || item?.title || item?.value || '' : String(item || ''));
 const _grp = (all, opts) => all.filter((f) => opts.includes(_getStr(f)));
 const _months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-const _fmtDate = (d) => (d ? `${d.getDate()} ${_months[d.getMonth()]} ${d.getFullYear()}` : '—');
-const fmtINR = (n) => (n !== undefined && n !== null ? `₹${Number(n).toLocaleString('en-IN')}` : '—');
+const _fmtDate = (d) => (d && !isNaN(d.getTime()) ? `${d.getDate()} ${_months[d.getMonth()]} ${d.getFullYear()}` : '—');
+const money = (n) => formatInr(n);
 
-function CollapsibleCard({ title, icon, defaultOpen = true, count, subtitle, children }) {
+// btToast is a function (message, { error }) — it has no .success/.error helpers.
+const notify = (message, error = false) => btToast(message, { error });
+
+// Same words as the Projects list filter tabs.
+function projectStatus(raw) {
+  const s = (raw || '').toLowerCase().replace(/[\s_]+/g, '');
+  if (s === 'planning') return { label: 'Planning', tone: 'neutral' };
+  if (s === 'onhold') return { label: 'On Hold', tone: 'warning' };
+  if (s === 'completed') return { label: 'Completed', tone: 'success' };
+  if (s === 'cancelled' || s === 'reviewneeded') return { label: 'Review Needed', tone: 'danger' };
+  return { label: 'Active', tone: 'brand' };
+}
+
+const TYPE_LABEL = { Materials: 'Material', Wages: 'Labour', Expense: 'Equipment' };
+const TYPE_TONE = { Materials: 'material', Wages: 'labour', Labour: 'labour', Expense: 'equipment', Equipment: 'equipment', Income: 'income' };
+
+const eyebrow = { color: 'var(--ink-3)' };
+
+/** Small label + value pair used across the overview / specs tabs. */
+function Fact({ label, children }) {
+  return (
+    <div style={{ minWidth: 0 }}>
+      <div className="bt-eyebrow" style={{ ...eyebrow, marginBottom: 4 }}>{label}</div>
+      <div style={{ fontFamily: 'var(--font-ui)', fontSize: 15, fontWeight: 600, color: 'var(--ink)', overflowWrap: 'anywhere' }}>
+        {children}
+      </div>
+    </div>
+  );
+}
+
+function FactTile({ label, children }) {
+  return (
+    <div style={{ padding: '14px 16px', borderRadius: 'var(--r-input)', background: 'var(--fill)', minWidth: 0 }}>
+      <Fact label={label}>{children}</Fact>
+    </div>
+  );
+}
+
+function Tag({ children }) {
+  return (
+    <span
+      style={{
+        padding: '6px 12px',
+        borderRadius: 'var(--r-chip)',
+        background: 'var(--fill)',
+        fontFamily: 'var(--font-ui)',
+        fontSize: 13,
+        fontWeight: 500,
+        color: 'var(--ink)',
+      }}
+    >
+      {children}
+    </span>
+  );
+}
+
+function CollapsibleCard({ title, icon: Icon, defaultOpen = true, count, children }) {
   const [open, setOpen] = useState(defaultOpen);
   return (
-    <BtCard padding="0" style={{ overflow: 'hidden' }}>
-      <div
+    <BtCard padding="0">
+      <button
+        type="button"
         onClick={() => setOpen(!open)}
+        aria-expanded={open}
         style={{
-          padding: '16px 20px',
+          width: '100%',
+          minHeight: 56,
+          padding: '0 20px',
           display: 'flex',
           alignItems: 'center',
           gap: 12,
           cursor: 'pointer',
-          userSelect: 'none',
-          background: 'var(--card)',
+          background: 'transparent',
+          border: 'none',
+          textAlign: 'left',
+          fontFamily: 'var(--font-ui)',
         }}
       >
-        {icon && (
-          <span
-            style={{
-              fontSize: 16,
-              flexShrink: 0,
-              color: 'var(--accent)',
-              display: 'flex',
-            }}
-          >
-            {icon}
-          </span>
-        )}
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <span
-            style={{
-              fontFamily: 'var(--font-display)',
-              fontSize: '15px',
-              fontWeight: 700,
-              color: 'var(--ink)',
-            }}
-          >
-            {title}
-          </span>
-          {(count !== undefined || subtitle) && (
-            <span
-              style={{
-                fontFamily: 'var(--font-ui)',
-                fontSize: '12px',
-                color: 'var(--ink-3)',
-                marginLeft: 8,
-              }}
-            >
-              {count !== undefined ? `(${count})` : subtitle}
+        {Icon && <Icon size={18} strokeWidth={1.9} color="var(--accent-ink)" style={{ flexShrink: 0 }} />}
+        <span style={{ flex: 1, minWidth: 0, fontSize: 16, fontWeight: 600, color: 'var(--ink)' }}>
+          {title}
+          {count !== undefined && (
+            <span className="tnum" style={{ marginLeft: 8, fontSize: 13, fontWeight: 500, color: 'var(--ink-3)' }}>
+              {count}
             </span>
           )}
-        </div>
+        </span>
         <ChevronDown
-          size={16}
+          size={18}
           color="var(--ink-3)"
-          style={{
-            transform: open ? 'rotate(180deg)' : 'none',
-            transition: 'transform 0.2s',
-            flexShrink: 0,
-          }}
+          style={{ transform: open ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s', flexShrink: 0 }}
         />
-      </div>
-      {open && (
-        <div
-          style={{
-            padding: '0 20px 18px',
-            borderTop: '1px solid var(--line)',
-            background: 'var(--card)',
-          }}
-        >
-          {children}
-        </div>
-      )}
+      </button>
+      {open && <div style={{ padding: '4px 20px 20px', borderTop: '1px solid var(--line)' }}>{children}</div>}
     </BtCard>
+  );
+}
+
+/** Centered dialog with scrim, Esc to close, and a labelled close button. */
+function ModalShell({ title, subtitle, onClose, maxWidth = 440, children }) {
+  useEffect(() => {
+    const onKey = (e) => e.key === 'Escape' && onClose();
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [onClose]);
+
+  return (
+    <div
+      style={{
+        position: 'fixed',
+        inset: 0,
+        background: 'var(--scrim)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        zIndex: 1000,
+        backdropFilter: 'blur(4px)',
+        padding: 16,
+      }}
+      onClick={onClose}
+    >
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-label={title}
+        style={{
+          background: 'var(--card)',
+          width: '100%',
+          maxWidth,
+          maxHeight: 'calc(100vh - 32px)',
+          overflowY: 'auto',
+          borderRadius: 'var(--r-card)',
+          padding: 24,
+          boxShadow: 'var(--shadow-modal)',
+          border: '1px solid var(--line)',
+          boxSizing: 'border-box',
+        }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12, marginBottom: 16 }}>
+          <div style={{ minWidth: 0 }}>
+            <h3
+              style={{
+                margin: 0,
+                fontFamily: 'var(--font-display)',
+                fontSize: 20,
+                fontWeight: 700,
+                letterSpacing: '-0.02em',
+                color: 'var(--ink)',
+                overflowWrap: 'anywhere',
+              }}
+            >
+              {title}
+            </h3>
+            {subtitle && <div style={{ marginTop: 6 }}>{subtitle}</div>}
+          </div>
+          <BtIconButton icon={X} label="Close" onClick={onClose} />
+        </div>
+        {children}
+      </div>
+    </div>
   );
 }
 
@@ -178,17 +256,25 @@ export default function ManageSitePage() {
   const projectId = project?._id || project?.id;
   const { isAdmin, user } = useAuth();
 
-  const [activeTab, setActiveTab] = useState('tracker'); // tracker | overview | money | details | entries
+  const [activeTab, setActiveTab] = useState('tracker'); // tracker | money | overview | details | entries
   const [toast, setToast] = useState({ msg: '', type: 'info' });
   const [confirmDlg, setConfirmDlg] = useState(null);
   const [stats, setStats] = useState(null);
-  const [loadingStats, setLoadingStats] = useState(true);
   const [transactions, setTransactions] = useState([]);
   const [loadingT, setLoadingT] = useState(true);
   const [viewingActivity, setViewingActivity] = useState(null);
   const [localProject, setLocalProject] = useState(project);
   const [budgetDialogActivity, setBudgetDialogActivity] = useState(null);
   const [budgetForm, setBudgetForm] = useState({ material: 0, labour: 0, equipment: 0 });
+  const [savingBudget, setSavingBudget] = useState(false);
+  const [isNarrow, setIsNarrow] = useState(() => typeof window !== 'undefined' && window.matchMedia('(max-width: 640px)').matches);
+
+  useEffect(() => {
+    const mq = window.matchMedia('(max-width: 640px)');
+    const onChange = (e) => setIsNarrow(e.matches);
+    mq.addEventListener('change', onChange);
+    return () => mq.removeEventListener('change', onChange);
+  }, []);
 
   const canViewInsights = isAdmin || (user?.permissions || []).includes('view_reports');
   const openInsights = () =>
@@ -202,13 +288,12 @@ export default function ManageSitePage() {
 
   useEffect(() => {
     if (!projectId) return;
-    setLoadingStats(true);
     Promise.all([
       projectAPI.getStats(projectId).then(({ data }) => setStats(data)).catch(() => setStats(null)),
       projectAPI.getById(projectId).then(({ data }) => {
         if (data.project) setLocalProject(data.project);
       }).catch(() => {}),
-    ]).finally(() => setLoadingStats(false));
+    ]);
   }, [projectId]);
 
   useEffect(() => {
@@ -240,35 +325,26 @@ export default function ManageSitePage() {
 
   if (!project) {
     return (
-      <div
-        style={{
-          display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'center',
-          justifyContent: 'center',
-          height: '100vh',
-          gap: 16,
-          padding: 24,
-        }}
-      >
-        <Building2 size={48} color="var(--ink-3)" />
-        <h2
-          style={{
-            margin: 0,
-            fontFamily: 'var(--font-display)',
-            fontSize: '22px',
-            fontWeight: 700,
-            color: 'var(--ink)',
-          }}
-        >
-          No project selected
-        </h2>
-        <p style={{ color: 'var(--ink-2)', fontSize: 14, margin: 0 }}>
-          Please select a project from the projects list.
-        </p>
-        <BtButton variant="primary" onPress={() => navigate('/projects')}>
-          Go to Projects
-        </BtButton>
+      <div style={{ width: '100%', minHeight: '100%', display: 'flex', flexDirection: 'column' }}>
+        <BtHero>
+          <BtPageHeader
+            back={{ label: 'Projects', onClick: () => navigate('/projects') }}
+            eyebrow="Project"
+            title="No project selected"
+            subtitle="Open a project from the list to manage its phases and money."
+          />
+        </BtHero>
+        <BtSheet>
+          <BtCard padding="24px">
+            <BtEmpty
+              icon={Building2}
+              title="Nothing to show yet"
+              message="Please select a project from the projects list."
+              actionLabel="Go to Projects"
+              onAction={() => navigate('/projects')}
+            />
+          </BtCard>
+        </BtSheet>
       </div>
     );
   }
@@ -284,13 +360,13 @@ export default function ManageSitePage() {
 
   const projectName = p.projectName || p.name || 'Untitled Project';
   const projectLoc = p.location || '—';
-  const progFallback = p.progress || 0;
+  const progFallback = Number(p.progress) || 0;
   const progress = hasNewTracker
     ? calcProgress(phases, p)
-    : progFallback > 1
+    : progFallback > 1 || progFallback === 0 || progFallback === 1
     ? progFallback
     : progFallback * 100;
-  const status = p.status || 'Active';
+  const st = projectStatus(p.status);
   const hasPhoto = Boolean(p.photo && String(p.photo).trim());
   const imgSrc = hasPhoto ? resolveImageUrl(p.photo) : '';
 
@@ -299,6 +375,7 @@ export default function ManageSitePage() {
   const spent = Number(p.spentAmount || stats?.totalSpent || 0);
   const remaining = Math.max(totalBudget - spent, 0);
   const util = totalBudget > 0 ? Math.min(spent / totalBudget, 1) : 0;
+  const overBudget = totalBudget > 0 && spent > totalBudget;
 
   const bMat = Number(p.budget?.material ?? p.budgetMaterial ?? 0);
   const bLab = Number(p.budget?.labour ?? p.budgetLabour ?? 0);
@@ -316,6 +393,14 @@ export default function ManageSitePage() {
   const allKnown = [..._kAddlConfig, ..._kUtility, ..._kGas, ..._kKitchen, ..._kElectrical, ..._kTerrace];
   const unknown = selectedFeatures.filter((f) => !allKnown.includes(f));
   const addlAll = [...addl, ...unknown];
+  const featureGroups = [
+    { title: 'Additional Configurations', icon: Settings, items: addlAll },
+    { title: 'Utility & Services', icon: Zap, items: utility },
+    { title: 'Gas Connection', icon: Flame, items: gas },
+    { title: 'Kitchen Requirements', icon: ChefHat, items: kitchen },
+    { title: 'Electrical & Plumbing', icon: Zap, items: electrical },
+    { title: 'Terrace & Interior', icon: Sun, items: terrace },
+  ].filter((g) => g.items.length > 0);
 
   const handleToggleActivity = async (phaseId, activityId) => {
     const updatedPhases = toggleActivity(phases, phaseId, activityId, p);
@@ -335,14 +420,14 @@ export default function ManageSitePage() {
         completedActivityKeys: completedKeys,
         progress: newProgress,
       });
-      btToast.success('Activity status updated');
+      notify('Activity status updated');
     } catch {
       setLocalProject((prev) => ({
         ...prev,
         selectedPhases: phases,
         progress: calcProgress(phases, p),
       }));
-      btToast.error('Failed to update activity');
+      notify('Failed to update activity', true);
     }
   };
 
@@ -354,7 +439,7 @@ export default function ManageSitePage() {
         rows.push([t.category || '', t.amount || 0, t.date || '', t.type || '']);
       });
       let csvContent = rows.map((r) => r.join(',')).join('\n');
-      csvContent = '\uFEFF' + csvContent;
+      csvContent = '﻿' + csvContent;
       const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
@@ -362,9 +447,9 @@ export default function ManageSitePage() {
       a.download = `${projectName}_export.csv`;
       a.click();
       URL.revokeObjectURL(url);
-      btToast.success('CSV exported successfully');
+      notify('CSV exported successfully');
     } catch {
-      btToast.error('Failed to export CSV');
+      notify('Failed to export CSV', true);
     }
   };
 
@@ -388,9 +473,9 @@ export default function ManageSitePage() {
           };
         });
         await projectAPI.update(projectId, { importedTransactions: parsed });
-        btToast.success(`Imported ${parsed.length} entries`);
+        notify(`Imported ${parsed.length} entries`);
       } catch {
-        btToast.error('Failed to import CSV');
+        notify('Failed to import CSV', true);
       }
     };
     input.click();
@@ -419,46 +504,61 @@ export default function ManageSitePage() {
   };
 
   const saveBudgetDialog = async () => {
-    if (!budgetDialogActivity) return;
+    if (!budgetDialogActivity || savingBudget) return;
     const updatedPhases = phases.map((ph) => ({
       ...ph,
       activities: ph.activities.map((a) =>
         a.id === budgetDialogActivity.id
           ? {
               ...a,
-              budgetMaterial: Number(budgetForm.material),
-              budgetLabour: Number(budgetForm.labour),
-              budgetEquipment: Number(budgetForm.equipment),
+              budgetMaterial: Number(budgetForm.material) || 0,
+              budgetLabour: Number(budgetForm.labour) || 0,
+              budgetEquipment: Number(budgetForm.equipment) || 0,
             }
           : a
       ),
     }));
+    setSavingBudget(true);
     setLocalProject((prev) => ({ ...prev, selectedPhases: updatedPhases }));
     try {
       await projectAPI.update(projectId, { selectedPhases: updatedPhases });
-      btToast.success('Budget allocated successfully');
+      notify('Budget allocated successfully');
     } catch {
       setLocalProject((prev) => ({ ...prev, selectedPhases: phases }));
-      btToast.error('Failed to update budget');
+      notify('Failed to update budget', true);
     }
+    setSavingBudget(false);
     setBudgetDialogActivity(null);
   };
 
-  const labelStyle = {
-    fontFamily: 'var(--font-mono)',
-    fontSize: '10.5px',
-    fontWeight: 600,
-    color: 'var(--ink-3)',
-    letterSpacing: '0.06em',
-    marginBottom: 2,
-    textTransform: 'uppercase',
-  };
-  const valueStyle = {
-    fontFamily: 'var(--font-ui)',
-    fontSize: '14px',
-    fontWeight: 600,
-    color: 'var(--ink)',
-  };
+  const budgetFormTotal =
+    (Number(budgetForm.material) || 0) + (Number(budgetForm.labour) || 0) + (Number(budgetForm.equipment) || 0);
+
+  const tabs = [
+    { id: 'tracker', label: 'Execution Tracker', count: `${trackerDone}/${trackerTotal}` },
+    { id: 'money', label: 'Financials & CSV', count: formatInr(spent, { compact: true }) },
+    { id: 'overview', label: 'Site Overview', count: null },
+    { id: 'details', label: 'Building Specs', count: null },
+    { id: 'entries', label: 'Recent Activity', count: String(transactions.length) },
+  ];
+
+  const sectionTitle = (title, sub) => (
+    <div style={{ minWidth: 0 }}>
+      <h2 style={{ margin: 0, fontFamily: 'var(--font-display)', fontSize: 20, fontWeight: 700, letterSpacing: '-0.02em', color: 'var(--ink)' }}>
+        {title}
+      </h2>
+      {sub && <p style={{ margin: '4px 0 0', fontFamily: 'var(--font-ui)', fontSize: 14, color: 'var(--ink-2)' }}>{sub}</p>}
+    </div>
+  );
+
+  const metaItem = (Icon, text) => (
+    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+      <Icon size={14} strokeWidth={1.9} />
+      {text}
+    </span>
+  );
+
+  const th = { whiteSpace: 'nowrap' };
 
   return (
     <div style={{ width: '100%', minHeight: '100%', display: 'flex', flexDirection: 'column' }}>
@@ -473,670 +573,379 @@ export default function ManageSitePage() {
         />
       )}
 
-      {/* ══════════════════════════════════════════════════════════
-          HERO (Blueprint Noir Header with Project Command)
-         ══════════════════════════════════════════════════════════ */}
-      <BtHero padding="28px 32px 56px">
-        <div style={{ maxWidth: 1200, margin: '0 auto', width: '100%' }}>
-          {/* Breadcrumb & Quick Actions Bar */}
-          <div
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              flexWrap: 'wrap',
-              gap: '12px',
-              marginBottom: '20px',
-            }}
-          >
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <button
-                type="button"
-                onClick={() => navigate('/projects')}
-                style={{
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: '6px',
-                  padding: '6px 12px',
-                  borderRadius: '16px',
-                  background: 'rgba(255, 255, 255, 0.08)',
-                  border: '1px solid rgba(255, 255, 255, 0.14)',
-                  color: 'var(--bone)',
-                  fontFamily: 'var(--font-ui)',
-                  fontSize: '13px',
-                  fontWeight: 600,
-                  cursor: 'pointer',
-                  transition: 'background 150ms ease',
-                }}
-              >
-                <ArrowLeft size={14} />
-                <span>Projects</span>
-              </button>
-
-              <span style={{ color: 'var(--on-noir-3)' }}>/</span>
-              <span
-                style={{
-                  fontFamily: 'var(--font-ui)',
-                  fontSize: '13px',
-                  fontWeight: 600,
-                  color: 'var(--on-noir-2)',
-                  maxWidth: '260px',
-                  overflow: 'hidden',
-                  textOverflow: 'ellipsis',
-                  whiteSpace: 'nowrap',
-                }}
-              >
-                {projectName}
-              </span>
-            </div>
-
-            {/* Header Right Actions */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-              <BtButton
-                variant="primary"
-                small
-                icon={Plus}
-                style={{ border: '1px solid rgba(255, 255, 255, 0.22)', boxShadow: '0 2px 8px rgba(0, 0, 0, 0.3)' }}
-                onPress={() => navigate('/add-entry', { state: { project: p } })}
-              >
-                Add Entry
+      {/* ── HERO ─────────────────────────────────────────────── */}
+      <BtHero>
+        <BtPageHeader
+          back={{ label: 'Projects', onClick: () => navigate('/projects') }}
+          eyebrow={p.projectCode ? `Code ${p.projectCode}` : 'Project'}
+          title={projectName}
+          size="md"
+          meta={
+            <>
+              <BtBadge label={st.label} tone={st.tone} />
+              {metaItem(MapPin, projectLoc)}
+              {p.startDate && metaItem(Calendar, `Started ${_fmtDate(new Date(p.startDate))}`)}
+              {p.expectedEndDate && metaItem(Clock, `Due ${_fmtDate(new Date(p.expectedEndDate))}`)}
+              {p.clientName && metaItem(User, `Client: ${p.clientName}`)}
+            </>
+          }
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+            <BtButton
+              variant="accent"
+              size="small"
+              icon={Plus}
+              onClick={() => navigate('/add-entry', { state: { project: p } })}
+            >
+              Add Entry
+            </BtButton>
+            <BtButton variant="onDark" size="small" icon={Mic} onClick={() => navigate('/voice', { state: { project: p } })}>
+              Voice
+            </BtButton>
+            {canViewInsights && (
+              <BtButton variant="onDark" size="small" icon={TrendingUp} onClick={openInsights}>
+                Insights
               </BtButton>
-
-              <BtButton
-                variant="onDark"
-                small
-                icon={Mic}
-                onPress={() => navigate('/voice', { state: { project: p } })}
-              >
-                Voice
-              </BtButton>
-
-              {canViewInsights && (
-                <BtButton
-                  variant="onDark"
-                  small
-                  icon={TrendingUp}
-                  onPress={openInsights}
-                >
-                  Insights
-                </BtButton>
-              )}
-
-              <BtButton
-                variant="onDark"
-                small
-                icon={FileText}
-                onPress={() => navigate(`/project-report/${projectId}`, { state: { project: p } })}
-              >
-                Report
-              </BtButton>
-
-              <BtButton
-                variant="onDark"
-                small
-                icon={Pencil}
-                onPress={() => navigate('/newproject', { state: { editProject: p } })}
-              >
-                Edit
-              </BtButton>
-            </div>
+            )}
+            <BtButton
+              variant="onDark"
+              size="small"
+              icon={FileText}
+              onClick={() => navigate(`/project-report/${projectId}`, { state: { project: p } })}
+            >
+              Report
+            </BtButton>
+            <BtButton
+              variant="onDark"
+              size="small"
+              icon={Pencil}
+              onClick={() => navigate('/newproject', { state: { editProject: p } })}
+            >
+              Edit
+            </BtButton>
           </div>
 
-          {/* Project Title & Status Eyebrow */}
-          <div style={{ marginBottom: '24px' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '8px' }}>
-              <BtBadge
-                label={status}
-                tone={status === 'Completed' ? 'green' : status === 'On Hold' ? 'amber' : 'brand'}
-              />
-              {p.projectCode && (
-                <span
-                  style={{
-                    fontFamily: 'var(--font-mono)',
-                    fontSize: '11px',
-                    color: 'var(--on-noir-3)',
-                    letterSpacing: '0.08em',
-                  }}
-                >
-                  CODE: {p.projectCode}
-                </span>
-              )}
-            </div>
-
-            <h1
-              style={{
-                margin: 0,
-                fontFamily: 'var(--font-display)',
-                fontSize: 'clamp(28px, 4vw, 40px)',
-                fontWeight: 800,
-                letterSpacing: '-0.03em',
-                color: 'var(--bone)',
-                lineHeight: 1.1,
-              }}
-            >
-              {projectName}
-            </h1>
-
-            <div
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                flexWrap: 'wrap',
-                gap: '16px',
-                marginTop: '8px',
-                fontFamily: 'var(--font-ui)',
-                fontSize: '13px',
-                color: 'var(--on-noir-2)',
-              }}
-            >
-              <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                <MapPin size={14} color="var(--accent)" />
-                {projectLoc}
-              </span>
-              {p.startDate && (
-                <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                  <Calendar size={14} />
-                  Started {_fmtDate(new Date(p.startDate))}
-                </span>
-              )}
-              {p.expectedEndDate && (
-                <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                  <Clock size={14} />
-                  Due {_fmtDate(new Date(p.expectedEndDate))}
-                </span>
-              )}
-              {p.clientName && (
-                <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                  <User size={14} />
-                  Client: {p.clientName}
-                </span>
-              )}
-            </div>
-          </div>
-
-          {/* 4 Metric Glass Tiles */}
-          <div
-            style={{
-              display: 'grid',
-              gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-              gap: '12px',
-            }}
-          >
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 12 }}>
+            <BtGlassTile label="Completion" value={`${progress.toFixed(1)}%`} icon={Target} />
+            <BtGlassTile label="Total budget" value={formatInr(totalBudget, { compact: true })} icon={CreditCard} />
             <BtGlassTile
-              label="Overall Completion"
-              value={`${progress.toFixed(1)}%`}
-              valueColor="var(--bone)"
-              icon={Target}
-            />
-            <BtGlassTile
-              label="Total Budget"
-              value={formatInr(totalBudget, { compact: true })}
-              icon={CreditCard}
-            />
-            <BtGlassTile
-              label="Spent Amount"
+              label="Spent"
               value={formatInr(spent, { compact: true })}
-              valueColor={spent > totalBudget && totalBudget > 0 ? 'var(--status-danger-bright)' : undefined}
+              valueColor={overBudget ? 'var(--status-danger-bright)' : undefined}
               icon={IndianRupee}
             />
-            <BtGlassTile
-              label="Activities Completed"
-              value={`${trackerDone}/${trackerTotal || '—'}`}
-              icon={ClipboardCheck}
-            />
+            <BtGlassTile label="Activities done" value={`${trackerDone}/${trackerTotal || '—'}`} icon={ClipboardCheck} />
           </div>
-        </div>
+        </BtPageHeader>
       </BtHero>
 
-      {/* ══════════════════════════════════════════════════════════
-          SHEET (Bone Surface with Project Navigation Tabs)
-         ══════════════════════════════════════════════════════════ */}
-      <BtSheet overlap={26} padding="28px 32px 64px">
-        <div
-          style={{
-            maxWidth: 1200,
-            margin: '0 auto',
-            width: '100%',
-            display: 'flex',
-            flexDirection: 'column',
-            gap: '24px',
-          }}
-        >
-          {/* Detail Tabs Bar */}
-          <div
-            style={{
-              display: 'flex',
-              gap: '8px',
-              overflowX: 'auto',
-              borderBottom: '1px solid var(--line)',
-              paddingBottom: '12px',
-            }}
-          >
-            {[
-              { id: 'tracker', label: 'Execution Tracker', count: `${trackerDone}/${trackerTotal}` },
-              { id: 'money', label: 'Financials & CSV', count: formatInr(spent, { compact: true }) },
-              { id: 'overview', label: 'Site Overview', count: null },
-              { id: 'details', label: 'Building Specs', count: null },
-              { id: 'entries', label: 'Recent Activity', count: transactions.length },
-            ].map((tab) => {
-              const isActive = activeTab === tab.id;
-              return (
-                <button
-                  key={tab.id}
-                  type="button"
-                  onClick={() => setActiveTab(tab.id)}
-                  style={{
-                    height: '40px',
-                    padding: '0 16px',
-                    borderRadius: '20px',
-                    background: isActive ? 'var(--ink)' : 'var(--card)',
-                    color: isActive ? 'var(--bone, #F6F4EF)' : 'var(--ink-2)',
-                    border: `1px solid ${isActive ? 'var(--ink)' : 'var(--line)'}`,
-                    boxShadow: isActive ? '0 2px 8px rgba(17, 19, 23, 0.12)' : 'none',
-                    fontFamily: 'var(--font-ui)',
-                    fontSize: '13px',
-                    fontWeight: 600,
-                    cursor: 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '8px',
-                    whiteSpace: 'nowrap',
-                    transition: 'all 150ms ease',
-                  }}
-                >
-                  <span>{tab.label}</span>
-                  {tab.count && (
-                    <span
-                      className="tnum"
-                      style={{
-                        fontSize: '11px',
-                        padding: '1px 6px',
-                        borderRadius: '10px',
-                        background: isActive ? 'rgba(255, 255, 255, 0.22)' : 'var(--fill)',
-                        color: isActive ? 'var(--bone, #F6F4EF)' : 'var(--ink-3)',
-                      }}
-                    >
-                      {tab.count}
-                    </span>
-                  )}
-                </button>
-              );
-            })}
+      {/* ── SHEET ────────────────────────────────────────────── */}
+      <BtSheet>
+        <div style={{ maxWidth: 1200, margin: '0 auto', width: '100%', display: 'flex', flexDirection: 'column', gap: 24 }}>
+          <div role="tablist" aria-label="Project sections" style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+            {tabs.map((tab) => (
+              <BtChip
+                key={tab.id}
+                role="tab"
+                aria-selected={activeTab === tab.id}
+                selected={activeTab === tab.id}
+                onClick={() => setActiveTab(tab.id)}
+                label={
+                  <>
+                    {tab.label}
+                    {tab.count && (
+                      <span className="tnum" style={{ marginLeft: 8, opacity: 0.7, fontWeight: 600 }}>
+                        {tab.count}
+                      </span>
+                    )}
+                  </>
+                }
+              />
+            ))}
           </div>
 
-          {/* ══════════════════════════════════════════════════════════
-              TAB 1: EXECUTION TRACKER (PHASES & ACTIVITIES CHECKLIST)
-             ══════════════════════════════════════════════════════════ */}
+          {/* ── TAB 1: EXECUTION TRACKER ── */}
           {activeTab === 'tracker' && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-              <div
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  flexWrap: 'wrap',
-                  gap: '12px',
-                }}
-              >
-                <div>
-                  <h3
-                    style={{
-                      margin: 0,
-                      fontFamily: 'var(--font-display)',
-                      fontSize: '20px',
-                      fontWeight: 800,
-                      color: 'var(--ink)',
-                    }}
-                  >
-                    Phase & Activity Execution Tracker
-                  </h3>
-                  <p
-                    style={{
-                      margin: '4px 0 0',
-                      fontFamily: 'var(--font-ui)',
-                      fontSize: '13px',
-                      color: 'var(--ink-3)',
-                    }}
-                  >
-                    Check off milestones as work completes on site. Real-time budget tracking per activity.
-                  </p>
-                </div>
-
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <BtButton
-                    variant="primary"
-                    small
-                    icon={Plus}
-                    onPress={() => navigate('/add-entry', { state: { project: p } })}
-                  >
-                    Log Entry
-                  </BtButton>
-                </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12 }}>
+                {sectionTitle('Phase & activity tracker', 'Tick off milestones as work completes on site, with budget against spend per activity.')}
+                <BtButton
+                  variant="secondary"
+                  size="small"
+                  icon={Plus}
+                  onClick={() => navigate('/add-entry', { state: { project: p } })}
+                >
+                  Log Entry
+                </BtButton>
               </div>
 
               {!hasNewTracker ? (
-                <BtCard padding="48px 24px">
+                <BtCard padding="24px">
                   <BtEmpty
                     icon={ClipboardCheck}
                     title="No execution plan configured"
-                    message="Phases and activities were not selected when creating this project. Click Edit to add them."
-                    action={
-                      <BtButton
-                        variant="secondary"
-                        onPress={() => navigate('/newproject', { state: { editProject: p } })}
-                      >
-                        Configure Phases
-                      </BtButton>
-                    }
+                    message="Phases and activities were not selected when creating this project."
+                    actionLabel="Configure Phases"
+                    onAction={() => navigate('/newproject', { state: { editProject: p } })}
                   />
                 </BtCard>
+              ) : isNarrow ? (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
+                  {phases.map((phase) => {
+                    const acts = phase.activities || [];
+                    const phaseBud = acts.reduce((sum, a) => sum + (a.budgetMaterial || 0) + (a.budgetLabour || 0) + (a.budgetEquipment || 0), 0);
+                    const phaseSpent = acts.reduce((sum, a) => sum + _spentForActivity(a.id), 0);
+                    const phaseVariance = phaseBud - phaseSpent;
+                    const pDone = acts.filter((a) => isActivityCompleted(a, phase, p)).length;
+                    const miniGrid = (bud, sp, vr, big) => (
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 8 }}>
+                        {[
+                          ['Budget', bud, 'var(--ink)'],
+                          ['Spent', sp, 'var(--ink)'],
+                          ['Variance', vr, vr < 0 ? 'var(--status-danger)' : vr > 0 ? 'var(--status-success)' : 'var(--ink-3)'],
+                        ].map(([label, val, color]) => (
+                          <div key={label} style={{ minWidth: 0 }}>
+                            <div className="bt-eyebrow" style={{ color: 'var(--ink-3)', marginBottom: 2 }}>{label}</div>
+                            <div className="tnum" style={{ fontFamily: big ? 'var(--font-display)' : 'var(--font-ui)', fontSize: big ? 15 : 14, fontWeight: big ? 700 : 600, color, overflowWrap: 'anywhere' }}>
+                              {money(val)}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    );
+                    return (
+                      <section key={phase.id} aria-label={phase.phaseName}>
+                        <BtCard padding="14px 16px" style={{ background: 'var(--bone)', marginBottom: 10 }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 }}>
+                            {phase.isCustom ? <Sparkles size={16} color="var(--accent-ink)" style={{ flexShrink: 0 }} /> : <Layers size={16} color="var(--accent-ink)" style={{ flexShrink: 0 }} />}
+                            <span style={{ flex: 1, minWidth: 0, fontFamily: 'var(--font-display)', fontSize: 16, fontWeight: 700, color: 'var(--ink)', overflowWrap: 'anywhere' }}>{phase.phaseName}</span>
+                            <BtBadge label={`${pDone}/${acts.length} done`} tone={pDone === acts.length && acts.length > 0 ? 'success' : 'brand'} />
+                          </div>
+                          {miniGrid(phaseBud, phaseSpent, phaseVariance, true)}
+                        </BtCard>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                          {acts.map((act) => {
+                            const actBud = (act.budgetMaterial || 0) + (act.budgetLabour || 0) + (act.budgetEquipment || 0);
+                            const spentForAct = _spentForActivity(act.id);
+                            const isC = _isC(act);
+                            const dateLabel = _completedDateLabel(act);
+                            return (
+                              <BtCard key={act.id} padding="14px 16px" style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                                  <button
+                                    type="button"
+                                    role="checkbox"
+                                    aria-checked={isC}
+                                    aria-label={`${isC ? 'Mark pending' : 'Mark done'}: ${act.name}`}
+                                    onClick={() => handleToggleActivity(phase.id, act.id)}
+                                    style={{ width: 40, height: 40, margin: '-8px 0 -8px -8px', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', background: 'transparent', border: 'none', cursor: 'pointer', flexShrink: 0 }}
+                                  >
+                                    <span style={{ width: 22, height: 22, borderRadius: 7, border: `1.5px solid ${isC ? 'var(--status-success)' : 'var(--input-border)'}`, background: isC ? 'var(--status-success)' : 'var(--card)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                      {isC && <Check size={14} color="#FFFFFF" strokeWidth={3} />}
+                                    </span>
+                                  </button>
+                                  <div style={{ flex: 1, minWidth: 0 }}>
+                                    <div style={{ fontSize: 15, fontWeight: 600, color: isC ? 'var(--ink-2)' : 'var(--ink)', textDecoration: isC ? 'line-through' : 'none', overflowWrap: 'anywhere' }}>{act.name}</div>
+                                    {isC && dateLabel && <div style={{ fontSize: 13, color: 'var(--status-success)', fontWeight: 600, marginTop: 2 }}>Completed {dateLabel}</div>}
+                                  </div>
+                                  <BtBadge label={isC ? 'Done' : 'Pending'} tone={isC ? 'success' : 'warning'} />
+                                </div>
+                                {miniGrid(actBud, spentForAct, actBud - spentForAct, false)}
+                                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                                  <BtButton
+                                    variant="secondary"
+                                    size="compact"
+                                    icon={Plus}
+                                    onClick={() => navigate('/add-entry', { state: { project: p, prefill: { phase: phase.phaseName, activity: act.name } } })}
+                                  >
+                                    Add
+                                  </BtButton>
+                                  {isC && (
+                                    <BtButton variant="secondary" size="compact" icon={Eye} onClick={() => setViewingActivity(act)}>
+                                      View
+                                    </BtButton>
+                                  )}
+                                  {isAdmin && (
+                                    <BtButton variant="secondary" size="compact" icon={Pencil} onClick={() => openBudgetDialog(act)}>
+                                      Budget
+                                    </BtButton>
+                                  )}
+                                </div>
+                              </BtCard>
+                            );
+                          })}
+                        </div>
+                      </section>
+                    );
+                  })}
+                </div>
               ) : (
-                <BtCard padding="0" style={{ overflow: 'hidden' }}>
+                <BtCard padding="0">
                   <div style={{ overflowX: 'auto' }}>
-                    <table style={{ width: '100%', minWidth: '800px', borderCollapse: 'collapse', textAlign: 'left' }}>
+                    <table className="bt-table" style={{ minWidth: 860 }}>
                       <thead>
-                        <tr
-                          style={{
-                            borderBottom: '1px solid var(--line)',
-                            background: 'var(--fill)',
-                            color: 'var(--ink-3)',
-                            fontFamily: 'var(--font-mono)',
-                            fontSize: '11px',
-                            letterSpacing: '0.07em',
-                            textTransform: 'uppercase',
-                          }}
-                        >
-                          <th style={{ padding: '14px 18px', fontWeight: 700 }}>Phase & Activity</th>
-                          <th style={{ padding: '14px 18px', fontWeight: 700 }}>Status</th>
-                          <th style={{ padding: '14px 18px', fontWeight: 700 }}>Budget</th>
-                          <th style={{ padding: '14px 18px', fontWeight: 700 }}>Spent</th>
-                          <th style={{ padding: '14px 18px', fontWeight: 700 }}>Variance</th>
-                          <th style={{ padding: '14px 18px', fontWeight: 700, textAlign: 'right' }}>Actions</th>
+                        <tr>
+                          <th style={th}>Phase & activity</th>
+                          <th style={th}>Status</th>
+                          <th className="num" style={th}>Budget</th>
+                          <th className="num" style={th}>Spent</th>
+                          <th className="num" style={th}>Variance</th>
+                          <th className="num" style={th}>Actions</th>
                         </tr>
                       </thead>
                       <tbody>
                         {phases.map((phase) => {
                           const phaseBud =
                             phase.activities?.reduce(
-                              (sum, act) =>
-                                sum +
-                                (act.budgetMaterial || 0) +
-                                (act.budgetLabour || 0) +
-                                (act.budgetEquipment || 0),
+                              (sum, act) => sum + (act.budgetMaterial || 0) + (act.budgetLabour || 0) + (act.budgetEquipment || 0),
                               0
                             ) || 0;
-                          const phaseSpent =
-                            phase.activities?.reduce((sum, act) => sum + _spentForActivity(act.id), 0) || 0;
+                          const phaseSpent = phase.activities?.reduce((sum, act) => sum + _spentForActivity(act.id), 0) || 0;
                           const phaseVariance = phaseBud - phaseSpent;
                           const pTotal = phase.activities?.length || 0;
-                          const pDone =
-                            phase.activities?.filter((a) => isActivityCompleted(a, phase, p)).length || 0;
+                          const pDone = phase.activities?.filter((a) => isActivityCompleted(a, phase, p)).length || 0;
+                          const phaseCell = { background: 'var(--bone)', fontFamily: 'var(--font-display)', fontWeight: 700 };
 
                           return (
                             <React.Fragment key={phase.id}>
-                              {/* Phase Row */}
-                              <tr
-                                style={{
-                                  background: 'var(--ground)',
-                                  borderBottom: '1px solid var(--line)',
-                                }}
-                              >
-                                <td
-                                  style={{
-                                    padding: '14px 18px',
-                                    fontFamily: 'var(--font-display)',
-                                    fontWeight: 800,
-                                    fontSize: '15px',
-                                    color: 'var(--ink)',
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    gap: 8,
-                                  }}
-                                >
-                                  {phase.isCustom ? (
-                                    <Sparkles size={16} color="var(--accent)" />
-                                  ) : (
-                                    <Layers size={16} color="var(--accent)" />
-                                  )}
-                                  <span>{phase.phaseName}</span>
+                              <tr>
+                                <td style={phaseCell}>
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 15 }}>
+                                    {phase.isCustom ? (
+                                      <Sparkles size={16} color="var(--accent-ink)" style={{ flexShrink: 0 }} />
+                                    ) : (
+                                      <Layers size={16} color="var(--accent-ink)" style={{ flexShrink: 0 }} />
+                                    )}
+                                    <span>{phase.phaseName}</span>
+                                  </div>
+                                  <div style={{ width: 140, marginTop: 8 }}>
+                                    <BtProgress value={pTotal ? pDone / pTotal : 0} height={4} />
+                                  </div>
                                 </td>
-                                <td style={{ padding: '14px 18px' }}>
+                                <td style={phaseCell}>
                                   <BtBadge
-                                    label={`${pDone}/${pTotal} Done`}
-                                    tone={pDone === pTotal && pTotal > 0 ? 'green' : 'brand'}
+                                    label={`${pDone}/${pTotal} done`}
+                                    tone={pDone === pTotal && pTotal > 0 ? 'success' : 'brand'}
                                   />
                                 </td>
+                                <td className="num" style={phaseCell}>{money(phaseBud)}</td>
+                                <td className="num" style={phaseCell}>{money(phaseSpent)}</td>
                                 <td
-                                  className="tnum"
-                                  style={{
-                                    padding: '14px 18px',
-                                    fontFamily: 'var(--font-display)',
-                                    fontWeight: 700,
-                                    color: 'var(--ink)',
-                                  }}
+                                  className="num"
+                                  style={{ ...phaseCell, color: phaseVariance < 0 ? 'var(--status-danger)' : 'var(--status-success)' }}
                                 >
-                                  {fmtINR(phaseBud)}
+                                  {money(phaseVariance)}
                                 </td>
-                                <td
-                                  className="tnum"
-                                  style={{
-                                    padding: '14px 18px',
-                                    fontFamily: 'var(--font-display)',
-                                    fontWeight: 700,
-                                    color: 'var(--ink)',
-                                  }}
-                                >
-                                  {fmtINR(phaseSpent)}
-                                </td>
-                                <td
-                                  className="tnum"
-                                  style={{
-                                    padding: '14px 18px',
-                                    fontFamily: 'var(--font-display)',
-                                    fontWeight: 700,
-                                    color: phaseVariance < 0 ? 'var(--status-danger-bright)' : 'var(--tone-green)',
-                                  }}
-                                >
-                                  {fmtINR(phaseVariance)}
-                                </td>
-                                <td style={{ padding: '14px 18px' }} />
+                                <td style={phaseCell} />
                               </tr>
 
-                              {/* Activity Sub-rows */}
                               {phase.activities?.map((act) => {
-                                const actBud =
-                                  (act.budgetMaterial || 0) +
-                                  (act.budgetLabour || 0) +
-                                  (act.budgetEquipment || 0);
+                                const actBud = (act.budgetMaterial || 0) + (act.budgetLabour || 0) + (act.budgetEquipment || 0);
                                 const spentForAct = _spentForActivity(act.id);
                                 const actVariance = actBud - spentForAct;
                                 const isC = _isC(act);
                                 const dateLabel = _completedDateLabel(act);
 
                                 return (
-                                  <tr
-                                    key={act.id}
-                                    style={{
-                                      borderBottom: '1px solid var(--line)',
-                                      background: 'var(--card)',
-                                      transition: 'background 120ms ease',
-                                    }}
-                                  >
-                                    <td style={{ padding: '12px 18px 12px 36px' }}>
-                                      <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                                        <div
-                                          onClick={(e) => {
-                                            e.stopPropagation();
-                                            handleToggleActivity(phase.id, act.id);
-                                          }}
+                                  <tr key={act.id}>
+                                    <td style={{ paddingLeft: 24 }}>
+                                      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                                        <button
+                                          type="button"
+                                          role="checkbox"
+                                          aria-checked={isC}
+                                          aria-label={`${isC ? 'Mark pending' : 'Mark done'}: ${act.name}`}
+                                          onClick={() => handleToggleActivity(phase.id, act.id)}
                                           style={{
-                                            width: 22,
-                                            height: 22,
-                                            borderRadius: '6px',
-                                            border: `1.5px solid ${isC ? 'var(--tone-green)' : 'var(--line)'}`,
-                                            background: isC ? 'var(--tone-green)' : 'var(--card)',
-                                            display: 'flex',
+                                            width: 40,
+                                            height: 40,
+                                            margin: '-8px 0 -8px -8px',
+                                            display: 'inline-flex',
                                             alignItems: 'center',
                                             justifyContent: 'center',
+                                            background: 'transparent',
+                                            border: 'none',
                                             cursor: 'pointer',
                                             flexShrink: 0,
-                                            transition: 'all 120ms ease',
                                           }}
                                         >
-                                          {isC && <Check size={14} color="#fff" strokeWidth={3} />}
-                                        </div>
-
-                                        <div>
+                                          <span
+                                            style={{
+                                              width: 22,
+                                              height: 22,
+                                              borderRadius: 7,
+                                              border: `1.5px solid ${isC ? 'var(--status-success)' : 'var(--input-border)'}`,
+                                              background: isC ? 'var(--status-success)' : 'var(--card)',
+                                              display: 'flex',
+                                              alignItems: 'center',
+                                              justifyContent: 'center',
+                                              transition: 'all 120ms ease',
+                                            }}
+                                          >
+                                            {isC && <Check size={14} color="#FFFFFF" strokeWidth={3} />}
+                                          </span>
+                                        </button>
+                                        <div style={{ minWidth: 0 }}>
                                           <div
                                             style={{
-                                              fontFamily: 'var(--font-ui)',
-                                              fontSize: '14px',
-                                              fontWeight: isC ? 500 : 600,
-                                              color: isC ? 'var(--ink-3)' : 'var(--ink)',
+                                              fontSize: 14,
+                                              fontWeight: 500,
+                                              color: isC ? 'var(--ink-2)' : 'var(--ink)',
                                               textDecoration: isC ? 'line-through' : 'none',
                                             }}
                                           >
                                             {act.name}
                                           </div>
                                           {isC && dateLabel && (
-                                            <div
-                                              style={{
-                                                fontSize: '11px',
-                                                color: 'var(--tone-green)',
-                                                fontWeight: 600,
-                                                marginTop: '2px',
-                                              }}
-                                            >
+                                            <div style={{ fontSize: 13, color: 'var(--status-success)', fontWeight: 600, marginTop: 2 }}>
                                               Completed {dateLabel}
                                             </div>
                                           )}
                                         </div>
                                       </div>
                                     </td>
-
-                                    <td style={{ padding: '12px 18px' }}>
-                                      <BtBadge
-                                        label={isC ? 'Done' : 'Pending'}
-                                        tone={isC ? 'green' : 'amber'}
-                                      />
+                                    <td>
+                                      <BtBadge label={isC ? 'Done' : 'Pending'} tone={isC ? 'success' : 'warning'} />
                                     </td>
-
+                                    <td className="num" style={{ color: 'var(--ink-2)' }}>{money(actBud)}</td>
+                                    <td className="num" style={{ color: 'var(--ink-2)' }}>{money(spentForAct)}</td>
                                     <td
-                                      className="tnum"
+                                      className="num"
                                       style={{
-                                        padding: '12px 18px',
-                                        fontSize: '13px',
-                                        fontWeight: 600,
-                                        color: 'var(--ink-2)',
-                                      }}
-                                    >
-                                      {fmtINR(actBud)}
-                                    </td>
-
-                                    <td
-                                      className="tnum"
-                                      style={{
-                                        padding: '12px 18px',
-                                        fontSize: '13px',
-                                        fontWeight: 600,
-                                        color: 'var(--ink-2)',
-                                      }}
-                                    >
-                                      {fmtINR(spentForAct)}
-                                    </td>
-
-                                    <td
-                                      className="tnum"
-                                      style={{
-                                        padding: '12px 18px',
-                                        fontSize: '13px',
                                         fontWeight: 600,
                                         color:
                                           actVariance < 0
-                                            ? 'var(--status-danger-bright)'
+                                            ? 'var(--status-danger)'
                                             : actVariance > 0
-                                            ? 'var(--tone-green)'
+                                            ? 'var(--status-success)'
                                             : 'var(--ink-3)',
                                       }}
                                     >
-                                      {fmtINR(actVariance)}
+                                      {money(actVariance)}
                                     </td>
-
-                                    <td style={{ padding: '12px 18px', textAlign: 'right' }}>
+                                    <td>
                                       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 6 }}>
-                                        <button
-                                          type="button"
-                                          onClick={(e) => {
-                                            e.stopPropagation();
+                                        <BtButton
+                                          variant="secondary"
+                                          size="compact"
+                                          icon={Plus}
+                                          onClick={() =>
                                             navigate('/add-entry', {
-                                              state: {
-                                                project: p,
-                                                prefill: { phase: phase.phaseName, activity: act.name },
-                                              },
-                                            });
-                                          }}
-                                          style={{
-                                            padding: '4px 10px',
-                                            borderRadius: '6px',
-                                            background: 'var(--fill)',
-                                            border: '1px solid var(--line)',
-                                            fontFamily: 'var(--font-mono)',
-                                            fontSize: '11px',
-                                            fontWeight: 700,
-                                            color: 'var(--ink)',
-                                            cursor: 'pointer',
-                                          }}
+                                              state: { project: p, prefill: { phase: phase.phaseName, activity: act.name } },
+                                            })
+                                          }
                                         >
-                                          + ADD
-                                        </button>
-
+                                          Add
+                                        </BtButton>
                                         {isC && (
-                                          <button
-                                            type="button"
-                                            onClick={(e) => {
-                                              e.stopPropagation();
-                                              setViewingActivity(act);
-                                            }}
-                                            style={{
-                                              padding: '4px 10px',
-                                              borderRadius: '6px',
-                                              background: 'var(--tone-green-bg)',
-                                              border: '1px solid rgba(16, 185, 129, 0.2)',
-                                              fontFamily: 'var(--font-mono)',
-                                              fontSize: '11px',
-                                              fontWeight: 700,
-                                              color: 'var(--tone-green)',
-                                              cursor: 'pointer',
-                                            }}
-                                          >
-                                            VIEW
-                                          </button>
+                                          <BtButton variant="secondary" size="compact" icon={Eye} onClick={() => setViewingActivity(act)}>
+                                            View
+                                          </BtButton>
                                         )}
-
                                         {isAdmin && (
-                                          <button
-                                            type="button"
-                                            onClick={(e) => {
-                                              e.stopPropagation();
-                                              openBudgetDialog(act);
-                                            }}
-                                            style={{
-                                              padding: '4px 10px',
-                                              borderRadius: '6px',
-                                              background: 'var(--card)',
-                                              border: '1px solid var(--line)',
-                                              fontFamily: 'var(--font-mono)',
-                                              fontSize: '11px',
-                                              fontWeight: 700,
-                                              color: 'var(--ink-2)',
-                                              cursor: 'pointer',
-                                              display: 'inline-flex',
-                                              alignItems: 'center',
-                                              gap: 4,
-                                            }}
-                                          >
-                                            <Pencil size={11} /> BUDGET
-                                          </button>
+                                          <BtButton variant="secondary" size="compact" icon={Pencil} onClick={() => openBudgetDialog(act)}>
+                                            Budget
+                                          </BtButton>
                                         )}
                                       </div>
                                     </td>
@@ -1154,255 +963,156 @@ export default function ManageSitePage() {
             </div>
           )}
 
-          {/* ══════════════════════════════════════════════════════════
-              TAB 2: FINANCIALS & CSV IMPORT / EXPORT
-             ══════════════════════════════════════════════════════════ */}
+          {/* ── TAB 2: FINANCIALS & CSV ── */}
           {activeTab === 'money' && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-              <div
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  flexWrap: 'wrap',
-                  gap: '12px',
-                }}
-              >
-                <div>
-                  <h3
-                    style={{
-                      margin: 0,
-                      fontFamily: 'var(--font-display)',
-                      fontSize: '20px',
-                      fontWeight: 800,
-                      color: 'var(--ink)',
-                    }}
-                  >
-                    Financial Overview & Category Allocations
-                  </h3>
-                  <p
-                    style={{
-                      margin: '4px 0 0',
-                      fontFamily: 'var(--font-ui)',
-                      fontSize: '13px',
-                      color: 'var(--ink-3)',
-                    }}
-                  >
-                    Category breakdown, cash inflow, and automated spreadsheet import / export.
-                  </p>
-                </div>
-
-                <div style={{ display: 'flex', gap: '8px' }}>
-                  <BtButton variant="secondary" small icon={FileDown} onPress={handleExportCSV}>
-                    Export CSV
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12 }}>
+                {sectionTitle('Financial overview', 'Budget, spend and cash inflow, with spreadsheet import and export.')}
+                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                  <BtButton variant="secondary" size="small" icon={FileDown} onClick={handleExportCSV}>
+                    Export entries
                   </BtButton>
-                  <BtButton variant="secondary" small icon={FileUp} onPress={handleImportCSV}>
-                    Import CSV
+                  <BtButton variant="secondary" size="small" icon={FileUp} onClick={handleImportCSV}>
+                    Import entries
                   </BtButton>
                 </div>
               </div>
 
-              {/* Financial KPI Cards */}
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '14px' }}>
+              <div className="bt-grid-3">
                 <BtCard padding="20px">
-                  <div style={labelStyle}>TOTAL BUDGET ALLOCATED</div>
-                  <div className="tnum" style={{ fontFamily: 'var(--font-display)', fontSize: '24px', fontWeight: 800, color: 'var(--ink)', marginTop: '4px' }}>
-                    {fmtINR(totalBudget)}
+                  <div className="bt-eyebrow" style={eyebrow}>Total budget</div>
+                  <div className="tnum" style={{ fontFamily: 'var(--font-display)', fontSize: 30, fontWeight: 700, color: 'var(--ink)', marginTop: 6 }}>
+                    {money(totalBudget)}
                   </div>
-                  <div style={{ marginTop: '12px' }}>
+                  <div style={{ marginTop: 14 }}>
                     <BtBricks value={util} height={8} />
                   </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', color: 'var(--ink-3)', marginTop: '8px' }}>
-                    <span>Budget Utilized</span>
-                    <span style={{ fontWeight: 700, color: util >= 1 ? 'var(--status-danger-bright)' : 'var(--ink)' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, color: 'var(--ink-2)', marginTop: 10 }}>
+                    <span>Budget used</span>
+                    <strong className="tnum" style={{ color: util >= 1 ? 'var(--status-danger)' : 'var(--ink)' }}>
                       {(util * 100).toFixed(0)}%
-                    </span>
+                    </strong>
                   </div>
                 </BtCard>
 
                 <BtCard padding="20px">
-                  <div style={labelStyle}>TOTAL FUNDS SPENT</div>
+                  <div className="bt-eyebrow" style={eyebrow}>Total spent</div>
                   <div
                     className="tnum"
-                    style={{
-                      fontFamily: 'var(--font-display)',
-                      fontSize: '24px',
-                      fontWeight: 800,
-                      color: spent > totalBudget && totalBudget > 0 ? 'var(--status-danger-bright)' : 'var(--ink)',
-                      marginTop: '4px',
-                    }}
+                    style={{ fontFamily: 'var(--font-display)', fontSize: 30, fontWeight: 700, marginTop: 6, color: overBudget ? 'var(--status-danger)' : 'var(--ink)' }}
                   >
-                    {fmtINR(spent)}
+                    {money(spent)}
                   </div>
-                  <div style={{ fontFamily: 'var(--font-ui)', fontSize: '13px', color: 'var(--ink-2)', marginTop: '10px' }}>
-                    Remaining budget: <strong style={{ color: 'var(--tone-green)' }}>{fmtINR(remaining)}</strong>
+                  <div style={{ fontSize: 14, color: 'var(--ink-2)', marginTop: 14 }}>
+                    Remaining budget{' '}
+                    <strong className="tnum" style={{ color: 'var(--status-success)' }}>{money(remaining)}</strong>
                   </div>
                 </BtCard>
 
                 <BtCard padding="20px">
-                  <div style={labelStyle}>TOTAL REVENUE INFLOW</div>
-                  <div
-                    className="tnum"
-                    style={{
-                      fontFamily: 'var(--font-display)',
-                      fontSize: '24px',
-                      fontWeight: 800,
-                      color: 'var(--tone-green)',
-                      marginTop: '4px',
-                    }}
-                  >
-                    +{fmtINR(totalIncome)}
+                  <div className="bt-eyebrow" style={eyebrow}>Money in</div>
+                  <div className="tnum" style={{ fontFamily: 'var(--font-display)', fontSize: 30, fontWeight: 700, color: 'var(--status-success)', marginTop: 6 }}>
+                    +{money(totalIncome)}
                   </div>
-                  <div style={{ fontFamily: 'var(--font-ui)', fontSize: '13px', color: 'var(--ink-2)', marginTop: '10px' }}>
-                    Net cash flow: <strong>{fmtINR(totalIncome - spent)}</strong>
+                  <div style={{ fontSize: 14, color: 'var(--ink-2)', marginTop: 14 }}>
+                    Net cash flow{' '}
+                    <strong className="tnum" style={{ color: totalIncome - spent < 0 ? 'var(--status-danger)' : 'var(--ink)' }}>
+                      {money(totalIncome - spent)}
+                    </strong>
                   </div>
                 </BtCard>
               </div>
 
-              {/* Category Breakdown */}
               {hasBrk && (
-                <BtCard padding="22px">
-                  <BtSectionHeader title="Category Breakdown" caption />
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '14px', marginTop: '10px' }}>
-                    {bMat > 0 && (
-                      <div style={{ padding: '12px 14px', borderRadius: 'var(--r-input)', background: 'var(--fill)' }}>
-                        <div style={labelStyle}>MATERIALS</div>
-                        <div className="tnum" style={{ fontFamily: 'var(--font-display)', fontSize: '18px', fontWeight: 700, color: 'var(--ink)' }}>
-                          {fmtINR(bMat)}
+                <BtCard padding="20px">
+                  <BtSectionHeader title="Category breakdown" caption />
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 12 }}>
+                    {[
+                      { label: 'Materials', value: bMat, color: 'var(--type-material)' },
+                      { label: 'Labour', value: bLab, color: 'var(--type-labour)' },
+                      { label: 'Equipment', value: bEq, color: 'var(--type-equipment)' },
+                      { label: 'Miscellaneous', value: bMisc, color: 'var(--slate)' },
+                    ]
+                      .filter((c) => c.value > 0)
+                      .map((c) => (
+                        <div key={c.label} style={{ padding: '14px 16px', borderRadius: 'var(--r-input)', background: 'var(--fill)' }}>
+                          <div className="bt-eyebrow" style={{ ...eyebrow, display: 'flex', alignItems: 'center', gap: 6 }}>
+                            <span style={{ width: 8, height: 8, borderRadius: '50%', background: c.color }} />
+                            {c.label}
+                          </div>
+                          <div className="tnum" style={{ fontFamily: 'var(--font-display)', fontSize: 20, fontWeight: 700, color: 'var(--ink)', marginTop: 6 }}>
+                            {money(c.value)}
+                          </div>
                         </div>
-                      </div>
-                    )}
-                    {bLab > 0 && (
-                      <div style={{ padding: '12px 14px', borderRadius: 'var(--r-input)', background: 'var(--fill)' }}>
-                        <div style={labelStyle}>LABOUR</div>
-                        <div className="tnum" style={{ fontFamily: 'var(--font-display)', fontSize: '18px', fontWeight: 700, color: 'var(--ink)' }}>
-                          {fmtINR(bLab)}
-                        </div>
-                      </div>
-                    )}
-                    {bEq > 0 && (
-                      <div style={{ padding: '12px 14px', borderRadius: 'var(--r-input)', background: 'var(--fill)' }}>
-                        <div style={labelStyle}>EQUIPMENT</div>
-                        <div className="tnum" style={{ fontFamily: 'var(--font-display)', fontSize: '18px', fontWeight: 700, color: 'var(--ink)' }}>
-                          {fmtINR(bEq)}
-                        </div>
-                      </div>
-                    )}
-                    {bMisc > 0 && (
-                      <div style={{ padding: '12px 14px', borderRadius: 'var(--r-input)', background: 'var(--fill)' }}>
-                        <div style={labelStyle}>MISCELLANEOUS</div>
-                        <div className="tnum" style={{ fontFamily: 'var(--font-display)', fontSize: '18px', fontWeight: 700, color: 'var(--ink)' }}>
-                          {fmtINR(bMisc)}
-                        </div>
-                      </div>
-                    )}
+                      ))}
                   </div>
                 </BtCard>
               )}
 
-              {/* CSV Tool Card */}
               <CsvImportExportCard project={p} onProjectUpdated={setLocalProject} setToast={setToast} />
             </div>
           )}
 
-          {/* ══════════════════════════════════════════════════════════
-              TAB 3: SITE OVERVIEW & TIMELINE
-             ══════════════════════════════════════════════════════════ */}
+          {/* ── TAB 3: SITE OVERVIEW ── */}
           {activeTab === 'overview' && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-              <BtCard padding="24px">
-                <BtSectionHeader title="Project Timeline & Status" caption />
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '14px', marginTop: '12px' }}>
-                  <div style={{ padding: '14px', borderRadius: 'var(--r-input)', background: 'var(--fill)' }}>
-                    <div style={labelStyle}>START DATE</div>
-                    <div style={{ fontFamily: 'var(--font-display)', fontSize: '16px', fontWeight: 700, color: 'var(--ink)' }}>
-                      {p.startDate ? _fmtDate(new Date(p.startDate)) : '—'}
-                    </div>
-                  </div>
-                  <div style={{ padding: '14px', borderRadius: 'var(--r-input)', background: 'var(--fill)' }}>
-                    <div style={labelStyle}>EXPECTED COMPLETION</div>
-                    <div style={{ fontFamily: 'var(--font-display)', fontSize: '16px', fontWeight: 700, color: 'var(--ink)' }}>
-                      {p.expectedEndDate ? _fmtDate(new Date(p.expectedEndDate)) : (p.endDate ? _fmtDate(new Date(p.endDate)) : '—')}
-                    </div>
-                  </div>
-                  <div style={{ padding: '14px', borderRadius: 'var(--r-input)', background: 'var(--fill)' }}>
-                    <div style={labelStyle}>CURRENT STATUS</div>
-                    <div style={{ marginTop: '4px' }}>
-                      <BtBadge label={status} tone={status === 'Completed' ? 'green' : 'brand'} />
-                    </div>
-                  </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+              <BtCard padding="20px">
+                <BtSectionHeader title="Timeline & status" caption />
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 12 }}>
+                  <FactTile label="Start date">{p.startDate ? _fmtDate(new Date(p.startDate)) : '—'}</FactTile>
+                  <FactTile label="Expected completion">
+                    {p.expectedEndDate ? _fmtDate(new Date(p.expectedEndDate)) : p.endDate ? _fmtDate(new Date(p.endDate)) : '—'}
+                  </FactTile>
+                  <FactTile label="Current status">
+                    <BtBadge label={st.label} tone={st.tone} />
+                  </FactTile>
                 </div>
               </BtCard>
 
-              {/* Site Photo Preview */}
               {hasPhoto && (
                 <BtCard padding="20px">
-                  <BtSectionHeader title="Site Photo" caption />
-                  <div style={{ marginTop: '10px', borderRadius: 'var(--r-card)', overflow: 'hidden', maxHeight: '340px' }}>
-                    <img src={imgSrc} alt="Site preview" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                  <BtSectionHeader title="Site photo" caption />
+                  <div style={{ borderRadius: 'var(--r-input)', overflow: 'hidden', maxHeight: 340 }}>
+                    <img src={imgSrc} alt="Site preview" style={{ width: '100%', maxHeight: 340, objectFit: 'cover', display: 'block' }} />
                   </div>
                 </BtCard>
               )}
 
-              {/* Project Scope */}
               {p.scope && (
                 <BtCard padding="20px">
-                  <BtSectionHeader title="Project Scope" caption />
-                  <div style={{ fontFamily: 'var(--font-ui)', fontSize: '14px', color: 'var(--ink-2)', lineHeight: 1.6, whiteSpace: 'pre-wrap', marginTop: '8px' }}>
+                  <BtSectionHeader title="Project scope" caption />
+                  <div style={{ fontFamily: 'var(--font-ui)', fontSize: 15, color: 'var(--ink-2)', lineHeight: 1.6, whiteSpace: 'pre-wrap' }}>
                     {p.scope}
                   </div>
                 </BtCard>
               )}
 
-              {/* Blueprints and Documents */}
               {p.documents && p.documents.length > 0 && (
                 <BtCard padding="20px">
-                  <BtSectionHeader title={`Blueprints & Documents (${p.documents.length})`} caption />
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: '12px', marginTop: '12px' }}>
+                  <BtSectionHeader title={`Blueprints & documents (${p.documents.length})`} caption />
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: 12 }}>
                     {p.documents.map((doc, idx) => {
                       const fileUrl = resolveImageUrl(doc);
                       const fileName = doc.split('/').pop() || `Document ${idx + 1}`;
                       const isImage = /\.(jpg|jpeg|png|gif|webp)$/i.test(fileName);
                       return (
-                        <div
-                          key={idx}
-                          style={{
-                            border: '1px solid var(--line)',
-                            borderRadius: 'var(--r-input)',
-                            overflow: 'hidden',
-                            background: 'var(--card)',
-                          }}
-                        >
-                          <div
-                            style={{
-                              height: '110px',
-                              background: 'var(--fill)',
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              position: 'relative',
-                            }}
-                          >
+                        <div key={idx} style={{ border: '1px solid var(--line)', borderRadius: 'var(--r-input)', overflow: 'hidden', background: 'var(--card)' }}>
+                          <div style={{ height: 110, background: 'var(--fill)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                             {isImage ? (
                               <img src={fileUrl} alt={fileName} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                             ) : (
-                              <FileText size={36} color="var(--accent)" />
+                              <FileText size={36} strokeWidth={1.6} color="var(--accent-ink)" />
                             )}
                           </div>
-                          <div style={{ padding: '10px 12px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                            <span style={{ fontFamily: 'var(--font-ui)', fontSize: '12px', fontWeight: 600, color: 'var(--ink)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '140px' }}>
+                          <div style={{ padding: '10px 12px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+                            <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--ink)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: 0 }}>
                               {fileName}
                             </span>
                             <a
                               href={fileUrl}
                               target="_blank"
                               rel="noreferrer"
-                              style={{
-                                fontSize: '11px',
-                                fontWeight: 700,
-                                color: 'var(--accent)',
-                                textDecoration: 'none',
-                              }}
+                              style={{ fontSize: 13, fontWeight: 700, color: 'var(--accent-ink)', textDecoration: 'none', padding: '8px 4px' }}
                             >
                               View
                             </a>
@@ -1416,69 +1126,34 @@ export default function ManageSitePage() {
             </div>
           )}
 
-          {/* ══════════════════════════════════════════════════════════
-              TAB 4: BUILDING SPECIFICATIONS & DETAILS
-             ══════════════════════════════════════════════════════════ */}
+          {/* ── TAB 4: BUILDING SPECS ── */}
           {activeTab === 'details' && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-              {/* Project Info Details */}
-              <CollapsibleCard title="General Project Information" icon={<ClipboardCheck size={16} />} defaultOpen>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '12px', paddingTop: '12px' }}>
-                  {p.projectCode && (
-                    <div>
-                      <div style={labelStyle}>PROJECT CODE</div>
-                      <div style={valueStyle}>{p.projectCode}</div>
-                    </div>
-                  )}
-                  {p.clientName && (
-                    <div>
-                      <div style={labelStyle}>CLIENT</div>
-                      <div style={valueStyle}>{p.clientName}</div>
-                    </div>
-                  )}
-                  {p.contractorName && (
-                    <div>
-                      <div style={labelStyle}>CONTRACTOR</div>
-                      <div style={valueStyle}>{p.contractorName}</div>
-                    </div>
-                  )}
-                  {p.siteEngineer && (
-                    <div>
-                      <div style={labelStyle}>ENGINEER</div>
-                      <div style={valueStyle}>{p.siteEngineer}</div>
-                    </div>
-                  )}
-                  {p.contactNumber && (
-                    <div>
-                      <div style={labelStyle}>CONTACT</div>
-                      <div style={valueStyle}>{p.contactNumber}</div>
-                    </div>
-                  )}
-                  <div>
-                    <div style={labelStyle}>LOCATION</div>
-                    <div style={valueStyle}>{projectLoc}</div>
-                  </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+              <CollapsibleCard title="General project information" icon={ClipboardCheck} defaultOpen>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 16, paddingTop: 16 }}>
+                  {p.projectCode && <Fact label="Project code">{p.projectCode}</Fact>}
+                  {p.clientName && <Fact label="Client">{p.clientName}</Fact>}
+                  {p.contractorName && <Fact label="Contractor">{p.contractorName}</Fact>}
+                  {p.siteEngineer && <Fact label="Engineer">{p.siteEngineer}</Fact>}
+                  {p.contactNumber && <Fact label="Contact">{p.contactNumber}</Fact>}
+                  <Fact label="Location">{projectLoc}</Fact>
                 </div>
               </CollapsibleCard>
 
-              {/* Land and Floors */}
               {(p.landArea || (p.floors && p.floors.length > 0)) && (
-                <CollapsibleCard title="Land & Floor Configuration" icon={<Layers size={16} />} defaultOpen>
-                  <div style={{ paddingTop: '12px' }}>
+                <CollapsibleCard title="Land & floor configuration" icon={Layers} defaultOpen>
+                  <div style={{ paddingTop: 16, display: 'flex', flexDirection: 'column', gap: 16 }}>
                     {p.landArea && (
-                      <div style={{ marginBottom: '14px' }}>
-                        <div style={labelStyle}>TOTAL LAND AREA</div>
-                        <div style={{ ...valueStyle, fontSize: '16px' }}>
-                          {p.landArea} {p.landUnit || 'sq ft'}
-                        </div>
-                      </div>
+                      <Fact label="Total land area">
+                        {p.landArea} {p.landUnit || 'sq ft'}
+                      </Fact>
                     )}
                     {p.floors && p.floors.length > 0 && (
                       <div>
-                        <div style={labelStyle}>FLOORS INCLUDED</div>
-                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginTop: '6px' }}>
+                        <div className="bt-eyebrow" style={{ ...eyebrow, marginBottom: 8 }}>Floors included</div>
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
                           {p.floors.map((f, i) => (
-                            <BtBadge key={i} label={f} tone="neutral" />
+                            <BtBadge key={i} label={f} tone="neutral" showDot={false} />
                           ))}
                         </div>
                       </div>
@@ -1487,89 +1162,55 @@ export default function ManageSitePage() {
                 </CollapsibleCard>
               )}
 
-              {/* Features and Configurations */}
-              {addlAll.length > 0 && (
-                <CollapsibleCard title="Additional Configurations" icon={<Settings size={16} />} count={addlAll.length} defaultOpen>
-                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', paddingTop: '12px' }}>
-                    {addlAll.map((item, i) => (
-                      <span
-                        key={i}
-                        style={{
-                          padding: '6px 12px',
-                          borderRadius: '8px',
-                          background: 'var(--fill)',
-                          border: '1px solid var(--line)',
-                          fontFamily: 'var(--font-ui)',
-                          fontSize: '12px',
-                          fontWeight: 500,
-                          color: 'var(--ink)',
-                        }}
-                      >
-                        {_getStr(item)}
-                      </span>
+              {featureGroups.map((g) => (
+                <CollapsibleCard key={g.title} title={g.title} icon={g.icon} count={g.items.length} defaultOpen>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, paddingTop: 16 }}>
+                    {g.items.map((item, i) => (
+                      <Tag key={i}>{_getStr(item)}</Tag>
                     ))}
                   </div>
                 </CollapsibleCard>
-              )}
-
-              {utility.length > 0 && (
-                <CollapsibleCard title="Utility & Services" icon={<Zap size={16} />} count={utility.length} defaultOpen>
-                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', paddingTop: '12px' }}>
-                    {utility.map((item, i) => (
-                      <span
-                        key={i}
-                        style={{
-                          padding: '6px 12px',
-                          borderRadius: '8px',
-                          background: 'var(--fill)',
-                          border: '1px solid var(--line)',
-                          fontFamily: 'var(--font-ui)',
-                          fontSize: '12px',
-                          fontWeight: 500,
-                          color: 'var(--ink)',
-                        }}
-                      >
-                        {_getStr(item)}
-                      </span>
-                    ))}
-                  </div>
-                </CollapsibleCard>
-              )}
+              ))}
             </div>
           )}
 
-          {/* ══════════════════════════════════════════════════════════
-              TAB 5: RECENT ACTIVITY LOG
-             ══════════════════════════════════════════════════════════ */}
+          {/* ── TAB 5: RECENT ACTIVITY ── */}
           {activeTab === 'entries' && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
               <BtSectionHeader
-                title={`Site Activity Log (${transactions.length})`}
+                title={`Site activity log (${transactions.length})`}
                 action="View all entries"
                 onAction={() => navigate('/transaction')}
               />
 
-              {transactions.length === 0 ? (
-                <BtCard padding="48px 24px">
+              {loadingT && transactions.length === 0 ? (
+                <BtCard padding="16px 20px" style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+                  {[0, 1, 2, 3].map((i) => (
+                    <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+                      <BtSkeleton width="40px" height="40px" />
+                      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 8 }}>
+                        <BtSkeleton width="50%" height="16px" borderRadius="6px" />
+                        <BtSkeleton width="30%" height="13px" borderRadius="6px" />
+                      </div>
+                      <BtSkeleton width="72px" height="18px" borderRadius="6px" />
+                    </div>
+                  ))}
+                </BtCard>
+              ) : transactions.length === 0 ? (
+                <BtCard padding="24px">
                   <BtEmpty
                     icon={Clock}
                     title="No logged transactions yet"
-                    message="Expenses, labour logs, and materials added for this project will be listed here."
-                    action={
-                      <BtButton
-                        variant="primary"
-                        icon={Plus}
-                        onPress={() => navigate('/add-entry', { state: { project: p } })}
-                      >
-                        Add First Entry
-                      </BtButton>
-                    }
+                    message="Expenses, labour logs and materials added for this project will be listed here."
+                    actionLabel="Add First Entry"
+                    onAction={() => navigate('/add-entry', { state: { project: p } })}
                   />
                 </BtCard>
               ) : (
                 <BtGroup>
                   {transactions.slice(0, 15).map((t, idx) => {
                     const amt = Number(t.amount || t.totalAmount || 0);
+                    const open = () => navigate('/entry-detail', { state: { entry: t } });
                     return (
                       <BtRow
                         key={t._id || idx}
@@ -1577,21 +1218,18 @@ export default function ManageSitePage() {
                         title={t.title || t.name || t.type || 'Entry'}
                         subtitle={`${t.category || t.type || ''} • ${_fmtDate(new Date(t.date || t.createdAt))}`}
                         amount={Math.abs(amt)}
-                        tag={
-                          <BtBadge
-                            label={t.type || 'Material'}
-                            tone={
-                              t.type === 'Wages' || t.type === 'Labour'
-                                ? 'green'
-                                : t.type === 'Income'
-                                ? 'green'
-                                : t.type === 'Expense'
-                                ? 'amber'
-                                : 'brand'
-                            }
-                          />
-                        }
-                        onClick={() => navigate('/entry-detail', { state: { entry: t } })}
+                        amountColor={t.type === 'Income' ? 'var(--status-success)' : undefined}
+                        tag={<BtBadge label={TYPE_LABEL[t.type] || t.type || 'Material'} tone={TYPE_TONE[t.type] || 'brand'} />}
+                        onClick={open}
+                        role="button"
+                        tabIndex={0}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' || e.key === ' ') {
+                            e.preventDefault();
+                            open();
+                          }
+                        }}
+                        className="bt-hover-row"
                       />
                     );
                   })}
@@ -1602,152 +1240,74 @@ export default function ManageSitePage() {
         </div>
       </BtSheet>
 
-      {/* ══════════════════════════════════════════════════════════
-          BUDGET ALLOCATION DIALOG (MODAL)
-         ══════════════════════════════════════════════════════════ */}
+      {/* ── BUDGET ALLOCATION DIALOG ── */}
       {budgetDialogActivity && (
-        <div
-          style={{
-            position: 'fixed',
-            inset: 0,
-            background: 'var(--scrim)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            zIndex: 1000,
-            backdropFilter: 'blur(4px)',
-            padding: '16px',
-          }}
-          onClick={() => setBudgetDialogActivity(null)}
+        <ModalShell
+          title="Allocate budget"
+          subtitle={
+            <span style={{ fontFamily: 'var(--font-ui)', fontSize: 14, color: 'var(--ink-2)' }}>
+              Set budget for <strong style={{ color: 'var(--ink)' }}>{budgetDialogActivity.name}</strong> across categories.
+            </span>
+          }
+          onClose={() => setBudgetDialogActivity(null)}
         >
-          <div
-            style={{
-              background: 'var(--card)',
-              width: '100%',
-              maxWidth: 440,
-              borderRadius: 'var(--r-card)',
-              padding: '24px 28px',
-              boxShadow: 'var(--shadow-modal)',
-              border: '1px solid var(--line)',
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              saveBudgetDialog();
             }}
-            onClick={(e) => e.stopPropagation()}
+            style={{ display: 'flex', flexDirection: 'column', gap: 16 }}
           >
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-              <h3
-                style={{
-                  margin: 0,
-                  fontFamily: 'var(--font-display)',
-                  fontSize: '18px',
-                  fontWeight: 800,
-                  color: 'var(--ink)',
-                }}
-              >
-                Allocate Budget
-              </h3>
-              <button
-                type="button"
-                onClick={() => setBudgetDialogActivity(null)}
-                style={{
-                  background: 'none',
-                  border: 'none',
-                  color: 'var(--ink-3)',
-                  cursor: 'pointer',
-                  padding: 4,
-                }}
-              >
-                <X size={18} />
-              </button>
+            <BtField
+              label="Materials budget"
+              isCurrency
+              type="number"
+              min="0"
+              inputMode="decimal"
+              value={budgetForm.material}
+              onChange={(e) => setBudgetForm((f) => ({ ...f, material: e.target.value }))}
+            />
+            <BtField
+              label="Labour budget"
+              isCurrency
+              type="number"
+              min="0"
+              inputMode="decimal"
+              value={budgetForm.labour}
+              onChange={(e) => setBudgetForm((f) => ({ ...f, labour: e.target.value }))}
+            />
+            <BtField
+              label="Equipment budget"
+              isCurrency
+              type="number"
+              min="0"
+              inputMode="decimal"
+              value={budgetForm.equipment}
+              onChange={(e) => setBudgetForm((f) => ({ ...f, equipment: e.target.value }))}
+            />
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 14px', borderRadius: 'var(--r-input)', background: 'var(--fill)' }}>
+              <span style={{ fontSize: 14, color: 'var(--ink-2)' }}>Activity total</span>
+              <strong className="tnum" style={{ fontFamily: 'var(--font-display)', fontSize: 18, color: 'var(--ink)' }}>
+                {money(budgetFormTotal)}
+              </strong>
             </div>
-
-            <p style={{ fontFamily: 'var(--font-ui)', fontSize: '13px', color: 'var(--ink-2)', margin: '0 0 20px' }}>
-              Set budget allocations for <strong>{budgetDialogActivity.name}</strong> across categories.
-            </p>
-
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', marginBottom: '24px' }}>
-              <div>
-                <label style={labelStyle}>MATERIALS BUDGET (₹)</label>
-                <input
-                  type="number"
-                  value={budgetForm.material}
-                  onChange={(e) => setBudgetForm((f) => ({ ...f, material: e.target.value }))}
-                  style={{
-                    width: '100%',
-                    height: '46px',
-                    padding: '0 14px',
-                    borderRadius: 'var(--r-input)',
-                    border: '1px solid var(--line)',
-                    background: 'var(--fill)',
-                    color: 'var(--ink)',
-                    fontFamily: 'var(--font-display)',
-                    fontSize: '15px',
-                    fontWeight: 700,
-                    outline: 'none',
-                    boxSizing: 'border-box',
-                  }}
-                />
-              </div>
-
-              <div>
-                <label style={labelStyle}>LABOUR BUDGET (₹)</label>
-                <input
-                  type="number"
-                  value={budgetForm.labour}
-                  onChange={(e) => setBudgetForm((f) => ({ ...f, labour: e.target.value }))}
-                  style={{
-                    width: '100%',
-                    height: '46px',
-                    padding: '0 14px',
-                    borderRadius: 'var(--r-input)',
-                    border: '1px solid var(--line)',
-                    background: 'var(--fill)',
-                    color: 'var(--ink)',
-                    fontFamily: 'var(--font-display)',
-                    fontSize: '15px',
-                    fontWeight: 700,
-                    outline: 'none',
-                    boxSizing: 'border-box',
-                  }}
-                />
-              </div>
-
-              <div>
-                <label style={labelStyle}>EQUIPMENT BUDGET (₹)</label>
-                <input
-                  type="number"
-                  value={budgetForm.equipment}
-                  onChange={(e) => setBudgetForm((f) => ({ ...f, equipment: e.target.value }))}
-                  style={{
-                    width: '100%',
-                    height: '46px',
-                    padding: '0 14px',
-                    borderRadius: 'var(--r-input)',
-                    border: '1px solid var(--line)',
-                    background: 'var(--fill)',
-                    color: 'var(--ink)',
-                    fontFamily: 'var(--font-display)',
-                    fontSize: '15px',
-                    fontWeight: 700,
-                    outline: 'none',
-                    boxSizing: 'border-box',
-                  }}
-                />
-              </div>
+            <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+              <BtButton variant="secondary" onClick={() => setBudgetDialogActivity(null)} style={{ flex: '1 1 120px' }}>
+                Cancel
+              </BtButton>
+              <BtButton type="submit" variant="primary" loading={savingBudget} style={{ flex: '2 1 180px' }}>
+                Save budget
+              </BtButton>
             </div>
-
-            <BtButton variant="primary" fullWidth onPress={saveBudgetDialog}>
-              Save Budget Allocation
-            </BtButton>
-          </div>
-        </div>
+          </form>
+        </ModalShell>
       )}
 
-      {/* ══════════════════════════════════════════════════════════
-          ACTIVITY DETAIL VIEW SHEET
-         ══════════════════════════════════════════════════════════ */}
+      {/* ── ACTIVITY DETAIL ── */}
       {viewingActivity && (
         <ActivityDetailSheet
           activity={viewingActivity}
-          phaseName={phases.find((p) => p.activities?.some((a) => a.id === viewingActivity.id))?.phaseName || ''}
+          phaseName={phases.find((ph) => ph.activities?.some((a) => a.id === viewingActivity.id))?.phaseName || ''}
           onClose={() => setViewingActivity(null)}
         />
       )}
@@ -1756,13 +1316,8 @@ export default function ManageSitePage() {
 }
 
 function ActivityDetailSheet({ activity, phaseName, onClose }) {
-  const [photos, setPhotos] = useState([]);
-  const [notes, setNotes] = useState('');
-
-  useEffect(() => {
-    setPhotos(activity.photos || (activity.photo ? [activity.photo] : []));
-    setNotes(activity.notes || '');
-  }, [activity]);
+  const photos = activity.photos || (activity.photo ? [activity.photo] : []);
+  const notes = activity.notes || '';
 
   const fmtDate = (d) => {
     if (!d) return 'Completed';
@@ -1772,158 +1327,62 @@ function ActivityDetailSheet({ activity, phaseName, onClose }) {
   };
 
   return (
-    <div
-      style={{
-        position: 'fixed',
-        inset: 0,
-        background: 'var(--scrim)',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        zIndex: 1000,
-        backdropFilter: 'blur(4px)',
-        padding: '16px',
-      }}
-      onClick={onClose}
+    <ModalShell
+      title={activity.name}
+      maxWidth={480}
+      onClose={onClose}
+      subtitle={phaseName ? <BtBadge label={phaseName} tone="neutral" showDot={false} /> : null}
     >
-      <div
-        style={{
-          background: 'var(--card)',
-          width: '100%',
-          maxWidth: 480,
-          borderRadius: 'var(--r-card)',
-          padding: '24px 28px',
-          boxShadow: 'var(--shadow-modal)',
-          border: '1px solid var(--line)',
-        }}
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16 }}>
-          <div>
-            <h3
-              style={{
-                margin: 0,
-                fontFamily: 'var(--font-display)',
-                fontSize: '18px',
-                fontWeight: 800,
-                color: 'var(--ink)',
-              }}
-            >
-              {activity.name}
-            </h3>
-            <div style={{ marginTop: '4px' }}>
-              <BtBadge label={phaseName} tone="neutral" />
-            </div>
-          </div>
-          <button
-            type="button"
-            onClick={onClose}
-            style={{
-              background: 'none',
-              border: 'none',
-              color: 'var(--ink-3)',
-              cursor: 'pointer',
-              padding: 4,
-            }}
-          >
-            <X size={18} />
-          </button>
-        </div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 20 }}>
+        <Check size={18} color="var(--status-success)" strokeWidth={3} />
+        <span style={{ fontFamily: 'var(--font-ui)', fontSize: 14, fontWeight: 600, color: 'var(--status-success)' }}>
+          Completed on {fmtDate(activity.completedAt)}
+        </span>
+      </div>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 20 }}>
-          <Check size={18} color="var(--tone-green)" strokeWidth={3} />
-          <span style={{ fontFamily: 'var(--font-ui)', fontSize: '13px', fontWeight: 700, color: 'var(--tone-green)' }}>
-            Completed on {fmtDate(activity.completedAt)}
-          </span>
-        </div>
-
-        {notes && notes.trim() ? (
-          <div style={{ marginBottom: 20 }}>
-            <div
-              style={{
-                fontFamily: 'var(--font-mono)',
-                fontSize: '11px',
-                fontWeight: 600,
-                color: 'var(--ink-3)',
-                letterSpacing: '0.06em',
-                marginBottom: 6,
-                textTransform: 'uppercase',
-              }}
-            >
-              Notes & Remarks
-            </div>
-            <div
-              style={{
-                padding: '12px 14px',
-                background: 'var(--fill)',
-                borderRadius: 'var(--r-input)',
-                border: '1px solid var(--line)',
-                fontSize: '13px',
-                color: 'var(--ink)',
-                lineHeight: 1.5,
-              }}
-            >
-              {notes}
-            </div>
-          </div>
-        ) : (
+      {notes && notes.trim() ? (
+        <div style={{ marginBottom: 20 }}>
+          <div className="bt-eyebrow" style={{ ...eyebrow, marginBottom: 8 }}>Notes & remarks</div>
           <div
             style={{
-              marginBottom: 20,
-              padding: '20px 16px',
+              padding: '12px 14px',
               background: 'var(--fill)',
               borderRadius: 'var(--r-input)',
-              textAlign: 'center',
+              fontSize: 14,
+              color: 'var(--ink)',
+              lineHeight: 1.5,
+              whiteSpace: 'pre-wrap',
             }}
           >
-            <Info size={20} color="var(--ink-3)" style={{ marginBottom: 6 }} />
-            <div style={{ fontSize: '13px', color: 'var(--ink-3)', fontStyle: 'italic' }}>
-              No additional notes recorded for this milestone.
-            </div>
+            {notes}
           </div>
-        )}
+        </div>
+      ) : (
+        <div style={{ marginBottom: 20, padding: '20px 16px', background: 'var(--fill)', borderRadius: 'var(--r-input)', textAlign: 'center' }}>
+          <Info size={20} color="var(--ink-3)" style={{ marginBottom: 6 }} />
+          <div style={{ fontSize: 14, color: 'var(--ink-2)' }}>No additional notes recorded for this milestone.</div>
+        </div>
+      )}
 
-        {photos.length > 0 && (
-          <div>
-            <div
-              style={{
-                fontFamily: 'var(--font-mono)',
-                fontSize: '11px',
-                fontWeight: 600,
-                color: 'var(--ink-3)',
-                letterSpacing: '0.06em',
-                marginBottom: 8,
-                textTransform: 'uppercase',
-              }}
-            >
-              Progress Photos
-            </div>
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-              {photos.map((url, i) => (
-                <div
-                  key={i}
-                  style={{
-                    width: 80,
-                    height: 80,
-                    borderRadius: 'var(--r-input)',
-                    border: '1px solid var(--line)',
-                    overflow: 'hidden',
+      {photos.length > 0 && (
+        <div>
+          <div className="bt-eyebrow" style={{ ...eyebrow, marginBottom: 8 }}>Progress photos</div>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+            {photos.map((url, i) => (
+              <div key={i} style={{ width: 80, height: 80, borderRadius: 'var(--r-input)', border: '1px solid var(--line)', overflow: 'hidden' }}>
+                <img
+                  src={resolveImageUrl(url)}
+                  alt="Progress milestone"
+                  style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                  onError={(e) => {
+                    e.target.style.display = 'none';
                   }}
-                >
-                  <img
-                    src={url}
-                    alt="Progress milestone"
-                    style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                    onError={(e) => {
-                      e.target.style.display = 'none';
-                    }}
-                  />
-                </div>
-              ))}
-            </div>
+                />
+              </div>
+            ))}
           </div>
-        )}
-      </div>
-    </div>
+        </div>
+      )}
+    </ModalShell>
   );
 }

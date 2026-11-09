@@ -85,10 +85,49 @@ const TONES = {
     text: 'var(--ink-2)',
     dot: 'var(--slate)',
   },
+
+  // Entry types (same colours as the type icons and charts)
+  material: {
+    bg: 'var(--type-material-soft)',
+    text: 'var(--type-material)',
+    dot: 'var(--type-material)',
+  },
+  labour: {
+    bg: 'var(--type-labour-soft)',
+    text: 'var(--type-labour)',
+    dot: 'var(--type-labour)',
+  },
+  equipment: {
+    bg: 'var(--type-equipment-soft)',
+    text: 'var(--type-equipment)',
+    dot: 'var(--type-equipment)',
+  },
+  income: {
+    bg: 'var(--type-income-soft)',
+    text: 'var(--status-success)',
+    dot: 'var(--type-income)',
+  },
+};
+
+// Short names used across screens → canonical tones
+const ALIASES = {
+  good: 'success',
+  green: 'success',
+  warn: 'warning',
+  amber: 'warning',
+  bad: 'danger',
+  red: 'danger',
+  accent: 'brand',
+  info: 'material',
+  blue: 'material',
+  muted: 'neutral',
+  materials: 'material',
+  wages: 'labour',
 };
 
 export default function BtBadge({
   label,
+  children,
   tone = 'neutral', // 'success' | 'warning' | 'danger' | 'brand' | 'neutral'
   showDot = true,
   className = '',
@@ -96,7 +135,7 @@ export default function BtBadge({
   ...props
 }) {
   const normalizedTone = String(tone).toLowerCase().replace(/[\s_-]/g, '');
-  const config = TONES[normalizedTone] || TONES.neutral;
+  const config = TONES[ALIASES[normalizedTone] || normalizedTone] || TONES.neutral;
 
   return (
     <span
@@ -131,7 +170,7 @@ export default function BtBadge({
           }}
         />
       )}
-      <span>{label}</span>
+      <span>{label ?? children}</span>
     </span>
   );
 }

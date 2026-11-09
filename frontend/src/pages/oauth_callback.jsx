@@ -49,6 +49,8 @@ export default function OAuthCallback() {
     run();
   }, [navigate]);
 
+  const failed = /failed|No access token|wrong/i.test(status);
+
   return (
     <div
       style={{
@@ -57,29 +59,42 @@ export default function OAuthCallback() {
         flexDirection: "column",
         alignItems: "center",
         justifyContent: "center",
-        background: "var(--noir, #0C0E12)",
+        background: "var(--noir)",
         backgroundImage: "radial-gradient(rgba(255, 255, 255, 0.08) 1px, transparent 1px)",
         backgroundSize: "22px 22px",
-        fontFamily: "var(--font-ui, 'Instrument Sans', sans-serif)",
+        fontFamily: "var(--font-ui)",
         gap: 20,
+        padding: 16,
+        boxSizing: "border-box",
+        textAlign: "center",
       }}
     >
       <BtBrickLoader size={48} />
 
       <div
         style={{
-          fontFamily: "var(--font-serif, 'Bricolage Grotesque', sans-serif)",
-          fontSize: 28,
-          fontWeight: 800,
+          fontFamily: "var(--font-display)",
+          fontSize: 30,
+          fontWeight: 700,
           letterSpacing: "-0.02em",
-          color: "var(--bone, #F2F0EB)",
+          color: "var(--on-noir)",
           marginTop: 8,
         }}
       >
-        Build<span style={{ color: "var(--accent, #E0A93B)" }}>Track</span>
+        Build<span style={{ color: "var(--accent)" }}>Track</span>
       </div>
 
-      <p style={{ color: "rgba(255, 255, 255, 0.65)", fontSize: 14, margin: 0 }}>
+      <p
+        role="status"
+        aria-live="polite"
+        style={{
+          color: failed ? "var(--status-danger-bright)" : "var(--on-noir-2)",
+          fontSize: 15,
+          margin: 0,
+          maxWidth: 360,
+          lineHeight: 1.5,
+        }}
+      >
         {status}
       </p>
     </div>

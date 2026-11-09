@@ -1,60 +1,132 @@
+import { useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { AlertTriangle, HelpCircle } from 'lucide-react';
-import { colors, radius, typography } from '../../styles/designTokens';
-import Button from './Button';
+import BtButton from './BtButton';
 
-export default function ConfirmDialog({ open, message, danger, confirmLabel, onConfirm, onCancel }) {
+/**
+ * ConfirmDialog — centred Blueprint Noir confirm.
+ * Props: open, title?, message, danger?, confirmLabel?, cancelLabel?, loading?, onConfirm, onCancel
+ */
+export default function ConfirmDialog({
+  open,
+  title,
+  message,
+  danger,
+  confirmLabel,
+  cancelLabel = 'Cancel',
+  loading = false,
+  onConfirm,
+  onCancel,
+}) {
+  const confirmRef = useRef(null);
+
+  useEffect(() => {
+    if (!open) return;
+    confirmRef.current?.focus();
+    const onKey = (e) => {
+      if (e.key === 'Escape' && !loading) onCancel?.();
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [open, loading, onCancel]);
+
   if (!open) return null;
 
-  return (
+  const Icon = danger ? AlertTriangle : HelpCircle;
+
+  return createPortal(
     <div
-      onClick={onCancel}
+      onClick={loading ? undefined : onCancel}
       style={{
-        position: 'fixed', inset: 0, zIndex: 1500,
-        background: 'rgba(17, 24, 39, 0.45)',
-        backdropFilter: 'blur(8px)',
-        WebkitBackdropFilter: 'blur(8px)',
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-        padding: 24, animation: 'fadeIn 200ms ease',
+        position: 'fixed',
+        inset: 0,
+        zIndex: 1500,
+        background: 'var(--scrim)',
+        backdropFilter: 'blur(4px)',
+        WebkitBackdropFilter: 'blur(4px)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: 16,
+        animation: 'fadeIn 160ms ease',
       }}
     >
       <div
+        role="alertdialog"
+        aria-modal="true"
+        aria-labelledby="bt-confirm-title"
+        aria-describedby="bt-confirm-message"
         onClick={(e) => e.stopPropagation()}
         style={{
-          background: 'rgba(255, 255, 255, 0.82)',
-          backdropFilter: 'blur(32px)',
-          WebkitBackdropFilter: 'blur(32px)',
-          border: '1px solid rgba(255, 255, 255, 0.65)',
-          borderRadius: '16px',
-          boxShadow: 'var(--shadow-lg)',
+          background: 'var(--card)',
+          border: '1px solid var(--line)',
+          borderRadius: 'var(--r-card)',
+          boxShadow: 'var(--shadow-raised)',
           width: '100%',
-          maxWidth: 400,
+          maxWidth: 420,
           padding: 24,
           display: 'flex',
           flexDirection: 'column',
-          gap: 20,
-          animation: 'fadeUp 300ms cubic-bezier(0.16, 1, 0.3, 1)',
+          gap: 16,
+          animation: 'fadeUp 260ms var(--ease)',
         }}
       >
         <div
           style={{
-            width: 44, height: 44, borderRadius: radius.lg,
-            background: danger ? colors.dangerLight : colors.primaryLight,
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            color: danger ? colors.danger : colors.primary,
+            width: 44,
+            height: 44,
+            borderRadius: 'var(--r-tile)',
+            background: danger ? 'var(--status-danger-soft)' : 'var(--accent-soft)',
+            color: danger ? 'var(--status-danger)' : 'var(--accent-ink)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
           }}
         >
-          {danger ? <AlertTriangle size={20} /> : <HelpCircle size={20} />}
+          <Icon size={20} strokeWidth={2} />
         </div>
-        <div style={{ fontSize: 15, color: colors.textPrimary, fontWeight: 700, lineHeight: 1.5, fontFamily: typography.fontFamily }}>
-          {message}
+
+        <div>
+          <div
+            id="bt-confirm-title"
+            style={{
+              fontFamily: 'var(--font-display)',
+              fontSize: 19,
+              fontWeight: 700,
+              letterSpacing: '-0.01em',
+              color: 'var(--ink)',
+              lineHeight: 1.3,
+            }}
+          >
+            {title || message}
+          </div>
+          {title && message && (
+            <div
+              id="bt-confirm-message"
+              style={{ marginTop: 6, fontFamily: 'var(--font-ui)', fontSize: 14.5, lineHeight: 1.5, color: 'var(--ink-2)' }}
+            >
+              {message}
+            </div>
+          )}
         </div>
-        <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', marginTop: 4 }}>
-          <Button variant="ghost" size="md" onClick={onCancel}>Cancel</Button>
-          <Button variant={danger ? 'danger' : 'primary'} size="md" onClick={onConfirm}>
+
+        <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', flexWrap: 'wrap', marginTop: 4 }}>
+          <BtButton variant="secondary" size="small" onClick={onCancel} disabled={loading}>
+            {cancelLabel}
+          </BtButton>
+          <BtButton
+            ref={confirmRef}
+            variant={danger ? 'destructive' : 'primary'}
+            size="small"
+            onClick={onConfirm}
+            loading={loading}
+            style={danger ? { background: 'var(--status-danger)', color: '#FFFFFF' } : undefined}
+          >
             {confirmLabel || 'Confirm'}
-          </Button>
+          </BtButton>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }

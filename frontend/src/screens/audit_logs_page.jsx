@@ -1,21 +1,37 @@
 import { useState, useEffect, useCallback } from "react";
 import { transactionAPI, projectAPI, authAPI } from "../api";
 import { useAuth } from "../contexts/AuthContext";
-import { Lock, Search, ClipboardList, AlertTriangle } from "lucide-react";
+import { Lock, Search, ClipboardList, RefreshCw, HelpCircle, ChevronLeft, ChevronRight } from "lucide-react";
 import ModuleTour from "../components/ModuleTour";
-import { colors, gradients, radius, typography } from "../styles/designTokens";
 import BtHero from "../components/ui/BtHero";
+import BtPageHeader from "../components/ui/BtPageHeader";
 import BtSheet from "../components/ui/BtSheet";
-import BtBrickLoader from "../components/ui/BtBrickLoader";
+import BtCard from "../components/ui/BtCard";
+import BtBadge from "../components/ui/BtBadge";
+import BtButton from "../components/ui/BtButton";
+import BtIconButton from "../components/ui/BtIconButton";
+import BtChip from "../components/ui/BtChip";
+import BtEmpty, { BtErrorCard } from "../components/ui/BtEmpty";
+import BtSkeleton from "../components/ui/BtSkeleton";
+import BtField from "../components/ui/BtField";
 
 const ITEMS_PER_PAGE = 15;
 
 const ACTION_META = {
-  create:   { icon: "+", bg: "#dcfce7", color: "#16a34a", border: "#bbf7d0", label: "Created" },
-  update:   { icon: "~", bg: "rgba(224, 169, 59, 0.12)", color: "#B88728", border: "rgba(224, 169, 59, 0.3)", label: "Updated" },
-  delete:   { icon: "#dc2626", bg: "#fee2e2", color: "#dc2626", border: "#fca5a5", label: "Deleted" },
-  approve:  { icon: "✓", bg: "rgba(42, 120, 214, 0.12)", color: "#2A78D6", border: "rgba(42, 120, 214, 0.3)", label: "Approved" },
+  create:  { tone: "success",  label: "Created" },
+  update:  { tone: "warning",  label: "Updated" },
+  delete:  { tone: "danger",   label: "Deleted" },
+  approve: { tone: "material", label: "Approved" },
 };
+
+const KPI_META = [
+  { key: "create", label: "Creates", color: "var(--status-success)" },
+  { key: "update", label: "Updates", color: "var(--status-warning)" },
+  { key: "delete", label: "Deletes", color: "var(--status-danger)" },
+  { key: "approve", label: "Approvals", color: "var(--type-material)" },
+];
+
+const FILTERS = ["All", "Creates", "Updates", "Deletes", "Approvals"];
 
 function relativeTime(dateStr) {
   if (!dateStr) return "";
@@ -66,7 +82,7 @@ function buildLogs(transactions, projects, users) {
     const userName = resolveUser(t.createdBy || t.user);
     const projectName = resolveProject(t.project);
     const date = t.updatedAt || t.createdAt || t.date;
-    const amountStr = t.amount ? `₹${t.amount}` : '';
+    const amountStr = t.amount ? `₹${Number(t.amount).toLocaleString('en-IN')}` : '';
     const details = [
       t.type || "General",
       projectName ? `Project: ${projectName}` : "",
@@ -113,9 +129,10 @@ function buildLogs(transactions, projects, users) {
     const userName = resolveUser(p.createdBy || p.user);
     const projectName = p.projectName || p.name || "Untitled Project";
     
+    const budgetValue = typeof p.budget === "object" && p.budget !== null ? p.budget.total : p.budget;
     const details = [
       p.status ? `Status: ${p.status}` : "",
-      p.budget ? `Budget: ₹${p.budget}` : "",
+      budgetValue ? `Budget: ₹${Number(budgetValue).toLocaleString('en-IN')}` : "",
       p.location ? `Loc: ${p.location}` : ""
     ].filter(Boolean).join(" • ");
 
@@ -155,7 +172,6 @@ export default function AuditLogsPage() {
   const [filter, setFilter] = useState("All");
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
-  const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
   const [runTour, setRunTour] = useState(false);
 
   const tourSteps = [
@@ -164,7 +180,6 @@ export default function AuditLogsPage() {
     { target: '.tour-filters', content: 'Filter logs by action type or search for specific keywords.' },
     { target: '.tour-log-list', content: 'The chronological list of all audit events.' }
   ];
-
 
   const fetchLogs = useCallback(() => {
     setLoading(true);
@@ -195,12 +210,7 @@ export default function AuditLogsPage() {
     fetchLogs();
     const onFocus = () => fetchLogs();
     window.addEventListener("focus", onFocus);
-    const onResize = () => setIsMobile(window.innerWidth < 768);
-    window.addEventListener("resize", onResize);
-    return () => {
-      window.removeEventListener("focus", onFocus);
-      window.removeEventListener("resize", onResize);
-    };
+    return () => window.removeEventListener("focus", onFocus);
   }, [fetchLogs]);
 
   const filtered = logs.filter((log) => {
@@ -243,549 +253,178 @@ export default function AuditLogsPage() {
     approve: logs.filter((l) => l.action === "approve").length,
   };
 
+  const clearFilters = () => { setFilter("All"); setSearch(""); };
+
   if (!isAdmin) {
     return (
-      <div
-        style={{
-          display: "flex",
-          flexDirection: "column",
-          width: "100%",
-          
-          
-          background: 'transparent',
-          alignItems: "center",
-          justifyContent: "center",
-        }}
-      >
-        <div
-          style={{
-            background: "#fff",
-            borderRadius: 20,
-            border: "1px solid #ebebeb",
-            boxShadow: "0 4px 24px rgba(0,0,0,0.06)",
-            padding: "60px 48px",
-            textAlign: "center",
-            maxWidth: 420,
-            width: "90%",
-          }}
-        >
-          <div
-            style={{
-              width: 72,
-              height: 72,
-              borderRadius: "50%",
-              background: "#fff7ed",
-              border: "2px solid #fed7aa",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              margin: "0 auto 24px",
-              fontSize: 32,
-            }}
-          >
-            <Lock size={28} />
+      <div style={{ minHeight: "100vh", background: "var(--ground)" }}>
+        <BtHero>
+          <BtPageHeader
+            eyebrow="Security and audit trail"
+            title="Audit Logs"
+            subtitle="Recent system activity across projects, transactions and users."
+          />
+        </BtHero>
+        <BtSheet overlap={26} padding="28px 32px 64px">
+          <div style={{ maxWidth: 480, margin: "0 auto" }}>
+            <BtCard padding={0}>
+              <BtEmpty
+                icon={Lock}
+                title="Admin access only"
+                message={`You don't have permission to view the audit logs. Signed in as ${user?.name || user?.email || "Unknown"} (${user?.role || "N/A"}).`}
+              />
+            </BtCard>
           </div>
-          <h2
-            style={{
-              margin: 0,
-              fontSize: 22,
-              fontWeight: 800,
-              color: "#1a1a1a",
-              marginBottom: 10,
-            }}
-          >
-            Admin Access Only
-          </h2>
-          <p
-            style={{
-              margin: 0,
-              fontSize: 14,
-              color: "#888",
-              lineHeight: 1.6,
-              marginBottom: 8,
-            }}
-          >
-            You don't have permission to view the Audit Logs.
-          </p>
-          <p
-            style={{
-              margin: 0,
-              fontSize: 13,
-              color: "#aaa",
-            }}
-          >
-            Signed in as <strong style={{ color: "#555" }}>{user?.name || user?.email || "Unknown"}</strong> ({user?.role || "N/A"})
-          </p>
-        </div>
+        </BtSheet>
       </div>
     );
   }
 
+  const showSkeleton = loading && logs.length === 0;
+
   return (
-    <div style={{ minHeight: "100vh", background: "var(--bg, #0B0D10)" }}>
+    <div style={{ minHeight: "100vh", background: "var(--ground)" }}>
       <ModuleTour steps={tourSteps} run={runTour} setRun={setRunTour} moduleName="AuditLogs" />
-      <div className="tour-header">
-        <BtHero
-          eyebrow="SECURITY · AUDIT TRAIL"
-          title="Audit Logs"
-          subtitle="Recent system activity across projects, transactions, and users."
-          actions={
-            <button
-              onClick={fetchLogs}
-              style={{
-                display: "inline-flex",
-                alignItems: "center",
-                gap: 6,
-                padding: "8px 16px",
-                borderRadius: 10,
-                background: "rgba(255, 255, 255, 0.08)",
-                border: "1px solid rgba(255, 255, 255, 0.15)",
-                color: "#F6F4EF",
-                fontSize: 13,
-                fontWeight: 600,
-                cursor: "pointer",
-                backdropFilter: "blur(8px)",
-                fontFamily: "inherit",
-              }}
-            >
-              ↻ Refresh
-            </button>
-          }
-        />
-      </div>
 
-      <BtSheet overlap={26}>
-        <div
-          style={{
-            padding: "24px 28px",
-            display: "flex",
-            flexDirection: "column",
-            gap: 20,
-          }}
-        >
-        {/* Error Banner */}
-        {error && (
-          <div
-            style={{
-              background: "#fef2f2",
-              border: "1px solid #fecaca",
-              borderRadius: 10,
-              padding: "14px 18px",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "space-between",
-              gap: 12,
-            }}
-          >
-            <span style={{ color: "#dc2626", fontSize: 14, fontWeight: 500 }}>
-              <AlertTriangle size={14} /> {error}
-            </span>
-            <button
-              onClick={fetchLogs}
-              style={{
-                padding: "6px 14px",
-                background: "#dc2626",
-                color: "#fff",
-                border: "none",
-                borderRadius: 7,
-                fontSize: 12,
-                fontWeight: 600,
-                cursor: "pointer",
-              }}
-            >
-              Retry
-            </button>
-          </div>
-        )}
-
-        {/* Summary Cards */}
-        <div className="tour-kpis"
-          style={{
-            display: "grid",
-            gridTemplateColumns: isMobile ? "1fr 1fr" : "repeat(4, 1fr)",
-            gap: 14,
-          }}
-        >
-          <div
-            style={{
-              background: "var(--card-bg, #FFFFFF)",
-              borderRadius: 16,
-              padding: "18px 20px",
-              border: "1px solid var(--border, #E2E8F0)",
-              boxShadow: "0 1px 3px rgba(0,0,0,0.03)",
-            }}
-          >
-            <div style={{ fontSize: 10, fontWeight: 800, color: "#16A34A", letterSpacing: "0.08em", marginBottom: 6, fontFamily: "JetBrains Mono, monospace" }}>
-              CREATES
-            </div>
-            <div style={{ fontSize: 28, fontWeight: 800, color: "var(--ink, #111317)", fontFamily: "JetBrains Mono, monospace", fontVariantNumeric: "tabular-nums" }}>
-              {counts.create}
-            </div>
-          </div>
-          <div
-            style={{
-              background: "var(--card-bg, #FFFFFF)",
-              borderRadius: 16,
-              padding: "18px 20px",
-              border: "1px solid var(--border, #E2E8F0)",
-              boxShadow: "0 1px 3px rgba(0,0,0,0.03)",
-            }}
-          >
-            <div style={{ fontSize: 10, fontWeight: 800, color: "#B88728", letterSpacing: "0.08em", marginBottom: 6, fontFamily: "JetBrains Mono, monospace" }}>
-              UPDATES
-            </div>
-            <div style={{ fontSize: 28, fontWeight: 800, color: "var(--ink, #111317)", fontFamily: "JetBrains Mono, monospace", fontVariantNumeric: "tabular-nums" }}>
-              {counts.update}
-            </div>
-          </div>
-          <div
-            style={{
-              background: "var(--card-bg, #FFFFFF)",
-              borderRadius: 16,
-              padding: "18px 20px",
-              border: "1px solid var(--border, #E2E8F0)",
-              boxShadow: "0 1px 3px rgba(0,0,0,0.03)",
-            }}
-          >
-            <div style={{ fontSize: 10, fontWeight: 800, color: "#DC2626", letterSpacing: "0.08em", marginBottom: 6, fontFamily: "JetBrains Mono, monospace" }}>
-              DELETES
-            </div>
-            <div style={{ fontSize: 28, fontWeight: 800, color: "var(--ink, #111317)", fontFamily: "JetBrains Mono, monospace", fontVariantNumeric: "tabular-nums" }}>
-              {counts.delete}
-            </div>
-          </div>
-          <div
-            style={{
-              background: "var(--card-bg, #FFFFFF)",
-              borderRadius: 16,
-              padding: "18px 20px",
-              border: "1px solid var(--border, #E2E8F0)",
-              boxShadow: "0 1px 3px rgba(0,0,0,0.03)",
-            }}
-          >
-            <div style={{ fontSize: 10, fontWeight: 800, color: "#2A78D6", letterSpacing: "0.08em", marginBottom: 6, fontFamily: "JetBrains Mono, monospace" }}>
-              APPROVALS
-            </div>
-            <div style={{ fontSize: 28, fontWeight: 800, color: "var(--ink, #111317)", fontFamily: "JetBrains Mono, monospace", fontVariantNumeric: "tabular-nums" }}>
-              {counts.approve}
-            </div>
-          </div>
+      <BtHero>
+        <div className="tour-header">
+          <BtPageHeader
+            eyebrow="Security and audit trail"
+            title="Audit Logs"
+            subtitle="Recent system activity across projects, transactions and users."
+            actions={
+              <>
+                <BtIconButton onDark icon={HelpCircle} label="Page tour" onClick={() => setRunTour(true)} />
+                <BtButton variant="onDark" size="small" icon={RefreshCw} loading={loading} onClick={fetchLogs}>
+                  Refresh
+                </BtButton>
+              </>
+            }
+          />
         </div>
+      </BtHero>
 
-        {/* Filter + Search Row */}
-        <div className="tour-filters"
-          style={{
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-            flexWrap: "wrap",
-            gap: 10,
-          }}
-        >
-          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
-            {["All", "Creates", "Updates", "Deletes", "Approvals"].map((f) => (
-              <button
-                key={f}
-                onClick={() => setFilter(f)}
-                style={{
-                  padding: "7px 16px",
-                  borderRadius: 20,
-                  border: "1.5px solid",
-                  fontSize: 13,
-                  fontWeight: 600,
-                  cursor: "pointer",
-                  transition: "all 0.15s",
-                  background: filter === f ? "var(--ink, #111317)" : "#fff",
-                  color: filter === f ? "#fff" : "#555",
-                  borderColor: filter === f ? "var(--ink, #111317)" : "#e5e5e5",
-                }}
-              >
-                {f}
-              </button>
+      <BtSheet overlap={26} padding="28px 32px 64px">
+        <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+          {error && <BtErrorCard title="Couldn't load audit logs" message={error} onRetry={fetchLogs} />}
+
+          {/* KPIs */}
+          <div className="tour-kpis" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 14 }}>
+            {KPI_META.map((k) => (
+              <BtCard key={k.key} padding="16px 20px">
+                <div className="bt-eyebrow" style={{ color: "var(--ink-3)", display: "flex", alignItems: "center", gap: 8 }}>
+                  <span aria-hidden="true" style={{ width: 8, height: 8, borderRadius: "50%", background: k.color }} />
+                  {k.label}
+                </div>
+                <div className="tnum" style={{ fontFamily: "var(--font-display)", fontSize: 32, fontWeight: 700, letterSpacing: "-0.02em", color: "var(--ink)", marginTop: 6 }}>
+                  {counts[k.key]}
+                </div>
+              </BtCard>
             ))}
           </div>
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              background: "#fff",
-              border: "1px solid #e5e5e5",
-              borderRadius: 10,
-              padding: "9px 14px",
-              gap: 8,
-            }}
-          >
-            <Search size={16} color="#aaa" />
-            <input
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search logs..."
-              style={{
-                border: "none",
-                outline: "none",
-                fontSize: 13,
-                color: "#555",
-                background: "transparent",
-                width: isMobile ? 130 : 220,
-              }}
-            />
-          </div>
-        </div>
 
-        {/* Log List Card */}
-        <div className="tour-log-list"
-          style={{
-            background: "#fff",
-            borderRadius: 16,
-            border: "1px solid #ebebeb",
-            overflow: "hidden",
-            boxShadow: "0 1px 6px rgba(0,0,0,0.04)",
-          }}
-        >
-          {loading ? (
-            /* ── Loading State ── */
-            <div
-              style={{
-                padding: 60,
-                textAlign: "center",
-                display: "flex",
-                flexDirection: "column",
-                alignItems: "center",
-                gap: 16,
-              }}
-            >
-              <div
-                style={{
-                  width: 40,
-                  height: 40,
-                  border: "3px solid #e5e5e5",
-                  borderTopColor: colors.primary,
-                  borderRadius: "50%",
-                  animation: "spin 0.8s linear infinite",
-                }}
+          {/* Filters */}
+          <div className="tour-filters" style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 12 }}>
+            <div role="group" aria-label="Filter by action" style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+              {FILTERS.map((f) => (
+                <BtChip key={f} label={f} selected={filter === f} aria-pressed={filter === f} onClick={() => setFilter(f)} style={{ height: 40 }} />
+              ))}
+            </div>
+            <div style={{ width: 280, maxWidth: "100%" }}>
+              <BtField
+                size="compact"
+                icon={Search}
+                type="search"
+                aria-label="Search logs"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Search logs"
               />
-              <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
-              <span style={{ fontSize: 14, color: "#888" }}>Loading audit logs…</span>
             </div>
-          ) : filtered.length === 0 ? (
-            /* ── Empty State ── */
-            <div
-              style={{
-                padding: 60,
-                textAlign: "center",
-                display: "flex",
-                flexDirection: "column",
-                alignItems: "center",
-                gap: 12,
-              }}
-            >
-              <div
-                style={{
-                  width: 56,
-                  height: 56,
-                  borderRadius: "50%",
-                  background: "#f5f5f5",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  fontSize: 24,
-                }}
-              >
-                <ClipboardList size={24} />
-              </div>
-              <div style={{ fontSize: 16, fontWeight: 600, color: "#1a1a1a" }}>
-                No audit logs found
-              </div>
-              <div style={{ fontSize: 13, color: "#888", maxWidth: 360 }}>
-                {search
-                  ? `No results for "${search}". Try a different search term.`
-                  : filter !== "All"
-                    ? `No ${filter.toLowerCase()} activity recorded yet.`
-                    : "System activity will appear here as users interact with the platform."
-                }
-              </div>
-            </div>
-          ) : (
-            /* ── Log Entries ── */
-            <div style={{ padding: isMobile ? 12 : "4px 0" }}>
-              {paginated.map((log, idx) => {
-                const meta = ACTION_META[log.action] || ACTION_META.update;
-                return (
-                  <div
-                    key={log.id}
-                    style={{
-                      display: "flex",
-                      alignItems: "flex-start",
-                      gap: isMobile ? 12 : 16,
-                      padding: isMobile ? "14px 14px" : "16px 24px",
-                      borderBottom: idx < paginated.length - 1 ? "1px solid #f5f5f5" : "none",
-                      transition: "background 0.1s",
-                      cursor: "default",
-                    }}
-                    className="hover-bg-subtle"
-                  >
-                    {/* Action Icon */}
-                    <div
-                      style={{
-                        width: isMobile ? 36 : 40,
-                        height: isMobile ? 36 : 40,
-                        borderRadius: 10,
-                        background: meta.bg,
-                        border: `1px solid ${meta.border}`,
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        fontSize: isMobile ? 16 : 18,
-                        fontWeight: 800,
-                        color: meta.color,
-                        flexShrink: 0,
-                        marginTop: 2,
-                      }}
-                    >
-                      {meta.icon}
-                    </div>
+          </div>
 
-                    {/* Content */}
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div
+          {/* Table */}
+          <BtCard padding={0} className="tour-log-list" style={{ overflowX: "auto" }}>
+            {showSkeleton ? (
+              <div style={{ padding: 20, display: "flex", flexDirection: "column", gap: 12 }}>
+                {[1, 2, 3, 4, 5].map((i) => <BtSkeleton key={i} height="44px" />)}
+              </div>
+            ) : filtered.length === 0 ? (
+              <BtEmpty
+                icon={ClipboardList}
+                title="No audit logs found"
+                message={
+                  search
+                    ? `No results for "${search}". Try a different search term.`
+                    : filter !== "All"
+                      ? `No ${filter.toLowerCase()} activity recorded yet.`
+                      : "System activity will appear here as users interact with the platform."
+                }
+                actionLabel={search || filter !== "All" ? "Clear filters" : undefined}
+                onAction={search || filter !== "All" ? clearFilters : undefined}
+              />
+            ) : (
+              <table className="bt-table" style={{ minWidth: 620 }}>
+                <thead>
+                  <tr>
+                    <th style={{ width: 110 }}>When</th>
+                    <th style={{ width: 120 }}>Action</th>
+                    <th>Activity</th>
+                    <th style={{ width: 170 }}>By</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {paginated.map((log) => {
+                    const meta = ACTION_META[log.action] || ACTION_META.update;
+                    return (
+                      <tr key={log.id}>
+                        <td style={{ whiteSpace: "nowrap", color: "var(--ink-2)" }}>{relativeTime(log.timestamp)}</td>
+                        <td><BtBadge tone={meta.tone} label={meta.label} showDot={false} /></td>
+                        <td>
+                          <div style={{ fontWeight: 500, lineHeight: 1.45, overflowWrap: "anywhere" }}>{log.description}</div>
+                          {log.detail && <div style={{ fontSize: 13, color: "var(--ink-3)", marginTop: 2, overflowWrap: "anywhere" }}>{log.detail}</div>}
+                        </td>
+                        <td style={{ color: "var(--ink-2)" }}>{log.user}</td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            )}
+
+            {filtered.length > 0 && (
+              <div style={{ padding: "12px 20px", borderTop: "1px solid var(--line)", display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 10 }}>
+                <span style={{ fontSize: 13, color: "var(--ink-3)" }}>{paginationLabel()}</span>
+                <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+                  <BtIconButton icon={ChevronLeft} label="Previous page" size={40} disabled={page === 1} onClick={() => setPage((p) => Math.max(1, p - 1))} />
+                  {getPages().map((p, i) =>
+                    typeof p === "number" ? (
+                      <button
+                        key={i}
+                        type="button"
+                        onClick={() => setPage(p)}
+                        aria-label={`Page ${p}`}
+                        aria-current={page === p ? "page" : undefined}
                         style={{
-                          fontSize: isMobile ? 13 : 14,
-                          fontWeight: 500,
-                          color: "#1a1a1a",
-                          lineHeight: 1.5,
-                          marginBottom: 4,
-                          overflow: "hidden",
-                          textOverflow: "ellipsis",
-                          display: "-webkit-box",
-                          WebkitLineClamp: 2,
-                          WebkitBoxOrient: "vertical",
+                          minWidth: 40, height: 40, borderRadius: 12, fontSize: 14, fontWeight: 600, cursor: "pointer",
+                          fontFamily: "var(--font-ui)",
+                          border: page === p ? "1px solid var(--ink)" : "1px solid var(--line)",
+                          background: page === p ? "var(--ink)" : "var(--card)",
+                          color: page === p ? "#FFFFFF" : "var(--ink-2)",
                         }}
                       >
-                        {log.description}
-                      </div>
-                      {log.detail && (
-                        <div style={{ fontSize: 12, color: "#999", marginBottom: 4 }}>
-                          {log.detail}
-                        </div>
-                      )}
-                      <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
-                        <span
-                          style={{
-                            padding: "2px 8px",
-                            borderRadius: 5,
-                            fontSize: 11,
-                            fontWeight: 600,
-                            background: meta.bg,
-                            color: meta.color,
-                          }}
-                        >
-                          {meta.label}
-                        </span>
-                        <span style={{ fontSize: 12, color: "#888" }}>
-                          by {log.user}
-                        </span>
-                      </div>
-                    </div>
-
-                    {/* Timestamp */}
-                    <div
-                      style={{
-                        fontSize: 12,
-                        color: "#aaa",
-                        whiteSpace: "nowrap",
-                        flexShrink: 0,
-                        paddingTop: 2,
-                      }}
-                    >
-                      {relativeTime(log.timestamp)}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-
-          {/* ── Pagination ── */}
-          {filtered.length > 0 && (
-            <div
-              style={{
-                padding: "14px 20px",
-                borderTop: "1px solid #f0f0f0",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "space-between",
-                flexWrap: "wrap",
-                gap: 10,
-              }}
-            >
-              <span style={{ fontSize: 13, color: "#888" }}>{paginationLabel()}</span>
-              <div style={{ display: "flex", gap: 5, alignItems: "center" }}>
-                <button
-                  onClick={() => setPage((p) => Math.max(1, p - 1))}
-                  disabled={page === 1}
-                  style={{
-                    width: 32,
-                    height: 32,
-                    borderRadius: 8,
-                    border: "1px solid #e5e5e5",
-                    background: "#fff",
-                    cursor: page === 1 ? "not-allowed" : "pointer",
-                    color: page === 1 ? "#ccc" : "#555",
-                    fontSize: 16,
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                  }}
-                >
-                  ‹
-                </button>
-                {getPages().map((p, i) => (
-                  <button
-                    key={i}
-                    onClick={() => typeof p === "number" && setPage(p)}
-                    style={{
-                      width: 32,
-                      height: 32,
-                      borderRadius: 8,
-                      border: "1px solid",
-                      fontSize: 13,
-                      cursor: typeof p === "number" ? "pointer" : "default",
-                      fontWeight: 600,
-                      borderColor: page === p ? "var(--ink, #111317)" : "#e5e5e5",
-                      background: page === p ? "var(--ink, #111317)" : "#fff",
-                      color: page === p ? "#fff" : "#555",
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                    }}
-                  >
-                    {p}
-                  </button>
-                ))}
-                <button
-                  onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-                  disabled={page === totalPages}
-                  style={{
-                    width: 32,
-                    height: 32,
-                    borderRadius: 8,
-                    border: "1px solid #e5e5e5",
-                    background: "#fff",
-                    cursor: page === totalPages ? "not-allowed" : "pointer",
-                    color: page === totalPages ? "#ccc" : "#555",
-                    fontSize: 16,
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                  }}
-                >
-                  ›
-                </button>
+                        {p}
+                      </button>
+                    ) : (
+                      <span key={i} style={{ minWidth: 24, textAlign: "center", color: "var(--ink-3)" }}>{p}</span>
+                    )
+                  )}
+                  <BtIconButton icon={ChevronRight} label="Next page" size={40} disabled={page === totalPages} onClick={() => setPage((p) => Math.min(totalPages, p + 1))} />
+                </div>
               </div>
-            </div>
-          )}
+            )}
+          </BtCard>
         </div>
-      </div>
       </BtSheet>
     </div>
   );

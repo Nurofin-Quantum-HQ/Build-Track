@@ -1,6 +1,11 @@
-import { useState, useRef, useEffect, useMemo } from "react";
+import { useState, useRef, useEffect, useMemo, useCallback } from "react";
+import {
+  Download, Upload, FileSpreadsheet, Settings2, Undo2, AlertCircle, CheckCircle2,
+  Info, X, Plus, Trash2, Loader2,
+} from "lucide-react";
 import { projectAPI, transactionAPI } from "../api";
-import { colors, radius, gradients } from "../styles/designTokens";
+import { BtButton, BtChip, BtBadge, BtProgress, BtIconButton, BtField, btToast } from "./ui";
+import ConfirmDialog from "./ui/ConfirmDialog";
 
 const MATERIAL_TEMPLATE_HEADERS = [
   "Date", "Project", "Floor", "Phase", "Activity", "Material / Item", "Unit",
@@ -412,107 +417,154 @@ function mapRowToPayload(row, detectedType, columnMapping, projects) {
   return payload;
 }
 
+
+const TEMPLATE_OPTIONS = [
+  { key: "all", label: "All types" },
+  { key: "material", label: "Material" },
+  { key: "labour", label: "Labour" },
+  { key: "equipment", label: "Equipment" },
+];
+
+const TEMPLATE_LABEL = { all: "All types", material: "Material", labour: "Labour", equipment: "Equipment" };
+
+const PROTECTED_COLUMNS = ["Date", "Project", "Name", "Type"];
+
 function CustomizeTemplateSheet({ initialColumns, initialVisibility, onSave, onClose }) {
   const [columns, setColumns] = useState([...initialColumns]);
   const [visibility, setVisibility] = useState({ ...initialVisibility });
-  const [newColumn, setNewColumn] = useState('');
+  const [newColumn, setNewColumn] = useState("");
+
+  useEffect(() => {
+    const onKey = (e) => { if (e.key === "Escape") onClose(); };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose]);
 
   const toggleVisibility = (col) => {
-    setVisibility(prev => ({ ...prev, [col]: !prev[col] }));
+    setVisibility((prev) => ({ ...prev, [col]: !prev[col] }));
   };
 
   const addColumn = () => {
     const trimmed = newColumn.trim();
     if (!trimmed || columns.includes(trimmed)) return;
-    setColumns(prev => [...prev, trimmed]);
-    setVisibility(prev => ({ ...prev, [trimmed]: true }));
-    setNewColumn('');
+    setColumns((prev) => [...prev, trimmed]);
+    setVisibility((prev) => ({ ...prev, [trimmed]: true }));
+    setNewColumn("");
   };
 
   const removeColumn = (col) => {
-    setColumns(prev => prev.filter(c => c !== col));
-    setVisibility(prev => { const n = { ...prev }; delete n[col]; return n; });
+    setColumns((prev) => prev.filter((c) => c !== col));
+    setVisibility((prev) => { const n = { ...prev }; delete n[col]; return n; });
   };
 
   return (
-    <div style={{
-      position: 'fixed', inset: 0, zIndex: 1000,
-      background: 'rgba(0,0,0,0.4)', display: 'flex', alignItems: 'flex-end', justifyContent: 'center',
-    }} onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
-      <div style={{
-        background: '#FFF', borderRadius: '20px 20px 0 0', width: '100%', maxWidth: 520,
-        padding: '24px 24px 40px', maxHeight: '85vh', overflowY: 'auto',
-        boxShadow: '0 -4px 24px rgba(0,0,0,0.12)',
-      }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
-          <h3 style={{ margin: 0, fontSize: 18, fontWeight: 800, color: colors.textPrimary }}>Customize Template Columns</h3>
-          <button onClick={onClose} style={{
-            width: 32, height: 32, borderRadius: '50%', border: 'none',
-            background: colors.bgBase4, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
-            fontSize: 16, color: colors.textLight,
-          }}>✕</button>
+    <div
+      onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
+      style={{
+        position: "fixed", inset: 0, zIndex: 1300, background: "var(--scrim)",
+        display: "flex", alignItems: "center", justifyContent: "center", padding: 16,
+      }}
+    >
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-label="Customize template columns"
+        style={{
+          background: "var(--card)", borderRadius: "var(--r-sheet)", width: "100%", maxWidth: 520,
+          maxHeight: "88vh", display: "flex", flexDirection: "column", overflow: "hidden",
+          boxShadow: "var(--shadow-raised)",
+        }}
+      >
+        <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12, padding: "22px 24px 8px" }}>
+          <div>
+            <h3 style={{ margin: 0, fontFamily: "var(--font-display)", fontSize: 20, fontWeight: 700, letterSpacing: "-0.02em", color: "var(--ink)" }}>
+              Customize template columns
+            </h3>
+            <p style={{ margin: "4px 0 0", fontSize: 14, color: "var(--ink-2)", lineHeight: 1.45 }}>
+              Choose which columns appear in the "All types" template.
+            </p>
+          </div>
+          <BtIconButton icon={X} label="Close" onClick={onClose} />
         </div>
 
-        <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
-          <input value={newColumn} onChange={e => setNewColumn(e.target.value)}
-            placeholder="Add custom column..."
-            onKeyDown={e => e.key === 'Enter' && addColumn()}
-            style={{
-              flex: 1, padding: '10px 14px', borderRadius: radius.sm,
-              border: `1px solid ${colors.cardBorder}`, fontSize: 13, outline: 'none',
-            }} />
-          <button onClick={addColumn} style={{
-            padding: '10px 16px', borderRadius: radius.sm, border: 'none',
-            background: 'var(--ink, #111317)', color: '#F6F4EF', fontWeight: 700, fontSize: 12, cursor: 'pointer',
-          }}>Add</button>
+        <div style={{ padding: "12px 24px", display: "flex", gap: 10, alignItems: "flex-end" }}>
+          <BtField
+            label="Add a custom column"
+            value={newColumn}
+            onChange={(e) => setNewColumn(e.target.value)}
+            placeholder="e.g. Invoice number"
+            onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addColumn(); } }}
+          />
+          <BtButton variant="secondary" size="normal" icon={Plus} onClick={addColumn} disabled={!newColumn.trim()} style={{ height: 48, minHeight: 48, flexShrink: 0 }}>
+            Add
+          </BtButton>
         </div>
 
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 20 }}>
-          {columns.map((col) => (
-            <div key={col} style={{
-              display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px',
-              background: visibility[col] ? '#F8F9FF' : '#F5F5F5',
-              borderRadius: radius.sm, border: `1px solid ${visibility[col] ? '#E0E5FF' : '#E5E5E5'}`,
-              opacity: visibility[col] ? 1 : 0.6,
-            }}>
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={colors.textLight} strokeWidth="2" style={{ cursor: 'grab', flexShrink: 0 }}>
-                <line x1="8" y1="6" x2="16" y2="6" /><line x1="8" y1="12" x2="16" y2="12" /><line x1="8" y1="18" x2="16" y2="18" />
-              </svg>
-              <span style={{ flex: 1, fontSize: 13, fontWeight: 600, color: colors.textPrimary }}>{col}</span>
-              <button onClick={() => toggleVisibility(col)} style={{
-                width: 24, height: 24, borderRadius: 6, border: 'none',
-                background: visibility[col] ? `${colors.primaryBlue}15` : '#E5E5E5',
-                cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
-                fontSize: 12, color: visibility[col] ? colors.primaryBlue : colors.textLight,
-              }}>
-                {visibility[col] ? '✓' : '✕'}
-              </button>
-              {!['Date', 'Project', 'Name', 'Type'].includes(col) && (
-                <button onClick={() => removeColumn(col)} style={{
-                  width: 24, height: 24, borderRadius: 6, border: 'none',
-                  background: 'transparent', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  fontSize: 12, color: '#EF4444',
-                }}>✕</button>
-              )}
-            </div>
-          ))}
+        <div style={{ flex: 1, overflowY: "auto", padding: "4px 24px 8px", display: "flex", flexDirection: "column", gap: 8 }}>
+          {columns.map((col) => {
+            const on = visibility[col] ?? true;
+            const locked = PROTECTED_COLUMNS.includes(col);
+            return (
+              <div
+                key={col}
+                style={{
+                  display: "flex", alignItems: "center", gap: 10, padding: "8px 8px 8px 14px",
+                  borderRadius: "var(--r-chip)", border: "1px solid var(--line)",
+                  background: on ? "var(--card)" : "var(--fill)",
+                }}
+              >
+                <label style={{ flex: 1, display: "flex", alignItems: "center", gap: 10, cursor: "pointer", minHeight: 36, fontSize: 14, fontWeight: 600, color: on ? "var(--ink)" : "var(--ink-3)" }}>
+                  <input
+                    type="checkbox"
+                    checked={on}
+                    onChange={() => toggleVisibility(col)}
+                    style={{ width: 18, height: 18, accentColor: "var(--ink)", cursor: "pointer" }}
+                  />
+                  {col}
+                </label>
+                {!locked && (
+                  <BtIconButton icon={Trash2} label={`Remove ${col}`} size={36} onClick={() => removeColumn(col)} />
+                )}
+              </div>
+            );
+          })}
         </div>
 
-        <button onClick={() => onSave({ columns, visibility })}
-          style={{
-            width: '100%', padding: '14px', borderRadius: radius.md, border: 'none',
-            background: 'var(--ink, #111317)', color: '#F6F4EF',
-            fontWeight: 800, fontSize: 15, cursor: 'pointer',
-          }}>
-          Apply Customization
-        </button>
+        <div style={{ padding: "14px 24px 22px", borderTop: "1px solid var(--line)", display: "flex", gap: 10, justifyContent: "flex-end" }}>
+          <BtButton variant="secondary" size="small" onClick={onClose}>Cancel</BtButton>
+          <BtButton variant="primary" size="small" onClick={() => onSave({ columns, visibility })}>Apply columns</BtButton>
+        </div>
       </div>
+    </div>
+  );
+}
+
+function Banner({ tone = "neutral", icon: Icon, children, style = {} }) {
+  const tones = {
+    success: { bg: "var(--status-success-soft)", fg: "var(--status-success)", ink: "var(--ink)" },
+    danger: { bg: "var(--status-danger-soft)", fg: "var(--status-danger)", ink: "var(--ink)" },
+    warning: { bg: "var(--status-warning-soft)", fg: "var(--status-warning)", ink: "var(--ink)" },
+    neutral: { bg: "var(--fill)", fg: "var(--ink-2)", ink: "var(--ink)" },
+  };
+  const t = tones[tone] || tones.neutral;
+  return (
+    <div
+      role={tone === "danger" ? "alert" : undefined}
+      style={{
+        display: "flex", gap: 12, alignItems: "flex-start", padding: "12px 14px",
+        borderRadius: "var(--r-input)", background: t.bg, color: t.ink,
+        fontSize: 14, lineHeight: 1.5, fontFamily: "var(--font-ui)", ...style,
+      }}
+    >
+      {Icon && <Icon size={18} color={t.fg} strokeWidth={2} style={{ flexShrink: 0, marginTop: 2 }} />}
+      <div style={{ minWidth: 0, flex: 1 }}>{children}</div>
     </div>
   );
 }
 
 export default function CsvImport({ onComplete }) {
   const fileRef = useRef(null);
+  const completeTimerRef = useRef(null);
   const [dragOver, setDragOver] = useState(false);
   const [parsing, setParsing] = useState(false);
   const [importing, setImporting] = useState(false);
@@ -526,21 +578,21 @@ export default function CsvImport({ onComplete }) {
   const [loadingProjects, setLoadingProjects] = useState(true);
   const [resolvedRows, setResolvedRows] = useState([]);
   const [showCustomizeSheet, setShowCustomizeSheet] = useState(false);
+  const [confirmRevert, setConfirmRevert] = useState(false);
+  const [reverting, setReverting] = useState(false);
   const [columnVisibility, setColumnVisibility] = useState(
-    () => Object.fromEntries(CSV_COLUMNS.map(c => [c, true]))
+    () => Object.fromEntries(CSV_COLUMNS.map((c) => [c, true]))
   );
+
+  useEffect(() => () => { if (completeTimerRef.current) clearTimeout(completeTimerRef.current); }, []);
 
   useEffect(() => {
     const fetchProjects = async () => {
       try {
         setLoadingProjects(true);
-        const currentUser = localStorage.getItem("bt_user");
-        console.log("[CSV Import] Currently logged-in user in localStorage:", currentUser);
         const res = await projectAPI.getContext();
         const data = res.data?.projects || res.data || [];
-        const projectList = Array.isArray(data) ? data : [];
-        console.log("[CSV Import] Fetched projects for matching:", projectList);
-        setProjects(projectList);
+        setProjects(Array.isArray(data) ? data : []);
       } catch (err) {
         console.error("[CSV Import] Failed to fetch projects:", err);
         setProjects([]);
@@ -556,7 +608,7 @@ export default function CsvImport({ onComplete }) {
       return;
     }
     const columnMapping = COLUMN_MAPPINGS[selectedTemplate] || COLUMN_MAPPINGS.all;
-    const resolved = preview.rows.map(row => {
+    const resolved = preview.rows.map((row) => {
       const rowStatus = row["Row Status"] || row["RowStatus"] || row["Action"] || row["action"] || "";
       const statusLower = rowStatus.trim().toLowerCase();
       if (statusLower === "unchanged") {
@@ -569,7 +621,7 @@ export default function CsvImport({ onComplete }) {
   }, [preview, projects, selectedTemplate, loadingProjects]);
 
   const handleFile = (file) => {
-    if (!file || !file.name.endsWith(".csv")) {
+    if (!file || !file.name.toLowerCase().endsWith(".csv")) {
       setError("Please select a CSV file");
       return;
     }
@@ -594,6 +646,69 @@ export default function CsvImport({ onComplete }) {
     reader.readAsText(file);
   };
 
+  const getRowError = useCallback((resolved, index) => {
+    const rowNum = index + 1;
+    if (!resolved?.payload) return `Invalid row data on row ${rowNum}`;
+    const p = resolved.payload;
+    const raw = resolved.raw || {};
+
+    if (!p._resolvedProject) {
+      return `Could not resolve project "${raw["Project"] || "Unknown"}" on row ${rowNum}`;
+    }
+
+    const type = p.type || "Materials";
+    if (type === "Materials" || selectedTemplate === "material") {
+      const matName = (p.title || raw["Material Name"] || raw["Material"] || raw["Item Name"] || raw["Material / Item"] || raw["Name"] || raw["Description"] || "").trim();
+      if (!matName || matName.toLowerCase() === "untitled") {
+        return `Missing material name on row ${rowNum}`;
+      }
+    } else if (type === "Wages" || selectedTemplate === "labour") {
+      const worker = (p.title || raw["Worker Name"] || raw["Worker"] || raw["Labour Type"] || raw["Labour"] || raw["Name"] || raw["Description"] || "").trim();
+      if (!worker || worker.toLowerCase() === "untitled") {
+        return `Missing worker type on row ${rowNum}`;
+      }
+    } else if (type === "Expense" || selectedTemplate === "equipment") {
+      const equip = (p.title || raw["Equipment Name"] || raw["Equipment"] || raw["Machine"] || raw["Name"] || raw["Description"] || "").trim();
+      if (!equip || equip.toLowerCase() === "untitled") {
+        return `Missing equipment name on row ${rowNum}`;
+      }
+    } else {
+      const name = (p.title || raw["Name"] || raw["Title"] || raw["Description"] || "").trim();
+      if (!name || name.toLowerCase() === "untitled") {
+        return `Missing item description on row ${rowNum}`;
+      }
+    }
+
+    return null;
+  }, [selectedTemplate]);
+
+  const rowValidationErrors = useMemo(() => {
+    if (!resolvedRows.length) return [];
+    const errors = [];
+    resolvedRows.forEach((r, idx) => {
+      if (!r || r.skipped) return;
+      const err = getRowError(r, idx);
+      if (err) errors.push({ row: idx + 1, message: err });
+    });
+    return errors;
+  }, [resolvedRows, getRowError]);
+
+  const getRowStatus = (resolved, index) => {
+    if (!resolved || resolved.skipped) return "skipped";
+    const err = getRowError(resolved, index);
+    if (err) return "error";
+    return "ok";
+  };
+
+  const hasUnskipped = resolvedRows.some((r) => r && !r.skipped);
+  const canProceedWithImport = hasUnskipped && rowValidationErrors.length === 0;
+
+  const scheduleComplete = (payload, delay) => {
+    if (!onComplete) return;
+    if (completeTimerRef.current) clearTimeout(completeTimerRef.current);
+    completeTimerRef.current = setTimeout(() => onComplete(payload), delay);
+  };
+
   const doImport = async () => {
     if (!preview || !resolvedRows.length) return;
 
@@ -604,17 +719,17 @@ export default function CsvImport({ onComplete }) {
 
     setImporting(true);
     setError("");
-    const rowsToImport = resolvedRows.filter(r => !r.skipped);
+    const rowsToImport = resolvedRows.filter((r) => !r.skipped);
     setImportProgress({ current: 0, total: rowsToImport.length });
 
     try {
       const transactions = rowsToImport.map(({ payload }) => {
         const qty = payload.quantity || 0;
         const rt = payload.rate || 0;
-        
-        const pad = (n) => n.toString().padStart(2, '0');
+
+        const pad = (n) => n.toString().padStart(2, "0");
         const formatLocalYMD = (d) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
-        
+
         let safeDate = formatLocalYMD(new Date());
         if (payload.date) {
           const parts = String(payload.date).trim().split(/[\/-]/);
@@ -625,8 +740,8 @@ export default function CsvImport({ onComplete }) {
             } else if (dStr.length === 4) {
               safeDate = `${dStr}-${mStr.padStart(2, "0")}-${yStr.padStart(2, "0")}`;
             } else {
-               const dObj = new Date(String(payload.date).trim());
-               if (!isNaN(dObj.getTime())) safeDate = formatLocalYMD(dObj);
+              const dObj = new Date(String(payload.date).trim());
+              if (!isNaN(dObj.getTime())) safeDate = formatLocalYMD(dObj);
             }
           } else {
             const dObj = new Date(String(payload.date).trim());
@@ -665,7 +780,7 @@ export default function CsvImport({ onComplete }) {
           subType: payload.subtype || "",
           workType: payload.workType || "",
           contractor: payload.contractor || "",
-          model: payload.model || ""
+          model: payload.model || "",
         };
       });
 
@@ -684,16 +799,33 @@ export default function CsvImport({ onComplete }) {
       const failures = data?.failures || [];
 
       setResult({ success, failed, total: preview.total });
-      setImportErrors(failures.map(f => ({ row: (f.index || 0) + 1, message: f.reason || "Import failed" })));
+      setImportErrors(failures.map((f) => ({ row: (f.index || 0) + 1, message: f.reason || "Import failed" })));
       setImportProgress({ current: preview.total, total: preview.total });
 
-      if (onComplete) onComplete({ success, failed });
+      if (failed > 0) {
+        btToast(`Imported ${success} of ${preview.total} entries. ${failed} failed.`, { error: true });
+      } else {
+        btToast(`Imported ${success} ${success === 1 ? "entry" : "entries"}.`);
+        // Let the summary stay visible for a moment before the host refreshes.
+        scheduleComplete({ success, failed }, 1600);
+      }
     } catch (err) {
       console.error("Bulk import error:", err);
       setError(err?.response?.data?.message || err.message || "Bulk import failed");
     } finally {
       setImporting(false);
     }
+  };
+
+  const resetImport = () => {
+    const hadFailures = result?.failed > 0;
+    const snapshot = result ? { success: result.success, failed: result.failed } : null;
+    setResult(null);
+    setPreview(null);
+    setImportErrors([]);
+    setResolvedRows([]);
+    setError("");
+    if (hadFailures && snapshot) scheduleComplete(snapshot, 0);
   };
 
   const downloadTemplate = (type) => {
@@ -708,7 +840,7 @@ export default function CsvImport({ onComplete }) {
       headers = EQUIPMENT_TEMPLATE_HEADERS;
       filename = "equipment_entries_template.csv";
     } else {
-      const visibleCols = CSV_COLUMNS.filter(c => columnVisibility[c] ?? true);
+      const visibleCols = CSV_COLUMNS.filter((c) => columnVisibility[c] ?? true);
       headers = visibleCols.length ? visibleCols : ALL_TEMPLATE_HEADERS;
       filename = "all_entries_template.csv";
     }
@@ -722,374 +854,285 @@ export default function CsvImport({ onComplete }) {
     URL.revokeObjectURL(url);
   };
 
-  const getRowError = (resolved, index) => {
-    const rowNum = index + 1;
-    if (!resolved?.payload) return `Invalid row data on row ${rowNum}`;
-    const p = resolved.payload;
-    const raw = resolved.raw || {};
-
-    if (!p._resolvedProject) {
-      return `Could not resolve project "${raw["Project"] || "Unknown"}" on row ${rowNum}`;
+  const doRevert = async () => {
+    setReverting(true);
+    try {
+      await transactionAPI.revertCsv();
+      setConfirmRevert(false);
+      btToast("Last upload reverted.");
+      scheduleComplete({ success: true, revert: true }, 1400);
+    } catch (err) {
+      setConfirmRevert(false);
+      btToast(err.response?.data?.message || "Failed to revert.", { error: true });
+    } finally {
+      setReverting(false);
     }
-
-    const type = p.type || "Materials";
-    if (type === "Materials" || selectedTemplate === "material") {
-      const matName = (p.title || raw["Material Name"] || raw["Material"] || raw["Item Name"] || raw["Material / Item"] || raw["Name"] || raw["Description"] || "").trim();
-      if (!matName || matName.toLowerCase() === "untitled") {
-        return `Missing material name on row ${rowNum}`;
-      }
-    } else if (type === "Wages" || selectedTemplate === "labour") {
-      const worker = (p.title || raw["Worker Name"] || raw["Worker"] || raw["Labour Type"] || raw["Labour"] || raw["Name"] || raw["Description"] || "").trim();
-      if (!worker || worker.toLowerCase() === "untitled") {
-        return `Missing worker type on row ${rowNum}`;
-      }
-    } else if (type === "Expense" || selectedTemplate === "equipment") {
-      const equip = (p.title || raw["Equipment Name"] || raw["Equipment"] || raw["Machine"] || raw["Name"] || raw["Description"] || "").trim();
-      if (!equip || equip.toLowerCase() === "untitled") {
-        return `Missing equipment name on row ${rowNum}`;
-      }
-    } else {
-      const name = (p.title || raw["Name"] || raw["Title"] || raw["Description"] || "").trim();
-      if (!name || name.toLowerCase() === "untitled") {
-        return `Missing item description on row ${rowNum}`;
-      }
-    }
-
-    return null;
   };
 
-  const rowValidationErrors = useMemo(() => {
-    if (!resolvedRows.length) return [];
-    const errors = [];
-    resolvedRows.forEach((r, idx) => {
-      if (!r || r.skipped) return;
-      const err = getRowError(r, idx);
-      if (err) errors.push({ row: idx + 1, message: err });
-    });
-    return errors;
-  }, [resolvedRows, selectedTemplate]);
-
-  const getRowStatus = (resolved, index) => {
-    if (!resolved || resolved.skipped) return "skipped";
-    const err = getRowError(resolved, index);
-    if (err) return "error";
-    return "ok";
-  };
-
-  const hasUnskipped = resolvedRows.some(r => r && !r.skipped);
-  const canProceedWithImport = hasUnskipped && rowValidationErrors.length === 0;
-  const allResolved = canProceedWithImport;
-  const unresolvedCount = rowValidationErrors.length;
+  const openPicker = () => fileRef.current?.click();
+  const importCount = resolvedRows.filter((r) => !r.skipped).length;
+  const tableHead = { padding: "10px 12px", textAlign: "left" };
 
   return (
-    <div style={{ background: "#fff", borderRadius: 18, border: "1px solid #e5e5e5", padding: 20, boxShadow: "0 2px 10px rgba(20,20,50,0.05)" }}>
-      <div style={{ display: "flex", alignItems: "center", gap: 14, marginBottom: 4 }}>
-        <div style={{
-          width: 42, height: 42, borderRadius: 12,
-          background: `${colors.primaryBlue}10`,
-          display: "flex", alignItems: "center", justifyContent: "center",
-        }}>
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={colors.primaryBlue} strokeWidth="2">
-            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-            <polyline points="14 2 14 8 20 8" />
-            <line x1="16" y1="13" x2="8" y2="13" />
-            <line x1="16" y1="17" x2="8" y2="17" />
-          </svg>
-        </div>
-        <div>
-          <div style={{ fontSize: 10.5, fontWeight: 800, color: colors.textLight, letterSpacing: '0.6em', textTransform: 'uppercase' }}>
-            BULK ENTRY IMPORT
+    <div style={{ display: "flex", flexDirection: "column", gap: 20, fontFamily: "var(--font-ui)", color: "var(--ink)" }}>
+      {/* Header */}
+      <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 16, flexWrap: "wrap" }}>
+        <div style={{ display: "flex", alignItems: "flex-start", gap: 14, minWidth: 0, flex: "1 1 320px" }}>
+          <div
+            style={{
+              width: 44, height: 44, borderRadius: "var(--r-tile)", background: "var(--fill)", color: "var(--ink)",
+              display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
+            }}
+          >
+            <FileSpreadsheet size={22} strokeWidth={1.75} />
           </div>
-          <div style={{ fontSize: 15, fontWeight: 800, color: colors.textPrimary, marginTop: 2, display: "flex", justifyContent: "space-between" }}>
-            <span>CSV Bulk Import</span>
-            <button
-              onClick={async () => {
-                if (window.confirm("Are you sure you want to revert your last CSV bulk upload? This will undo all changes made during that specific upload.")) {
-                  try {
-                    await transactionAPI.revertCsv();
-                    if (onComplete) onComplete({ success: true, revert: true });
-                    alert("Reverted successfully.");
-                  } catch (err) {
-                    alert(err.response?.data?.message || "Failed to revert.");
-                  }
-                }
-              }}
-              style={{ padding: "4px 10px", fontSize: 11, fontWeight: 700, borderRadius: 6, border: "1px solid #FCA5A5", background: "#FEF2F2", color: "#EF4444", cursor: "pointer" }}
-            >
-              Revert Last Upload
-            </button>
+          <div style={{ minWidth: 0 }}>
+            <h3 style={{ margin: 0, fontFamily: "var(--font-display)", fontSize: 18, fontWeight: 700, letterSpacing: "-0.02em", color: "var(--ink)" }}>
+              Import entries from CSV
+            </h3>
+            <p style={{ margin: "4px 0 0", fontSize: 14, lineHeight: 1.5, color: "var(--ink-2)", maxWidth: 560 }}>
+              Download a template, fill it in, then upload it. Projects, floors, phases and activities are matched for you.
+            </p>
           </div>
         </div>
+        <BtButton variant="destructive" size="small" icon={Undo2} onClick={() => setConfirmRevert(true)}>
+          Revert last upload
+        </BtButton>
       </div>
-      <p style={{ fontSize: 12.5, color: colors.textLight, lineHeight: 1.35, marginBottom: 18, marginTop: 6 }}>
-        Import Materials, Labour, or Equipment entries. Download the template, fill it with your data including project names, and upload. Projects, floors, phases, and activities are automatically matched.
-      </p>
 
-      <div style={{ marginBottom: 16 }}>
-        <div style={{ fontSize: 11, fontWeight: 700, color: "#666", marginBottom: 8, textTransform: "uppercase", letterSpacing: "0.05em" }}>
-          SELECT TEMPLATE
-        </div>
-        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-          {[
-            { key: "all", label: "All Types" },
-            { key: "material", label: "Material" },
-            { key: "labour", label: "Labour" },
-            { key: "equipment", label: "Equipment" },
-          ].map(t => (
-            <button key={t.key} onClick={() => setSelectedTemplate(t.key)}
-              style={{
-                padding: "8px 16px", borderRadius: 8, border: `1px solid ${selectedTemplate === t.key ? "var(--ink, #111317)" : "#e5e5e5"}`,
-                background: selectedTemplate === t.key ? "var(--ink, #111317)" : "#fafafa",
-                color: selectedTemplate === t.key ? "#F6F4EF" : "#555",
-                fontWeight: 600, fontSize: 12, cursor: "pointer",
-                transition: "all 0.2s",
-              }}>
-              {t.label}
-            </button>
+      {/* Template picker */}
+      <div>
+        <div className="bt-eyebrow" style={{ color: "var(--ink-3)", marginBottom: 10 }}>Template</div>
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+          {TEMPLATE_OPTIONS.map((t) => (
+            <BtChip key={t.key} label={t.label} selected={selectedTemplate === t.key} onClick={() => setSelectedTemplate(t.key)} aria-pressed={selectedTemplate === t.key} />
           ))}
         </div>
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 14 }}>
+          <BtButton variant="secondary" size="small" icon={Download} onClick={() => downloadTemplate(selectedTemplate)}>
+            Download {TEMPLATE_LABEL[selectedTemplate].toLowerCase()} template
+          </BtButton>
+          <BtButton variant="ghost" size="small" icon={Settings2} onClick={() => setShowCustomizeSheet(true)}>
+            Customize columns
+          </BtButton>
+        </div>
       </div>
 
-      <div style={{ display: "flex", gap: 8, marginBottom: 8 }}>
-        <button onClick={() => downloadTemplate(selectedTemplate)}
-          style={{
-            flex: 1, padding: "12px", borderRadius: 12, border: "1px solid var(--border, #E2E8F0)",
-            background: "#fff", fontSize: 13, fontWeight: 700, color: "var(--ink, #111317)",
-            cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
-          }}>
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-            <polyline points="7 10 12 15 17 10" />
-            <line x1="12" y1="15" x2="12" y2="3" />
-          </svg>
-          Download Template
-        </button>
-      </div>
-
-      <button onClick={() => setShowCustomizeSheet(true)}
-        style={{
-          width: '100%', padding: '10px', borderRadius: 8, border: 'none',
-          background: 'transparent', color: colors.primaryBlue,
-          fontWeight: 700, fontSize: 12.5, cursor: 'pointer',
-          display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
-          marginBottom: 16,
-        }}>
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-          <circle cx="12" cy="12" r="3" />
-          <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z" />
-        </svg>
-        Customize Template Columns
-      </button>
-
-      <input ref={fileRef} type="file" accept=".csv" style={{ display: "none" }}
-        onChange={e => { handleFile(e.target.files[0]); e.target.value = ""; }} />
-
+      {/* Upload */}
+      <input
+        ref={fileRef}
+        type="file"
+        accept=".csv"
+        aria-label="Choose a CSV file to import"
+        style={{ display: "none" }}
+        onChange={(e) => { handleFile(e.target.files[0]); e.target.value = ""; }}
+      />
       <div
-        onClick={() => fileRef.current?.click()}
-        onDragOver={e => { e.preventDefault(); setDragOver(true); }}
+        role="button"
+        tabIndex={0}
+        aria-label="Upload a CSV file"
+        onClick={openPicker}
+        onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); openPicker(); } }}
+        onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
         onDragLeave={() => setDragOver(false)}
-        onDrop={e => { e.preventDefault(); setDragOver(false); handleFile(e.dataTransfer.files[0]); }}
+        onDrop={(e) => { e.preventDefault(); setDragOver(false); handleFile(e.dataTransfer.files[0]); }}
+        className="bt-hover-row"
         style={{
-          border: `2px dashed ${dragOver ? colors.primaryBlue : "#e5e5e5"}`,
-          borderRadius: 12, padding: "28px 20px", textAlign: "center",
-          background: dragOver ? "#F0F2FF" : "#fafafa", cursor: "pointer",
-          transition: "all 0.2s", marginBottom: 16,
+          border: `1.5px dashed ${dragOver ? "var(--accent)" : "var(--input-border)"}`,
+          borderRadius: "var(--r-card)", padding: "26px 20px", textAlign: "center",
+          background: dragOver ? "var(--accent-soft)" : "var(--ground)", cursor: "pointer",
+          display: "flex", flexDirection: "column", alignItems: "center", gap: 10,
+          transition: "border-color 150ms ease, background 150ms ease",
         }}
       >
-        <div style={{ fontSize: 28, marginBottom: 8 }}>📄</div>
-        <div style={{ fontSize: 14, fontWeight: 600, color: "#444" }}>
-          {parsing ? "Parsing…" : "Click to upload or drag and drop"}
+        <div style={{ width: 44, height: 44, borderRadius: "50%", background: "var(--card)", border: "1px solid var(--line)", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--ink)" }}>
+          {parsing ? <Loader2 size={20} style={{ animation: "spin 0.8s linear infinite" }} /> : <Upload size={20} strokeWidth={1.85} />}
         </div>
-        <div style={{ fontSize: 12, color: "#aaa", marginTop: 4 }}>CSV files only</div>
+        <div style={{ fontSize: 15, fontWeight: 600, color: "var(--ink)" }}>
+          {parsing ? "Reading your file…" : "Drop a CSV here, or click to browse"}
+        </div>
+        <div style={{ fontSize: 13, color: "var(--ink-3)" }}>CSV files only</div>
       </div>
 
       {loadingProjects && (
-        <div style={{ fontSize: 12, color: colors.primaryBlue, marginBottom: 12, display: "flex", alignItems: "center", gap: 6 }}>
-          <span style={{ animation: "spin 1s linear infinite", display: "inline-block" }}>⏳</span>
-          Loading projects for auto-matching...
+        <div style={{ fontSize: 13, color: "var(--ink-2)", display: "flex", alignItems: "center", gap: 8 }}>
+          <Loader2 size={14} style={{ animation: "spin 0.8s linear infinite" }} />
+          Loading your projects for matching…
         </div>
       )}
 
       {error && (
-        <div style={{ background: "#fee2e2", border: "1px solid #fca5a5", borderRadius: 10, padding: "10px 14px", color: "#991b1b", fontSize: 13, marginBottom: 12 }}>
-          ⚠️ {error}
-        </div>
+        <Banner tone="danger" icon={AlertCircle}>{error}</Banner>
       )}
 
+      {/* Preview */}
       {preview && !result && (
-        <div>
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12, flexWrap: "wrap", gap: 8 }}>
-            <div style={{ fontSize: 13, color: "#555" }}>
-              <strong>{preview.total}</strong> rows found
-              {preview.detectedType && (
-                <span style={{ marginLeft: 8, padding: "2px 8px", background: "#FFF5F0", color: "var(--color-primary, #F97316)", borderRadius: 4, fontSize: 11, fontWeight: 600 }}>
-                  Auto-detected: {preview.detectedType}
-                </span>
-              )}
+        <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", fontSize: 15 }}>
+              <span><strong className="tnum">{preview.total}</strong> {preview.total === 1 ? "row" : "rows"} found</span>
+              {preview.detectedType && <BtBadge tone="brand" showDot={false} label={`Detected: ${TEMPLATE_LABEL[preview.detectedType] || preview.detectedType}`} />}
             </div>
-            <button onClick={doImport} disabled={importing || !canProceedWithImport}
-              style={{
-                padding: "8px 20px",
-                background: importing ? "#64748B" : !canProceedWithImport ? "#ccc" : "var(--ink, #111317)",
-                color: "#F6F4EF",
-                border: "none", borderRadius: 8, fontWeight: 700, fontSize: 13,
-                boxShadow: !canProceedWithImport ? "none" : "0 2px 8px rgba(0,0,0,0.2)",
-                cursor: importing || !canProceedWithImport ? "not-allowed" : "pointer",
-              }}>
-              {importing ? `Importing ${importProgress.current}/${importProgress.total}…` : `Import ${resolvedRows.filter(r => !r.skipped).length} Entries`}
-            </button>
+            <BtButton
+              variant="primary"
+              size="small"
+              loading={importing}
+              disabled={!canProceedWithImport}
+              onClick={doImport}
+            >
+              {`Import ${importCount} ${importCount === 1 ? "entry" : "entries"}`}
+            </BtButton>
           </div>
 
           {!loadingProjects && (hasUnskipped ? (
-            <div style={{
-              marginBottom: 12, padding: "12px 14px", borderRadius: 10,
-              background: canProceedWithImport ? "#dcfce7" : "#fee2e2",
-              border: `1px solid ${canProceedWithImport ? "#86efac" : "#fca5a5"}`,
-              fontSize: 12.5,
-            }}>
-              {canProceedWithImport ? (
-                <span style={{ color: "#166534", fontWeight: 600 }}>
-                  ✅ All changed rows matched and validated successfully. Ready to import!
-                </span>
-              ) : (
-                <div style={{ color: "#991b1b" }}>
-                  <div style={{ fontWeight: 700, marginBottom: 4 }}>
-                    ⚠️ Found {rowValidationErrors.length} validation error{rowValidationErrors.length > 1 ? "s" : ""} in CSV file:
-                  </div>
-                  <ul style={{ margin: "4px 0 0", paddingLeft: 18 }}>
-                    {rowValidationErrors.slice(0, 5).map(e => (
-                      <li key={e.row} style={{ marginBottom: 2 }}>
-                        <strong>Row {e.row}:</strong> {e.message}
-                      </li>
-                    ))}
-                  </ul>
-                  {rowValidationErrors.length > 5 && (
-                    <div style={{ marginTop: 4, fontStyle: "italic", fontSize: 11.5 }}>
-                      + {rowValidationErrors.length - 5} more row error(s). Please fix these in your CSV file before importing.
-                    </div>
-                  )}
-                  <div style={{ fontSize: 11, marginTop: 6, opacity: 0.85 }}>
-                    <strong>Loaded projects:</strong> {projects.length ? projects.map(p => `"${p.projectName}"`).join(", ") : "None"}
-                  </div>
+            canProceedWithImport ? (
+              <Banner tone="success" icon={CheckCircle2}>
+                <strong>All rows check out.</strong> Every changed row matched a project and is ready to import.
+              </Banner>
+            ) : (
+              <Banner tone="danger" icon={AlertCircle}>
+                <div style={{ fontWeight: 700, marginBottom: 4 }}>
+                  {rowValidationErrors.length} {rowValidationErrors.length === 1 ? "row needs" : "rows need"} fixing before you can import
                 </div>
-              )}
-            </div>
+                <ul style={{ margin: "4px 0 0", paddingLeft: 18 }}>
+                  {rowValidationErrors.slice(0, 5).map((e) => (
+                    <li key={e.row} style={{ marginBottom: 2 }}>{e.message}</li>
+                  ))}
+                </ul>
+                {rowValidationErrors.length > 5 && (
+                  <div style={{ marginTop: 4, fontSize: 13, color: "var(--ink-2)" }}>
+                    and {rowValidationErrors.length - 5} more. Fix these in your CSV and upload it again.
+                  </div>
+                )}
+                <div style={{ fontSize: 13, marginTop: 8, color: "var(--ink-2)" }}>
+                  Your projects: {projects.length ? projects.map((p) => `"${p.projectName}"`).join(", ") : "none found"}
+                </div>
+              </Banner>
+            )
           ) : (
             preview.total > 0 && (
-              <div style={{
-                marginBottom: 12, padding: "12px 14px", borderRadius: 10,
-                background: "#f1f5f9",
-                border: "1px solid #e2e8f0",
-                fontSize: 12.5,
-                color: "#475569"
-              }}>
-                ℹ️ <strong>0 changed rows found.</strong> All {preview.total} rows have the 'Row Status' set to 'unchanged'. Change the status to 'changed' for the rows you want to update.
-              </div>
+              <Banner tone="neutral" icon={Info}>
+                <strong>No changed rows found.</strong> All {preview.total} rows have their Row Status set to "unchanged". Change the status for the rows you want to update.
+              </Banner>
             )
           ))}
 
           {importing && (
-            <div style={{ marginBottom: 12 }}>
-              <div style={{ height: 6, background: "#e5e7eb", borderRadius: 3, overflow: "hidden" }}>
-                <div style={{
-                  height: "100%", background: colors.primaryBlue, borderRadius: 3,
-                  width: `${(importProgress.current / importProgress.total) * 100}%`,
-                  transition: "width 0.3s",
-                }} />
-              </div>
-              <div style={{ fontSize: 11, color: "#888", marginTop: 4, textAlign: "center" }}>
-                Processing row {importProgress.current} of {importProgress.total}
+            <div>
+              <BtProgress value={importProgress.total ? importProgress.current / importProgress.total : 0} />
+              <div style={{ fontSize: 13, color: "var(--ink-2)", marginTop: 6 }}>
+                Importing {importProgress.total} {importProgress.total === 1 ? "row" : "rows"}…
               </div>
             </div>
           )}
 
-          <div style={{ overflowX: "auto" }}>
-            <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
-              <thead>
-                <tr style={{ background: "#fafafa" }}>
-                  <th style={{ padding: "8px 6px", textAlign: "center", fontWeight: 600, color: "#555", borderBottom: "1px solid #eee", width: 30 }}>Status</th>
-                  {preview.headers.slice(0, 8).map(h => (
-                    <th key={h} style={{ padding: "8px 10px", textAlign: "left", fontWeight: 600, color: "#555", borderBottom: "1px solid #eee" }}>{h}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {preview.rows.slice(0, 5).map((row, i) => {
-                  const resolved = resolvedRows[i];
-                  const rowErr = resolved ? getRowError(resolved, i) : null;
-                  const status = resolved ? getRowStatus(resolved, i) : "pending";
-                  return (
-                    <tr key={i} style={{ borderBottom: "1px solid #f5f5f5", background: status === "error" ? "#fff5f5" : "transparent" }}>
-                      <td style={{ padding: "8px 6px", textAlign: "center" }} title={status === "skipped" ? "Skipped (unchanged)" : rowErr || "Valid row"}>
-                        {status === "ok" ? (
-                          <span style={{ color: "#22c55e", fontSize: 14 }}>✓</span>
-                        ) : status === "error" ? (
-                          <span style={{ color: "#ef4444", fontSize: 14, fontWeight: "bold" }}>✗</span>
-                        ) : status === "skipped" ? (
-                          <span style={{ color: "#94a3b8", fontSize: 14 }}>—</span>
-                        ) : (
-                          <span style={{ color: "#aaa", fontSize: 14 }}>…</span>
-                        )}
-                      </td>
-                      {preview.headers.slice(0, 8).map(h => {
-                        const isProjectCol = h === "Project";
-                        const isResolved = resolved && status === "ok";
-                        return (
-                          <td key={h} style={{
-                            padding: "8px 10px",
-                            color: isProjectCol && !isResolved ? "#dc2626" : "#333",
-                            fontWeight: isProjectCol ? 600 : 400,
-                          }}>
-                            {row[h] || "—"}
-                            {isProjectCol && isResolved && resolved.payload._resolvedProjectName && (
-                              <span style={{ marginLeft: 4, fontSize: 10, color: "#22c55e" }}>✓</span>
-                            )}
-                          </td>
-                        );
-                      })}
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+          <div style={{ border: "1px solid var(--line)", borderRadius: "var(--r-input)", overflow: "hidden", background: "var(--card)" }}>
+            <div style={{ overflowX: "auto" }}>
+              <table className="bt-table" style={{ minWidth: 640 }}>
+                <thead>
+                  <tr>
+                    <th style={{ ...tableHead, width: 56 }}>Status</th>
+                    {preview.headers.slice(0, 8).map((h) => (
+                      <th key={h} style={tableHead}>{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {preview.rows.slice(0, 5).map((row, i) => {
+                    const resolved = resolvedRows[i];
+                    const rowErr = resolved ? getRowError(resolved, i) : null;
+                    const status = resolved ? getRowStatus(resolved, i) : "pending";
+                    return (
+                      <tr key={i}>
+                        <td style={{ padding: "10px 12px" }} title={status === "skipped" ? "Skipped (unchanged)" : rowErr || "Valid row"}>
+                          {status === "ok" ? (
+                            <BtBadge tone="success" label="OK" showDot={false} />
+                          ) : status === "error" ? (
+                            <BtBadge tone="danger" label="Fix" showDot={false} />
+                          ) : status === "skipped" ? (
+                            <BtBadge tone="neutral" label="Skip" showDot={false} />
+                          ) : (
+                            <span style={{ color: "var(--ink-3)" }}>…</span>
+                          )}
+                        </td>
+                        {preview.headers.slice(0, 8).map((h) => {
+                          const isProjectCol = h === "Project";
+                          const isResolved = resolved && status === "ok";
+                          return (
+                            <td
+                              key={h}
+                              style={{
+                                padding: "10px 12px", fontSize: 13.5, whiteSpace: "nowrap",
+                                color: isProjectCol && !isResolved ? "var(--status-danger)" : "var(--ink)",
+                                fontWeight: isProjectCol ? 600 : 400,
+                              }}
+                            >
+                              {row[h] || "-"}
+                            </td>
+                          );
+                        })}
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
           </div>
           {preview.total > 5 && (
-            <div style={{ fontSize: 12, color: "#aaa", marginTop: 8, textAlign: "center" }}>Showing 5 of {preview.total} rows</div>
+            <div style={{ fontSize: 13, color: "var(--ink-3)" }}>Showing the first 5 of {preview.total} rows</div>
           )}
         </div>
       )}
 
+      {/* Result */}
       {result && (
-        <div>
-          <div style={{
-            background: result.failed ? "#fef9c3" : "#dcfce7",
-            border: `1px solid ${result.failed ? "#fde047" : "#86efac"}`,
-            borderRadius: 10, padding: "14px 16px", fontSize: 13, marginBottom: 12
-          }}>
-            {result.failed ? "⚠️" : "✅"} Imported <strong>{result.success}</strong> of {result.total} entries
-            {result.failed > 0 && <span style={{ color: "#991b1b" }}> ({result.failed} failed)</span>}
+        <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+          <Banner tone={result.failed ? "warning" : "success"} icon={result.failed ? AlertCircle : CheckCircle2}>
+            <strong>
+              Imported <span className="tnum">{result.success}</span> of <span className="tnum">{result.total}</span> entries
+            </strong>
+            {result.failed > 0 && <span> ({result.failed} failed)</span>}
+          </Banner>
+
+          <div style={{ border: "1px solid var(--line)", borderRadius: "var(--r-input)", overflow: "hidden", background: "var(--card)" }}>
+            <table className="bt-table">
+              <thead>
+                <tr>
+                  <th>Result</th>
+                  <th className="num">Rows</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr><td>Rows in file</td><td className="num tnum">{result.total}</td></tr>
+                <tr><td>Imported</td><td className="num tnum" style={{ color: "var(--status-success)", fontWeight: 600 }}>{result.success}</td></tr>
+                <tr><td>Failed</td><td className="num tnum" style={{ color: result.failed ? "var(--status-danger)" : "var(--ink)", fontWeight: result.failed ? 600 : 400 }}>{result.failed}</td></tr>
+              </tbody>
+            </table>
           </div>
 
           {importErrors.length > 0 && (
-            <div style={{ background: "#FEF2F2", border: "1px solid #FCA5A5", borderRadius: 10, padding: "14px 16px", fontSize: 12 }}>
-              <div style={{ fontWeight: 700, color: "#991b1b", marginBottom: 8 }}>Import Errors:</div>
-              <div style={{ maxHeight: 150, overflowY: "auto" }}>
-                {importErrors.map((err, idx) => (
-                  <div key={idx} style={{ padding: "4px 0", color: "#991b1b", borderBottom: "1px solid #FCA5A5" }}>
-                    Row {err.row}: {err.message}
-                  </div>
-                ))}
+            <div style={{ border: "1px solid var(--line)", borderRadius: "var(--r-input)", overflow: "hidden", background: "var(--card)" }}>
+              <div style={{ maxHeight: 200, overflow: "auto" }}>
+                <table className="bt-table">
+                  <thead>
+                    <tr><th style={{ width: 80 }}>Row</th><th>Why it failed</th></tr>
+                  </thead>
+                  <tbody>
+                    {importErrors.map((err, idx) => (
+                      <tr key={idx}>
+                        <td className="tnum">{err.row}</td>
+                        <td style={{ color: "var(--status-danger)" }}>{err.message}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
               </div>
             </div>
           )}
 
-          <button onClick={() => { setResult(null); setPreview(null); setImportErrors([]); setResolvedRows([]); }}
-            style={{
-              marginTop: 12, padding: "10px 20px", borderRadius: 8, border: "1px solid #e5e5e5",
-              background: "#f3f4f6", fontSize: 13, fontWeight: 600, color: "#555", cursor: "pointer",
-            }}>
-            Import Another File
-          </button>
+          <div>
+            <BtButton variant="secondary" size="small" onClick={resetImport}>Import another file</BtButton>
+          </div>
         </div>
       )}
 
@@ -1097,13 +1140,22 @@ export default function CsvImport({ onComplete }) {
         <CustomizeTemplateSheet
           initialColumns={CSV_COLUMNS}
           initialVisibility={columnVisibility}
-          onSave={(result) => {
-            setColumnVisibility(result.visibility);
+          onSave={(res) => {
+            setColumnVisibility(res.visibility);
             setShowCustomizeSheet(false);
           }}
           onClose={() => setShowCustomizeSheet(false)}
         />
       )}
+
+      <ConfirmDialog
+        open={confirmRevert}
+        danger
+        message="Revert your last CSV upload? This undoes every change made by that upload."
+        confirmLabel={reverting ? "Reverting…" : "Revert upload"}
+        onConfirm={() => { if (!reverting) doRevert(); }}
+        onCancel={() => { if (!reverting) setConfirmRevert(false); }}
+      />
     </div>
   );
 }

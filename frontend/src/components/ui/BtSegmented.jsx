@@ -41,7 +41,7 @@ export default function BtSegmented({
               padding: '8px 16px',
               height: '36px',
               borderRadius: '11px',
-              background: isSelected ? '#FFFFFF' : 'transparent',
+              background: isSelected ? 'var(--card)' : 'transparent',
               color: isSelected ? 'var(--ink)' : 'var(--ink-2)',
               boxShadow: isSelected ? '0 1px 3px rgba(12, 14, 18, 0.08)' : 'none',
               fontSize: '13px',

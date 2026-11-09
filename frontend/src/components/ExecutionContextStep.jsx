@@ -1,21 +1,23 @@
 import { useState } from 'react';
-import { Building, ChevronDown, ChevronRight, MapPin, Layers, Hammer } from 'lucide-react';
+import { Building2, ChevronRight, MapPin, Layers, Hammer } from 'lucide-react';
 import { ACTIVITY_OPTIONS, PHASE_OPTIONS } from '../utils/voiceConstants';
+import { BtCard, BtButton, BtSelect } from './ui';
 
 export default function ExecutionContextStep({ projects, onComplete, onCancel }) {
   const [selectedProject, setSelectedProject] = useState(null);
   const [floor, setFloor] = useState('');
   const [phase, setPhase] = useState('');
   const [activity, setActivity] = useState('');
-  const [showProjectDropdown, setShowProjectDropdown] = useState(false);
-  const [showFloorDropdown, setShowFloorDropdown] = useState(false);
-  const [showPhaseDropdown, setShowPhaseDropdown] = useState(false);
-  const [showActivityDropdown, setShowActivityDropdown] = useState(false);
+  const [showError, setShowError] = useState(false);
 
   const projectFloors = selectedProject?.floors || [];
   const hasFloors = projectFloors.length > 0;
 
   const handleComplete = () => {
+    if (!selectedProject) {
+      setShowError(true);
+      return;
+    }
     onComplete({
       project: selectedProject,
       floor: floor || null,
@@ -25,322 +27,109 @@ export default function ExecutionContextStep({ projects, onComplete, onCancel })
   };
 
   return (
-    <div style={{
-      width: '100%',
-      maxWidth: 600,
-      margin: '0 auto',
-      padding: '24px',
-    }}>
-      <div style={{ textAlign: 'center', marginBottom: 32 }}>
-        <div style={{
-          width: 64,
-          height: 64,
-          borderRadius: 16,
-          background: 'var(--surface-subtle, #F8FAFC)', border: '1px solid var(--border, #E2E8F0)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          margin: '0 auto 16px',
-        }}>
-          <Building size={28} color="var(--ink, #111317)" />
-        </div>
-        <h2 style={{
-          fontSize: 20,
-          fontWeight: 700,
-          color: '#1F2937',
-          margin: '0 0 8px',
-        }}>
-          Set Entry Context
-        </h2>
-        <p style={{
-          fontSize: 13,
-          color: '#6B7280',
-          margin: 0,
-          lineHeight: 1.5,
-        }}>
-          Select project and location details. These will pre-fill your voice entries.
-        </p>
-      </div>
-
-      <div style={{ marginBottom: 16 }}>
-        <label style={labelStyle}>
-          <Building size={14} color="#6B7280" /> Project *
-        </label>
-        <div style={{ position: 'relative' }}>
-          <button
-            onClick={() => { setShowProjectDropdown(!showProjectDropdown); setShowFloorDropdown(false); setShowPhaseDropdown(false); setShowActivityDropdown(false); }}
-            style={dropdownBtnStyle}
-          >
-            <span style={{ color: selectedProject ? '#1F2937' : '#9CA3AF' }}>
-              {selectedProject?.projectName || selectedProject?.name || 'Select project...'}
-            </span>
-            <ChevronDown size={16} color="#6B7280" />
-          </button>
-          {showProjectDropdown && (
-            <div style={dropdownListStyle}>
-              {(projects || []).map((p, i) => (
-                <div
-                  key={p._id || i}
-                  onClick={() => { setSelectedProject(p); setFloor(''); setShowProjectDropdown(false); }}
-                  style={{
-                    ...dropdownItemStyle,
-                    background: selectedProject?._id === p._id ? '#F1F5F9' : 'transparent',
-                  }}
-                >
-                  <div style={{ fontWeight: 600, fontSize: 13, color: '#1F2937' }}>
-                    {p.projectName || p.name}
-                  </div>
-                  {p.location && (
-                    <div style={{ fontSize: 11, color: '#6B7280', marginTop: 2 }}>{p.location}</div>
-                  )}
-                </div>
-              ))}
-              {(!projects || projects.length === 0) && (
-                <div style={{ padding: '12px 16px', fontSize: 13, color: '#9CA3AF', textAlign: 'center' }}>
-                  No projects available
-                </div>
-              )}
-            </div>
-          )}
-        </div>
-      </div>
-
-      <div style={{ marginBottom: 16 }}>
-        <label style={labelStyle}>
-          <MapPin size={14} color="#6B7280" /> Floor / Level
-        </label>
-        <div style={{ position: 'relative' }}>
-          <button
-            disabled={!selectedProject || !hasFloors}
-            onClick={() => {
-              if (selectedProject && hasFloors) {
-                setShowFloorDropdown(!showFloorDropdown);
-                setShowProjectDropdown(false);
-                setShowPhaseDropdown(false);
-                setShowActivityDropdown(false);
-              }
-            }}
-            style={{
-              ...dropdownBtnStyle,
-              opacity: (!selectedProject || !hasFloors) ? 0.6 : 1,
-              cursor: (!selectedProject || !hasFloors) ? 'not-allowed' : 'pointer',
-            }}
-          >
-            <span style={{ color: (selectedProject && hasFloors && floor) ? '#1F2937' : '#9CA3AF' }}>
-              {selectedProject && !hasFloors ? '' : (floor || 'Select floor...')}
-            </span>
-            <ChevronDown size={16} color={(!selectedProject || !hasFloors) ? '#D1D5DB' : '#6B7280'} />
-          </button>
-          {showFloorDropdown && hasFloors && (
-            <div style={dropdownListStyle}>
-              <div
-                onClick={() => { setFloor(''); setShowFloorDropdown(false); }}
-                style={{ ...dropdownItemStyle, color: '#9CA3AF', fontStyle: 'italic' }}
-              >
-                None
-              </div>
-              {projectFloors.map(f => {
-                const fName = typeof f === 'string' ? f : f.name;
-                return (
-                  <div
-                    key={fName}
-                    onClick={() => { setFloor(fName); setShowFloorDropdown(false); }}
-                    style={{
-                      ...dropdownItemStyle,
-                      background: floor === fName ? '#FFF5F0' : 'transparent',
-                    }}
-                  >
-                    {fName}
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </div>
-      </div>
-
-      <div style={{ marginBottom: 16 }}>
-        <label style={labelStyle}>
-          <Layers size={14} color="#6B7280" /> Phase
-        </label>
-        <div style={{ position: 'relative' }}>
-          <button
-            onClick={() => { setShowPhaseDropdown(!showPhaseDropdown); setShowProjectDropdown(false); setShowFloorDropdown(false); setShowActivityDropdown(false); }}
-            style={dropdownBtnStyle}
-          >
-            <span style={{ color: phase ? '#1F2937' : '#9CA3AF' }}>
-              {phase || 'Select phase...'}
-            </span>
-            <ChevronDown size={16} color="#6B7280" />
-          </button>
-          {showPhaseDropdown && (
-            <div style={dropdownListStyle}>
-              <div
-                onClick={() => { setPhase(''); setShowPhaseDropdown(false); }}
-                style={{ ...dropdownItemStyle, color: '#9CA3AF', fontStyle: 'italic' }}
-              >
-                None
-              </div>
-              {PHASE_OPTIONS.map(p => (
-                <div
-                  key={p}
-                  onClick={() => { setPhase(p); setShowPhaseDropdown(false); }}
-                  style={{
-                    ...dropdownItemStyle,
-                    background: phase === p ? '#FFF5F0' : 'transparent',
-                  }}
-                >
-                  {p}
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      </div>
-
-      <div style={{ marginBottom: 24 }}>
-        <label style={labelStyle}>
-          <Hammer size={14} color="#6B7280" /> Activity
-        </label>
-        <div style={{ position: 'relative' }}>
-          <button
-            onClick={() => { setShowActivityDropdown(!showActivityDropdown); setShowProjectDropdown(false); setShowFloorDropdown(false); setShowPhaseDropdown(false); }}
-            style={dropdownBtnStyle}
-          >
-            <span style={{ color: activity ? '#1F2937' : '#9CA3AF' }}>
-              {activity || 'Select activity...'}
-            </span>
-            <ChevronDown size={16} color="#6B7280" />
-          </button>
-          {showActivityDropdown && (
-            <div style={{ ...dropdownListStyle, maxHeight: 240, overflowY: 'auto' }}>
-              <div
-                onClick={() => { setActivity(''); setShowActivityDropdown(false); }}
-                style={{ ...dropdownItemStyle, color: '#9CA3AF', fontStyle: 'italic' }}
-              >
-                None
-              </div>
-              {ACTIVITY_OPTIONS.map(a => (
-                <div
-                  key={a}
-                  onClick={() => { setActivity(a); setShowActivityDropdown(false); }}
-                  style={{
-                    ...dropdownItemStyle,
-                    background: activity === a ? '#FFF5F0' : 'transparent',
-                  }}
-                >
-                  {a}
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      </div>
-
-      <div style={{ display: 'flex', gap: 12 }}>
-        {onCancel && (
-          <button
-            onClick={onCancel}
-            style={{
-              flex: 1,
-              height: 44,
-              borderRadius: 12,
-              border: '1.5px solid #E5E7EB',
-              background: '#FFFFFF',
-              color: '#6B7280',
-              fontSize: 14,
-              fontWeight: 600,
-              cursor: 'pointer',
-            }}
-          >
-            Cancel
-          </button>
-        )}
-        <button
-          onClick={handleComplete}
-          disabled={!selectedProject}
+    <BtCard padding="28px" style={{ width: '100%', maxWidth: 640, margin: '0 auto' }}>
+      <div style={{ display: 'flex', alignItems: 'flex-start', gap: 14, marginBottom: 24 }}>
+        <div
           style={{
-            flex: 2,
+            width: 44,
             height: 44,
-            borderRadius: 12,
-            border: 'none',
-            background: selectedProject
-              ? 'var(--ink, #111317)'
-              : '#E5E7EB',
-            boxShadow: selectedProject ? '0 4px 12px rgba(0,0,0,0.2)' : 'none',
-            color: selectedProject ? '#FFFFFF' : '#9CA3AF',
-            fontSize: 14,
-            fontWeight: 600,
-            cursor: selectedProject ? 'pointer' : 'not-allowed',
+            borderRadius: 'var(--r-tile)',
+            background: 'var(--fill)',
+            color: 'var(--ink)',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            gap: 8,
+            flexShrink: 0,
           }}
         >
-          Continue
-          <ChevronRight size={16} />
-        </button>
+          <Building2 size={22} strokeWidth={1.75} />
+        </div>
+        <div>
+          <h2 style={{ margin: 0, fontFamily: 'var(--font-display)', fontSize: 20, fontWeight: 700, letterSpacing: '-0.02em', color: 'var(--ink)' }}>
+            Set entry context
+          </h2>
+          <p style={{ margin: '4px 0 0', fontFamily: 'var(--font-ui)', fontSize: 14, color: 'var(--ink-2)', lineHeight: 1.5 }}>
+            Choose the project and where on site the work happened. These pre-fill your voice entry.
+          </p>
+        </div>
       </div>
-    </div>
+
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+        <BtSelect
+          label="Project"
+          required
+          icon={Building2}
+          value={selectedProject?._id || ''}
+          error={showError && !selectedProject ? 'Select a project to continue' : undefined}
+          onChange={(e) => {
+            const p = (projects || []).find((x) => x._id === e.target.value) || null;
+            setSelectedProject(p);
+            setFloor('');
+            setShowError(false);
+          }}
+        >
+          <option value="">Select project</option>
+          {(projects || []).map((p, i) => (
+            <option key={p._id || i} value={p._id}>
+              {p.projectName || p.name}
+              {p.location ? ` · ${p.location}` : ''}
+            </option>
+          ))}
+        </BtSelect>
+        {(!projects || projects.length === 0) && (
+          <div style={{ fontFamily: 'var(--font-ui)', fontSize: 13, color: 'var(--ink-3)', marginTop: -8 }}>No projects available</div>
+        )}
+
+        <div className="bt-grid-2">
+          <BtSelect
+            label="Floor / level"
+            icon={MapPin}
+            disabled={!selectedProject || !hasFloors}
+            value={floor}
+            helperText={selectedProject && !hasFloors ? 'This project has no floors set up' : undefined}
+            onChange={(e) => setFloor(e.target.value)}
+          >
+            <option value="">{selectedProject ? 'No floor' : 'Pick a project first'}</option>
+            {projectFloors.map((f) => {
+              const fName = typeof f === 'string' ? f : f.name;
+              return (
+                <option key={fName} value={fName}>
+                  {fName}
+                </option>
+              );
+            })}
+          </BtSelect>
+
+          <BtSelect label="Phase" icon={Layers} value={phase} onChange={(e) => setPhase(e.target.value)}>
+            <option value="">No phase</option>
+            {PHASE_OPTIONS.map((p) => (
+              <option key={p} value={p}>
+                {p}
+              </option>
+            ))}
+          </BtSelect>
+        </div>
+
+        <BtSelect label="Activity" icon={Hammer} value={activity} onChange={(e) => setActivity(e.target.value)}>
+          <option value="">No activity</option>
+          {ACTIVITY_OPTIONS.map((a) => (
+            <option key={a} value={a}>
+              {a}
+            </option>
+          ))}
+        </BtSelect>
+      </div>
+
+      <div style={{ display: 'flex', gap: 12, marginTop: 28, flexWrap: 'wrap' }}>
+        {onCancel && (
+          <BtButton variant="secondary" onClick={onCancel} style={{ flex: '1 1 120px' }}>
+            Cancel
+          </BtButton>
+        )}
+        <BtButton variant="primary" trailingIcon={ChevronRight} onClick={handleComplete} style={{ flex: '2 1 200px' }}>
+          Continue
+        </BtButton>
+      </div>
+    </BtCard>
   );
 }
-
-const labelStyle = {
-  display: 'flex',
-  alignItems: 'center',
-  gap: 6,
-  fontSize: 12,
-  fontWeight: 600,
-  color: '#6B7280',
-  letterSpacing: '0.3px',
-  marginBottom: 6,
-  textTransform: 'uppercase',
-};
-
-const dropdownBtnStyle = {
-  width: '100%',
-  display: 'flex',
-  alignItems: 'center',
-  justifyContent: 'space-between',
-  padding: '12px 14px',
-  borderRadius: 12,
-  border: '1px solid rgba(255, 255, 255, 0.45)',
-  background: 'rgba(255, 255, 255, 0.55)',
-  backdropFilter: 'blur(12px)',
-  WebkitBackdropFilter: 'blur(12px)',
-  boxShadow: '0 4px 10px rgba(15, 23, 42, 0.02)',
-  fontSize: 14,
-  fontWeight: 500,
-  cursor: 'pointer',
-  textAlign: 'left',
-  outline: 'none',
-  transition: 'all 300ms cubic-bezier(0.4, 0, 0.2, 1)',
-};
-
-const dropdownListStyle = {
-  position: 'absolute',
-  top: '100%',
-  left: 0,
-  right: 0,
-  marginTop: 4,
-  background: 'rgba(255, 255, 255, 0.9)',
-  backdropFilter: 'blur(20px)',
-  WebkitBackdropFilter: 'blur(20px)',
-  border: '1px solid rgba(255, 255, 255, 0.55)',
-  borderRadius: 12,
-  boxShadow: 'var(--shadow-md)',
-  zIndex: 50,
-  maxHeight: 200,
-  overflowY: 'auto',
-};
-
-const dropdownItemStyle = {
-  padding: '10px 14px',
-  fontSize: 13,
-  fontWeight: 500,
-  color: '#1F2937',
-  cursor: 'pointer',
-  borderBottom: '1px solid #F3F4F6',
-  transition: 'background 0.15s',
-};

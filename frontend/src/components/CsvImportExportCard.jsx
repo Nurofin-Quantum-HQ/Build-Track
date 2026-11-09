@@ -1,5 +1,8 @@
 import { useState, useRef } from "react";
-import { Table, FileDown, FileUp, Loader2 } from "lucide-react";
+import { Table, FileDown, FileUp } from "lucide-react";
+import BtCard from "./ui/BtCard";
+import BtButton from "./ui/BtButton";
+import { BtTile } from "./ui/BtTile";
 import { projectAPI } from "../api";
 import useProjectStore from "../stores/projectStore";
 import { buildDefaultPhases } from "../utils/constructionPhases";
@@ -80,7 +83,7 @@ export default function CsvImportExportCard({ project, onProjectUpdated, setToas
         const labRate = Number(act.labourRate || 0);
         const eqRate = Number(act.equipmentRate || 0);
 
-        csvRows.add ? csvRows.push([
+        csvRows.push([
           `"${phaseName.replace(/"/g, '""')}"`,
           slNo++,
           `"${(act.name || "").replace(/"/g, '""')}"`,
@@ -93,7 +96,7 @@ export default function CsvImportExportCard({ project, onProjectUpdated, setToas
           eqRate > 0 ? eqRate.toFixed(2) : "",
           eqAmt > 0 ? eqAmt.toFixed(2) : "",
           totAmt > 0 ? totAmt.toFixed(2) : "",
-        ]) : null;
+        ]);
       });
     });
 
@@ -292,15 +295,7 @@ export default function CsvImportExportCard({ project, onProjectUpdated, setToas
   };
 
   return (
-    <div style={{
-      background: "#fff",
-      borderRadius: 12,
-      border: "1px solid #E5E7EB",
-      padding: "20px 24px",
-      display: "flex",
-      flexDirection: "column",
-      gap: 16,
-    }}>
+    <BtCard padding="20px" style={{ display: "flex", flexDirection: "column", gap: 16 }}>
       <input
         ref={fileInputRef}
         type="file"
@@ -309,100 +304,32 @@ export default function CsvImportExportCard({ project, onProjectUpdated, setToas
         onChange={handleFileChange}
       />
 
-      <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-        <div style={{
-          width: 36,
-          height: 36,
-          borderRadius: 10,
-          background: "rgba(16, 185, 129, 0.12)",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          flexShrink: 0,
-          color: "#10B981",
-        }}>
-          <Table size={18} />
-        </div>
+      <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+        <BtTile icon={Table} bg="var(--accent-soft)" fg="var(--accent-ink)" size={44} />
         <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{
-            fontSize: 10,
-            letterSpacing: "1px",
-            fontWeight: 800,
-            color: "#64748B",
-            textTransform: "uppercase",
-            marginBottom: 2,
-          }}>
-            PHASES & BUDGET CONFIGURATION
+          <div className="bt-eyebrow" style={{ color: "var(--ink-3)", marginBottom: 4 }}>
+            Phases &amp; budget configuration
           </div>
-          <div style={{
-            fontSize: 12,
-            fontWeight: 600,
-            color: "#111827",
-          }}>
-            Import/Export CSV budgets for all phases.
+          <div style={{ fontFamily: "var(--font-ui)", fontSize: 15, fontWeight: 600, color: "var(--ink)" }}>
+            Import or export CSV budgets for all phases.
           </div>
         </div>
       </div>
 
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-        <button
-          onClick={handleDownloadTemplate}
-          style={{
-            padding: "10px 14px",
-            borderRadius: 10,
-            border: "1.5px solid #F1F1F1",
-            background: "#fff",
-            color: "var(--ink, #111317)",
-            fontSize: 12,
-            fontWeight: 700,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            gap: 6,
-            cursor: "pointer",
-            fontFamily: "inherit",
-            transition: "all 0.18s ease",
-          }}
-        >
-          <FileDown size={16} />
-          <span>Export CSV</span>
-        </button>
-
-        <button
+      <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+        <BtButton variant="secondary" size="small" icon={FileDown} onClick={handleDownloadTemplate}>
+          Export CSV
+        </BtButton>
+        <BtButton
+          variant="primary"
+          size="small"
+          icon={FileUp}
+          loading={isUploading}
           onClick={handleUploadCsvClick}
-          disabled={isUploading}
-          style={{
-            padding: "10px 14px",
-            borderRadius: 10,
-            border: "none",
-            background: "var(--ink, #111317)",
-            color: "#F6F4EF",
-            boxShadow: "0 2px 8px rgba(0,0,0,0.2)",
-            fontSize: 12,
-            fontWeight: 700,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            gap: 6,
-            cursor: isUploading ? "not-allowed" : "pointer",
-            fontFamily: "inherit",
-            opacity: isUploading ? 0.7 : 1,
-            transition: "all 0.18s ease",
-          }}
         >
-          {isUploading ? (
-            <>
-              <Loader2 size={16} style={{ animation: "spin 0.8s linear infinite" }} />
-              <span>Uploading...</span>
-            </>
-          ) : (
-            <>
-              <FileUp size={16} />
-              <span>Upload CSV</span>
-            </>
-          )}
-        </button>
+          Upload CSV
+        </BtButton>
       </div>
-    </div>
+    </BtCard>
   );
 }

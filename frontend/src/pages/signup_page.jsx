@@ -10,15 +10,14 @@ import {
   EyeOff,
   ArrowRight,
   Building,
-  CheckCircle,
+  CheckCircle2,
   AlertTriangle,
+  AlertCircle,
   Upload,
   X,
-  Type,
-  Image as ImageIcon,
-  Phone
+  Phone,
 } from "lucide-react";
-import LightPremiumInput from "../components/ui/LightPremiumInput";
+import { BtField, BtButton, BtIconButton, BtBadge, BtHero } from "../components/ui";
 import nurofinLogo from "../assets/nurofin-black.svg";
 
 export const COMPANY_FONT_OPTIONS = [
@@ -190,648 +189,543 @@ export default function SignUpPage() {
     }
   };
 
+  const textLinkStyle = {
+    background: "none",
+    border: "none",
+    padding: "8px 2px",
+    minHeight: 40,
+    fontFamily: "var(--font-ui)",
+    fontSize: 14,
+    fontWeight: 600,
+    color: "var(--ink)",
+    textDecoration: "underline",
+    textUnderlineOffset: 3,
+    cursor: "pointer",
+  };
+
+  const eyeToggle = (shown, toggle, label) => (
+    <button
+      type="button"
+      onClick={toggle}
+      aria-label={shown ? `Hide ${label}` : `Show ${label}`}
+      style={{
+        background: "none",
+        border: "none",
+        color: "var(--ink-2)",
+        cursor: "pointer",
+        width: 32,
+        height: 32,
+        marginRight: -8,
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        borderRadius: 10,
+      }}
+    >
+      {shown ? <EyeOff size={17} /> : <Eye size={17} />}
+    </button>
+  );
+
+  const fieldLabelStyle = {
+    fontFamily: "var(--font-ui)",
+    fontSize: 13,
+    fontWeight: 600,
+    color: "var(--ink-2)",
+    marginBottom: 8,
+  };
+
   return (
     <div
       style={{
         minHeight: "100vh",
         width: "100%",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        background: "var(--surface-ground, #F2F0EB)",
-        backgroundImage: "radial-gradient(rgba(17, 19, 23, 0.08) 1px, transparent 1px)",
-        backgroundSize: "22px 22px",
-        fontFamily: "var(--font-ui, 'Instrument Sans', sans-serif)",
-        position: "relative",
-        padding: "36px 16px",
-        boxSizing: "border-box",
+        display: "grid",
+        gridTemplateColumns: isDesktop ? "minmax(0, 1fr) minmax(0, 1fr)" : "minmax(0, 1fr)",
+        background: "var(--ground)",
+        fontFamily: "var(--font-ui)",
+        color: "var(--ink)",
       }}
     >
-      <div
+      {isDesktop && (
+        <div style={{ position: "relative" }}>
+          <BtHero
+            padding="56px 64px"
+            minHeight="100vh"
+            style={{ position: "sticky", top: 0, height: "100vh", display: "flex", flexDirection: "column", justifyContent: "center" }}
+          >
+            <div style={{ maxWidth: 500 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 14, marginBottom: 20 }}>
+                <img
+                  src="/buildtrack-logo.png"
+                  alt="BuildTrack"
+                  style={{ width: 52, height: 52, borderRadius: "var(--r-tile)", objectFit: "contain" }}
+                />
+                <span
+                  style={{
+                    fontFamily: "var(--font-display)",
+                    fontSize: 32,
+                    fontWeight: 700,
+                    color: "var(--on-noir)",
+                    letterSpacing: "-0.02em",
+                    lineHeight: 1,
+                  }}
+                >
+                  BuildTrack
+                </span>
+              </div>
+
+              <div
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: 10,
+                  marginBottom: 40,
+                  padding: "6px 12px",
+                  background: "var(--bone)",
+                  borderRadius: "var(--r-full)",
+                }}
+              >
+                <span className="bt-eyebrow" style={{ color: "var(--ink-2)" }}>
+                  Powered by
+                </span>
+                <img src={nurofinLogo} alt="Nurofin" style={{ height: 16, width: "auto", display: "block" }} />
+              </div>
+
+              <h1
+                style={{
+                  fontFamily: "var(--font-display)",
+                  fontSize: "clamp(38px, 3.6vw, 52px)",
+                  fontWeight: 700,
+                  color: "var(--on-noir)",
+                  lineHeight: 1.08,
+                  margin: "0 0 20px",
+                  letterSpacing: "-0.03em",
+                }}
+              >
+                Build smarter. <span style={{ color: "var(--accent)" }}>Track everything.</span>
+              </h1>
+
+              <p style={{ fontSize: 16, color: "var(--on-noir-2)", lineHeight: 1.6, margin: "0 0 40px", maxWidth: 460 }}>
+                From site operations to financial reporting, everything your construction team needs in one platform.
+              </p>
+
+              <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+                {features.map((item) => (
+                  <div key={item.title} style={{ display: "flex", alignItems: "flex-start", gap: 14 }}>
+                    <span
+                      style={{
+                        width: 28,
+                        height: 28,
+                        borderRadius: "50%",
+                        background: "var(--accent-soft)",
+                        color: "var(--accent)",
+                        display: "grid",
+                        placeItems: "center",
+                        flexShrink: 0,
+                      }}
+                    >
+                      <CheckCircle2 size={16} strokeWidth={2} />
+                    </span>
+                    <div>
+                      <div style={{ fontSize: 15, fontWeight: 600, color: "var(--on-noir)" }}>{item.title}</div>
+                      <div style={{ fontSize: 14, color: "var(--on-noir-2)", lineHeight: 1.45, marginTop: 2 }}>{item.desc}</div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </BtHero>
+        </div>
+      )}
+
+      <main
         style={{
-          width: "100%",
-          maxWidth: "1200px",
-          margin: "0 auto",
-          display: "grid",
-          gridTemplateColumns: isDesktop ? "1.1fr 0.9fr" : "1fr",
-          gap: isDesktop ? "64px" : "32px",
+          display: "flex",
           alignItems: "flex-start",
-          position: "relative",
-          zIndex: 10,
+          justifyContent: "center",
+          padding: isDesktop ? "48px 40px" : "32px 16px",
+          boxSizing: "border-box",
         }}
       >
-        {/* Left Column (Desktop) */}
-        {isDesktop && (
-          <div style={{ display: "flex", flexDirection: "column", justifyContent: "center", paddingTop: 30 }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 16, marginBottom: 16 }}>
+        <div
+          style={{
+            width: "100%",
+            maxWidth: 480,
+            background: "var(--card)",
+            border: "1px solid var(--line)",
+            borderRadius: "var(--r-sheet)",
+            padding: isDesktop ? "40px 36px" : "28px 22px",
+            boxShadow: "var(--shadow-card)",
+            boxSizing: "border-box",
+            transform: shake ? "translateX(-6px)" : "none",
+            transition: "transform 100ms ease",
+          }}
+        >
+          {!isDesktop && (
+            <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 24 }}>
               <img
                 src="/buildtrack-logo.png"
                 alt="BuildTrack"
-                style={{
-                  width: 56,
-                  height: 56,
-                  borderRadius: 14,
-                  objectFit: "contain",
-                  boxShadow: "0 6px 20px rgba(0, 0, 0, 0.12)",
-                }}
+                style={{ width: 40, height: 40, borderRadius: "var(--r-chip)", objectFit: "contain" }}
               />
-              <span
-                style={{
-                  fontFamily: "var(--font-serif, 'Bricolage Grotesque', sans-serif)",
-                  fontSize: 36,
-                  fontWeight: 800,
-                  color: "var(--ink, #111317)",
-                  letterSpacing: "-0.02em",
-                }}
-              >
+              <span style={{ fontFamily: "var(--font-display)", fontSize: 24, fontWeight: 700, letterSpacing: "-0.02em" }}>
                 BuildTrack
               </span>
             </div>
+          )}
 
-            <div
+          <div style={{ marginBottom: 24 }}>
+            <h2
               style={{
-                display: "inline-flex",
-                alignItems: "center",
-                gap: 8,
-                marginBottom: 32,
-                padding: "4px 12px",
-                background: "rgba(255, 255, 255, 0.8)",
-                border: "1px solid var(--border, #E6E3DC)",
-                borderRadius: 20,
-                width: "fit-content",
+                fontFamily: "var(--font-display)",
+                fontSize: 28,
+                fontWeight: 700,
+                letterSpacing: "-0.025em",
+                color: "var(--ink)",
+                margin: "0 0 6px",
               }}
             >
-              <span
-                style={{
-                  fontFamily: "var(--font-mono)",
-                  fontSize: 10,
-                  fontWeight: 700,
-                  color: "var(--ink-secondary, #525864)",
-                  textTransform: "uppercase",
-                  letterSpacing: "0.08em",
-                }}
-              >
-                POWERED BY
-              </span>
-              <img
-                src={nurofinLogo}
-                alt="Nurofin"
-                style={{ height: 16, width: "auto", objectFit: "contain", display: "block" }}
-              />
-            </div>
-
-            <h1
-              style={{
-                fontFamily: "var(--font-serif, 'Bricolage Grotesque', sans-serif)",
-                fontSize: 48,
-                fontWeight: 800,
-                color: "var(--ink, #111317)",
-                lineHeight: 1.12,
-                margin: "0 0 20px",
-                letterSpacing: "-0.03em",
-              }}
-            >
-              Build smarter. <br />
-              <span style={{ color: "var(--accent, #E0A93B)" }}>Track everything.</span>
-            </h1>
-
-            <p
-              style={{
-                fontSize: 16,
-                color: "var(--ink-secondary, #525864)",
-                lineHeight: 1.6,
-                margin: "0 0 36px",
-                maxWidth: 480,
-                fontWeight: 500,
-              }}
-            >
-              From site operations to financial reporting — everything your construction team needs, unified in one platform.
+              Create your account
+            </h2>
+            <p style={{ margin: 0, fontSize: 15, color: "var(--ink-2)" }}>
+              Start your 14-day free trial. No credit card required.
             </p>
-
-            <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
-              {features.map((item, idx) => (
-                <div key={idx} style={{ display: "flex", alignItems: "flex-start", gap: 12 }}>
-                  <div
-                    style={{
-                      width: 24,
-                      height: 24,
-                      borderRadius: "50%",
-                      background: "var(--ink, #111317)",
-                      color: "var(--bone, #F2F0EB)",
-                      display: "grid",
-                      placeItems: "center",
-                      flexShrink: 0,
-                      marginTop: 2,
-                    }}
-                  >
-                    <CheckCircle size={14} />
-                  </div>
-                  <div>
-                    <h4 style={{ margin: "0 0 2px", fontSize: 14, fontWeight: 700, color: "var(--ink, #111317)" }}>
-                      {item.title}
-                    </h4>
-                    <p style={{ margin: 0, fontSize: 13, color: "var(--ink-secondary, #525864)", lineHeight: 1.4 }}>
-                      {item.desc}
-                    </p>
-                  </div>
-                </div>
-              ))}
-            </div>
           </div>
-        )}
 
-        {/* Right Column: Sign Up Form Card */}
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "center", width: "100%" }}>
-          <div
-            style={{
-              width: "100%",
-              maxWidth: 480,
-              background: "#FFFFFF",
-              border: "1px solid var(--border, #E6E3DC)",
-              borderRadius: 24,
-              padding: isDesktop ? "44px 38px" : "32px 24px",
-              boxShadow: "0 12px 36px rgba(0, 0, 0, 0.05)",
-              boxSizing: "border-box",
-              position: "relative",
-              transform: shake ? "translateX(-6px)" : "none",
-              transition: "transform 100ms ease",
-            }}
-          >
-            {/* Header */}
-            <div style={{ marginBottom: 24, textAlign: isDesktop ? "left" : "center" }}>
-              <h2
-                style={{
-                  fontSize: 24,
-                  fontWeight: 800,
-                  fontFamily: "var(--font-serif, 'Bricolage Grotesque', sans-serif)",
-                  color: "var(--ink, #111317)",
-                  margin: "0 0 6px",
-                  letterSpacing: "-0.01em",
-                }}
-              >
-                Create your account
-              </h2>
-              <p style={{ margin: 0, fontSize: 14, color: "var(--ink-secondary, #525864)" }}>
-                Start your 14-day free trial. No credit card required.
-              </p>
+          {serverErr && (
+            <div
+              role="alert"
+              style={{
+                background: "var(--status-danger-soft)",
+                borderRadius: "var(--r-chip)",
+                padding: "12px 14px",
+                marginBottom: 18,
+                display: "flex",
+                alignItems: "flex-start",
+                gap: 10,
+              }}
+            >
+              <AlertTriangle size={17} color="var(--status-danger)" style={{ marginTop: 1, flexShrink: 0 }} />
+              <span style={{ fontSize: 14, color: "var(--status-danger)", fontWeight: 500, lineHeight: 1.45 }}>{serverErr}</span>
             </div>
+          )}
 
-            {serverErr && (
-              <div
-                style={{
-                  background: "rgba(239, 68, 68, 0.08)",
-                  border: "1px solid rgba(239, 68, 68, 0.25)",
-                  borderRadius: 12,
-                  padding: "10px 14px",
-                  marginBottom: 18,
-                  display: "flex",
-                  alignItems: "flex-start",
-                  gap: 8,
-                }}
-              >
-                <AlertTriangle size={16} color="var(--rose-ember, #DC2626)" style={{ marginTop: 2, flexShrink: 0 }} />
-                <span style={{ fontSize: 13, color: "var(--rose-ember, #DC2626)", fontWeight: 600, lineHeight: 1.4 }}>
-                  {serverErr}
-                </span>
+          <form onSubmit={handleSubmit} noValidate style={{ display: "flex", flexDirection: "column", gap: 18 }}>
+            <BtField
+              type="text"
+              label="Full name"
+              required
+              icon={User}
+              value={fullName}
+              onChange={(e) => {
+                setFullName(e.target.value);
+                setErrors((p) => ({ ...p, name: "" }));
+                setServerErr("");
+              }}
+              error={errors.name}
+              autoComplete="name"
+            />
+
+            <BtField
+              type="tel"
+              label="Phone number"
+              required
+              icon={Phone}
+              value={phone}
+              onChange={(e) => {
+                setPhone(e.target.value);
+                setErrors((p) => ({ ...p, phone: "" }));
+                setServerErr("");
+              }}
+              error={errors.phone}
+              autoComplete="tel"
+            />
+
+            <BtField
+              type="email"
+              label="Company email"
+              required
+              icon={Mail}
+              placeholder="you@company.com"
+              value={email}
+              onChange={(e) => {
+                if (isEmailVerified) return;
+                setEmail(e.target.value);
+                setErrors((p) => ({ ...p, email: "" }));
+                setServerErr("");
+                setOtpSent(false);
+              }}
+              error={errors.email}
+              helperText={!isEmailVerified && !otpSent ? "We will email you a code to confirm it." : undefined}
+              autoComplete="email"
+              readOnly={isEmailVerified}
+              suffix={
+                isEmailVerified ? (
+                  <BtBadge label="Verified" tone="success" />
+                ) : !otpSent ? (
+                  <BtButton
+                    variant="primary"
+                    size="compact"
+                    loading={otpLoading}
+                    disabled={!email.trim()}
+                    onClick={handleSendOtp}
+                    style={{ marginRight: -6 }}
+                  >
+                    Verify
+                  </BtButton>
+                ) : null
+              }
+            />
+
+            {!isEmailVerified && otpSent && (
+              <div>
+                <BtField
+                  type="text"
+                  label="Verification code"
+                  required
+                  icon={Shield}
+                  inputMode="numeric"
+                  autoComplete="one-time-code"
+                  value={otp}
+                  onChange={(e) => {
+                    setOtp(e.target.value);
+                    setErrors((p) => ({ ...p, otp: "" }));
+                    setServerErr("");
+                  }}
+                  error={errors.otp}
+                  helperText={`Sent to ${email.trim()}`}
+                  suffix={
+                    <BtButton
+                      variant="primary"
+                      size="compact"
+                      loading={verifyLoading}
+                      disabled={otp.length < 4}
+                      onClick={handleVerifyOtp}
+                      style={{ marginRight: -6 }}
+                    >
+                      Confirm
+                    </BtButton>
+                  }
+                />
+                <button type="button" onClick={handleSendOtp} disabled={otpLoading} style={textLinkStyle}>
+                  {otpLoading ? "Sending…" : "Resend code"}
+                </button>
               </div>
             )}
 
-            <form onSubmit={handleSubmit}>
-              <LightPremiumInput
-                type="text"
-                label="Full Name"
-                icon={User}
-                value={fullName}
-                onChange={(e) => {
-                  setFullName(e.target.value);
-                  setErrors((p) => ({ ...p, name: "" }));
-                  setServerErr("");
-                }}
-                error={errors.name}
-                autoComplete="name"
-              />
+            {isEmailVerified && (
+              <>
+                <BtField
+                  type="text"
+                  label="Company name"
+                  required
+                  icon={Building}
+                  value={companyName}
+                  onChange={(e) => {
+                    setCompanyName(e.target.value);
+                    setErrors((p) => ({ ...p, companyName: "" }));
+                    setServerErr("");
+                  }}
+                  error={errors.companyName}
+                  placeholder="e.g. Apex Construction & Infra"
+                  autoComplete="organization"
+                />
 
-              <LightPremiumInput
-                type="tel"
-                label="Phone Number"
-                icon={Phone}
-                value={phone}
-                onChange={(e) => {
-                  setPhone(e.target.value);
-                  setErrors((p) => ({ ...p, phone: "" }));
-                  setServerErr("");
-                }}
-                error={errors.phone}
-                autoComplete="tel"
-              />
-
-              {/* Email with Verification */}
-              <div style={{ display: "flex", alignItems: "flex-start", gap: 10 }}>
-                <div style={{ flex: 1 }}>
-                  <LightPremiumInput
-                    type="email"
-                    label="Company Email"
-                    icon={Mail}
-                    value={email}
-                    onChange={(e) => {
-                      if (isEmailVerified) return;
-                      setEmail(e.target.value);
-                      setErrors((p) => ({ ...p, email: "" }));
-                      setServerErr("");
-                      setOtpSent(false);
-                    }}
-                    error={errors.email}
-                    autoComplete="email"
-                  />
-                </div>
-                {!isEmailVerified && !otpSent && (
-                  <button
-                    type="button"
-                    onClick={handleSendOtp}
-                    disabled={otpLoading || !email.trim()}
-                    style={{
-                      background: "var(--ink, #111317)",
-                      color: "var(--bone, #F2F0EB)",
-                      border: "none",
-                      borderRadius: 10,
-                      padding: "0 16px",
-                      height: 48,
-                      fontSize: 12,
-                      fontWeight: 700,
-                      cursor: otpLoading || !email.trim() ? "not-allowed" : "pointer",
-                      opacity: otpLoading || !email.trim() ? 0.6 : 1,
-                    }}
-                  >
-                    {otpLoading ? "SENDING..." : "VERIFY"}
-                  </button>
-                )}
-                {isEmailVerified && (
+                {/* Brand typography */}
+                <div>
+                  <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", ...fieldLabelStyle }}>
+                    <span id="font-style-label">Company font style</span>
+                    <span style={{ fontSize: 13, fontWeight: 400, color: "var(--ink-3)" }}>Live preview</span>
+                  </div>
                   <div
-                    style={{
-                      height: 48,
-                      color: "var(--jade, #059669)",
-                      display: "flex",
-                      alignItems: "center",
-                      gap: 6,
-                      fontSize: 12,
-                      fontWeight: 800,
-                    }}
+                    role="radiogroup"
+                    aria-labelledby="font-style-label"
+                    style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, padding: 2 }}
                   >
-                    <CheckCircle size={16} /> VERIFIED
-                  </div>
-                )}
-              </div>
-
-              {!isEmailVerified && otpSent && (
-                <div style={{ marginBottom: 16 }}>
-                  <div style={{ display: "flex", alignItems: "flex-start", gap: 10 }}>
-                    <div style={{ flex: 1 }}>
-                      <LightPremiumInput
-                        type="text"
-                        label="Verification Code (OTP)"
-                        icon={Shield}
-                        value={otp}
-                        onChange={(e) => {
-                          setOtp(e.target.value);
-                          setErrors((p) => ({ ...p, otp: "" }));
-                          setServerErr("");
-                        }}
-                        error={errors.otp}
-                      />
-                    </div>
-                    <button
-                      type="button"
-                      onClick={handleVerifyOtp}
-                      disabled={verifyLoading || otp.length < 4}
-                      style={{
-                        background: "var(--jade, #059669)",
-                        color: "#fff",
-                        border: "none",
-                        borderRadius: 10,
-                        padding: "0 16px",
-                        height: 48,
-                        fontSize: 12,
-                        fontWeight: 700,
-                        cursor: verifyLoading || otp.length < 4 ? "not-allowed" : "pointer",
-                        opacity: verifyLoading || otp.length < 4 ? 0.6 : 1,
-                      }}
-                    >
-                      {verifyLoading ? "CHECKING..." : "CONFIRM"}
-                    </button>
-                  </div>
-                  <div style={{ display: "flex", justifyContent: "flex-start", marginTop: -8 }}>
-                    <button
-                      type="button"
-                      onClick={handleSendOtp}
-                      style={{
-                        background: "none",
-                        border: "none",
-                        color: "var(--ink, #111317)",
-                        fontSize: 11,
-                        fontWeight: 700,
-                        cursor: "pointer",
-                        padding: 0,
-                        textDecoration: "underline",
-                      }}
-                    >
-                      Resend Code
-                    </button>
-                  </div>
-                </div>
-              )}
-
-              {/* Step 2: Company Setup & Password */}
-              {isEmailVerified && (
-                <>
-                  <LightPremiumInput
-                    type="text"
-                    label="Company Name *"
-                    icon={Building}
-                    value={companyName}
-                    onChange={(e) => {
-                      setCompanyName(e.target.value);
-                      setErrors((p) => ({ ...p, companyName: "" }));
-                      setServerErr("");
-                    }}
-                    error={errors.companyName}
-                    placeholder="e.g. Apex Construction & Infra"
-                    autoComplete="organization"
-                  />
-
-                  {/* Brand Typography */}
-                  <div style={{ marginBottom: 18 }}>
-                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
-                      <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, fontWeight: 700, color: "var(--ink)" }}>
-                        <Type size={14} color="var(--ink)" />
-                        <span>Company Font Style</span>
-                      </label>
-                      <span style={{ fontSize: 11, color: "var(--ink-secondary)", fontFamily: "var(--font-mono)" }}>Live Preview</span>
-                    </div>
-
-                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, maxHeight: "150px", overflowY: "auto", padding: "2px" }}>
-                      {COMPANY_FONT_OPTIONS.map((f) => {
-                        const isSelected = companyFontStyle === f.id;
-                        return (
-                          <button
-                            key={f.id}
-                            type="button"
-                            onClick={() => setCompanyFontStyle(f.id)}
+                    {COMPANY_FONT_OPTIONS.map((f) => {
+                      const isSelected = companyFontStyle === f.id;
+                      return (
+                        <button
+                          key={f.id}
+                          type="button"
+                          role="radio"
+                          aria-checked={isSelected}
+                          onClick={() => setCompanyFontStyle(f.id)}
+                          style={{
+                            padding: "10px 12px",
+                            minHeight: 56,
+                            borderRadius: "var(--r-chip)",
+                            border: isSelected ? "2px solid var(--ink)" : "1px solid var(--input-border)",
+                            background: isSelected ? "var(--fill)" : "var(--card)",
+                            cursor: "pointer",
+                            textAlign: "left",
+                            display: "flex",
+                            flexDirection: "column",
+                            gap: 2,
+                            minWidth: 0,
+                          }}
+                        >
+                          <span style={{ fontFamily: "var(--font-ui)", fontSize: 13, color: "var(--ink-2)", fontWeight: 600 }}>
+                            {f.name}
+                          </span>
+                          <span
                             style={{
-                              padding: "8px 10px",
-                              borderRadius: 10,
-                              border: isSelected ? "2px solid var(--ink)" : "1px solid var(--border)",
-                              background: isSelected ? "var(--surface-sunken)" : "#FFFFFF",
-                              cursor: "pointer",
-                              textAlign: "left",
-                              display: "flex",
-                              flexDirection: "column",
-                              gap: 2,
-                              transition: "all 0.12s ease",
+                              fontFamily: f.font,
+                              fontSize: 15,
+                              fontWeight: 700,
+                              color: "var(--ink)",
+                              whiteSpace: "nowrap",
+                              overflow: "hidden",
+                              textOverflow: "ellipsis",
                             }}
                           >
-                            <span style={{ fontSize: 10.5, color: isSelected ? "var(--ink)" : "var(--ink-secondary)", fontWeight: 700 }}>
-                              {f.name}
-                            </span>
-                            <span
-                              style={{
-                                fontFamily: f.font,
-                                fontSize: 13.5,
-                                fontWeight: 800,
-                                color: "var(--ink)",
-                                whiteSpace: "nowrap",
-                                overflow: "hidden",
-                                textOverflow: "ellipsis",
-                              }}
-                            >
-                              {companyName.trim() || "Preview"}
-                            </span>
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
-
-                  {/* Company Logo Upload */}
-                  <div style={{ marginBottom: 18 }}>
-                    <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, fontWeight: 700, color: "var(--ink)", marginBottom: 6 }}>
-                      <ImageIcon size={14} color="var(--ink)" />
-                      <span>Company Logo <span style={{ fontWeight: 400, color: "var(--ink-secondary)" }}>(Optional)</span></span>
-                    </label>
-
-                    <input
-                      ref={logoInputRef}
-                      type="file"
-                      accept="image/*"
-                      style={{ display: "none" }}
-                      onChange={handleLogoChange}
-                    />
-
-                    {logoPreview ? (
-                      <div
-                        style={{
-                          display: "flex",
-                          alignItems: "center",
-                          justifyContent: "space-between",
-                          padding: "10px 14px",
-                          borderRadius: 12,
-                          background: "var(--surface-sunken)",
-                          border: "1px solid var(--border)",
-                        }}
-                      >
-                        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                          <img
-                            src={logoPreview}
-                            alt="Logo Preview"
-                            style={{ width: 40, height: 40, objectFit: "contain", borderRadius: 8, background: "#FFF", border: "1px solid var(--border)" }}
-                          />
-                          <div>
-                            <div style={{ fontSize: 12, fontWeight: 700, color: "var(--ink)" }}>Logo Attached</div>
-                            <button
-                              type="button"
-                              onClick={() => logoInputRef.current?.click()}
-                              style={{ background: "none", border: "none", color: "var(--ink)", fontSize: 11, fontWeight: 700, padding: 0, cursor: "pointer", textDecoration: "underline" }}
-                            >
-                              Replace logo
-                            </button>
-                          </div>
-                        </div>
-                        <button
-                          type="button"
-                          onClick={handleRemoveLogo}
-                          style={{ background: "rgba(239, 68, 68, 0.1)", border: "none", borderRadius: 8, padding: 6, cursor: "pointer", color: "var(--rose-ember)", display: "flex" }}
-                          title="Remove logo"
-                        >
-                          <X size={15} />
+                            {companyName.trim() || "Preview"}
+                          </span>
                         </button>
-                      </div>
-                    ) : (
-                      <div
-                        onClick={() => logoInputRef.current?.click()}
-                        style={{
-                          border: "1.5px dashed var(--border-strong, #CBD5E1)",
-                          borderRadius: 12,
-                          padding: "14px 16px",
-                          background: "var(--surface-sunken)",
-                          cursor: "pointer",
-                          display: "flex",
-                          alignItems: "center",
-                          justifyContent: "center",
-                          gap: 10,
-                          transition: "all 0.14s ease",
-                        }}
-                      >
-                        <Upload size={16} color="var(--ink)" />
-                        <span style={{ fontSize: 12, fontWeight: 600, color: "var(--ink)" }}>
-                          Upload Logo (Optional)
-                        </span>
-                      </div>
-                    )}
+                      );
+                    })}
                   </div>
+                </div>
 
-                  <LightPremiumInput
-                    type={showPass ? "text" : "password"}
-                    label="Password"
-                    icon={Lock}
-                    value={password}
-                    onChange={(e) => {
-                      setPassword(e.target.value);
-                      setErrors((p) => ({ ...p, password: "" }));
-                      setServerErr("");
-                    }}
-                    error={errors.password}
-                    autoComplete="new-password"
-                    rightElement={
-                      <button
-                        type="button"
-                        onClick={() => setShowPass(!showPass)}
-                        style={{
-                          background: "none",
-                          border: "none",
-                          color: "var(--ink-secondary)",
-                          cursor: "pointer",
-                          padding: 4,
-                          display: "flex",
-                          alignItems: "center",
-                          justifyContent: "center",
-                        }}
-                      >
-                        {showPass ? <EyeOff size={16} /> : <Eye size={16} />}
-                      </button>
-                    }
-                  />
-
-                  <LightPremiumInput
-                    type={showConfirm ? "text" : "password"}
-                    label="Confirm Password"
-                    icon={Shield}
-                    value={confirm}
-                    onChange={(e) => {
-                      setConfirm(e.target.value);
-                      setErrors((p) => ({ ...p, confirm: "" }));
-                      setServerErr("");
-                    }}
-                    error={errors.confirm}
-                    autoComplete="new-password"
-                    rightElement={
-                      <button
-                        type="button"
-                        onClick={() => setShowConfirm(!showConfirm)}
-                        style={{
-                          background: "none",
-                          border: "none",
-                          color: "var(--ink-secondary)",
-                          cursor: "pointer",
-                          padding: 4,
-                          display: "flex",
-                          alignItems: "center",
-                          justifyContent: "center",
-                        }}
-                      >
-                        {showConfirm ? <EyeOff size={16} /> : <Eye size={16} />}
-                      </button>
-                    }
-                  />
-
-                  <div style={{ marginBottom: 20, marginTop: 10 }}>
-                    <label style={{ display: "flex", alignItems: "flex-start", gap: 10, cursor: "pointer" }}>
-                      <div
-                        onClick={() => { setAgreed((v) => !v); setErrors((p) => ({ ...p, agreed: "" })); }}
-                        style={{
-                          width: 18,
-                          height: 18,
-                          borderRadius: 5,
-                          flexShrink: 0,
-                          marginTop: 2,
-                          border: `2px solid ${errors.agreed ? "var(--rose-ember)" : agreed ? "var(--ink)" : "var(--border)"}`,
-                          background: agreed ? "var(--ink)" : "#fff",
-                          display: "flex",
-                          alignItems: "center",
-                          justifyContent: "center",
-                          transition: "all 0.12s",
-                        }}
-                      >
-                        {agreed && (
-                          <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
-                            <path d="M1.5 5l2.5 2.5 5-5" stroke="#fff" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
-                          </svg>
-                        )}
-                      </div>
-                      <span style={{ fontSize: 13, color: "var(--ink-secondary)", lineHeight: 1.5 }}>
-                        By creating an account, you agree to our{" "}
-                        <span style={{ color: "var(--ink)", fontWeight: 700, textDecoration: "underline" }}>Terms</span>
-                        {" "}and{" "}
-                        <span style={{ color: "var(--ink)", fontWeight: 700, textDecoration: "underline" }}>Privacy Policy</span>.
-                      </span>
-                    </label>
+                {/* Company logo */}
+                <div>
+                  <div style={fieldLabelStyle}>
+                    Company logo <span style={{ fontWeight: 400, color: "var(--ink-3)" }}>(optional)</span>
                   </div>
+                  <input
+                    ref={logoInputRef}
+                    type="file"
+                    accept="image/*"
+                    style={{ display: "none" }}
+                    onChange={handleLogoChange}
+                    aria-label="Upload company logo"
+                  />
+                  {logoPreview ? (
+                    <div
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "space-between",
+                        gap: 12,
+                        padding: "10px 12px",
+                        borderRadius: "var(--r-tile)",
+                        background: "var(--ground)",
+                        border: "1px solid var(--line)",
+                      }}
+                    >
+                      <div style={{ display: "flex", alignItems: "center", gap: 12, minWidth: 0 }}>
+                        <img
+                          src={logoPreview}
+                          alt="Logo preview"
+                          style={{
+                            width: 44,
+                            height: 44,
+                            objectFit: "contain",
+                            borderRadius: 10,
+                            background: "var(--card)",
+                            border: "1px solid var(--line)",
+                          }}
+                        />
+                        <div>
+                          <div style={{ fontSize: 14, fontWeight: 600, color: "var(--ink)" }}>Logo attached</div>
+                          <button type="button" onClick={() => logoInputRef.current?.click()} style={{ ...textLinkStyle, minHeight: 32, padding: "2px 0", fontSize: 13 }}>
+                            Replace logo
+                          </button>
+                        </div>
+                      </div>
+                      <BtIconButton icon={X} label="Remove logo" onClick={handleRemoveLogo} />
+                    </div>
+                  ) : (
+                    <BtButton variant="secondary" size="small" icon={Upload} onClick={() => logoInputRef.current?.click()}>
+                      Upload logo
+                    </BtButton>
+                  )}
+                  {errors.logo && (
+                    <div role="alert" style={{ display: "flex", alignItems: "center", gap: 5, marginTop: 6, fontSize: 12.5, color: "var(--status-danger)" }}>
+                      <AlertCircle size={13} style={{ flexShrink: 0 }} />
+                      <span>{errors.logo}</span>
+                    </div>
+                  )}
+                </div>
 
-                  {/* Primary Submit Button */}
-                  <button
-                    type="submit"
-                    disabled={loading}
-                    style={{
-                      width: "100%",
-                      height: 48,
-                      borderRadius: "var(--r-btn, 12px)",
-                      border: "none",
-                      background: "var(--ink, #111317)",
-                      color: "var(--bone, #F2F0EB)",
-                      fontWeight: 700,
-                      fontSize: 14,
-                      letterSpacing: "0.02em",
-                      cursor: loading ? "not-allowed" : "pointer",
-                      opacity: loading ? 0.75 : 1,
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      gap: 8,
-                      boxShadow: "0 2px 8px rgba(0, 0, 0, 0.15)",
-                    }}
+                <BtField
+                  type={showPass ? "text" : "password"}
+                  label="Password"
+                  required
+                  icon={Lock}
+                  value={password}
+                  onChange={(e) => {
+                    setPassword(e.target.value);
+                    setErrors((p) => ({ ...p, password: "" }));
+                    setServerErr("");
+                  }}
+                  error={errors.password}
+                  helperText="At least 6 characters."
+                  autoComplete="new-password"
+                  suffix={eyeToggle(showPass, () => setShowPass(!showPass), "password")}
+                />
+
+                <BtField
+                  type={showConfirm ? "text" : "password"}
+                  label="Confirm password"
+                  required
+                  icon={Shield}
+                  value={confirm}
+                  onChange={(e) => {
+                    setConfirm(e.target.value);
+                    setErrors((p) => ({ ...p, confirm: "" }));
+                    setServerErr("");
+                  }}
+                  error={errors.confirm}
+                  autoComplete="new-password"
+                  suffix={eyeToggle(showConfirm, () => setShowConfirm(!showConfirm), "confirm password")}
+                />
+
+                <div>
+                  <label
+                    htmlFor="agree-terms"
+                    style={{ display: "flex", alignItems: "flex-start", gap: 10, cursor: "pointer", minHeight: 40 }}
                   >
-                    {loading ? "Creating Account..." : "Create Account"}
-                    {!loading && <ArrowRight size={16} />}
-                  </button>
-                </>
-              )}
-            </form>
+                    <input
+                      id="agree-terms"
+                      type="checkbox"
+                      checked={agreed}
+                      onChange={(e) => {
+                        setAgreed(e.target.checked);
+                        setErrors((p) => ({ ...p, agreed: "" }));
+                      }}
+                      aria-invalid={errors.agreed ? true : undefined}
+                      style={{ width: 18, height: 18, marginTop: 2, accentColor: "var(--ink)", flexShrink: 0 }}
+                    />
+                    <span style={{ fontSize: 14, color: "var(--ink-2)", lineHeight: 1.5 }}>
+                      By creating an account, you agree to our{" "}
+                      <strong style={{ color: "var(--ink)" }}>Terms</strong> and{" "}
+                      <strong style={{ color: "var(--ink)" }}>Privacy Policy</strong>.
+                    </span>
+                  </label>
+                  {errors.agreed && (
+                    <div role="alert" style={{ display: "flex", alignItems: "center", gap: 5, marginTop: 4, fontSize: 12.5, color: "var(--status-danger)" }}>
+                      <AlertCircle size={13} style={{ flexShrink: 0 }} />
+                      <span>{errors.agreed}</span>
+                    </div>
+                  )}
+                </div>
 
-            <div style={{ textAlign: "center", marginTop: 24, fontSize: 13, color: "var(--ink-secondary)" }}>
-              Already have an account?{" "}
-              <span
-                onClick={() => navigate("/login")}
-                style={{
-                  color: "var(--ink, #111317)",
-                  fontWeight: 700,
-                  cursor: "pointer",
-                  textDecoration: "underline",
-                }}
-              >
-                Sign in
-              </span>
-            </div>
+                <BtButton type="submit" variant="primary" fullWidth loading={loading} trailingIcon={ArrowRight}>
+                  Create account
+                </BtButton>
+              </>
+            )}
+          </form>
+
+          <div style={{ textAlign: "center", marginTop: 22, fontSize: 14, color: "var(--ink-2)" }}>
+            Already have an account?{" "}
+            <button type="button" onClick={() => navigate("/login")} style={textLinkStyle}>
+              Sign in
+            </button>
           </div>
         </div>
-      </div>
+      </main>
     </div>
   );
 }

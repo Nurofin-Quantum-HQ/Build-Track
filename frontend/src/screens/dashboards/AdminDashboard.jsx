@@ -1,14 +1,15 @@
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import {
   BtButton,
+  BtIconButton,
   BtCard,
   BtGroup,
   BtRow,
   BtBadge,
-  BtChip,
   BtHero,
+  BtPageHeader,
   BtGlassTile,
   BtSheet,
   BtBricks,
@@ -16,47 +17,39 @@ import {
   BtCountUp,
   formatInr,
   BtEmpty,
+  BtErrorCard,
   BtTypeTile,
   BtSectionHeader,
   BtPageLoader,
 } from '../../components/ui';
-import { dashboardAPI, transactionAPI, projectAPI, workerAPI, approvalAPI } from '../../api';
+import { dashboardAPI, workerAPI, approvalAPI } from '../../api';
 import perfLogger from '../../utils/performanceLogger';
 import {
   Clock,
-  TrendingUp,
-  IndianRupee,
-  Wallet,
   PlusCircle,
   Mic,
   FileText,
   Building2,
   ChevronRight,
-  ArrowUpRight,
-  ArrowDownRight,
-  Briefcase,
+  ChevronDown,
   AlertTriangle,
   HelpCircle,
   CheckCircle2,
   XCircle,
   Plus,
-  Radio,
   Layers,
   Check,
-  ChevronDown,
+  Wallet,
+  TrendingUp,
+  TrendingDown,
+  ArrowUpRight,
+  IndianRupee,
 } from 'lucide-react';
 import useProjectStore from '../../stores/projectStore';
 import useTransactionStore from '../../stores/transactionStore';
 import AddRevenueModal from '../../components/AddRevenueModal';
 import ModuleTour from '../../components/ModuleTour';
 import { ConfirmDialog } from '../../components/Toast';
-
-function formatCurrency(amount) {
-  return '₹' + Number(amount || 0).toLocaleString('en-IN', {
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 2,
-  });
-}
 
 function relativeTime(dateStr) {
   if (!dateStr) return '';
@@ -81,34 +74,118 @@ function getGreeting() {
   return 'Good evening';
 }
 
+const clip = (text, max) => (text && text.length > max ? `${text.slice(0, max - 1)}…` : text);
+
+/** One clickable tile in the Quick actions row (a real button: keyboard + focus ring). */
+function ActionTile({ icon: Icon, title, desc, onClick, ink = false, className = '' }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`bt-hover-card ${className}`}
+      style={{
+        display: 'flex',
+        alignItems: 'center',
+        gap: 14,
+        width: '100%',
+        minHeight: 84,
+        padding: '16px 18px',
+        textAlign: 'left',
+        cursor: 'pointer',
+        boxSizing: 'border-box',
+        borderRadius: 'var(--r-card)',
+        border: ink ? '1px solid var(--noir-line)' : '1px solid var(--line)',
+        background: ink ? 'var(--ink)' : 'var(--card)',
+        boxShadow: 'var(--shadow-card)',
+        fontFamily: 'var(--font-ui)',
+      }}
+    >
+      <span
+        style={{
+          width: 44,
+          height: 44,
+          borderRadius: 'var(--r-tile)',
+          background: ink ? 'var(--accent)' : 'var(--fill)',
+          color: ink ? 'var(--on-accent)' : 'var(--ink)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          flexShrink: 0,
+        }}
+      >
+        <Icon size={21} strokeWidth={ink ? 2.1 : 1.85} />
+      </span>
+      <span style={{ flex: 1, minWidth: 0 }}>
+        <span
+          style={{
+            display: 'block',
+            fontSize: 15,
+            fontWeight: 600,
+            color: ink ? 'var(--on-noir)' : 'var(--ink)',
+          }}
+        >
+          {title}
+        </span>
+        <span
+          style={{
+            display: 'block',
+            fontSize: 13,
+            color: ink ? 'var(--on-noir-2)' : 'var(--ink-3)',
+            marginTop: 2,
+          }}
+        >
+          {desc}
+        </span>
+      </span>
+      <ChevronRight size={16} color={ink ? 'var(--on-noir-3)' : 'var(--ink-3)'} style={{ flexShrink: 0 }} />
+    </button>
+  );
+}
+
 export default function AdminDashboard() {
   const navigate = useNavigate();
   const { user } = useAuth();
 
-  const { projects, fetchProjects } = useProjectStore();
+  const { projects, fetchProjects, error: projectsError } = useProjectStore();
   const { transactions, fetchTransactions } = useTransactionStore();
   const [selectedProjectId, setSelectedProjectId] = useState('all');
   const [projectDropdownOpen, setProjectDropdownOpen] = useState(false);
+  const [dropdownAlign, setDropdownAlign] = useState('right');
   const projectDropdownRef = useRef(null);
 
+  const [loading, setLoading] = useState(true);
+  const [pendingApprovals, setPendingApprovals] = useState(0);
+  const [addRevenueModalOpen, setAddRevenueModalOpen] = useState(false);
+  const [runTour, setRunTour] = useState(false);
+  const [showTourPopup, setShowTourPopup] = useState(false);
+
+  // Close the scope menu on outside click or Escape.
   useEffect(() => {
+    if (!projectDropdownOpen) return undefined;
     const handleClickOutside = (e) => {
       if (projectDropdownRef.current && !projectDropdownRef.current.contains(e.target)) {
         setProjectDropdownOpen(false);
       }
     };
-    if (projectDropdownOpen) {
-      document.addEventListener('mousedown', handleClickOutside);
-    }
-    return () => document.removeEventListener('mousedown', handleClickOutside);
+    const handleKey = (e) => {
+      if (e.key === 'Escape') setProjectDropdownOpen(false);
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    document.addEventListener('keydown', handleKey);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('keydown', handleKey);
+    };
   }, [projectDropdownOpen]);
-  const [dashData, setDashData] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [pendingApprovals, setPendingApprovals] = useState(0);
-  const [approvalHistory, setApprovalHistory] = useState([]);
-  const [addRevenueModalOpen, setAddRevenueModalOpen] = useState(false);
-  const [runTour, setRunTour] = useState(false);
-  const [showTourPopup, setShowTourPopup] = useState(false);
+
+  const toggleDropdown = () => {
+    if (!projectDropdownOpen && projectDropdownRef.current) {
+      const rect = projectDropdownRef.current.getBoundingClientRect();
+      // Open towards whichever side has room so the menu never leaves the screen.
+      setDropdownAlign(rect.left + 320 > window.innerWidth - 16 ? 'right' : 'left');
+    }
+    setProjectDropdownOpen((prev) => !prev);
+  };
 
   const tourSteps = [
     ...(projects.length === 0
@@ -126,22 +203,21 @@ export default function AdminDashboard() {
     perfLogger.logMount('AdminDashboard');
   }, []);
 
-  useEffect(() => {
-    Promise.all([
+  const loadAll = useCallback(() => {
+    setLoading(true);
+    return Promise.all([
       fetchProjects(),
       dashboardAPI.getSummary().catch(() => ({ data: null })),
       workerAPI.getAll().catch(() => ({ data: { workers: [] } })),
       approvalAPI.getPending().catch(() => ({ data: [] })),
       approvalAPI.getHistory().catch(() => ({ data: [] })),
     ])
-      .then(([projList, dashRes, workerRes, pendRes, histRes]) => {
+      .then(([projList, , , pendRes]) => {
         if (projList && projList.length === 0) {
           if (!localStorage.getItem('appTourPrompted')) {
             setShowTourPopup(true);
           }
         }
-
-        setDashData(dashRes?.data || null);
 
         const extractArray = (res) => {
           if (!res || !res.data) return [];
@@ -149,22 +225,20 @@ export default function AdminDashboard() {
           if (Array.isArray(res.data.data)) return res.data.data;
           if (Array.isArray(res.data.transactions)) return res.data.transactions;
           if (res.data.data && Array.isArray(res.data.data.transactions)) return res.data.data.transactions;
-          if (Array.isArray(res.data.history)) return res.data.history;
-          if (res.data.data && Array.isArray(res.data.data.history)) return res.data.data.history;
           return [];
         };
 
-        const pendingArr = extractArray(pendRes);
-        const historyArr = extractArray(histRes);
-
-        const pendingCount = pendingArr.filter(
+        const pendingCount = extractArray(pendRes).filter(
           (a) => (a.approvalStatus || '').toLowerCase() === 'pending'
         ).length;
         setPendingApprovals(pendingCount);
-        setApprovalHistory(historyArr);
       })
       .finally(() => setLoading(false));
   }, [fetchProjects]);
+
+  useEffect(() => {
+    loadAll();
+  }, [loadAll]);
 
   useEffect(() => {
     if (!selectedProjectId) return;
@@ -177,6 +251,7 @@ export default function AdminDashboard() {
 
   const isGlobalView = selectedProjectId === 'all' || !selectedProjectId;
   const selectedProject = projects.find((p) => (p._id || p.id) === selectedProjectId);
+  const selectedName = selectedProject?.projectName || selectedProject?.name || 'Select project';
 
   const projectTransactions = useMemo(() => {
     return transactions
@@ -199,7 +274,7 @@ export default function AdminDashboard() {
   }, [projectTransactions]);
 
   const recentEntries = projectTransactions.slice(0, 5);
-  const incomeTransactions = projectTransactions.filter((t) => t.type === 'Income').slice(0, 5);
+  const incomeTransactions = projectTransactions.filter((t) => t.type === 'Income').slice(0, 3);
 
   const progressRaw = selectedProject
     ? Number(selectedProject?.progress || 0)
@@ -221,7 +296,6 @@ export default function AdminDashboard() {
     ? Number(selectedProject?.totalBudget || selectedProject?.budget?.total || 0)
     : projects.reduce((sum, p) => sum + Number(p.totalBudget || p.budget?.total || 0), 0);
 
-  const remaining = Math.max(budget - totalCost, 0);
   const usedPct = budget > 0 ? totalCost / budget : 0;
   const over = budget > 0 && totalCost > budget * 0.9;
   const hasData = isGlobalView || Boolean(selectedProject);
@@ -232,9 +306,33 @@ export default function AdminDashboard() {
     month: 'short',
   }).format(new Date());
 
+  const firstName = (user?.name || 'Admin').split(' ')[0];
+
+  const refreshTransactions = () => {
+    if (selectedProjectId === 'all') fetchTransactions({});
+    else fetchTransactions({ project: selectedProjectId });
+  };
+
   if (loading) {
-    return <BtPageLoader message="Loading dashboard…" />;
+    return <BtPageLoader label="Loading dashboard…" />;
   }
+
+  const scopeOptionStyle = (selected) => ({
+    width: '100%',
+    padding: '10px 12px',
+    borderRadius: 12,
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 10,
+    cursor: 'pointer',
+    border: 'none',
+    textAlign: 'left',
+    fontFamily: 'var(--font-ui)',
+    background: selected ? 'rgba(255, 255, 255, 0.10)' : 'transparent',
+    color: selected ? 'var(--on-noir)' : 'var(--on-noir-2)',
+    transition: 'background 120ms ease',
+  });
 
   return (
     <div style={{ width: '100%', minHeight: '100%', display: 'flex', flexDirection: 'column' }}>
@@ -258,171 +356,95 @@ export default function AdminDashboard() {
         />
       )}
 
-      {/* ══════════════════════════════════════════════════════════
-          HERO (Blueprint Noir Surface)
-         ══════════════════════════════════════════════════════════ */}
-      <BtHero padding="28px 32px 56px">
-        <div style={{ maxWidth: 1200, margin: '0 auto', width: '100%' }}>
-          {/* Top greeting + project selector bar */}
-          <div
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              flexWrap: 'wrap',
-              gap: '16px',
-              marginBottom: '28px',
-            }}
-          >
-            <div>
-              <div
-                style={{
-                  fontFamily: 'var(--font-mono)',
-                  fontSize: '11px',
-                  letterSpacing: '0.09em',
-                  textTransform: 'uppercase',
-                  color: 'var(--on-noir-3)',
-                  marginBottom: '4px',
-                }}
-              >
-                {todayLabel} • {getGreeting()}
-              </div>
-              <h1
-                style={{
-                  margin: 0,
-                  fontFamily: 'var(--font-display)',
-                  fontSize: '28px',
-                  fontWeight: 800,
-                  letterSpacing: '-0.03em',
-                  color: 'var(--bone, #F6F4EF)',
-                }}
-              >
-                {user?.name || 'Admin'}
-              </h1>
-            </div>
-
-            {/* Project Picker dropdown / chip */}
-            <div
-              ref={projectDropdownRef}
-              className="tour-project-selector"
-              style={{ position: 'relative', display: 'flex', alignItems: 'center', gap: '10px' }}
-            >
-              <div
-                style={{
-                  position: 'relative',
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                }}
-              >
-                <button
-                  type="button"
-                  onClick={() => setProjectDropdownOpen((prev) => !prev)}
+      {/* HERO: who, which scope, and the one number that matters (cost so far) */}
+      <BtHero padding="24px clamp(16px, 4vw, 28px) 56px">
+        <BtPageHeader
+          eyebrow={`${todayLabel} · ${getGreeting()}`}
+          title={`${getGreeting()}, ${firstName}`}
+          subtitle={
+            isGlobalView
+              ? `Here is where ${projects.length === 1 ? 'your project stands' : 'all your projects stand'} today.`
+              : `Showing ${selectedName} only.`
+          }
+          actions={
+            <>
+              <div ref={projectDropdownRef} className="tour-project-selector" style={{ position: 'relative' }}>
+                <BtButton
+                  variant="onDark"
+                  size="small"
+                  icon={isGlobalView ? Layers : Building2}
+                  trailingIcon={ChevronDown}
+                  aria-haspopup="listbox"
+                  aria-expanded={projectDropdownOpen}
+                  onClick={toggleDropdown}
                   style={{
-                    height: '42px',
-                    padding: '0 16px 0 14px',
-                    borderRadius: '21px',
-                    background: projectDropdownOpen ? 'rgba(255, 255, 255, 0.14)' : 'rgba(255, 255, 255, 0.08)',
-                    border: `1px solid ${projectDropdownOpen ? 'var(--accent)' : 'rgba(255, 255, 255, 0.16)'}`,
-                    color: 'var(--bone, #F6F4EF)',
-                    fontFamily: 'var(--font-ui)',
-                    fontSize: '14px',
-                    fontWeight: 600,
-                    cursor: 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '10px',
-                    backdropFilter: 'blur(8px)',
-                    transition: 'all 150ms ease',
-                    boxShadow: projectDropdownOpen ? '0 0 0 3px rgba(224, 169, 59, 0.2)' : 'none',
+                    background: projectDropdownOpen ? 'rgba(255, 255, 255, 0.14)' : undefined,
+                    borderColor: projectDropdownOpen ? 'var(--accent)' : undefined,
                   }}
                 >
-                  <Building2 size={16} color="var(--accent)" />
-                  <span style={{ maxWidth: '240px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                    {selectedProjectId === 'all'
-                      ? 'Global Financial Overview (All Projects)'
-                      : (selectedProject?.projectName || selectedProject?.name || 'Select Project')}
-                  </span>
-                  <ChevronDown
-                    size={14}
-                    color="var(--on-noir-2, rgba(246, 244, 239, 0.7))"
-                    style={{
-                      transform: projectDropdownOpen ? 'rotate(180deg)' : 'rotate(0deg)',
-                      transition: 'transform 200ms ease',
-                    }}
-                  />
-                </button>
+                  {isGlobalView ? 'All projects' : clip(selectedName, 22)}
+                </BtButton>
 
                 {projectDropdownOpen && (
                   <div
+                    role="listbox"
+                    aria-label="Dashboard scope"
                     style={{
                       position: 'absolute',
                       top: 'calc(100% + 8px)',
-                      right: 0,
-                      width: '320px',
-                      background: 'var(--noir-2, #14171D)',
-                      border: '1px solid rgba(255, 255, 255, 0.14)',
-                      borderRadius: '16px',
-                      boxShadow: '0 16px 40px rgba(0, 0, 0, 0.65)',
+                      [dropdownAlign]: 0,
+                      width: 'min(320px, calc(100vw - 56px))',
+                      background: 'var(--noir-2)',
+                      border: '1px solid var(--noir-line)',
+                      borderRadius: 'var(--r-input)',
+                      boxShadow: 'var(--shadow-raised)',
                       zIndex: 100,
-                      padding: '8px',
-                      backdropFilter: 'blur(16px)',
+                      padding: 8,
                       animation: 'fadeIn 120ms ease',
                     }}
                   >
                     <div
+                      className="bt-eyebrow"
                       style={{
-                        padding: '6px 10px 8px',
-                        fontSize: '11px',
-                        fontFamily: 'var(--font-mono)',
-                        color: 'var(--on-noir-3, rgba(246, 244, 239, 0.45))',
-                        letterSpacing: '0.08em',
-                        textTransform: 'uppercase',
-                        borderBottom: '1px solid rgba(255, 255, 255, 0.08)',
-                        marginBottom: '4px',
+                        padding: '6px 12px 8px',
+                        color: 'var(--on-noir-3)',
+                        borderBottom: '1px solid var(--noir-line)',
+                        marginBottom: 4,
                       }}
                     >
-                      Filter Dashboard Scope
+                      Show numbers for
                     </div>
 
-                    <div
+                    <button
+                      type="button"
+                      role="option"
+                      aria-selected={isGlobalView}
                       onClick={() => {
                         setSelectedProjectId('all');
                         setProjectDropdownOpen(false);
                       }}
-                      style={{
-                        padding: '10px 12px',
-                        borderRadius: '10px',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'space-between',
-                        cursor: 'pointer',
-                        background: selectedProjectId === 'all' ? 'rgba(255, 255, 255, 0.10)' : 'transparent',
-                        color: selectedProjectId === 'all' ? 'var(--bone, #F6F4EF)' : 'var(--on-noir-2, rgba(246, 244, 239, 0.7))',
-                        transition: 'background 120ms ease',
-                      }}
-                      onMouseEnter={(e) => (e.currentTarget.style.background = 'rgba(255, 255, 255, 0.08)')}
-                      onMouseLeave={(e) =>
-                        (e.currentTarget.style.background =
-                          selectedProjectId === 'all' ? 'rgba(255, 255, 255, 0.10)' : 'transparent')
-                      }
+                      style={scopeOptionStyle(isGlobalView)}
+                      className="bt-icon-btn on-dark"
                     >
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                      <span style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                         <Layers size={16} color="var(--accent)" />
-                        <div>
-                          <div style={{ fontSize: '13px', fontWeight: 600 }}>Global Financial Overview</div>
-                          <div style={{ fontSize: '11px', color: 'var(--on-noir-3, rgba(246, 244, 239, 0.45))' }}>All projects combined</div>
-                        </div>
-                      </div>
-                      {selectedProjectId === 'all' && <Check size={16} color="var(--accent)" />}
-                    </div>
+                        <span>
+                          <span style={{ display: 'block', fontSize: 14, fontWeight: 600 }}>All projects</span>
+                          <span style={{ display: 'block', fontSize: 13, color: 'var(--on-noir-3)' }}>
+                            Combined overview
+                          </span>
+                        </span>
+                      </span>
+                      {isGlobalView && <Check size={16} color="var(--accent)" />}
+                    </button>
 
                     {projects.length > 0 && (
                       <div
                         style={{
-                          margin: '6px 0',
-                          borderTop: '1px solid rgba(255, 255, 255, 0.08)',
-                          paddingTop: '6px',
-                          maxHeight: '220px',
+                          marginTop: 6,
+                          borderTop: '1px solid var(--noir-line)',
+                          paddingTop: 6,
+                          maxHeight: 240,
                           overflowY: 'auto',
                         }}
                       >
@@ -430,34 +452,25 @@ export default function AdminDashboard() {
                           const pid = p._id || p.id;
                           const isSel = selectedProjectId === pid;
                           return (
-                            <div
+                            <button
+                              type="button"
+                              role="option"
+                              aria-selected={isSel}
                               key={pid}
                               onClick={() => {
                                 setSelectedProjectId(pid);
                                 setProjectDropdownOpen(false);
                               }}
-                              style={{
-                                padding: '10px 12px',
-                                borderRadius: '10px',
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'space-between',
-                                cursor: 'pointer',
-                                background: isSel ? 'rgba(255, 255, 255, 0.10)' : 'transparent',
-                                color: isSel ? 'var(--bone, #F6F4EF)' : 'var(--on-noir-2, rgba(246, 244, 239, 0.7))',
-                                transition: 'background 120ms ease',
-                              }}
-                              onMouseEnter={(e) => (e.currentTarget.style.background = 'rgba(255, 255, 255, 0.08)')}
-                              onMouseLeave={(e) =>
-                                (e.currentTarget.style.background = isSel ? 'rgba(255, 255, 255, 0.10)' : 'transparent')
-                              }
+                              style={scopeOptionStyle(isSel)}
+                              className="bt-icon-btn on-dark"
                             >
-                              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0 }}>
-                                <Building2 size={15} color="var(--accent)" style={{ flexShrink: 0 }} />
-                                <div style={{ minWidth: 0 }}>
-                                  <div
+                              <span style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
+                                <Building2 size={16} color="var(--accent)" style={{ flexShrink: 0 }} />
+                                <span style={{ minWidth: 0 }}>
+                                  <span
                                     style={{
-                                      fontSize: '13px',
+                                      display: 'block',
+                                      fontSize: 14,
                                       fontWeight: 600,
                                       overflow: 'hidden',
                                       textOverflow: 'ellipsis',
@@ -465,16 +478,16 @@ export default function AdminDashboard() {
                                     }}
                                   >
                                     {p.projectName || p.name}
-                                  </div>
+                                  </span>
                                   {(p.location || p.projectCode) && (
-                                    <div style={{ fontSize: '11px', color: 'var(--on-noir-3, rgba(246, 244, 239, 0.45))' }}>
+                                    <span style={{ display: 'block', fontSize: 13, color: 'var(--on-noir-3)' }}>
                                       {p.location || p.projectCode}
-                                    </div>
+                                    </span>
                                   )}
-                                </div>
-                              </div>
+                                </span>
+                              </span>
                               {isSel && <Check size={16} color="var(--accent)" style={{ flexShrink: 0 }} />}
-                            </div>
+                            </button>
                           );
                         })}
                       </div>
@@ -486,81 +499,51 @@ export default function AdminDashboard() {
               {projects.length === 0 && (
                 <BtButton
                   variant="accent"
-                  small
+                  size="small"
                   className="tour-new-project"
                   icon={Plus}
-                  onPress={() => navigate('/newproject')}
+                  onClick={() => navigate('/newproject')}
                 >
-                  New Project
+                  New project
                 </BtButton>
               )}
 
-              <button
-                type="button"
-                onClick={() => setRunTour(true)}
-                title="Help Tour"
-                style={{
-                  width: '42px',
-                  height: '42px',
-                  borderRadius: '21px',
-                  background: 'rgba(255, 255, 255, 0.08)',
-                  border: '1px solid rgba(255, 255, 255, 0.14)',
-                  color: 'var(--on-noir-2)',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  cursor: 'pointer',
-                  transition: 'background 150ms ease',
-                }}
-              >
-                <HelpCircle size={18} />
-              </button>
-            </div>
-          </div>
-
-          {/* Hero primary KPI amount: Total Cost So Far */}
-          <div style={{ marginBottom: '20px' }}>
-            <div
-              style={{
-                fontFamily: 'var(--font-ui)',
-                fontSize: '14px',
-                fontWeight: 500,
-                color: 'var(--on-noir-2)',
-                marginBottom: '6px',
-              }}
-            >
+              <BtIconButton icon={HelpCircle} label="Page tour" onDark onClick={() => setRunTour(true)} />
+            </>
+          }
+        >
+          {/* The one answer: money spent against budget */}
+          <div>
+            <div style={{ fontFamily: 'var(--font-ui)', fontSize: 14, fontWeight: 500, color: 'var(--on-noir-2)' }}>
               Total cost so far
             </div>
-
             <div
               className="tnum"
               style={{
                 fontFamily: 'var(--font-display)',
-                fontSize: 'clamp(36px, 5vw, 56px)',
-                fontWeight: 800,
-                letterSpacing: '-0.04em',
+                fontSize: 'clamp(40px, 5.4vw, 60px)',
+                fontWeight: 700,
+                letterSpacing: '-0.035em',
                 lineHeight: 1.05,
-                color: 'var(--bone)',
-                marginBottom: '8px',
+                color: 'var(--on-noir)',
+                margin: '6px 0 8px',
               }}
             >
               {hasData ? (
-                <BtCountUp value={totalCost} format={(v) => formatInr(v, { compact: false })} />
+                <BtCountUp value={totalCost} format={(v) => formatInr(v, { compact: true })} />
               ) : (
                 '—'
               )}
             </div>
-
-            <div
-              style={{
-                fontFamily: 'var(--font-ui)',
-                fontSize: '14px',
-                color: 'var(--on-noir-2)',
-              }}
-            >
+            <div style={{ fontFamily: 'var(--font-ui)', fontSize: 14, color: 'var(--on-noir-2)' }}>
               {budget > 0 ? (
                 <>
-                  of <span className="tnum" style={{ fontWeight: 600, color: 'var(--bone)' }}>{formatInr(budget, { compact: true })}</span> budget •{' '}
+                  of{' '}
+                  <span className="tnum" style={{ fontWeight: 600, color: 'var(--on-noir)' }}>
+                    {formatInr(budget, { compact: true })}
+                  </span>{' '}
+                  budget
+                  <span aria-hidden="true"> · </span>
                   <span
                     className="tnum"
                     style={{
@@ -577,34 +560,18 @@ export default function AdminDashboard() {
             </div>
           </div>
 
-          {/* BtBricks Budget Utilization Bar */}
-          <div style={{ marginBottom: '24px' }}>
-            <BtBricks
-              value={Math.min(Math.max(usedPct, 0), 1)}
-              onDark={true}
-              color={over ? 'var(--status-danger-bright)' : undefined}
-            />
-          </div>
+          <BtBricks
+            value={Math.min(Math.max(usedPct, 0), 1)}
+            onDark
+            color={over ? 'var(--status-danger-bright)' : undefined}
+          />
 
-          {/* 4 Glass KPI Tiles Grid */}
-          <div
-            className="tour-kpis"
-            style={{
-              display: 'grid',
-              gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-              gap: '12px',
-            }}
-          >
+          <div className="bt-grid-3 tour-kpis" style={{ gap: 12 }}>
             <BtGlassTile
               label="Budget left"
               value={budget > 0 ? formatInr(budget - totalCost, { compact: true }) : '—'}
               valueColor={budget > 0 && totalCost > budget ? 'var(--status-danger-bright)' : undefined}
               icon={Wallet}
-            />
-            <BtGlassTile
-              label="Upcoming · planned"
-              value={budget > 0 ? formatInr(remaining, { compact: true }) : '—'}
-              icon={Clock}
             />
             <BtGlassTile
               label="Total revenue"
@@ -614,288 +581,155 @@ export default function AdminDashboard() {
             />
             <BtGlassTile
               label={netCashflow >= 0 ? 'Net profit' : 'Net loss'}
-              value={`${netCashflow >= 0 ? '+' : ''}${formatInr(netCashflow, { compact: true })}`}
+              value={`${netCashflow >= 0 ? '+' : '-'}${formatInr(Math.abs(netCashflow), { compact: true })}`}
               valueColor={netCashflow >= 0 ? 'var(--status-success-bright)' : 'var(--status-danger-bright)'}
-              icon={ArrowDownRight}
+              icon={netCashflow >= 0 ? TrendingUp : TrendingDown}
             />
           </div>
-        </div>
+        </BtPageHeader>
       </BtHero>
 
-      {/* ══════════════════════════════════════════════════════════
-          SHEET (Bone Surface Overlapping Hero)
-         ══════════════════════════════════════════════════════════ */}
-      <BtSheet overlap={26} padding="28px 32px 64px">
-        <div
-          style={{
-            maxWidth: 1200,
-            margin: '0 auto',
-            width: '100%',
-            display: 'flex',
-            flexDirection: 'column',
-            gap: '24px',
-          }}
-        >
-          {/* Pending Approvals Alert Banner */}
+      {/* SHEET */}
+      <BtSheet overlap={26} padding="28px clamp(16px, 4vw, 28px) 64px">
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 28 }}>
+          {projectsError && projects.length === 0 && (
+            <BtErrorCard
+              title="Couldn't load your projects"
+              message="The numbers above may be incomplete. Check your connection and try again."
+              onRetry={loadAll}
+            />
+          )}
+
           {pendingApprovals > 0 && (
             <div
               style={{
-                background: 'linear-gradient(135deg, #FFF7ED 0%, #FFEDD5 100%)',
-                border: '1px solid #FED7AA',
+                background: 'var(--status-warning-soft)',
+                border: '1px solid var(--line)',
                 borderRadius: 'var(--r-card)',
-                padding: '16px 22px',
+                padding: '16px 20px',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'space-between',
                 flexWrap: 'wrap',
-                gap: '14px',
-                boxShadow: 'var(--shadow-card)',
+                gap: 14,
               }}
             >
-              <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
-                <div
+              <div style={{ display: 'flex', alignItems: 'center', gap: 14, minWidth: 0 }}>
+                <span
                   style={{
-                    width: '42px',
-                    height: '42px',
-                    borderRadius: '12px',
-                    background: '#EA580C',
-                    color: '#FFFFFF',
+                    width: 42,
+                    height: 42,
+                    borderRadius: 'var(--r-tile)',
+                    background: 'var(--status-warning)',
+                    color: 'var(--card)',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
                     flexShrink: 0,
                   }}
                 >
-                  <AlertTriangle size={22} />
-                </div>
-                <div>
-                  <div
-                    style={{
-                      fontFamily: 'var(--font-display)',
-                      fontWeight: 700,
-                      fontSize: '16px',
-                      color: '#9A3412',
-                    }}
-                  >
-                    {pendingApprovals} Pending Approvals
+                  <AlertTriangle size={21} strokeWidth={2} />
+                </span>
+                <div style={{ minWidth: 0 }}>
+                  <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 17, color: 'var(--ink)' }}>
+                    {pendingApprovals} {pendingApprovals === 1 ? 'approval is' : 'approvals are'} waiting for you
                   </div>
-                  <div
-                    style={{
-                      fontFamily: 'var(--font-ui)',
-                      fontSize: '13px',
-                      color: '#C2410C',
-                      marginTop: '2px',
-                    }}
-                  >
-                    Review updates and expenses waiting for your sign-off.
+                  <div style={{ fontFamily: 'var(--font-ui)', fontSize: 14, color: 'var(--ink-2)', marginTop: 2 }}>
+                    Entries and updates from your team need a decision.
                   </div>
                 </div>
               </div>
-
-              <BtButton
-                variant="primary"
-                small
-                onPress={() => navigate('/approvals')}
-              >
-                Review Now
+              <BtButton variant="primary" size="small" onClick={() => navigate('/approvals')}>
+                Review now
               </BtButton>
             </div>
           )}
 
-          {/* AI Voice Foreman Hero Card */}
-          <div
-            onClick={() => navigate('/voice')}
-            className="tour-voice-update"
-            style={{
-              background: 'var(--ink)',
-              borderRadius: 'var(--r-card)',
-              padding: '22px 26px',
-              color: 'var(--bone)',
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              boxShadow: '0 10px 28px rgba(17, 19, 23, 0.16)',
-              transition: 'transform 180ms ease, box-shadow 180ms ease',
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.transform = 'translateY(-2px)';
-              e.currentTarget.style.boxShadow = '0 14px 34px rgba(17, 19, 23, 0.22)';
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.transform = 'translateY(0)';
-              e.currentTarget.style.boxShadow = '0 10px 28px rgba(17, 19, 23, 0.16)';
-            }}
-          >
-            <div style={{ display: 'flex', alignItems: 'center', gap: '18px' }}>
-              <div
-                style={{
-                  width: '50px',
-                  height: '50px',
-                  borderRadius: '50%',
-                  background: 'var(--accent)',
-                  color: 'var(--on-accent, #111317)',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  boxShadow: '0 0 20px var(--accent-glow)',
-                  flexShrink: 0,
-                }}
-              >
-                <Mic size={26} strokeWidth={2.2} />
-              </div>
-              <div>
-                <div
-                  style={{
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: '6px',
-                    fontFamily: 'var(--font-mono)',
-                    fontSize: '10.5px',
-                    letterSpacing: '0.08em',
-                    textTransform: 'uppercase',
-                    color: 'var(--accent)',
-                    marginBottom: '4px',
-                  }}
-                >
-                  <Radio size={12} className="spin-slow" />
-                  AI Foreman is listening
-                </div>
-                <div
-                  style={{
-                    fontFamily: 'var(--font-display)',
-                    fontSize: '22px',
-                    fontWeight: 800,
-                    letterSpacing: '-0.02em',
-                    color: 'var(--bone, #F6F4EF)',
-                    margin: 0,
-                  }}
-                >
-                  Speak Update
-                </div>
-                <div
-                  style={{
-                    fontFamily: 'var(--font-ui)',
-                    fontSize: '13px',
-                    color: 'var(--on-noir-2)',
-                    marginTop: '2px',
-                  }}
-                >
-                  Say what happened — we transcribe, categorize, and log it instantly.
-                </div>
-              </div>
+          {/* Quick actions (Speak Update is the voice entry) */}
+          <section className="tour-quick-actions">
+            <BtSectionHeader title="Quick actions" />
+            <div className="bt-grid-4">
+              <ActionTile
+                ink
+                className="tour-voice-update"
+                icon={Mic}
+                title="Speak update"
+                desc="Say it, we log it"
+                onClick={() => navigate('/voice')}
+              />
+              <ActionTile
+                icon={PlusCircle}
+                title="Add entry"
+                desc="Log expense or labour"
+                onClick={() => navigate('/add-entry')}
+              />
+              <ActionTile
+                icon={FileText}
+                title="Manual entry"
+                desc="Fill in the full form"
+                onClick={() => navigate('/manualentry')}
+              />
+              <ActionTile
+                icon={Building2}
+                title="View projects"
+                desc="All sites and phases"
+                onClick={() => navigate('/projects')}
+              />
             </div>
+          </section>
 
-            <div
-              style={{
-                width: '38px',
-                height: '38px',
-                borderRadius: '50%',
-                background: 'rgba(255, 255, 255, 0.08)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                color: 'var(--bone)',
-              }}
-            >
-              <ChevronRight size={20} />
-            </div>
-          </div>
-
-          {/* 2-Column Row: Work Done + Client Money */}
-          <div
-            style={{
-              display: 'grid',
-              gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))',
-              gap: '20px',
-            }}
-          >
-            {/* Work Done Card */}
-            <BtCard padding="24px">
-              <div
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  marginBottom: '16px',
-                }}
-              >
-                <div
-                  style={{
-                    fontFamily: 'var(--font-mono)',
-                    fontSize: '11px',
-                    fontWeight: 700,
-                    letterSpacing: '0.08em',
-                    textTransform: 'uppercase',
-                    color: 'var(--ink-3)',
-                  }}
-                >
-                  WORK PROGRESS
-                </div>
+          {/* Work + client money */}
+          <div className="bt-grid-2" style={{ alignItems: 'stretch' }}>
+            <BtCard padding="22px 24px" style={{ display: 'flex', flexDirection: 'column' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, minHeight: 32 }}>
+                <span className="bt-eyebrow" style={{ color: 'var(--ink-3)' }}>
+                  Work progress
+                </span>
                 {selectedProject && (
                   <BtBadge
                     label={selectedProject.status || 'Active'}
-                    tone={selectedProject.status === 'Active' ? 'green' : 'amber'}
+                    tone={selectedProject.status === 'Active' || !selectedProject.status ? 'success' : 'warning'}
                   />
                 )}
               </div>
 
-              <div style={{ display: 'flex', alignItems: 'center', gap: '22px' }}>
-                <BtRing
-                  value={Math.min(Math.max(progress, 0), 1)}
-                  size={76}
-                  stroke={7}
-                  color="var(--accent)"
-                >
+              <div style={{ display: 'flex', alignItems: 'center', gap: 22, flex: 1, paddingTop: 12 }}>
+                <BtRing value={Math.min(Math.max(progress, 0), 1)} size={88} stroke={8} color="var(--accent)">
                   <span
                     className="tnum"
-                    style={{
-                      fontFamily: 'var(--font-display)',
-                      fontSize: '16px',
-                      fontWeight: 700,
-                      color: 'var(--ink)',
-                    }}
+                    style={{ fontFamily: 'var(--font-display)', fontSize: 20, fontWeight: 700, color: 'var(--ink)' }}
                   >
                     {(progress * 100).toFixed(0)}%
                   </span>
                 </BtRing>
 
                 <div style={{ minWidth: 0 }}>
-                  <div
-                    style={{
-                      fontFamily: 'var(--font-display)',
-                      fontSize: '18px',
-                      fontWeight: 700,
-                      color: 'var(--ink)',
-                    }}
-                  >
+                  <div style={{ fontFamily: 'var(--font-display)', fontSize: 20, fontWeight: 700, color: 'var(--ink)' }}>
                     Work done
                   </div>
                   <div
                     style={{
                       fontFamily: 'var(--font-ui)',
-                      fontSize: '14px',
+                      fontSize: 14,
                       color: 'var(--ink-2)',
-                      marginTop: '2px',
+                      marginTop: 2,
                       overflow: 'hidden',
                       textOverflow: 'ellipsis',
                       whiteSpace: 'nowrap',
                     }}
                   >
-                    {isGlobalView
-                      ? 'All projects combined'
-                      : selectedProject?.projectName || selectedProject?.name || 'Project Name'}
+                    {isGlobalView ? 'Average across all projects' : selectedName}
                   </div>
                   {selectedProject?.location && (
                     <div
                       style={{
                         fontFamily: 'var(--font-ui)',
-                        fontSize: '12px',
+                        fontSize: 13,
                         color: 'var(--ink-3)',
-                        marginTop: '4px',
+                        marginTop: 4,
                         display: 'flex',
                         alignItems: 'center',
-                        gap: '4px',
+                        gap: 4,
                       }}
                     >
                       <Building2 size={13} />
@@ -906,213 +740,101 @@ export default function AdminDashboard() {
               </div>
             </BtCard>
 
-            {/* Client Money Card */}
-            <BtCard padding="24px">
-              <div
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  marginBottom: '14px',
-                }}
-              >
-                <div
-                  style={{
-                    fontFamily: 'var(--font-mono)',
-                    fontSize: '11px',
-                    fontWeight: 700,
-                    letterSpacing: '0.08em',
-                    textTransform: 'uppercase',
-                    color: 'var(--ink-3)',
-                  }}
-                >
-                  CLIENT MONEY
-                </div>
-                <button
-                  type="button"
+            <BtCard padding="22px 24px" style={{ display: 'flex', flexDirection: 'column' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, minHeight: 32 }}>
+                <span className="bt-eyebrow" style={{ color: 'var(--ink-3)' }}>
+                  Client money
+                </span>
+                <BtButton
+                  variant="secondary"
+                  size="compact"
+                  icon={Plus}
                   onClick={() => setAddRevenueModalOpen(true)}
-                  style={{
-                    background: 'var(--fill)',
-                    border: '1px solid var(--line)',
-                    borderRadius: '8px',
-                    padding: '4px 10px',
-                    fontFamily: 'var(--font-ui)',
-                    fontSize: '12px',
-                    fontWeight: 600,
-                    color: 'var(--ink)',
-                    cursor: 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '4px',
-                  }}
                 >
-                  <Plus size={13} /> Record Revenue
-                </button>
+                  Record revenue
+                </BtButton>
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
-                <div>
-                  <div
+              {incomeTransactions.length === 0 ? (
+                <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 14, paddingTop: 12 }}>
+                  <span
                     style={{
-                      fontFamily: 'var(--font-ui)',
-                      fontSize: '13px',
-                      color: 'var(--ink-3)',
+                      width: 44,
+                      height: 44,
+                      borderRadius: 'var(--r-tile)',
+                      background: 'var(--fill)',
+                      color: 'var(--ink-2)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      flexShrink: 0,
                     }}
                   >
-                    Total revenue
-                  </div>
-                  <div
-                    className="tnum"
-                    style={{
-                      fontFamily: 'var(--font-display)',
-                      fontSize: '22px',
-                      fontWeight: 800,
-                      color: 'var(--status-success-bright)',
-                      marginTop: '4px',
-                    }}
-                  >
-                    +{formatCurrency(totalRevenue)}
-                  </div>
-                </div>
-
-                <div>
-                  <div
-                    style={{
-                      fontFamily: 'var(--font-ui)',
-                      fontSize: '13px',
-                      color: 'var(--ink-3)',
-                    }}
-                  >
-                    Net cash flow
-                  </div>
-                  <div
-                    className="tnum"
-                    style={{
-                      fontFamily: 'var(--font-display)',
-                      fontSize: '22px',
-                      fontWeight: 800,
-                      color:
-                        netCashflow >= 0
-                          ? 'var(--status-success-bright)'
-                          : 'var(--status-danger-bright)',
-                      marginTop: '4px',
-                    }}
-                  >
-                    {netCashflow >= 0 ? '+' : ''}
-                    {formatCurrency(netCashflow)}
+                    <IndianRupee size={20} strokeWidth={1.85} />
+                  </span>
+                  <div>
+                    <div style={{ fontFamily: 'var(--font-ui)', fontSize: 15, fontWeight: 600, color: 'var(--ink)' }}>
+                      No payments recorded yet
+                    </div>
+                    <div style={{ fontFamily: 'var(--font-ui)', fontSize: 14, color: 'var(--ink-3)', marginTop: 2 }}>
+                      Money you receive from the client shows here.
+                    </div>
                   </div>
                 </div>
-              </div>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', marginTop: 8 }}>
+                  {incomeTransactions.map((t, idx) => (
+                    <div
+                      key={t._id || t.id || idx}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 12,
+                        padding: '10px 0',
+                        borderTop: idx === 0 ? 'none' : '1px solid var(--line)',
+                      }}
+                    >
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div
+                          style={{
+                            fontFamily: 'var(--font-ui)',
+                            fontSize: 15,
+                            fontWeight: 600,
+                            color: 'var(--ink)',
+                            overflow: 'hidden',
+                            textOverflow: 'ellipsis',
+                            whiteSpace: 'nowrap',
+                          }}
+                        >
+                          {t.title || 'Revenue'}
+                        </div>
+                        <div style={{ fontFamily: 'var(--font-ui)', fontSize: 13, color: 'var(--ink-3)' }}>
+                          {relativeTime(t.date || t.createdAt)}
+                        </div>
+                      </div>
+                      <div
+                        className="tnum"
+                        style={{
+                          fontFamily: 'var(--font-display)',
+                          fontSize: 16,
+                          fontWeight: 700,
+                          color: 'var(--status-success)',
+                          flexShrink: 0,
+                        }}
+                      >
+                        +{formatInr(Math.abs(Number(t.amount || t.totalAmount || 0)))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </BtCard>
           </div>
 
-          {/* Quick Actions Grid */}
-          <div className="tour-quick-actions">
-            <BtSectionHeader title="Quick Actions" caption />
-            <div
-              style={{
-                display: 'grid',
-                gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
-                gap: '14px',
-              }}
-            >
-              {[
-                {
-                  label: 'Add Entry',
-                  desc: 'Log expense or labour',
-                  icon: PlusCircle,
-                  path: '/add-entry',
-                  tone: 'brand',
-                },
-                {
-                  label: 'Voice Entry',
-                  desc: 'Record via AI Foreman',
-                  icon: Mic,
-                  path: '/voice',
-                  tone: 'brand',
-                },
-                {
-                  label: 'Manual Entry',
-                  desc: 'Direct granular form',
-                  icon: FileText,
-                  path: '/manualentry',
-                  tone: 'brand',
-                },
-                {
-                  label: 'View Projects',
-                  desc: 'All sites & phases',
-                  icon: Building2,
-                  path: '/projects',
-                  tone: 'brand',
-                },
-              ].map((act) => {
-                const Icon = act.icon;
-                return (
-                  <BtCard
-                    key={act.label}
-                    onClick={() => navigate(act.path)}
-                    padding="18px 20px"
-                    style={{ display: 'flex', alignItems: 'center', gap: '14px' }}
-                  >
-                    <div
-                      style={{
-                        width: '42px',
-                        height: '42px',
-                        borderRadius: 'var(--r-tile)',
-                        background: 'var(--fill)',
-                        color: 'var(--ink)',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        flexShrink: 0,
-                      }}
-                    >
-                      <Icon size={20} strokeWidth={1.8} />
-                    </div>
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div
-                        style={{
-                          fontFamily: 'var(--font-ui)',
-                          fontSize: '15px',
-                          fontWeight: 700,
-                          color: 'var(--ink)',
-                        }}
-                      >
-                        {act.label}
-                      </div>
-                      <div
-                        style={{
-                          fontFamily: 'var(--font-ui)',
-                          fontSize: '12px',
-                          color: 'var(--ink-3)',
-                          marginTop: '2px',
-                        }}
-                      >
-                        {act.desc}
-                      </div>
-                    </div>
-                    <ChevronRight size={16} color="var(--ink-3)" />
-                  </BtCard>
-                );
-              })}
-            </div>
-          </div>
-
-          {/* Recent Activity & Team Approvals Section */}
-          <div
-            style={{
-              display: 'grid',
-              gridTemplateColumns: 'repeat(auto-fit, minmax(360px, 1fr))',
-              gap: '24px',
-            }}
-          >
-            {/* Recent Entries */}
-            <div className="tour-recent-activity">
-              <BtSectionHeader
-                title="Recent activity"
-                action="View all"
-                onAction={() => navigate('/transaction')}
-              />
+          {/* Recent activity + approval history */}
+          <div className="bt-grid-2" style={{ alignItems: 'start', gap: 24 }}>
+            <section className="tour-recent-activity">
+              <BtSectionHeader title="Recent activity" action="View all" onAction={() => navigate('/transaction')} />
               {recentEntries.length === 0 ? (
                 <BtCard>
                   <BtEmpty
@@ -1133,45 +855,37 @@ export default function AdminDashboard() {
                     return (
                       <BtRow
                         key={entry._id || entry.id || idx}
+                        className="bt-hover-row"
+                        role="button"
+                        tabIndex={0}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' || e.key === ' ') {
+                            e.preventDefault();
+                            navigate('/entry-detail', { state: { entry } });
+                          }
+                        }}
                         icon={<BtTypeTile type={entry.type} size={38} />}
                         title={entry.title || entry.name || entry.type || 'Entry'}
-                        subtitle={`${pName ? `${pName} • ` : ''}${relativeTime(entry.date || entry.createdAt)}`}
-                        tag={
-                          <BtBadge
-                            label={entry.type || 'Material'}
-                            tone={
-                              entry.type === 'Wages' || entry.type === 'Labour'
-                                ? 'green'
-                                : entry.type === 'Expense' || entry.type === 'Equipment'
-                                ? 'amber'
-                                : entry.type === 'Income'
-                                ? 'green'
-                                : 'brand'
-                            }
-                          />
-                        }
+                        subtitle={`${pName ? `${pName} · ` : ''}${relativeTime(entry.date || entry.createdAt)}`}
+                        tag={<BtBadge label={entry.type || 'Material'} tone={entry.type || 'material'} />}
                         amount={Math.abs(amt)}
+                        amountColor={entry.type === 'Income' ? 'var(--status-success)' : undefined}
                         onClick={() => navigate('/entry-detail', { state: { entry } })}
                       />
                     );
                   })}
                 </BtGroup>
               )}
-            </div>
+            </section>
 
-            {/* Team Approval History */}
-            <div className="tour-approvals-history">
-              <BtSectionHeader
-                title="Team Approval History"
-                action="Approvals hub"
-                onAction={() => navigate('/approvals')}
-              />
+            <section className="tour-approvals-history">
+              <BtSectionHeader title="Team approvals" action="Approvals hub" onAction={() => navigate('/approvals')} />
               {filteredApprovalHistory.length === 0 ? (
                 <BtCard>
                   <BtEmpty
                     icon={CheckCircle2}
                     title="No approval history"
-                    message="Logged approvals and rejections will be archived here."
+                    message="Approvals and rejections will be listed here."
                   />
                 </BtCard>
               ) : (
@@ -1179,39 +893,29 @@ export default function AdminDashboard() {
                   {filteredApprovalHistory.slice(0, 5).map((h, idx) => {
                     const actionedBy = h.actionedBy?.name || h.reviewedBy?.name || 'Admin';
                     const submitter = h.submitter?.name || h.createdBy?.name || 'Worker';
-                    const isApproved =
-                      (h.approvalStatus || h.status)?.toLowerCase() === 'approved';
+                    const isApproved = (h.approvalStatus || h.status)?.toLowerCase() === 'approved';
 
                     return (
                       <BtRow
                         key={h._id || idx}
                         icon={
                           isApproved ? (
-                            <CheckCircle2 size={18} color="var(--tone-green)" />
+                            <CheckCircle2 size={18} color="var(--status-success)" />
                           ) : (
-                            <XCircle size={18} color="var(--status-danger-bright)" />
+                            <XCircle size={18} color="var(--status-danger)" />
                           )
                         }
-                        iconBg={
-                          isApproved
-                            ? 'var(--tone-green-bg)'
-                            : 'rgba(239, 68, 68, 0.1)'
-                        }
+                        iconBg={isApproved ? 'var(--status-success-soft)' : 'var(--status-danger-soft)'}
                         title={h.title || 'Submission'}
-                        subtitle={`Submitted by ${submitter} • ${isApproved ? 'Approved' : 'Rejected'} by ${actionedBy}`}
-                        tag={
-                          <BtBadge
-                            label={isApproved ? 'Approved' : 'Rejected'}
-                            tone={isApproved ? 'green' : 'red'}
-                          />
-                        }
+                        subtitle={`${submitter} · ${isApproved ? 'approved' : 'rejected'} by ${actionedBy}`}
+                        tag={<BtBadge label={isApproved ? 'Approved' : 'Rejected'} tone={isApproved ? 'success' : 'danger'} />}
                         amount={h.amount ? Number(h.amount) : undefined}
                       />
                     );
                   })}
                 </BtGroup>
               )}
-            </div>
+            </section>
           </div>
         </div>
       </BtSheet>
@@ -1220,13 +924,7 @@ export default function AdminDashboard() {
         open={addRevenueModalOpen}
         projects={projects}
         onClose={() => setAddRevenueModalOpen(false)}
-        onSaved={() => {
-          if (selectedProjectId === 'all') {
-            fetchTransactions({});
-          } else {
-            fetchTransactions({ project: selectedProjectId });
-          }
-        }}
+        onSaved={refreshTransactions}
       />
     </div>
   );

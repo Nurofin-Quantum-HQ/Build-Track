@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useRef } from 'react';
+import { isFullMotion } from '../../utils/motion';
 
 const BRICKS = [
   { left: 0, bottom: 0, width: 19 },
@@ -27,7 +28,7 @@ export default function BtBrickLoader({
 
   useEffect(() => {
     // Check prefers-reduced-motion
-    if (typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+    if (!isFullMotion()) {
       setProgress(0.5);
       return;
     }
@@ -128,7 +129,8 @@ export default function BtBrickLoader({
   );
 }
 
-export function BtPageLoader({ label = 'Loading…', onDark = false }) {
+export function BtPageLoader({ label, message, onDark = false }) {
+  label = label || message || 'Loading…';
   return (
     <div
       style={{

@@ -1,33 +1,109 @@
 import { useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { Card, Badge, Button, Spinner, Toast, ConfirmDialog } from '../components/ui';
 import { transactionAPI, approvalAPI } from '../api';
 import RecordPaymentSheet from '../components/RecordPaymentSheet';
+import ConfirmDialog from '../components/ui/ConfirmDialog';
 import { useAuth } from '../contexts/AuthContext';
+import BtHero from '../components/ui/BtHero';
+import BtSheet from '../components/ui/BtSheet';
+import BtPageHeader from '../components/ui/BtPageHeader';
+import BtCard from '../components/ui/BtCard';
+import BtBadge from '../components/ui/BtBadge';
+import BtButton from '../components/ui/BtButton';
+import BtEmpty from '../components/ui/BtEmpty';
+import BtProgress from '../components/ui/BtProgress';
+import btToast from '../components/ui/BtToast';
+import { formatInr } from '../components/ui/BtCountUp';
 import {
-  Package, User, Wrench, IndianRupee, ArrowLeft, Trash2, Calendar,
-  CreditCard, Building2, Hash, FileText, AlertTriangle, CheckCircle,
-  XCircle, Clock, MapPin, Phone, UserCheck, FileCheck, ExternalLink,
-  Receipt, PlusCircle
+  Package, User, Wrench, IndianRupee, Trash2, Calendar,
+  CreditCard, Building2, Hash, FileText, AlertTriangle,
+  CheckCircle, XCircle, Clock, MapPin, Phone, UserCheck, FileCheck,
+  ExternalLink, Receipt, Pencil, ArrowLeft,
 } from 'lucide-react';
 
-const typeConfig = {
-  Materials: { label: 'Material', bg: 'rgba(42, 120, 214, 0.1)', color: '#2A78D6', icon: <Package size={18} /> },
-  Wages: { label: 'Labour', bg: 'rgba(235, 104, 52, 0.1)', color: '#EB6834', icon: <User size={18} /> },
-  Expense: { label: 'Equipment', bg: 'rgba(25, 158, 112, 0.1)', color: '#199E70', icon: <Wrench size={18} /> },
-  Income: { label: 'Income', bg: 'rgba(16, 185, 129, 0.1)', color: '#10B981', icon: <IndianRupee size={18} /> },
+// Raw API types (Materials / Wages / Expense / Income) and the lowercase
+// names the report mapper produces both resolve to one config.
+const TYPE_CONFIG = {
+  material: { label: 'Material', tone: 'material', color: 'var(--type-material)', bg: 'var(--type-material-soft)', icon: Package },
+  labour: { label: 'Labour', tone: 'labour', color: 'var(--type-labour)', bg: 'var(--type-labour-soft)', icon: User },
+  equipment: { label: 'Equipment', tone: 'equipment', color: 'var(--type-equipment)', bg: 'var(--type-equipment-soft)', icon: Wrench },
+  income: { label: 'Income', tone: 'income', color: 'var(--type-income)', bg: 'var(--type-income-soft)', icon: IndianRupee },
 };
+const TYPE_ALIASES = { materials: 'material', wages: 'labour', expense: 'equipment' };
 
-function formatCurrency(amount) {
-  return '\u20B9' + Number(amount || 0).toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 2 });
+function resolveType(type) {
+  const key = String(type || '').toLowerCase();
+  return TYPE_CONFIG[TYPE_ALIASES[key] || key] || null;
 }
 
 function formatDate(dateStr) {
-  if (!dateStr) return '\u2014';
-  try {
-    const d = new Date(dateStr);
-    return d.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
-  } catch { return dateStr; }
+  if (!dateStr) return '—';
+  const d = new Date(dateStr);
+  if (isNaN(d.getTime())) return String(dateStr);
+  return d.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
+}
+
+function paymentTone(status) {
+  const s = String(status || '').toLowerCase();
+  if (s === 'paid' || s === 'fully paid') return 'success';
+  if (s === 'partial') return 'warning';
+  return 'danger';
+}
+
+function paymentLabel(status) {
+  const s = String(status || '').toLowerCase();
+  if (s === 'paid' || s === 'fully paid') return 'Fully paid';
+  if (s === 'partial') return 'Partial';
+  if (!s) return 'Not paid';
+  return 'Not paid';
+}
+
+const sectionTitleStyle = {
+  margin: 0,
+  fontFamily: 'var(--font-ui)',
+  fontSize: 16,
+  fontWeight: 600,
+  color: 'var(--ink)',
+  display: 'flex',
+  alignItems: 'center',
+  gap: 8,
+};
+
+function Section({ title, icon: Icon, action, badge, children }) {
+  return (
+    <BtCard padding="20px 22px" style={{ marginBottom: 16 }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', marginBottom: 16 }}>
+        <h3 style={sectionTitleStyle}>
+          {Icon && <Icon size={17} strokeWidth={1.9} color="var(--ink-2)" />}
+          {title}
+        </h3>
+        {badge || action || null}
+      </div>
+      {children}
+    </BtCard>
+  );
+}
+
+function StatTile({ label, value, color }) {
+  return (
+    <div style={{ background: 'var(--bone)', border: '1px solid var(--line)', borderRadius: 'var(--r-tile)', padding: '12px 14px', minWidth: 0 }}>
+      <div className="bt-eyebrow" style={{ color: 'var(--ink-3)' }}>{label}</div>
+      <div
+        className="tnum"
+        style={{
+          fontFamily: 'var(--font-display)',
+          fontSize: 22,
+          fontWeight: 700,
+          letterSpacing: '-0.02em',
+          color: color || 'var(--ink)',
+          marginTop: 4,
+          overflowWrap: 'anywhere',
+        }}
+      >
+        {value}
+      </div>
+    </div>
+  );
 }
 
 export default function EntryDetailPage({ entryData, onCloseModal, isModal = false }) {
@@ -41,236 +117,251 @@ export default function EntryDetailPage({ entryData, onCloseModal, isModal = fal
 
   const [deleting, setDeleting] = useState(false);
   const [showDelete, setShowDelete] = useState(false);
-  const [deleted, setDeleted] = useState(false);
   const [showPaymentSheet, setShowPaymentSheet] = useState(false);
-  const [toastMsg, setToastMsg] = useState("");
+
+  const goBack = () => (isModal ? onCloseModal?.() : navigate(-1));
 
   if (!entry) {
     return (
-      <div style={{ padding: '40px 28px', textAlign: 'center' }}>
-        <AlertTriangle size={48} color="#CBD5E1" style={{ marginBottom: 16 }} />
-        <h3 style={{ color: '#111827', margin: '0 0 8px', fontWeight: 700 }}>No Entry Data</h3>
-        <p style={{ color: '#64748B', marginBottom: 20 }}>Please navigate here from a transaction or entry list.</p>
-        <Button variant="secondary" size="md" onClick={() => (isModal ? onCloseModal : () => navigate(-1))()}>
-          <ArrowLeft size={14} /> Go Back
-        </Button>
+      <div style={{ background: 'var(--ground)', minHeight: isModal ? undefined : '100vh' }}>
+        {!isModal && (
+          <BtHero>
+            <BtPageHeader eyebrow="Entry details" title="Entry details" subtitle="Open an entry from Log or Reports to see it here." />
+          </BtHero>
+        )}
+        <BtSheet overlap={isModal ? 0 : 26}>
+          <BtCard padding="8px">
+            <BtEmpty
+              icon={AlertTriangle}
+              title="No entry selected"
+              message="Open an entry from the Log or Reports page to see its details."
+              actionLabel="Go back"
+              onAction={goBack}
+            />
+          </BtCard>
+        </BtSheet>
       </div>
     );
   }
 
-  if (deleted) {
-    return (
-      <div style={{ padding: '40px 28px', textAlign: 'center' }}>
-        <CheckCircle size={48} color="#22C55E" style={{ marginBottom: 16 }} />
-        <h3 style={{ color: '#111827', margin: '0 0 8px', fontWeight: 700 }}>Entry Deleted</h3>
-        <p style={{ color: '#64748B', marginBottom: 20 }}>This entry has been successfully removed.</p>
-        <Button variant="secondary" size="md" onClick={() => (isModal ? onCloseModal : () => navigate(-1))()}>
-          <ArrowLeft size={14} /> Go Back
-        </Button>
-      </div>
-    );
-  }
+  const tc = resolveType(entry.type) || { label: 'Entry', tone: 'neutral', color: 'var(--ink-2)', bg: 'var(--fill)', icon: FileText };
+  const TypeIcon = tc.icon;
+  const isIncome = tc.tone === 'income';
+  const role = (user?.role || '').toLowerCase();
+  // The server only accepts deletes from Admins or users holding `delete_entry`.
+  const canDelete = role === 'admin' || can('delete_entry');
+  const canRecordPayment = can('mark_paid') || can('approve_payments') || role === 'admin';
 
-  const tc = typeConfig[entry.type] || { label: 'Entry', bg: '#F1F5F9', color: '#64748B', icon: <FileText size={18} /> };
-  const canDelete = (user?.role || '').toLowerCase() === 'admin' || can('delete_project');
-  const canRecordPayment = can('mark_paid') || can('approve_payments') || (user?.role || '').toLowerCase() === 'admin';
-
+  const entryId = entry._id || entry.id;
   const totalAmt = Number(entry.amount || 0);
   const paidAmt = Number(entry.paidAmount || 0);
   const outstandingAmt = Math.max(0, totalAmt - paidAmt);
 
   const gstPct = Number(entry.gstPercentage || entry.gst || 0);
   const isWithGst = Boolean(entry.isWithGst || gstPct > 0);
-  const taxableBase = isWithGst && gstPct > 0 ? (totalAmt / (1 + gstPct / 100)) : totalAmt;
+  const taxableBase = isWithGst && gstPct > 0 ? totalAmt / (1 + gstPct / 100) : totalAmt;
   const gstTaxAmt = totalAmt - taxableBase;
 
   const paymentHistory = entry.paymentHistory || [];
+  const projectName = entry.project?.projectName || entry.projectName || '';
 
   const fields = [
-    { icon: <Calendar size={14} />, label: 'Date', value: formatDate(entry.date) },
-    { icon: <Hash size={14} />, label: 'Entry ID', value: entry._id || entry.id || '\u2014' },
-    { icon: <Building2 size={14} />, label: 'Project', value: entry.project?.projectName || entry.projectName || '\u2014' },
-    { icon: <MapPin size={14} />, label: 'Location/Site', value: entry.site || entry.location || '\u2014' },
-    { icon: <User size={14} />, label: 'Supplier/Vendor', value: entry.supplier || entry.vendor || entry.contractor || entry.workerName || '\u2014' },
-    { icon: <UserCheck size={14} />, label: 'Operator/Worker', value: entry.operator || entry.workerName || '\u2014' },
-    { icon: <Phone size={14} />, label: 'Contact', value: entry.contact || entry.phone || '\u2014' },
-    { icon: <FileText size={14} />, label: 'Category', value: entry.category || entry.materialType || entry.workType || '\u2014' },
-    { icon: <Package size={14} />, label: 'Quantity', value: entry.quantity ? `${entry.quantity} ${entry.unit || ''}` : '\u2014' },
-    { icon: <CreditCard size={14} />, label: 'Rate', value: entry.rate ? formatCurrency(entry.rate) : '\u2014' },
-    { icon: <IndianRupee size={14} />, label: 'Total Amount', value: formatCurrency(entry.amount), highlight: true },
-    { icon: <CheckCircle size={14} />, label: 'Payment Status', value: entry.paymentStatus || '\u2014' },
+    { icon: Calendar, label: 'Date', value: formatDate(entry.date) },
+    { icon: Hash, label: 'Entry ID', value: entryId || '—', mono: true },
+    { icon: Building2, label: 'Project', value: projectName || 'No project', dim: !projectName },
+    { icon: MapPin, label: 'Location / site', value: entry.site || entry.location || '—' },
+    { icon: User, label: 'Supplier / vendor', value: entry.supplier || entry.vendor || entry.contractor || entry.workerName || '—' },
+    { icon: UserCheck, label: 'Operator / worker', value: entry.operator || entry.workerName || '—' },
+    { icon: Phone, label: 'Contact', value: entry.contact || entry.phone || '—' },
+    { icon: FileText, label: 'Category', value: entry.category || entry.materialType || entry.workType || '—' },
+    { icon: Package, label: 'Quantity', value: entry.quantity ? `${entry.quantity} ${entry.unit || ''}`.trim() : '—' },
+    { icon: CreditCard, label: 'Rate', value: entry.rate ? formatInr(entry.rate) : '—' },
+    { icon: IndianRupee, label: 'Total amount', value: formatInr(totalAmt), strong: true },
+    { icon: CheckCircle, label: 'Payment status', value: entry.paymentStatus ? paymentLabel(entry.paymentStatus) : '—' },
   ];
 
   const handleApprove = async () => {
     setApproving(true);
     try {
-      await approvalAPI.approve(entry._id || entry.id);
-      setToastMsg("Entry approved successfully");
+      await approvalAPI.approve(entryId);
+      btToast('Entry approved');
       setIsPending(false);
-    } catch { setToastMsg("Failed to approve"); }
-    finally { setApproving(false); }
+    } catch {
+      btToast('Could not approve this entry', { error: true });
+    } finally {
+      setApproving(false);
+    }
   };
 
   const handleReject = async () => {
     setRejecting(true);
     try {
-      await approvalAPI.reject(entry._id || entry.id, "Rejected by manager");
-      setToastMsg("Entry rejected");
+      await approvalAPI.reject(entryId, 'Rejected by manager');
+      btToast('Entry rejected');
       setIsPending(false);
-      (isModal ? onCloseModal : () => navigate(-1))();
-    } catch { setToastMsg("Failed to reject"); }
-    finally { setRejecting(false); }
+      goBack();
+    } catch {
+      btToast('Could not reject this entry', { error: true });
+    } finally {
+      setRejecting(false);
+    }
   };
 
   const handleDelete = async () => {
+    if (deleting) return;
     setDeleting(true);
+    setShowDelete(false);
     try {
-      await transactionAPI.delete(entry._id || entry.id);
-      setDeleted(true);
+      await transactionAPI.delete(entryId);
+      btToast('Entry deleted');
+      goBack();
     } catch {
       setDeleting(false);
-      setShowDelete(false);
+      btToast('Could not delete this entry', { error: true });
     }
   };
 
   const handlePaymentSaved = async (msg) => {
-    setToastMsg(msg);
+    btToast(msg || 'Payment recorded');
     try {
-      const res = await transactionAPI.getById(entry._id || entry.id);
+      const res = await transactionAPI.getById(entryId);
       if (res.data?.transaction) {
         setEntry(res.data.transaction);
       }
     } catch {
-
+      // the saved payment is already confirmed by the toast; the next load will refresh the totals
     }
-    setTimeout(() => setToastMsg(""), 4000);
   };
 
-  return (
-    <div style={{ padding: '24px 28px', maxWidth: 680, margin: '0 auto', fontFamily: "Inter, 'Segoe UI', sans-serif" }}>
-      {toastMsg && (
-        <div style={{ background: "#F0FDF4", border: "1px solid #BBF7D0", borderRadius: 8, padding: "10px 14px", color: "#166534", fontSize: 13, marginBottom: 16, display: "flex", alignItems: "center", gap: 8 }}>
-          <CheckCircle size={14} /> {toastMsg}
-        </div>
-      )}
+  const deleteButton = canDelete ? (
+    <BtButton variant={isModal ? 'destructive' : 'onDark'} size="small" icon={Trash2} onClick={() => setShowDelete(true)} disabled={deleting}>
+      Delete
+    </BtButton>
+  ) : null;
 
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 24 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-          <button onClick={() => (isModal ? onCloseModal : () => navigate(-1))()}
-            style={{ border: 'none', background: '#F1F5F9', cursor: 'pointer', width: 36, height: 36, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#475569' }}>
-            <ArrowLeft size={16} />
-          </button>
-          <div>
-            <h2 style={{ fontSize: 20, fontWeight: 700, color: '#111827', margin: 0, letterSpacing: '-0.03em' }}>Entry Details</h2>
-            <p style={{ fontSize: 12, color: '#64748B', margin: '2px 0 0' }}>{entry.title || tc.label}</p>
-          </div>
-        </div>
-        {true && (
-          <button onClick={() => setShowDelete(true)}
-            style={{ border: '1px solid #FECACA', borderRadius: 8, padding: '8px 14px', background: '#fff', color: '#EF4444', fontSize: 12, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6, fontFamily: 'inherit' }}>
-            <Trash2 size={14} /> Delete
-          </button>
-        )}
-      </div>
-
-      <Card padding="20px" style={{ marginBottom: 16 }}>
-        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 16 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-            <div style={{ width: 44, height: 44, borderRadius: 10, background: tc.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', color: tc.color }}>
-              {tc.icon}
+  const body = (
+    <div style={{ maxWidth: isModal ? undefined : 960, margin: '0 auto' }}>
+      {/* Summary */}
+      <BtCard padding="22px" style={{ marginBottom: 16 }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 14, minWidth: 0 }}>
+            <div
+              aria-hidden="true"
+              style={{ width: 52, height: 52, borderRadius: 'var(--r-input)', background: tc.bg, color: tc.color, display: 'grid', placeItems: 'center', flexShrink: 0 }}
+            >
+              <TypeIcon size={22} strokeWidth={1.9} />
             </div>
-            <div>
-              <Badge variant={entry.type === 'Wages' ? 'success' : entry.type === 'Expense' ? 'warning' : 'info'} size="sm">{tc.label}</Badge>
-              <div style={{ fontSize: 14, fontWeight: 600, color: '#111827', marginTop: 6 }}>{entry.title || 'Untitled Entry'}</div>
+            <div style={{ minWidth: 0 }}>
+              <BtBadge tone={tc.tone} label={tc.label} />
+              <div style={{ fontFamily: 'var(--font-ui)', fontSize: 17, fontWeight: 600, color: 'var(--ink)', marginTop: 8, overflowWrap: 'anywhere' }}>
+                {entry.title || 'Untitled entry'}
+              </div>
             </div>
           </div>
           <div style={{ textAlign: 'right' }}>
-            <div style={{ fontSize: 22, fontWeight: 700, color: entry.type === 'Income' ? '#22C55E' : '#111827', letterSpacing: '-0.03em' }}>
-              {entry.type === 'Income' ? '+' : '-'}{formatCurrency(entry.amount)}
+            <div
+              className="tnum"
+              style={{
+                fontFamily: 'var(--font-display)',
+                fontSize: 32,
+                fontWeight: 700,
+                letterSpacing: '-0.03em',
+                color: isIncome ? 'var(--status-success)' : 'var(--ink)',
+                lineHeight: 1.1,
+              }}
+            >
+              {isIncome ? '+' : ''}{formatInr(totalAmt)}
             </div>
-            <Badge variant={entry.paymentStatus === 'Paid' ? 'success' : entry.paymentStatus === 'Partial' ? 'warning' : 'info'} size="sm">{entry.paymentStatus || '\u2014'}</Badge>
+            <div style={{ marginTop: 8 }}>
+              <BtBadge tone={paymentTone(entry.paymentStatus)} label={entry.paymentStatus ? paymentLabel(entry.paymentStatus) : 'Not paid'} />
+            </div>
           </div>
         </div>
-      </Card>
+      </BtCard>
 
-      <Card padding="20px" style={{ marginBottom: 16, background: '#FAFAFA', border: '1px solid #E5E7EB' }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
-          <div style={{ fontSize: 13, fontWeight: 700, color: '#111827', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Payment Summary</div>
-          {canRecordPayment && outstandingAmt > 0 && (
-            <button onClick={() => setShowPaymentSheet(true)}
-              style={{ border: 'none', background: 'var(--ink, #111317)', color: 'var(--bone, #F2F0EB)', padding: '7px 14px', borderRadius: 'var(--r-btn, 10px)', fontSize: 12, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}>
-              <Receipt size={14} /> Record Payment
-            </button>
-          )}
+      {/* Payment summary */}
+      <Section
+        title="Payment summary"
+        icon={Receipt}
+        action={
+          canRecordPayment && outstandingAmt > 0 ? (
+            <BtButton variant="primary" size="small" icon={Receipt} onClick={() => setShowPaymentSheet(true)}>
+              Record payment
+            </BtButton>
+          ) : null
+        }
+      >
+        <div className="bt-grid-3">
+          <StatTile label="Total bill" value={formatInr(totalAmt)} />
+          <StatTile label="Paid" value={formatInr(paidAmt)} color="var(--status-success)" />
+          <StatTile label="Outstanding" value={formatInr(outstandingAmt)} color={outstandingAmt > 0 ? 'var(--status-danger)' : 'var(--status-success)'} />
         </div>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12 }}>
-          <div style={{ background: '#fff', padding: '10px 12px', borderRadius: 8, border: '1px solid #E5E7EB' }}>
-            <div style={{ fontSize: 11, color: '#64748B', fontWeight: 600 }}>TOTAL BILL</div>
-            <div style={{ fontSize: 15, fontWeight: 700, color: '#111827', marginTop: 2 }}>{formatCurrency(totalAmt)}</div>
+        {totalAmt > 0 && (
+          <div style={{ marginTop: 16 }}>
+            <BtProgress value={Math.min(1, paidAmt / totalAmt)} color="var(--status-success-bright)" />
+            <div style={{ fontSize: 13, color: 'var(--ink-3)', marginTop: 6 }}>
+              {Math.round(Math.min(1, paidAmt / totalAmt) * 100)}% of the bill is paid
+            </div>
           </div>
-          <div style={{ background: '#fff', padding: '10px 12px', borderRadius: 8, border: '1px solid #E5E7EB' }}>
-            <div style={{ fontSize: 11, color: '#166534', fontWeight: 600 }}>PAID AMOUNT</div>
-            <div style={{ fontSize: 15, fontWeight: 700, color: '#166534', marginTop: 2 }}>{formatCurrency(paidAmt)}</div>
-          </div>
-          <div style={{ background: '#fff', padding: '10px 12px', borderRadius: 8, border: '1px solid #E5E7EB' }}>
-            <div style={{ fontSize: 11, color: '#DC2626', fontWeight: 600 }}>OUTSTANDING</div>
-            <div style={{ fontSize: 15, fontWeight: 700, color: '#DC2626', marginTop: 2 }}>{formatCurrency(outstandingAmt)}</div>
-          </div>
-        </div>
-      </Card>
+        )}
+      </Section>
 
       {isWithGst && (
-        <Card padding="20px" style={{ marginBottom: 16, border: '1px solid #E2E8F0' }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
-            <div style={{ fontSize: 13, fontWeight: 700, color: '#111827', textTransform: 'uppercase', letterSpacing: '0.05em', display: 'flex', alignItems: 'center', gap: 6 }}>
-              <FileCheck size={16} color="var(--ink, #111317)" /> GST & Tax Breakdown
-            </div>
-            <Badge variant="info" size="sm">{gstPct > 0 ? `${gstPct}% GST` : 'GST Included'}</Badge>
+        <Section
+          title="GST and tax"
+          icon={FileCheck}
+          badge={<BtBadge tone="brand" label={gstPct > 0 ? `${gstPct}% GST` : 'GST included'} />}
+        >
+          <div className="bt-grid-3">
+            <StatTile label="Taxable base" value={formatInr(taxableBase)} />
+            <StatTile label={`GST (${gstPct}%)`} value={formatInr(gstTaxAmt)} />
+            <StatTile label="Net total" value={formatInr(totalAmt)} />
           </div>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10, background: '#F8FAFC', padding: 12, borderRadius: 8 }}>
-            <div>
-              <div style={{ fontSize: 11, color: '#64748B' }}>Taxable Base</div>
-              <div style={{ fontSize: 14, fontWeight: 600, color: '#334155', marginTop: 2 }}>{formatCurrency(taxableBase)}</div>
-            </div>
-            <div>
-              <div style={{ fontSize: 11, color: '#64748B' }}>GST Tax ({gstPct}%)</div>
-              <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--ink, #111317)', marginTop: 2 }}>{formatCurrency(gstTaxAmt)}</div>
-            </div>
-            <div>
-              <div style={{ fontSize: 11, color: '#64748B' }}>Net Total</div>
-              <div style={{ fontSize: 14, fontWeight: 700, color: '#111827', marginTop: 2 }}>{formatCurrency(totalAmt)}</div>
-            </div>
-          </div>
-        </Card>
+        </Section>
       )}
 
-      <Card padding="20px" style={{ marginBottom: 16 }}>
-        <h3 style={{ fontSize: 14, fontWeight: 700, color: '#111827', margin: '0 0 14px', display: 'flex', alignItems: 'center', gap: 6 }}>
-          <Clock size={16} color="var(--ink, #111317)" /> Payment History Timeline ({paymentHistory.length})
-        </h3>
+      <Section title={`Payment history (${paymentHistory.length})`} icon={Clock}>
         {paymentHistory.length === 0 ? (
-          <div style={{ fontSize: 13, color: '#94A3B8', fontStyle: 'italic', textAlign: 'center', padding: '12px 0' }}>
-            No partial payments recorded yet.
+          <div style={{ fontSize: 14, color: 'var(--ink-3)', textAlign: 'center', padding: '8px 0' }}>
+            No payments recorded yet.
           </div>
         ) : (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+          <div style={{ display: 'flex', flexDirection: 'column' }}>
             {paymentHistory.map((log, idx) => (
-              <div key={idx} style={{ display: 'flex', gap: 12, paddingBottom: 12, borderBottom: idx < paymentHistory.length - 1 ? '1px dashed #E2E8F0' : 'none' }}>
-                <div style={{ width: 32, height: 32, borderRadius: '50%', background: '#FFF5F0', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--ink, #111317)', flexShrink: 0, fontSize: 12, fontWeight: 700 }}>
-                  #{idx + 1}
+              <div
+                key={idx}
+                style={{
+                  display: 'flex',
+                  gap: 14,
+                  padding: '14px 0',
+                  borderTop: idx === 0 ? 'none' : '1px solid var(--line)',
+                }}
+              >
+                <div
+                  className="tnum"
+                  style={{ width: 32, height: 32, borderRadius: '50%', background: 'var(--fill)', color: 'var(--ink-2)', display: 'grid', placeItems: 'center', flexShrink: 0, fontSize: 13, fontWeight: 600 }}
+                >
+                  {idx + 1}
                 </div>
-                <div style={{ flex: 1 }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <span style={{ fontSize: 14, fontWeight: 700, color: '#166534' }}>+{formatCurrency(log.amount)}</span>
-                    <span style={{ fontSize: 12, color: '#64748B' }}>{formatDate(log.date)}</span>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12 }}>
+                    <span className="tnum" style={{ fontFamily: 'var(--font-display)', fontSize: 17, fontWeight: 700, color: 'var(--status-success)' }}>
+                      +{formatInr(log.amount)}
+                    </span>
+                    <span style={{ fontSize: 13, color: 'var(--ink-3)' }}>{formatDate(log.date)}</span>
                   </div>
-                  <div style={{ fontSize: 12, color: '#475569', marginTop: 2, display: 'flex', gap: 8, alignItems: 'center' }}>
-                    <Badge variant="outline" size="sm">{log.method || 'Cash'}</Badge>
-                    {log.note && <span style={{ color: '#64748B' }}>{log.note}</span>}
+                  <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginTop: 6, flexWrap: 'wrap' }}>
+                    <BtBadge tone="neutral" showDot={false} label={log.method || 'Cash'} />
+                    {log.note && <span style={{ fontSize: 14, color: 'var(--ink-2)' }}>{log.note}</span>}
                   </div>
                   {log.receipt && (
-                    <a href={log.receipt} target="_blank" rel="noopener noreferrer" style={{ fontSize: 12, color: 'var(--ink, #111317)', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: 4, marginTop: 4, fontWeight: 600 }}>
-                      <ExternalLink size={12} /> View Receipt
+                    <a
+                      href={log.receipt}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      style={{ fontSize: 13.5, color: 'var(--accent-ink)', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: 5, marginTop: 8, fontWeight: 600 }}
+                    >
+                      <ExternalLink size={13} /> View receipt
                     </a>
                   )}
                 </div>
@@ -278,89 +369,131 @@ export default function EntryDetailPage({ entryData, onCloseModal, isModal = fal
             ))}
           </div>
         )}
-      </Card>
+      </Section>
 
-      <Card padding="20px" style={{ marginBottom: 16 }}>
-        <h3 style={{ fontSize: 14, fontWeight: 700, color: '#111827', margin: '0 0 14px' }}>Entry Information</h3>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 4 }}>
-          {fields.map((f, i) => (
-            <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 0', borderBottom: '1px solid #F8FAFC' }}>
-              <span style={{ color: '#94A3B8', display: 'flex', flexShrink: 0 }}>{f.icon}</span>
-              <div style={{ minWidth: 0 }}>
-                <div style={{ fontSize: 10, fontWeight: 600, color: '#94A3B8', letterSpacing: '0.03em', textTransform: 'uppercase' }}>{f.label}</div>
-                <div style={{ fontSize: 13, fontWeight: f.highlight ? 700 : 500, color: f.highlight ? 'var(--ink, #111317)' : '#111827' }}>{f.value}</div>
+      <Section title="Entry information" icon={FileText}>
+        <div className="bt-grid-2" style={{ columnGap: 28, rowGap: 0 }}>
+          {fields.map((f) => {
+            const FieldIcon = f.icon;
+            return (
+              <div key={f.label} style={{ display: 'flex', alignItems: 'flex-start', gap: 10, padding: '12px 0', borderBottom: '1px solid var(--line)', minWidth: 0 }}>
+                <FieldIcon size={15} strokeWidth={1.8} color="var(--ink-3)" style={{ marginTop: 2, flexShrink: 0 }} />
+                <div style={{ minWidth: 0 }}>
+                  <div className="bt-eyebrow" style={{ color: 'var(--ink-3)' }}>{f.label}</div>
+                  <div
+                    className={f.strong ? 'tnum' : undefined}
+                    style={{
+                      fontSize: 15,
+                      fontWeight: f.strong ? 700 : 500,
+                      color: f.dim ? 'var(--ink-3)' : 'var(--ink)',
+                      marginTop: 3,
+                      overflowWrap: 'anywhere',
+                      fontFamily: f.mono ? 'var(--font-mono)' : undefined,
+                      ...(f.mono ? { fontSize: 13 } : {}),
+                    }}
+                  >
+                    {f.value}
+                  </div>
+                </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
-      </Card>
+      </Section>
 
       {entry.notes && (
-        <Card padding="20px" style={{ marginBottom: 16 }}>
-          <h3 style={{ fontSize: 14, fontWeight: 700, color: '#111827', margin: '0 0 10px' }}>Notes</h3>
-          <p style={{ fontSize: 13, color: '#475569', lineHeight: 1.6, margin: 0 }}>{entry.notes}</p>
-        </Card>
+        <Section title="Notes" icon={FileText}>
+          <p style={{ fontSize: 15, color: 'var(--ink-2)', lineHeight: 1.6, margin: 0, overflowWrap: 'anywhere' }}>{entry.notes}</p>
+        </Section>
       )}
 
-      {((entry.eSignStatus && entry.eSignStatus !== 'Not requested') || entry.signatureData) && (
-        <Card padding="20px" style={{ marginBottom: 16 }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-            <h3 style={{ fontSize: 14, fontWeight: 700, color: '#111827', margin: 0, display: 'flex', alignItems: 'center', gap: 6 }}>
-              <FileCheck size={16} color="#10B981" /> E-Signature Verification
-            </h3>
-            <Badge variant={entry.eSignStatus === 'Signed' || entry.signatureData ? 'success' : 'warning'} size="sm">
-              {entry.eSignStatus || (entry.signatureData ? 'Signed' : 'Pending')}
-            </Badge>
-          </div>
+      {((entry.eSignStatus && String(entry.eSignStatus).toLowerCase().replace(/[\s_-]/g, '') !== 'notrequested') || entry.signatureData) && (
+        <Section
+          title="E-signature"
+          icon={FileCheck}
+          badge={
+            <BtBadge
+              tone={entry.eSignStatus === 'Signed' || entry.signatureData ? 'success' : 'warning'}
+              label={entry.eSignStatus || (entry.signatureData ? 'Signed' : 'Pending')}
+            />
+          }
+        >
           {entry.signatureData ? (
-            <div style={{ background: '#F8FAFC', borderRadius: 8, padding: 16, display: 'flex', justifyContent: 'center', border: '1px dashed #CBD5E1' }}>
-              <img 
-                src={entry.signatureData.startsWith('data:image') ? entry.signatureData : `data:image/png;base64,${entry.signatureData}`} 
-                alt="E-Signature" 
-                style={{ maxHeight: 120, maxWidth: '100%', objectFit: 'contain' }} 
+            <div style={{ background: 'var(--bone)', borderRadius: 'var(--r-tile)', padding: 16, display: 'flex', justifyContent: 'center', border: '1px dashed var(--input-border)' }}>
+              <img
+                src={entry.signatureData.startsWith('data:image') ? entry.signatureData : `data:image/png;base64,${entry.signatureData}`}
+                alt="E-signature"
+                style={{ maxHeight: 120, maxWidth: '100%', objectFit: 'contain' }}
               />
             </div>
           ) : (
-            <div style={{ fontSize: 13, color: '#64748B', fontStyle: 'italic', padding: '12px 0', textAlign: 'center' }}>
-              Signature pending from field agent.
+            <div style={{ fontSize: 14, color: 'var(--ink-3)', padding: '8px 0', textAlign: 'center' }}>
+              Signature pending from the field agent.
             </div>
           )}
-        </Card>
+        </Section>
       )}
 
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+      {/* Actions */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginTop: 8 }}>
         {isPending && (
-          <div style={{ display: 'flex', gap: 10 }}>
-            <Button variant="danger" size="md" fullWidth onClick={handleReject} disabled={rejecting}>
-              <XCircle size={14} /> {rejecting ? '...' : 'Reject'}
-            </Button>
-            <Button variant="primary" size="md" fullWidth onClick={handleApprove} disabled={approving}>
-              <CheckCircle size={14} /> {approving ? '...' : 'Approve'}
-            </Button>
+          <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+            <BtButton variant="destructive" size="normal" icon={XCircle} loading={rejecting} disabled={approving} onClick={handleReject} style={{ flex: '1 1 180px' }}>
+              Reject
+            </BtButton>
+            <BtButton variant="primary" size="normal" icon={CheckCircle} loading={approving} disabled={rejecting} onClick={handleApprove} style={{ flex: '1 1 180px' }}>
+              Approve
+            </BtButton>
           </div>
         )}
-        <div style={{ display: 'flex', gap: 10 }}>
-          <Button variant="secondary" size="md" fullWidth onClick={() => navigate('/manualentry', { state: { transaction: { ...entry, isEditing: true } } })}>
-            <FileText size={14} /> Edit Entry
-          </Button>
-        </div>
+        <BtButton
+          variant="secondary"
+          size="normal"
+          icon={Pencil}
+          fullWidth
+          onClick={() => navigate('/manualentry', { state: { transaction: { ...entry, isEditing: true } } })}
+        >
+          Edit entry
+        </BtButton>
       </div>
+    </div>
+  );
 
-      {showDelete && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.35)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: 24 }}
-          onClick={() => setShowDelete(false)}>
-          <div style={{ background: '#fff', borderRadius: 12, padding: 24, maxWidth: 400, width: '100%' }} onClick={e => e.stopPropagation()}>
-            <h3 style={{ fontSize: 16, fontWeight: 700, color: '#111827', margin: '0 0 8px' }}>Delete Entry?</h3>
-            <p style={{ fontSize: 13, color: '#64748B', marginBottom: 20 }}>This action cannot be undone. Are you sure you want to delete this entry?</p>
-            <div style={{ display: 'flex', gap: 10 }}>
-              <Button variant="secondary" size="md" fullWidth onClick={() => setShowDelete(false)} disabled={deleting}>Cancel</Button>
-              <Button variant="danger" size="md" fullWidth onClick={handleDelete} disabled={deleting}>
-                {deleting ? 'Deleting...' : 'Delete'}
-              </Button>
-            </div>
+  return (
+    <div style={{ background: 'var(--ground)', minHeight: isModal ? undefined : '100vh', fontFamily: 'var(--font-ui)', color: 'var(--ink)' }}>
+      {isModal ? (
+        <div style={{ padding: '20px 24px 8px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12, minWidth: 0 }}>
+            <BtButton variant="secondary" size="small" icon={ArrowLeft} onClick={goBack}>Back</BtButton>
+            <h2 style={{ margin: 0, fontFamily: 'var(--font-display)', fontSize: 22, fontWeight: 700, letterSpacing: '-0.02em' }}>Entry details</h2>
           </div>
+          {deleteButton}
         </div>
+      ) : (
+        <BtHero>
+          <BtPageHeader
+            back={{ label: 'Back', onClick: goBack }}
+            eyebrow="Entry details"
+            title={entry.title || tc.label}
+            subtitle={`${projectName || 'No project'} · ${formatDate(entry.date)}`}
+            size="md"
+            actions={deleteButton}
+          />
+        </BtHero>
       )}
+
+      <BtSheet overlap={isModal ? 0 : 26} padding={isModal ? '16px 24px 40px' : '24px 28px 56px'}>
+        {body}
+      </BtSheet>
+
+      <ConfirmDialog
+        open={showDelete}
+        danger
+        message={`Delete "${entry.title || 'this entry'}"? This cannot be undone.`}
+        confirmLabel="Delete entry"
+        onConfirm={handleDelete}
+        onCancel={() => setShowDelete(false)}
+      />
 
       {showPaymentSheet && (
         <RecordPaymentSheet

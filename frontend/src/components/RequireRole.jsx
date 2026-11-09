@@ -1,14 +1,18 @@
-import { Navigate } from "react-router-dom";
+import { Navigate, useNavigate } from "react-router-dom";
+import { Lock, ArrowLeft } from "lucide-react";
+import BtButton from "./ui/BtButton";
 import { useAuth } from "../contexts/AuthContext";
 import BtBrickLoader from "./ui/BtBrickLoader";
+import { canAccessRoute } from "../utils/access";
 
 export default function RequireRole({ permission, route, children }) {
   const { user, loading, isAuthenticated, can } = useAuth();
+  const navigate = useNavigate();
 
   if (loading) {
     return (
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "center", minHeight: "100vh", background: "var(--bg, #0B0D10)" }}>
-        <BtBrickLoader label="Authenticating session..." />
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "center", minHeight: "60vh" }}>
+        <BtBrickLoader label="Checking access…" />
       </div>
     );
   }
@@ -16,14 +20,33 @@ export default function RequireRole({ permission, route, children }) {
   if (!isAuthenticated) return <Navigate to="/login" replace />;
 
   const AccessDenied = () => (
-    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', minHeight: 400, padding: 24, textAlign: 'center' }}>
-      <div style={{ width: 64, height: 64, borderRadius: 32, background: '#FEE2E2', color: '#EF4444', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 24 }}>
-        <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
+    <div style={{ display: "flex", alignItems: "center", justifyContent: "center", flex: 1, minHeight: 420, padding: 24 }}>
+      <div style={{ maxWidth: 420, textAlign: "center", display: "flex", flexDirection: "column", alignItems: "center", gap: 14 }}>
+        <div
+          style={{
+            width: 64,
+            height: 64,
+            borderRadius: "var(--r-card)",
+            background: "var(--noir)",
+            color: "var(--accent)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            boxShadow: "var(--shadow-raised)",
+          }}
+        >
+          <Lock size={26} strokeWidth={2} />
+        </div>
+        <h2 style={{ margin: 0, fontFamily: "var(--font-display)", fontSize: 24, fontWeight: 700, color: "var(--ink)", letterSpacing: "-0.02em" }}>
+          You don't have access to this page
+        </h2>
+        <p style={{ margin: 0, fontFamily: "var(--font-ui)", fontSize: 15, lineHeight: 1.5, color: "var(--ink-2)" }}>
+          Ask your workspace admin to turn on the right permission for you in Assign Roles.
+        </p>
+        <BtButton variant="primary" size="small" icon={ArrowLeft} onClick={() => navigate("/")} style={{ marginTop: 6 }}>
+          Back to dashboard
+        </BtButton>
       </div>
-      <h2 style={{ margin: '0 0 8px', fontSize: 24, fontWeight: 700, color: '#111827' }}>Access Restricted</h2>
-      <p style={{ margin: 0, color: '#6B7280', maxWidth: 400, fontSize: 15 }}>
-        You do not have permission to view this page. If you believe this is a mistake, please contact your administrator.
-      </p>
     </div>
   );
 
@@ -31,12 +54,8 @@ export default function RequireRole({ permission, route, children }) {
     return <AccessDenied />;
   }
 
-  if (!permission && route) {
-    const r = user?.role?.toLowerCase();
-    const isAdminOrSupervisor = r === "admin" || r === "supervisor";
-    if (!isAdminOrSupervisor) {
-      return <AccessDenied />;
-    }
+  if (route && !canAccessRoute(user, route)) {
+    return <AccessDenied />;
   }
 
   return children;

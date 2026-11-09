@@ -1,6 +1,5 @@
 import { useState, useCallback, useEffect } from "react";
 import {
-  ArrowLeft,
   CheckCircle,
   Upload,
   Smartphone,
@@ -8,11 +7,9 @@ import {
   Building2,
   CreditCard,
   FileText,
-  Calendar,
   X,
 } from "lucide-react";
-
-const primaryBlue = "var(--ink, #111317)";
+import { BtButton, BtField, BtTextarea, BtIconButton } from "./ui";
 
 const PAYMENT_METHODS = [
   { value: "UPI", icon: Smartphone },
@@ -23,19 +20,27 @@ const PAYMENT_METHODS = [
 ];
 
 const STATUS_OPTIONS = [
-  { key: "paid", label: "Fully Paid", color: "#15803D", bg: "#DCFCE7" },
-  { key: "partial", label: "Partial", color: "#B45309", bg: "#FEF3C7" },
-  { key: "pending", label: "Not Paid", color: "#DC2626", bg: "#FEE2E2" },
+  { key: "paid", label: "Fully paid", fg: "var(--status-success)", bg: "var(--status-success-soft)" },
+  { key: "partial", label: "Partial", fg: "var(--status-warning)", bg: "var(--status-warning-soft)" },
+  { key: "pending", label: "Not paid", fg: "var(--status-danger)", bg: "var(--status-danger-soft)" },
 ];
 
 function formatINR(n) {
-  return `\u20B9${Number(n || 0).toLocaleString("en-IN")}`;
+  return `₹${Number(n || 0).toLocaleString("en-IN")}`;
 }
 
 function parseAmount(val) {
   if (!val || val.trim() === "") return null;
   const num = parseFloat(val);
   return isNaN(num) ? null : num;
+}
+
+function Label({ children }) {
+  return (
+    <div className="bt-eyebrow" style={{ color: "var(--ink-3)", marginBottom: 8 }}>
+      {children}
+    </div>
+  );
 }
 
 export default function PayNowSheet({
@@ -47,6 +52,7 @@ export default function PayNowSheet({
   alreadyPaid = 0,
   onClose,
   onConfirm,
+  submitting = false,
 }) {
   const [selectedStatus, setSelectedStatus] = useState("pending");
   const [selectedMethod, setSelectedMethod] = useState("UPI");
@@ -191,6 +197,15 @@ export default function PayNowSheet({
     });
   };
 
+  useEffect(() => {
+    if (!open) return undefined;
+    const onKey = (e) => {
+      if (e.key === "Escape") onClose?.();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [open, onClose]);
+
   if (!open) return null;
 
   const displayError = amountError;
@@ -202,7 +217,7 @@ export default function PayNowSheet({
       style={{
         position: "fixed",
         inset: 0,
-        background: "rgba(0,0,0,0.5)",
+        background: "var(--scrim)",
         zIndex: 1100,
         display: "flex",
         alignItems: "flex-end",
@@ -213,289 +228,194 @@ export default function PayNowSheet({
       }}
     >
       <div
+        role="dialog"
+        aria-modal="true"
+        aria-label="Fulfillment and payment"
         style={{
-          background: "#F4F5FF",
-          borderRadius: "22px 22px 0 0",
+          background: "var(--ground)",
+          borderRadius: "var(--r-sheet) var(--r-sheet) 0 0",
           width: "100%",
-          maxWidth: 480,
+          maxWidth: 520,
           maxHeight: "92vh",
           display: "flex",
           flexDirection: "column",
-          boxShadow: "0 -8px 40px rgba(0,0,0,0.25)",
+          boxShadow: "var(--shadow-raised)",
           overflow: "hidden",
+          animation: "slideUp 300ms cubic-bezier(0.16, 1, 0.3, 1)",
         }}
         onClick={(e) => e.stopPropagation()}
       >
-        <div style={{ padding: "12px 0 4px", display: "flex", justifyContent: "center" }}>
-          <div style={{ width: 38, height: 4, borderRadius: 16, background: "#BDBEE8" }} />
+        <div style={{ padding: "12px 0 2px", display: "flex", justifyContent: "center" }}>
+          <div style={{ width: 44, height: 5, borderRadius: 99, background: "var(--input-border)" }} />
         </div>
 
-        <div style={{ padding: "12px 16px", display: "flex", alignItems: "center", gap: 14 }}>
-          <button
-            onClick={onClose}
-            style={{
-              width: 38,
-              height: 38,
-              borderRadius: 12,
-              background: "#FFF",
-              border: "1px solid #E2E4F6",
-              cursor: "pointer",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              flexShrink: 0,
-            }}
-          >
-            <ArrowLeft size={16} color={primaryBlue} />
-          </button>
-          <span style={{ fontSize: 18, fontWeight: 800, color: "#1E1E2E", flex: 1 }}>
-            Fulfillment &amp; Payment
-          </span>
+        <div style={{ padding: "8px 20px 12px", display: "flex", alignItems: "center", gap: 12 }}>
+          <h2 style={{ margin: 0, flex: 1, fontFamily: "var(--font-display)", fontSize: 20, fontWeight: 700, letterSpacing: "-0.02em", color: "var(--ink)" }}>
+            Fulfillment &amp; payment
+          </h2>
+          <BtIconButton icon={X} label="Close payment sheet" onClick={onClose} />
         </div>
 
-        <div style={{ flex: 1, overflowY: "auto", padding: "8px 16px" }}>
+        <div style={{ flex: 1, overflowY: "auto", padding: "4px 20px 16px" }}>
           <div
             style={{
-              width: "100%",
-              padding: 18,
-              borderRadius: 18,
-              background: "var(--ink, #111317)", border: "1px solid rgba(255,255,255,0.12)", boxShadow: "0 4px 16px rgba(0,0,0,0.2)",
-              marginBottom: 20,
+              padding: "18px 20px",
+              borderRadius: "var(--r-card)",
+              background: "var(--noir)",
+              color: "var(--on-noir)",
+              marginBottom: 22,
+              display: "flex",
+              gap: 16,
+              alignItems: "flex-start",
             }}
           >
-            <div style={{ display: "flex", gap: 16 }}>
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div
-                  style={{
-                    fontSize: 9,
-                    fontWeight: 800,
-                    color: "rgba(255,255,255,0.54)",
-                    letterSpacing: 1.3,
-                    marginBottom: 6,
-                  }}
-                >
-                  FULFILLMENT &amp; PAYMENT
-                </div>
-                <div
-                  style={{
-                    fontSize: 18,
-                    fontWeight: 900,
-                    color: "#FFF",
-                    lineHeight: 1.2,
-                    letterSpacing: -0.3,
-                    overflow: "hidden",
-                    textOverflow: "ellipsis",
-                    display: "-webkit-box",
-                    WebkitLineClamp: 2,
-                    WebkitBoxOrient: "vertical",
-                    marginBottom: 6,
-                  }}
-                >
-                  {entryTitle || "Entry"}
-                </div>
-                {(typeLabel || vendorName) && (
-                  <div style={{ fontSize: 11, fontWeight: 600, color: "rgba(255,255,255,0.7)" }}>
-                    {[typeLabel, vendorName].filter(Boolean).join(" · ")}
-                  </div>
-                )}
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div className="bt-eyebrow" style={{ color: "var(--on-noir-3)", marginBottom: 6 }}>Entry</div>
+              <div
+                style={{
+                  fontFamily: "var(--font-display)",
+                  fontSize: 18,
+                  fontWeight: 700,
+                  lineHeight: 1.25,
+                  letterSpacing: "-0.01em",
+                  overflow: "hidden",
+                  display: "-webkit-box",
+                  WebkitLineClamp: 2,
+                  WebkitBoxOrient: "vertical",
+                  overflowWrap: "anywhere",
+                }}
+              >
+                {entryTitle || "Entry"}
               </div>
-
-              <div style={{ textAlign: "right", flexShrink: 0 }}>
-                <div
-                  style={{
-                    fontSize: 9,
-                    fontWeight: 800,
-                    color: "rgba(255,255,255,0.54)",
-                    letterSpacing: 1.2,
-                  }}
-                >
-                  OUTSTANDING
+              {(typeLabel || vendorName) && (
+                <div style={{ fontSize: 13, color: "var(--on-noir-2)", marginTop: 6 }}>
+                  {[typeLabel, vendorName].filter(Boolean).join(" · ")}
                 </div>
-                <div
-                  style={{
-                    fontSize: 22,
-                    fontWeight: 900,
-                    color: "#FFF",
-                    letterSpacing: -0.5,
-                    marginTop: 6,
-                  }}
-                >
-                  {formatINR(outstanding > 0 ? outstanding : totalAmount)}
-                </div>
-                {alreadyPaid > 0 && (
-                  <div style={{ fontSize: 11, fontWeight: 600, color: "rgba(255,255,255,0.7)", marginTop: 4 }}>
-                    {formatINR(alreadyPaid)} paid
-                  </div>
-                )}
+              )}
+            </div>
+            <div style={{ textAlign: "right", flexShrink: 0 }}>
+              <div className="bt-eyebrow" style={{ color: "var(--on-noir-3)", marginBottom: 6 }}>Outstanding</div>
+              <div className="tnum" style={{ fontFamily: "var(--font-display)", fontSize: 24, fontWeight: 700, letterSpacing: "-0.02em" }}>
+                {formatINR(outstanding > 0 ? outstanding : totalAmount)}
               </div>
+              {alreadyPaid > 0 && (
+                <div className="tnum" style={{ fontSize: 13, color: "var(--on-noir-2)", marginTop: 4 }}>
+                  {formatINR(alreadyPaid)} paid
+                </div>
+              )}
             </div>
           </div>
 
-          <div style={{ fontSize: 10, fontWeight: 800, color: "#6B7280", letterSpacing: 1.1, marginBottom: 8 }}>
-            PAYMENT STATUS
-          </div>
-          <div style={{ display: "flex", gap: 8, marginBottom: 20 }}>
+          <Label>Payment status</Label>
+          <div role="radiogroup" aria-label="Payment status" style={{ display: "flex", gap: 8, marginBottom: 22 }}>
             {STATUS_OPTIONS.map((opt) => {
               const sel = selectedStatus === opt.key;
               return (
                 <button
                   key={opt.key}
+                  type="button"
+                  role="radio"
+                  aria-checked={sel}
                   onClick={() => handleStatusSelect(opt.key)}
                   style={{
                     flex: 1,
-                    height: 46,
-                    borderRadius: 12,
-                    border: `1.5px solid ${sel ? opt.color : "#E2E4F6"}`,
-                    background: sel ? opt.bg : "#FFF",
+                    height: 48,
+                    borderRadius: "var(--r-input)",
+                    border: `1.5px solid ${sel ? opt.fg : "var(--input-border)"}`,
+                    background: sel ? opt.bg : "var(--card)",
                     display: "flex",
                     alignItems: "center",
                     justifyContent: "center",
-                    gap: 5,
+                    gap: 7,
                     cursor: "pointer",
-                    transition: "all 0.16s ease",
+                    transition: "all 160ms ease",
+                    fontFamily: "var(--font-ui)",
                   }}
                 >
-                  <div
-                    style={{
-                      width: 7,
-                      height: 7,
-                      borderRadius: "50%",
-                      background: opt.color,
-                      flexShrink: 0,
-                    }}
-                  />
-                  <span
-                    style={{
-                      fontSize: 10.5,
-                      fontWeight: 800,
-                      color: sel ? opt.color : "#374151",
-                    }}
-                  >
-                    {opt.label}
-                  </span>
+                  <span style={{ width: 8, height: 8, borderRadius: "50%", background: opt.fg, flexShrink: 0 }} />
+                  <span style={{ fontSize: 14, fontWeight: 600, color: sel ? opt.fg : "var(--ink)" }}>{opt.label}</span>
                 </button>
               );
             })}
           </div>
 
-          <div style={{ fontSize: 10, fontWeight: 800, color: "#6B7280", letterSpacing: 1.1, marginBottom: 8 }}>
-            PAYMENT METHOD
-          </div>
-          <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 20 }}>
+          <Label>Payment method</Label>
+          <div role="radiogroup" aria-label="Payment method" style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 22 }}>
             {PAYMENT_METHODS.map((m, idx) => {
               const Icon = m.icon;
               const sel = selectedMethod === m.value;
-              const isFullWidth = idx === 4;
               return (
                 <button
                   key={m.value}
+                  type="button"
+                  role="radio"
+                  aria-checked={sel}
                   onClick={() => setSelectedMethod(m.value)}
                   style={{
-                    flex: isFullWidth ? "1 1 100%" : "1 1 calc(50% - 4px)",
-                    height: 46,
-                    borderRadius: 12,
-                    border: `1.5px solid ${sel ? primaryBlue : "#E2E4F6"}`,
-                    background: sel ? primaryBlue : "#FFF",
+                    flex: idx === 4 ? "1 1 100%" : "1 1 calc(50% - 4px)",
+                    height: 48,
+                    borderRadius: "var(--r-input)",
+                    border: `1.5px solid ${sel ? "var(--ink)" : "var(--input-border)"}`,
+                    background: sel ? "var(--ink)" : "var(--card)",
+                    color: sel ? "#FFFFFF" : "var(--ink)",
                     display: "flex",
                     alignItems: "center",
                     justifyContent: "center",
-                    gap: 6,
+                    gap: 8,
                     cursor: "pointer",
-                    transition: "all 0.16s ease",
-                    boxShadow: sel ? "0 2px 6px rgba(249,115,22,0.18)" : "none",
+                    transition: "all 160ms ease",
+                    fontFamily: "var(--font-ui)",
+                    fontSize: 14,
+                    fontWeight: 600,
                   }}
                 >
-                  <Icon size={16} color={sel ? "#FFF" : "#6B7280"} />
-                  <span
-                    style={{
-                      fontSize: 11,
-                      fontWeight: 700,
-                      color: sel ? "#FFF" : "#374151",
-                    }}
-                  >
-                    {m.value}
-                  </span>
+                  <Icon size={17} />
+                  {m.value}
                 </button>
               );
             })}
           </div>
 
           {selectedMethod === "Cash" && (
-            <div style={{ marginBottom: 20, padding: 14, borderRadius: 12, border: "1px solid #E2E4F6", background: "#F8F9FF" }}>
-              <label style={{ display: "flex", alignItems: "center", gap: 10, cursor: "pointer", marginBottom: requestEsign ? 12 : 0 }}>
+            <div style={{ marginBottom: 22, padding: 16, borderRadius: "var(--r-input)", border: "1px solid var(--line)", background: "var(--card)" }}>
+              <label style={{ display: "flex", alignItems: "center", gap: 10, cursor: "pointer", minHeight: 28, marginBottom: requestEsign ? 14 : 0 }}>
                 <input
                   type="checkbox"
                   checked={requestEsign}
                   onChange={(e) => setRequestEsign(e.target.checked)}
-                  style={{ width: 16, height: 16, cursor: "pointer" }}
+                  style={{ width: 18, height: 18, cursor: "pointer", accentColor: "var(--ink)" }}
                 />
-                <span style={{ fontSize: 13, fontWeight: 700, color: "#1E1E2E" }}>Request E-Signature for Cash Receipt</span>
+                <span style={{ fontSize: 14, fontWeight: 600, color: "var(--ink)" }}>Request e-signature for the cash receipt</span>
               </label>
-
               {requestEsign && (
-                <input
+                <BtField
+                  label="Client email"
                   type="email"
-                  placeholder="Client Email Address"
+                  placeholder="client@example.com"
                   value={clientEmail}
                   onChange={(e) => setClientEmail(e.target.value)}
-                  style={{ padding: "10px 14px", borderRadius: 8, border: "1px solid #CCCFE8", outline: "none", fontSize: 13, fontFamily: "inherit", width: "100%", boxSizing: "border-box" }}
                 />
               )}
             </div>
           )}
 
-          <div style={{ fontSize: 10, fontWeight: 800, color: "#6B7280", letterSpacing: 1.1, marginBottom: 8 }}>
-            ACTUAL AMOUNT PAID ({"\u20B9"})
-          </div>
-          <div style={{ height: 60, opacity: selectedStatus === "pending" ? 0.4 : 1.0, transition: "opacity 0.18s ease" }}>
-            <div
-              style={{
-                height: 60,
-                borderRadius: 12,
-                background: "#FFF",
-                display: "flex",
-                alignItems: "center",
-                border: `1px solid ${isError ? "#DC2626" : "#E2E4F6"}`,
-              }}
-            >
-              <input
-                type="text"
-                inputMode="decimal"
-                value={amount}
-                onChange={(e) => handleAmountChange(e.target.value)}
-                disabled={selectedStatus === "pending"}
-                placeholder="0.00"
-                style={{
-                  flex: 1,
-                  height: "100%",
-                  border: "none",
-                  background: "transparent",
-                  fontSize: 22,
-                  fontWeight: 800,
-                  color: "#1E1E2E",
-                  outline: "none",
-                  paddingLeft: 16,
-                  paddingRight: 16,
-                }}
-              />
-            </div>
-          </div>
-          <div
-            style={{
-              marginTop: 5,
-              paddingLeft: 2,
-              fontSize: 11,
-              fontWeight: 500,
-              fontStyle: isError ? "italic" : "normal",
-              color: isError ? "#DC2626" : "#6B7280",
-            }}
-          >
-            {helperText}
+          <div style={{ opacity: selectedStatus === "pending" ? 0.5 : 1, transition: "opacity 180ms ease", marginBottom: 22 }}>
+            <BtField
+              label="Actual amount paid"
+              isCurrency
+              type="text"
+              inputMode="decimal"
+              value={amount}
+              onChange={(e) => handleAmountChange(e.target.value)}
+              disabled={selectedStatus === "pending"}
+              placeholder="0.00"
+              error={isError ? displayError : undefined}
+              helperText={!isError ? helperText : undefined}
+              inputStyle={{ fontSize: 20 }}
+            />
           </div>
 
-          <div style={{ fontSize: 10, fontWeight: 800, color: "#6B7280", letterSpacing: 1.1, marginTop: 20, marginBottom: 8 }}>
-            PAYMENT RECEIPT
-          </div>
+          <Label>Payment receipt</Label>
           <input
             type="file"
             accept="image/*,.pdf"
@@ -503,188 +423,77 @@ export default function PayNowSheet({
             style={{ display: "none" }}
             id="pay-now-receipt-input"
           />
-          <div
-            onClick={() => !receiptFile && document.getElementById("pay-now-receipt-input")?.click()}
-            style={{
-              width: "100%",
-              padding: "13px 16px",
-              borderRadius: 12,
-              border: `1.5px solid ${receiptFile ? "#15803D" : "#CCCFE8"}`,
-              background: receiptFile ? "#F0FDF4" : "#FFF",
-              cursor: receiptFile ? "default" : "pointer",
-              marginBottom: 12,
-              transition: "all 0.18s ease",
-              boxSizing: "border-box",
-            }}
-          >
-            {receiptFile ? (
-              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                <CheckCircle size={18} color="#15803D" />
-                <span
-                  style={{
-                    flex: 1,
-                    fontSize: 12,
-                    fontWeight: 700,
-                    color: "#15803D",
-                    overflow: "hidden",
-                    textOverflow: "ellipsis",
-                    whiteSpace: "nowrap",
-                  }}
-                >
-                  {receiptFile.name}
-                </span>
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setReceiptFile(null);
-                    const el = document.getElementById("pay-now-receipt-input");
-                    if (el) el.value = "";
-                  }}
-                  style={{
-                    background: "none",
-                    border: "none",
-                    cursor: "pointer",
-                    color: "#6B7280",
-                    padding: 0,
-                    display: "flex",
-                  }}
-                >
-                  <X size={15} />
-                </button>
-              </div>
-            ) : (
-              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                <div
-                  style={{
-                    width: 34,
-                    height: 34,
-                    borderRadius: 9,
-                    background: "#EEEFFF",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    flexShrink: 0,
-                  }}
-                >
-                  <Upload size={17} color={primaryBlue} />
-                </div>
-                <div>
-                  <div style={{ fontSize: 12.5, fontWeight: 700, color: "#1E1E2E" }}>
-                    Upload Payment Receipt
-                  </div>
-                  <div style={{ fontSize: 10.5, fontWeight: 500, color: "#6B7280", marginTop: 1 }}>
-                    PNG, JPG, PDF — UPI / Bank / Cheque proof
-                  </div>
-                </div>
-              </div>
-            )}
-          </div>
-
-          <div style={{ fontSize: 10, fontWeight: 800, color: "#6B7280", letterSpacing: 1.1, marginBottom: 8 }}>
-            PAYMENT DATE
-          </div>
-          <div
-            style={{
-              width: "100%",
-              padding: "13px 16px",
-              borderRadius: 12,
-              border: "1.5px solid #CCCFE8",
-              background: "#FFF",
-              display: "flex",
-              alignItems: "center",
-              gap: 8,
-              marginBottom: 12,
-              boxSizing: "border-box",
-            }}
-          >
-            <Calendar size={19} color={primaryBlue} />
-            <input
-              type="date"
-              value={paymentDate}
-              onChange={(e) => setPaymentDate(e.target.value)}
+          {receiptFile ? (
+            <div
               style={{
-                border: "none",
-                background: "transparent",
-                fontSize: 14,
-                fontWeight: 700,
-                color: "#1E1E2E",
-                outline: "none",
-                flex: 1,
-                cursor: "pointer",
+                display: "flex", alignItems: "center", gap: 10, padding: "12px 16px", borderRadius: "var(--r-input)",
+                border: "1.5px solid var(--status-success)", background: "var(--status-success-soft)", marginBottom: 22,
               }}
+            >
+              <CheckCircle size={18} color="var(--status-success)" />
+              <span style={{ flex: 1, fontSize: 14, fontWeight: 600, color: "var(--status-success)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                {receiptFile.name}
+              </span>
+              <BtIconButton
+                icon={X}
+                label="Remove receipt"
+                size={36}
+                onClick={() => {
+                  setReceiptFile(null);
+                  const el = document.getElementById("pay-now-receipt-input");
+                  if (el) el.value = "";
+                }}
+              />
+            </div>
+          ) : (
+            <button
+              type="button"
+              onClick={() => document.getElementById("pay-now-receipt-input")?.click()}
+              className="bt-hover-row"
+              style={{
+                width: "100%", font: "inherit", textAlign: "left", display: "flex", alignItems: "center", gap: 12,
+                padding: "13px 16px", borderRadius: "var(--r-input)", border: "1.5px dashed var(--input-border)",
+                background: "var(--card)", cursor: "pointer", marginBottom: 22, boxSizing: "border-box",
+              }}
+            >
+              <span style={{ width: 38, height: 38, borderRadius: "var(--r-chip)", background: "var(--fill)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                <Upload size={18} color="var(--ink)" />
+              </span>
+              <span>
+                <span style={{ display: "block", fontSize: 14, fontWeight: 600, color: "var(--ink)" }}>Upload payment receipt</span>
+                <span style={{ display: "block", fontSize: 13, color: "var(--ink-3)", marginTop: 1 }}>PNG, JPG or PDF. UPI, bank or cheque proof.</span>
+              </span>
+            </button>
+          )}
+
+          <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+            <BtField label="Payment date" type="date" value={paymentDate} onChange={(e) => setPaymentDate(e.target.value)} />
+            <BtTextarea
+              label="Note"
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              placeholder="Transaction ID, cheque number, or remarks"
+              rows={3}
             />
           </div>
-
-          <textarea
-            value={notes}
-            onChange={(e) => setNotes(e.target.value)}
-            placeholder="Transaction ID, cheque number, or remarks…"
-            rows={3}
-            style={{
-              width: "100%",
-              padding: "14px 16px",
-              borderRadius: 12,
-              border: "1.5px solid #CCCFE8",
-              background: "#FFF",
-              fontSize: 13,
-              color: "#1E1E2E",
-              outline: "none",
-              resize: "none",
-              fontFamily: "inherit",
-              boxSizing: "border-box",
-            }}
-          />
-          <div style={{ height: 6 }} />
         </div>
 
         <div
           style={{
-            padding: "12px 16px 16px",
-            background: "#FFF",
-            borderTop: "1px solid #E8EAFF",
+            padding: "14px 20px 18px",
+            background: "var(--card)",
+            borderTop: "1px solid var(--line)",
             display: "flex",
             gap: 10,
             flexShrink: 0,
           }}
         >
-          <button
-            onClick={onClose}
-            style={{
-              flex: 2,
-              height: 46,
-              borderRadius: 11,
-              border: "1.5px solid #EBEBEB",
-              background: "#FFF",
-              fontSize: 13,
-              fontWeight: 700,
-              color: "#6B7280",
-              cursor: "pointer",
-            }}
-          >
+          <BtButton variant="secondary" onClick={onClose} style={{ flex: 2 }}>
             Cancel
-          </button>
-          <button
-            onClick={handleConfirm}
-            style={{
-              flex: 5,
-              height: 46,
-              borderRadius: 11,
-              background: "var(--ink, #111317)",
-              border: "1px solid rgba(255,255,255,0.2)",
-              fontSize: 13,
-              fontWeight: 800,
-              color: "#F6F4EF",
-              cursor: "pointer",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              gap: 6,
-              boxShadow: "0 4px 12px rgba(0,0,0,0.25)",
-            }}
-          >
-            <CheckCircle size={16} />
-            <span style={{ whiteSpace: "nowrap" }}>Confirm Payment</span>
-          </button>
+          </BtButton>
+          <BtButton variant="primary" icon={CheckCircle} loading={submitting} onClick={handleConfirm} style={{ flex: 4 }}>
+            Confirm payment
+          </BtButton>
         </div>
       </div>
     </div>

@@ -2,48 +2,73 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { authAPI, projectAPI, subscriptionAPI } from '../api';
 import {
-  Users,
-  User,
   Info,
   HelpCircle,
   Plus,
-  ShieldCheck,
-  Building2,
   Trash2,
-  Edit2,
-  ArrowLeft,
-  X,
+  Pencil,
   Check,
-  CheckCircle2,
+  Users,
+  UserPlus,
+  Mail,
+  KeyRound,
+  User,
+  AlertCircle,
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import ModuleTour from '../components/ModuleTour';
-import { Toast } from '../components/Toast';
 import ConfirmDialog from '../components/ui/ConfirmDialog';
 import BtHero from '../components/ui/BtHero';
+import BtPageHeader from '../components/ui/BtPageHeader';
 import BtSheet from '../components/ui/BtSheet';
 import BtCard from '../components/ui/BtCard';
 import BtBadge from '../components/ui/BtBadge';
 import BtButton from '../components/ui/BtButton';
-import BtPressable from '../components/ui/BtPressable';
-import BtEmpty from '../components/ui/BtEmpty';
+import BtIconButton from '../components/ui/BtIconButton';
+import BtChip from '../components/ui/BtChip';
+import BtEmpty, { BtErrorCard } from '../components/ui/BtEmpty';
+import BtSkeleton from '../components/ui/BtSkeleton';
+import BtField from '../components/ui/BtField';
+import btToast from '../components/ui/BtToast';
 
-const _featureRows = [
-  { section: 'Project' },
-  { type: 'table', label: 'Project Status', desc: 'View progress, budget, and project details', view: 'view_assigned_project', edit: 'edit_project' },
-  { type: 'table', label: 'Activities & Entries', desc: 'View, edit or delete material/labour/equipment entries', view: 'view_assigned_project', edit: 'manage_expenses', delete: 'delete_entry' },
-  { section: 'Daily Work' },
-  { type: 'toggle', label: 'Add Entries', desc: 'Can add material, labour, and equipment entries', key: 'manage_expenses' },
-  { type: 'toggle', label: 'Add Equipment Entries', desc: 'Can specifically add and manage equipment entries', key: 'manage_equipment_master' },
-  { type: 'toggle', label: 'Submit Daily Progress Update', desc: 'Can file a daily update with photos and checklist', key: 'submit_daily_update' },
-  { section: 'Approvals & Payments' },
-  { type: 'toggle', label: 'Approve Payments', desc: 'Can mark entries as paid and record payment details', key: 'approve_payments' },
-  { type: 'toggle', label: 'Approve Updates', desc: 'Can approve or reject daily progress submissions', key: 'approve_updates' },
-  { section: 'Visibility' },
-  { type: 'table', label: 'Reports & Analytics', desc: 'Access to charts, cost summaries and analytics', view: 'view_reports' },
-  { type: 'table', label: 'Transaction Logs', desc: 'Access to the full list of expense entries', view: 'view_payment_reports' },
-  { section: 'Administration' },
-  { type: 'table', label: 'Assign Roles', desc: 'Can create accounts and assign roles to team members', edit: 'assign_roles' },
+// Permission groups: one switch per permission key, each with a one-line description.
+const PERMISSION_GROUPS = [
+  {
+    title: 'Project',
+    items: [
+      { key: 'view_assigned_project', label: 'View assigned projects', desc: 'See progress, budget and details of the projects they can access.' },
+      { key: 'edit_project', label: 'Edit project details', desc: 'Change a project’s information and budget.' },
+      { key: 'delete_entry', label: 'Delete entries', desc: 'Remove material, labour or equipment entries.' },
+    ],
+  },
+  {
+    title: 'Daily work',
+    items: [
+      { key: 'manage_expenses', label: 'Add and edit entries', desc: 'Add material, labour and equipment entries.' },
+      { key: 'manage_equipment_master', label: 'Manage equipment', desc: 'Add and manage equipment entries.' },
+      { key: 'submit_daily_update', label: 'Submit daily progress update', desc: 'File a daily update with photos and a checklist.' },
+    ],
+  },
+  {
+    title: 'Approvals & payments',
+    items: [
+      { key: 'approve_payments', label: 'Approve payments', desc: 'Mark entries as paid and record payment details.' },
+      { key: 'approve_updates', label: 'Approve updates', desc: 'Approve or reject daily progress submissions.' },
+    ],
+  },
+  {
+    title: 'Visibility',
+    items: [
+      { key: 'view_reports', label: 'Reports and analytics', desc: 'See charts, cost summaries and analytics.' },
+      { key: 'view_payment_reports', label: 'Transaction logs', desc: 'See the full list of expense entries.' },
+    ],
+  },
+  {
+    title: 'Administration',
+    items: [
+      { key: 'assign_roles', label: 'Assign roles', desc: 'Create accounts and assign roles to team members.' },
+    ],
+  },
 ];
 
 const availableRolesToOversee = ['Mason', 'Contractor', 'Labourer'];
@@ -63,6 +88,107 @@ const DEFAULT_PERMS = {
   assign_roles: false,
 };
 
+function roleTone(roleName = '') {
+  const r = roleName.toLowerCase();
+  if (r === 'admin') return 'brand';
+  if (r === 'supervisor') return 'material';
+  if (r === 'mason') return 'labour';
+  return 'neutral';
+}
+
+function BtSwitch({ checked, onChange, label }) {
+  return (
+    <button
+      type="button"
+      role="switch"
+      aria-checked={checked}
+      aria-label={label}
+      onClick={() => onChange(!checked)}
+      style={{
+        width: 48,
+        height: 28,
+        borderRadius: 'var(--r-full)',
+        background: checked ? 'var(--ink)' : 'var(--input-border)',
+        border: 'none',
+        padding: 3,
+        cursor: 'pointer',
+        transition: 'background 200ms ease',
+        display: 'inline-flex',
+        alignItems: 'center',
+        flexShrink: 0,
+      }}
+    >
+      <span
+        style={{
+          width: 22,
+          height: 22,
+          borderRadius: '50%',
+          background: '#FFFFFF',
+          boxShadow: '0 1px 3px rgba(12, 14, 18, 0.25)',
+          transform: checked ? 'translateX(20px)' : 'translateX(0px)',
+          transition: 'transform 200ms var(--ease)',
+          display: 'block',
+        }}
+      />
+    </button>
+  );
+}
+
+function CardTitle({ index, title, description }) {
+  return (
+    <div style={{ marginBottom: 18 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+        {index && (
+          <span
+            style={{
+              width: 24,
+              height: 24,
+              borderRadius: '50%',
+              background: 'var(--ink)',
+              color: '#FFFFFF',
+              fontSize: 13,
+              fontWeight: 700,
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              flexShrink: 0,
+            }}
+          >
+            {index}
+          </span>
+        )}
+        <h2 style={{ margin: 0, fontSize: 16, fontWeight: 600, color: 'var(--ink)' }}>{title}</h2>
+      </div>
+      {description && (
+        <p style={{ margin: '6px 0 0', fontSize: 14, color: 'var(--ink-2)', lineHeight: 1.5 }}>{description}</p>
+      )}
+    </div>
+  );
+}
+
+function Avatar({ name }) {
+  return (
+    <div
+      style={{
+        width: 44,
+        height: 44,
+        borderRadius: '50%',
+        background: 'var(--fill)',
+        border: '1px solid var(--line)',
+        display: 'grid',
+        placeItems: 'center',
+        fontFamily: 'var(--font-display)',
+        fontSize: 17,
+        fontWeight: 700,
+        color: 'var(--ink)',
+        flexShrink: 0,
+      }}
+    >
+      {name ? name.charAt(0).toUpperCase() : 'U'}
+    </div>
+  );
+}
+
 export default function AssignRolesPage() {
   const navigate = useNavigate();
   const location = useLocation();
@@ -75,8 +201,8 @@ export default function AssignRolesPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [saving, setSaving] = useState(false);
-  const [toast, setToast] = useState({ message: '', type: 'info', key: 0 });
   const [confirmDlg, setConfirmDlg] = useState(null);
+  const [deactivating, setDeactivating] = useState(null);
 
   const [showForm, setShowForm] = useState(false);
   const [isEditMode, setIsEditMode] = useState(false);
@@ -89,7 +215,7 @@ export default function AssignRolesPage() {
   const [permissions, setPermissions] = useState({ ...DEFAULT_PERMS });
   const [selectedProjects, setSelectedProjects] = useState([]);
   const [selectedOverseesRoles, setSelectedOverseesRoles] = useState([]);
-  const [customOverseesInput, setCustomOverseesInput] = useState('');
+  const [formErrors, setFormErrors] = useState({});
   const [runTour, setRunTour] = useState(false);
 
   const tourSteps = showForm
@@ -173,6 +299,7 @@ export default function AssignRolesPage() {
   const handleRoleChange = (role) => {
     setSelectedRole(role);
     if (role !== '__custom_role__') setCustomRoleName('');
+    setFormErrors((e) => ({ ...e, role: undefined }));
     if (isAdmin) applyDefaultPermissions(role);
   };
 
@@ -188,6 +315,7 @@ export default function AssignRolesPage() {
     applyDefaultPermissions('Supervisor');
     setSelectedProjects([]);
     setSelectedOverseesRoles([]);
+    setFormErrors({});
     setShowForm(true);
   };
 
@@ -215,17 +343,20 @@ export default function AssignRolesPage() {
 
     setSelectedProjects(userToEdit.projectIds || userToEdit.projects || []);
     setSelectedOverseesRoles(userToEdit.overseesRoles || []);
+    setFormErrors({});
     setShowForm(true);
   };
 
   const handleProvision = async () => {
     const finalRole = isCustomRole ? customRoleName.trim() : selectedRole;
-    if (!newName.trim() || !newEmail.trim() || !finalRole) {
-      setToast({ message: 'Please fill in all required fields.', type: 'error', key: Date.now() });
-      return;
-    }
-    if (!isEditMode && !newPassword) {
-      setToast({ message: 'Please enter a temporary password.', type: 'error', key: Date.now() });
+    const errs = {};
+    if (!newName.trim()) errs.name = 'Enter the member’s full name.';
+    if (!newEmail.trim()) errs.email = 'Enter an email address.';
+    if (!finalRole) errs.role = 'Enter a title for the custom role.';
+    if (!isEditMode && !newPassword) errs.password = 'Enter a temporary password.';
+    setFormErrors(errs);
+    if (Object.keys(errs).length) {
+      btToast('Please fix the highlighted fields.', { error: true });
       return;
     }
 
@@ -233,7 +364,7 @@ export default function AssignRolesPage() {
       if (users.length >= limitMaxUsers) {
         setConfirmDlg({
           message: `Your ${subscription?.plan || 'Free'} plan allows up to ${limitMaxUsers} users. Upgrade to add more team members.`,
-          confirmLabel: 'Upgrade Plan',
+          confirmLabel: 'Upgrade plan',
           onConfirm: () => {
             setConfirmDlg(null);
             navigate('/subscription');
@@ -258,7 +389,7 @@ export default function AssignRolesPage() {
         };
         if (newPassword) payload.password = newPassword;
         await authAPI.updateUser(editingUserId, payload);
-        setToast({ message: 'User updated successfully', type: 'success', key: Date.now() });
+        btToast('User updated successfully');
       } else {
         const payload = {
           name: newName.trim(),
@@ -270,21 +401,40 @@ export default function AssignRolesPage() {
           overseesRoles: selectedOverseesRoles,
         };
         await authAPI.provision(payload);
-        setToast({ message: 'User created successfully', type: 'success', key: Date.now() });
+        btToast('User created successfully');
       }
       setShowForm(false);
       fetchAll();
     } catch (err) {
-      setToast({
-        message:
-          err.friendlyMessage ||
+      btToast(
+        err.friendlyMessage ||
           (isEditMode ? 'Failed to update user' : 'Failed to create user'),
-        type: 'error',
-        key: Date.now(),
-      });
+        { error: true }
+      );
     } finally {
       setSaving(false);
     }
+  };
+
+  const handleDeactivate = (member) => {
+    setConfirmDlg({
+      message: `Deactivate ${member.name || 'this member'}? They will no longer be able to sign in.`,
+      danger: true,
+      confirmLabel: 'Deactivate',
+      onConfirm: () => {
+        setConfirmDlg(null);
+        const id = member._id || member.id;
+        setDeactivating(id);
+        authAPI
+          .deleteUser(id)
+          .then(() => {
+            btToast('User deactivated successfully');
+            fetchAll();
+          })
+          .catch((err) => btToast(err.friendlyMessage || 'Failed to delete user', { error: true }))
+          .finally(() => setDeactivating(null));
+      },
+    });
   };
 
   const toggleProject = (projectId) => {
@@ -302,15 +452,12 @@ export default function AssignRolesPage() {
     );
   };
 
+  const totalPerms = Object.keys(DEFAULT_PERMS).length;
+  const onPerms = Object.values(permissions).filter(Boolean).length;
+
   return (
     <div style={{ minHeight: '100vh', background: 'var(--ground)' }}>
       <ModuleTour steps={tourSteps} run={runTour} setRun={setRunTour} moduleName="AssignRolesPage" />
-      <Toast
-        key={toast.key}
-        message={toast.message}
-        type={toast.type}
-        onClose={() => setToast((prev) => ({ ...prev, message: '' }))}
-      />
       <ConfirmDialog
         open={!!confirmDlg}
         message={confirmDlg?.message || ''}
@@ -320,482 +467,283 @@ export default function AssignRolesPage() {
         confirmLabel={confirmDlg?.confirmLabel}
       />
 
-      {/* ── TOP HERO (Deep Noir with blueprint grid & glow) ── */}
-      <BtHero padding="24px 32px 48px">
-        <div
-          className="tour-header"
-          style={{
-            display: 'flex',
-            alignItems: 'flex-start',
-            justifyContent: 'space-between',
-            gap: 16,
-            flexWrap: 'wrap',
-            marginBottom: 20,
-          }}
-        >
-          <div>
-            <div
-              style={{
-                fontFamily: 'var(--font-mono)',
-                fontSize: 11,
-                letterSpacing: '0.08em',
-                color: 'var(--on-noir-2)',
-                textTransform: 'uppercase',
-                fontWeight: 600,
-                marginBottom: 4,
-              }}
-            >
-              Access Control &amp; Roles
-            </div>
-            <h1
-              style={{
-                fontFamily: 'var(--font-display)',
-                fontSize: 34,
-                fontWeight: 700,
-                letterSpacing: '-0.02em',
-                color: 'var(--bone)',
-                margin: 0,
-                lineHeight: 1.15,
-              }}
-            >
-              Assign Roles
-            </h1>
-            <p style={{ fontSize: 13, color: 'var(--on-noir-2)', margin: '4px 0 0' }}>
-              Configure member credentials, granular permissions, and project access scopes
-            </p>
-          </div>
-
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <button
-              onClick={() => setRunTour(true)}
-              title="Help Tour"
-              style={{
-                width: 38,
-                height: 38,
-                borderRadius: 'var(--r-btn, 12px)',
-                background: 'rgba(255, 255, 255, 0.08)',
-                border: '1px solid rgba(255, 255, 255, 0.12)',
-                color: 'var(--bone)',
-                display: 'grid',
-                placeItems: 'center',
-                cursor: 'pointer',
-              }}
-            >
-              <HelpCircle size={17} />
-            </button>
-
-            {!showForm && (
-              <button
-                className="tour-add-btn"
-                onClick={handleCreateClick}
-                style={{
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: 7,
-                  height: 38,
-                  padding: '0 16px',
-                  borderRadius: 'var(--r-btn, 12px)',
-                  background: '#FFFFFF',
-                  border: 'none',
-                  color: 'var(--ink)',
-                  fontSize: 13,
-                  fontWeight: 700,
-                  cursor: 'pointer',
-                  boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
-                }}
-              >
-                <Plus size={16} />
-                <span>Add Member</span>
-              </button>
-            )}
-          </div>
+      {/* ── HERO ── */}
+      <BtHero>
+        <div className="tour-header">
+          <BtPageHeader
+            size={showForm ? 'md' : 'lg'}
+            back={showForm ? { label: 'Team', onClick: () => setShowForm(false) } : undefined}
+            eyebrow="Access control"
+            title={showForm ? (isEditMode ? 'Edit team member' : 'New team member') : 'Assign Roles'}
+            subtitle={
+              showForm
+                ? 'Set their role, what they can do, and which projects they can see.'
+                : 'Add team members and choose exactly what each person can access.'
+            }
+            actions={
+              <>
+                <BtIconButton onDark icon={HelpCircle} label="Page tour" onClick={() => setRunTour(true)} />
+                {!showForm && (
+                  <BtButton variant="accent" size="small" icon={Plus} className="tour-add-btn" onClick={handleCreateClick}>
+                    Add member
+                  </BtButton>
+                )}
+              </>
+            }
+          />
         </div>
       </BtHero>
 
-      {/* ── MAIN CONTENT (Overlapping BtSheet) ── */}
+      {/* ── SHEET ── */}
       <BtSheet overlap={26} padding="28px 32px 64px">
         {showForm ? (
-          /* ── FORM VIEW: ADD / EDIT MEMBER ── */
-          <div style={{ maxWidth: 840, margin: '0 auto' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 20 }}>
-              <button
-                onClick={() => setShowForm(false)}
-                style={{
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: 6,
-                  background: 'none',
-                  border: 'none',
-                  color: 'var(--ink)',
-                  fontSize: 14,
-                  fontWeight: 600,
-                  cursor: 'pointer',
-                }}
-              >
-                <ArrowLeft size={16} />
-                <span>Back to Team</span>
-              </button>
-              <span style={{ fontSize: 13, color: 'var(--ink-soft)' }}>/</span>
-              <span style={{ fontSize: 15, fontWeight: 700, color: 'var(--ink)' }}>
-                {isEditMode ? 'Edit Team Member' : 'New Member Provisioning'}
-              </span>
-            </div>
+          <div style={{ maxWidth: 960, margin: '0 auto', display: 'flex', flexDirection: 'column', gap: 20 }}>
+            {/* 1. Credentials */}
+            <BtCard padding="24px" className="tour-user-details">
+              <CardTitle index={1} title="Member details" description="Who they are and how they sign in." />
+              <div className="bt-grid-3">
+                <BtField
+                  label="Full name"
+                  required
+                  icon={User}
+                  value={newName}
+                  onChange={(e) => { setNewName(e.target.value); setFormErrors((x) => ({ ...x, name: undefined })); }}
+                  placeholder="e.g. Ramesh Kumar"
+                  error={formErrors.name}
+                  autoComplete="off"
+                />
+                <BtField
+                  label="Email address"
+                  required
+                  type="email"
+                  icon={Mail}
+                  value={newEmail}
+                  onChange={(e) => { setNewEmail(e.target.value); setFormErrors((x) => ({ ...x, email: undefined })); }}
+                  placeholder="ramesh@example.com"
+                  disabled={isEditMode}
+                  error={formErrors.email}
+                  helperText={isEditMode ? 'Email cannot be changed.' : undefined}
+                  autoComplete="off"
+                />
+                <BtField
+                  label={isEditMode ? 'Reset password (optional)' : 'Temporary password'}
+                  required={!isEditMode}
+                  type="password"
+                  icon={KeyRound}
+                  value={newPassword}
+                  onChange={(e) => { setNewPassword(e.target.value); setFormErrors((x) => ({ ...x, password: undefined })); }}
+                  placeholder={isEditMode ? 'Leave blank to keep current' : 'Set a temporary password'}
+                  error={formErrors.password}
+                  helperText={!isEditMode ? 'They can change it after signing in.' : undefined}
+                  autoComplete="new-password"
+                />
+              </div>
+            </BtCard>
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
-              {/* Card 1: User Account Details */}
-              <BtCard padding="24px" className="tour-user-details">
-                <h3 style={{ margin: '0 0 16px', fontSize: 16, fontWeight: 700, color: 'var(--ink)' }}>
-                  1. Member Credentials
-                </h3>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 16 }}>
-                  <div>
-                    <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: 'var(--ink-soft)', marginBottom: 6 }}>
-                      Full Name *
-                    </label>
-                    <input
-                      type="text"
-                      value={newName}
-                      onChange={(e) => setNewName(e.target.value)}
-                      placeholder="e.g. Ramesh Kumar"
-                      style={{
-                        width: '100%',
-                        padding: '10px 14px',
-                        borderRadius: 'var(--r-btn, 12px)',
-                        border: '1px solid var(--line)',
-                        background: 'var(--fill)',
-                        fontSize: 13,
-                        color: 'var(--ink)',
-                        outline: 'none',
-                      }}
+            {/* 2. Role */}
+            <BtCard padding="24px" className="tour-role-select">
+              <CardTitle index={2} title="Role" description="Picking a role pre-sets the permissions below. You can fine-tune them after." />
+              <div role="radiogroup" aria-label="Role" style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+                {roleOptions.map((roleKey) => {
+                  const label = roleKey === '__custom_role__' ? 'Custom role' : roleKey;
+                  return (
+                    <BtChip
+                      key={roleKey}
+                      label={label}
+                      selected={selectedRole === roleKey}
+                      role="radio"
+                      aria-checked={selectedRole === roleKey}
+                      onClick={() => handleRoleChange(roleKey)}
+                      style={{ height: 40, padding: '0 18px', fontSize: 14 }}
                     />
-                  </div>
-                  <div>
-                    <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: 'var(--ink-soft)', marginBottom: 6 }}>
-                      Email Address *
-                    </label>
-                    <input
-                      type="email"
-                      value={newEmail}
-                      onChange={(e) => setNewEmail(e.target.value)}
-                      placeholder="ramesh@example.com"
-                      disabled={isEditMode}
-                      style={{
-                        width: '100%',
-                        padding: '10px 14px',
-                        borderRadius: 'var(--r-btn, 12px)',
-                        border: '1px solid var(--line)',
-                        background: isEditMode ? 'var(--fill)' : '#FFFFFF',
-                        fontSize: 13,
-                        color: isEditMode ? 'var(--ink-soft)' : 'var(--ink)',
-                        outline: 'none',
-                      }}
-                    />
-                  </div>
-                  <div>
-                    <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: 'var(--ink-soft)', marginBottom: 6 }}>
-                      {isEditMode ? 'Reset Password (optional)' : 'Temporary Password *'}
-                    </label>
-                    <input
-                      type="password"
-                      value={newPassword}
-                      onChange={(e) => setNewPassword(e.target.value)}
-                      placeholder="••••••••"
-                      style={{
-                        width: '100%',
-                        padding: '10px 14px',
-                        borderRadius: 'var(--r-btn, 12px)',
-                        border: '1px solid var(--line)',
-                        background: '#FFFFFF',
-                        fontSize: 13,
-                        color: 'var(--ink)',
-                        outline: 'none',
-                      }}
-                    />
-                  </div>
+                  );
+                })}
+              </div>
+
+              {isCustomRole && (
+                <div style={{ marginTop: 16, maxWidth: 420 }}>
+                  <BtField
+                    label="Custom role title"
+                    required
+                    value={customRoleName}
+                    onChange={(e) => { setCustomRoleName(e.target.value); setFormErrors((x) => ({ ...x, role: undefined })); }}
+                    placeholder="e.g. Site Engineer, Billing Specialist"
+                    error={formErrors.role}
+                  />
                 </div>
-              </BtCard>
+              )}
+            </BtCard>
 
-              {/* Card 2: Role Selection */}
-              <BtCard padding="24px" className="tour-role-select">
-                <h3 style={{ margin: '0 0 16px', fontSize: 16, fontWeight: 700, color: 'var(--ink)' }}>
-                  2. Role Assignment
-                </h3>
-                <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginBottom: 14 }}>
-                  {['Supervisor', 'Mason', '__custom_role__'].map((roleKey) => {
-                    const label = roleKey === '__custom_role__' ? 'Custom Role' : roleKey;
-                    const isSelected = selectedRole === roleKey;
+            {/* 3. Overseeing roles (Supervisor) */}
+            {selectedRole === 'Supervisor' && (
+              <BtCard padding="24px">
+                <CardTitle
+                  index={3}
+                  title="Roles to oversee"
+                  description="Which roles this supervisor can review, give tasks to, or approve entries for."
+                />
+                <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+                  {availableRolesToOversee.map((r) => {
+                    const isSelected = selectedOverseesRoles.includes(r);
                     return (
-                      <button
-                        key={roleKey}
-                        type="button"
-                        onClick={() => handleRoleChange(roleKey)}
-                        style={{
-                          padding: '10px 18px',
-                          borderRadius: 'var(--r-btn, 12px)',
-                          border: isSelected ? '1px solid var(--ink)' : '1px solid var(--line)',
-                          background: isSelected ? 'var(--ink)' : '#FFFFFF',
-                          color: isSelected ? '#FFFFFF' : 'var(--ink)',
-                          fontSize: 13,
-                          fontWeight: 600,
-                          cursor: 'pointer',
-                        }}
-                      >
-                        {label}
-                      </button>
+                      <BtChip
+                        key={r}
+                        label={r}
+                        icon={isSelected ? Check : Plus}
+                        selected={isSelected}
+                        variant="accent"
+                        aria-pressed={isSelected}
+                        onClick={() => toggleOverseesRole(r)}
+                        style={{ height: 40, padding: '0 16px', fontSize: 14 }}
+                      />
                     );
                   })}
                 </div>
-
-                {isCustomRole && (
-                  <div style={{ marginTop: 12 }}>
-                    <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: 'var(--ink-soft)', marginBottom: 6 }}>
-                      Custom Role Title *
-                    </label>
-                    <input
-                      type="text"
-                      value={customRoleName}
-                      onChange={(e) => setCustomRoleName(e.target.value)}
-                      placeholder="e.g. Site Engineer, Billing Specialist"
-                      style={{
-                        width: '100%',
-                        maxWidth: 360,
-                        padding: '10px 14px',
-                        borderRadius: 'var(--r-btn, 12px)',
-                        border: '1px solid var(--line)',
-                        fontSize: 13,
-                        color: 'var(--ink)',
-                        outline: 'none',
-                      }}
-                    />
-                  </div>
-                )}
               </BtCard>
+            )}
 
-              {/* Card 3: Overseeing Roles (if Supervisor) */}
-              {selectedRole === 'Supervisor' && (
-                <BtCard padding="24px">
-                  <h3 style={{ margin: '0 0 12px', fontSize: 16, fontWeight: 700, color: 'var(--ink)' }}>
-                    3. Roles to Oversee
-                  </h3>
-                  <p style={{ margin: '0 0 14px', fontSize: 13, color: 'var(--ink-soft)' }}>
-                    Select which roles this supervisor can review, dispatch tasks to, or approve entries for.
-                  </p>
-                  <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-                    {availableRolesToOversee.map((r) => {
-                      const isSelected = selectedOverseesRoles.includes(r);
-                      return (
-                        <button
-                          key={r}
-                          type="button"
-                          onClick={() => toggleOverseesRole(r)}
-                          style={{
-                            padding: '8px 16px',
-                            borderRadius: 'var(--r-chip)',
-                            border: isSelected ? '1px solid var(--accent)' : '1px solid var(--line)',
-                            background: isSelected ? 'var(--accent-soft)' : '#FFFFFF',
-                            color: isSelected ? 'var(--accent-ink)' : 'var(--ink)',
-                            fontSize: 13,
-                            fontWeight: 600,
-                            cursor: 'pointer',
-                          }}
-                        >
-                          {isSelected ? `✓ ${r}` : `+ ${r}`}
-                        </button>
-                      );
-                    })}
-                  </div>
-                </BtCard>
-              )}
-
-              {/* Card 4: Fine-Grained Permissions Matrix */}
-              <BtCard padding="24px" className="tour-permissions">
-                <h3 style={{ margin: '0 0 12px', fontSize: 16, fontWeight: 700, color: 'var(--ink)' }}>
-                  4. Fine-Grained Permission Matrix
-                </h3>
-                <div style={{ border: '1px solid var(--line)', borderRadius: 'var(--r-card)', overflow: 'hidden' }}>
-                  <div style={{ display: 'flex', background: 'var(--fill)', padding: '10px 16px', borderBottom: '1px solid var(--line)' }}>
-                    <div style={{ flex: 5, fontSize: 11, fontWeight: 700, fontFamily: 'var(--font-mono)', color: 'var(--ink-soft)', textTransform: 'uppercase' }}>Feature</div>
-                    <div style={{ width: 56, textAlign: 'center', fontSize: 11, fontWeight: 700, fontFamily: 'var(--font-mono)', color: 'var(--ink-soft)', textTransform: 'uppercase' }}>View</div>
-                    <div style={{ width: 56, textAlign: 'center', fontSize: 11, fontWeight: 700, fontFamily: 'var(--font-mono)', color: 'var(--ink-soft)', textTransform: 'uppercase' }}>Edit</div>
-                    <div style={{ width: 56, textAlign: 'center', fontSize: 11, fontWeight: 700, fontFamily: 'var(--font-mono)', color: 'var(--ink-soft)', textTransform: 'uppercase' }}>Delete</div>
-                  </div>
-
-                  {_featureRows.map((row, idx) => {
-                    if (row.section) {
-                      return (
-                        <div key={idx} style={{ background: 'var(--fill)', padding: '8px 16px', fontSize: 11, fontWeight: 700, fontFamily: 'var(--font-mono)', color: 'var(--ink-soft)', textTransform: 'uppercase' }}>
-                          {row.section}
-                        </div>
-                      );
-                    }
-
-                    const renderCheckbox = (key) => {
-                      if (!key) return <div style={{ width: 56, textAlign: 'center', color: 'var(--ink-soft)' }}>—</div>;
-                      return (
-                        <div style={{ width: 56, display: 'flex', justifyContent: 'center' }}>
-                          <input
-                            type="checkbox"
-                            checked={permissions[key] || false}
-                            onChange={(e) => setPermissions({ ...permissions, [key]: e.target.checked })}
-                            style={{ width: 16, height: 16, accentColor: 'var(--ink)', cursor: 'pointer' }}
-                          />
-                        </div>
-                      );
-                    };
-
-                    if (row.type === 'table') {
-                      return (
-                        <div key={idx} style={{ display: 'flex', alignItems: 'center', padding: '12px 16px', borderBottom: '1px solid var(--fill)' }}>
-                          <div style={{ flex: 5 }}>
-                            <div style={{ fontSize: 13.5, fontWeight: 600, color: 'var(--ink)' }}>{row.label}</div>
-                            <div style={{ fontSize: 12, color: 'var(--ink-soft)' }}>{row.desc}</div>
-                          </div>
-                          {renderCheckbox(row.view)}
-                          {renderCheckbox(row.edit)}
-                          {renderCheckbox(row.delete)}
-                        </div>
-                      );
-                    }
-
-                    if (row.type === 'toggle') {
-                      return (
-                        <div key={idx} style={{ display: 'flex', alignItems: 'center', padding: '12px 16px', borderBottom: '1px solid var(--fill)' }}>
-                          <div style={{ flex: 1 }}>
-                            <div style={{ fontSize: 13.5, fontWeight: 600, color: 'var(--ink)' }}>{row.label}</div>
-                            <div style={{ fontSize: 12, color: 'var(--ink-soft)' }}>{row.desc}</div>
-                          </div>
-                          <div style={{ marginLeft: 8 }}>
-                            <input
-                              type="checkbox"
-                              checked={permissions[row.key] || false}
-                              onChange={(e) => setPermissions({ ...permissions, [row.key]: e.target.checked })}
-                              style={{ width: 18, height: 18, accentColor: 'var(--ink)', cursor: 'pointer' }}
-                            />
-                          </div>
-                        </div>
-                      );
-                    }
-                    return null;
-                  })}
+            {/* 4. Permissions */}
+            <BtCard padding={0} className="tour-permissions">
+              <div style={{ padding: '24px 24px 8px' }}>
+                <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
+                  <CardTitle
+                    index={selectedRole === 'Supervisor' ? 4 : 3}
+                    title="Permissions"
+                    description="Switch on only what this person needs."
+                  />
+                  <BtBadge tone={onPerms > 0 ? 'brand' : 'neutral'} label={`${onPerms} of ${totalPerms} on`} showDot={false} />
                 </div>
-              </BtCard>
+              </div>
 
-              {/* Card 5: Project Access */}
-              <BtCard padding="24px" className="tour-project-access">
-                <h3 style={{ margin: '0 0 12px', fontSize: 16, fontWeight: 700, color: 'var(--ink)' }}>
-                  5. Project Scoping
-                </h3>
-                <p style={{ margin: '0 0 14px', fontSize: 13, color: 'var(--ink-soft)' }}>
-                  Select which projects this user can see and work on. If none are selected, they have access to all projects.
-                </p>
+              {PERMISSION_GROUPS.map((group) => {
+                const groupOn = group.items.filter((it) => permissions[it.key]).length;
+                return (
+                  <section key={group.title} aria-label={group.title}>
+                    <div
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        gap: 12,
+                        padding: '10px 24px',
+                        background: 'var(--bone)',
+                        borderTop: '1px solid var(--line)',
+                        borderBottom: '1px solid var(--line)',
+                      }}
+                    >
+                      <span className="bt-eyebrow" style={{ color: 'var(--ink-2)' }}>{group.title}</span>
+                      <span style={{ fontSize: 13, color: 'var(--ink-3)' }}>{groupOn} of {group.items.length} on</span>
+                    </div>
+                    {group.items.map((item, i) => (
+                      <div
+                        key={item.key}
+                        className="bt-hover-row"
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          gap: 16,
+                          padding: '14px 24px',
+                          borderTop: i === 0 ? 'none' : '1px solid var(--line)',
+                        }}
+                      >
+                        <div style={{ minWidth: 0 }}>
+                          <div style={{ fontSize: 15, fontWeight: 600, color: 'var(--ink)' }}>{item.label}</div>
+                          <div style={{ fontSize: 13, color: 'var(--ink-3)', marginTop: 2, lineHeight: 1.45 }}>{item.desc}</div>
+                        </div>
+                        <BtSwitch
+                          label={item.label}
+                          checked={permissions[item.key] || false}
+                          onChange={(val) => setPermissions((prev) => ({ ...prev, [item.key]: val }))}
+                        />
+                      </div>
+                    ))}
+                  </section>
+                );
+              })}
+            </BtCard>
+
+            {/* 5. Project scoping */}
+            <BtCard padding="24px" className="tour-project-access">
+              <CardTitle
+                index={selectedRole === 'Supervisor' ? 5 : 4}
+                title="Project access"
+                description="Choose which projects they can see and work on. If none are selected, they can access all projects."
+              />
+              {projects.length === 0 ? (
+                <div style={{ fontSize: 14, color: 'var(--ink-3)' }}>No projects yet. They will see projects as soon as you create them.</div>
+              ) : (
                 <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
                   {projects.map((p) => {
                     const pid = p._id || p.id;
                     const isSelected = selectedProjects.includes(pid);
                     return (
-                      <button
+                      <BtChip
                         key={pid}
-                        type="button"
+                        label={p.projectName || p.name}
+                        icon={isSelected ? Check : undefined}
+                        selected={isSelected}
+                        aria-pressed={isSelected}
                         onClick={() => toggleProject(pid)}
-                        style={{
-                          padding: '8px 14px',
-                          borderRadius: 'var(--r-chip)',
-                          border: isSelected ? '1px solid var(--ink)' : '1px solid var(--line)',
-                          background: isSelected ? 'var(--ink)' : '#FFFFFF',
-                          color: isSelected ? '#FFFFFF' : 'var(--ink)',
-                          fontSize: 13,
-                          fontWeight: 600,
-                          cursor: 'pointer',
-                        }}
-                      >
-                        {isSelected ? `✓ ${p.projectName || p.name}` : p.projectName || p.name}
-                      </button>
+                        style={{ height: 40, padding: '0 16px', fontSize: 14, opacity: isAdmin ? 1 : 0.6, cursor: isAdmin ? 'pointer' : 'not-allowed' }}
+                      />
                     );
                   })}
                 </div>
-              </BtCard>
-
-              {/* Action Buttons */}
-              <div style={{ display: 'flex', gap: 12, justifyContent: 'flex-end', marginTop: 12 }}>
-                <button
-                  type="button"
-                  onClick={() => setShowForm(false)}
-                  style={{
-                    height: 42,
-                    padding: '0 20px',
-                    borderRadius: 'var(--r-btn, 12px)',
-                    border: '1px solid var(--line)',
-                    background: '#FFFFFF',
-                    color: 'var(--ink)',
-                    fontSize: 13.5,
-                    fontWeight: 600,
-                    cursor: 'pointer',
-                  }}
-                >
-                  Cancel
-                </button>
-                <button
-                  type="button"
-                  onClick={handleProvision}
-                  disabled={saving}
-                  style={{
-                    height: 42,
-                    padding: '0 24px',
-                    borderRadius: 'var(--r-btn, 12px)',
-                    border: 'none',
-                    background: 'var(--ink)',
-                    color: '#FFFFFF',
-                    fontSize: 13.5,
-                    fontWeight: 700,
-                    cursor: saving ? 'not-allowed' : 'pointer',
-                    boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
-                  }}
-                >
-                  {saving ? 'Saving…' : isEditMode ? 'Save Changes' : 'Provision User'}
-                </button>
+              )}
+              <div style={{ marginTop: 14, fontSize: 13, color: 'var(--ink-3)' }}>
+                {selectedProjects.length === 0 ? 'Access: all projects' : `Access: ${selectedProjects.length} selected`}
               </div>
+            </BtCard>
+
+            {/* Sticky actions */}
+            <div
+              style={{
+                position: 'sticky',
+                bottom: 0,
+                zIndex: 5,
+                display: 'flex',
+                gap: 12,
+                justifyContent: 'flex-end',
+                padding: '14px 0 4px',
+                background: 'linear-gradient(to top, var(--ground) 70%, transparent)',
+              }}
+            >
+              <BtButton variant="secondary" onClick={() => setShowForm(false)} disabled={saving}>
+                Cancel
+              </BtButton>
+              <BtButton variant="primary" onClick={handleProvision} loading={saving} icon={isEditMode ? undefined : UserPlus} style={{ minWidth: 190 }}>
+                {isEditMode ? 'Save changes' : 'Add member'}
+              </BtButton>
             </div>
           </div>
         ) : (
-          /* ── LIST VIEW: TEAM MEMBERS ── */
-          <div className="tour-user-list">
-            {/* Plan limit alert banner */}
-            {limitMaxUsers !== -1 && (
+          /* ── LIST VIEW ── */
+          <div className="tour-user-list" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+            {limitMaxUsers !== -1 && !loading && !error && (
               <div
                 style={{
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'space-between',
-                  padding: '14px 20px',
+                  gap: 12,
+                  flexWrap: 'wrap',
+                  padding: '14px 18px',
                   borderRadius: 'var(--r-card)',
                   background: 'var(--card)',
                   border: '1px solid var(--line)',
-                  marginBottom: 20,
-                  boxShadow: 'var(--shadow-card)',
                 }}
               >
-                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                  <Info size={18} color="var(--accent-ink)" />
-                  <span style={{ fontSize: 13, color: 'var(--ink-soft)' }}>
-                    Your <b>{subscription?.plan || 'Free'}</b> plan allows up to <b>{limitMaxUsers} users</b>. You currently have <b>{users.length} members</b>.
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
+                  <Info size={18} color="var(--accent-ink)" style={{ flexShrink: 0 }} />
+                  <span style={{ fontSize: 14, color: 'var(--ink-2)', lineHeight: 1.45 }}>
+                    Your <b style={{ color: 'var(--ink)', textTransform: 'capitalize' }}>{subscription?.plan || 'Free'}</b> plan allows up to <b style={{ color: 'var(--ink)' }}>{limitMaxUsers} users</b>. You have <b style={{ color: 'var(--ink)' }}>{users.length}</b>.
                   </span>
                 </div>
                 {users.length >= limitMaxUsers && (
-                  <button
-                    onClick={() => navigate('/subscription')}
-                    style={{
-                      border: 'none',
-                      background: 'var(--accent-soft)',
-                      color: 'var(--accent-ink)',
-                      padding: '6px 14px',
-                      borderRadius: 8,
-                      fontSize: 12.5,
-                      fontWeight: 700,
-                      cursor: 'pointer',
-                    }}
-                  >
-                    Upgrade
-                  </button>
+                  <BtButton variant="secondary" size="small" onClick={() => navigate('/subscription')}>
+                    Upgrade plan
+                  </BtButton>
                 )}
               </div>
             )}
@@ -803,130 +751,63 @@ export default function AssignRolesPage() {
             {loading ? (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
                 {[1, 2, 3].map((i) => (
-                  <div
-                    key={i}
-                    style={{
-                      height: 84,
-                      borderRadius: 'var(--r-card)',
-                      background: 'var(--fill)',
-                    }}
-                  />
+                  <BtSkeleton key={i} height="84px" borderRadius="var(--r-card)" />
                 ))}
               </div>
+            ) : error ? (
+              <BtErrorCard title="Couldn't load your team" message={error} onRetry={fetchAll} />
             ) : users.length === 0 ? (
-              <BtEmpty
-                title="No members provisioned yet"
-                message="Start building your workforce team by adding members and configuring their permissions."
-                actionLabel="Add Member"
-                onAction={handleCreateClick}
-              />
+              <BtCard padding={0}>
+                <BtEmpty
+                  icon={Users}
+                  title="No team members yet"
+                  message="Add your first team member and choose what they can access."
+                  actionLabel="Add member"
+                  onAction={handleCreateClick}
+                />
+              </BtCard>
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
                 {users.map((member) => {
                   const roleName = member.role || 'Member';
-                  const roleTone =
-                    roleName.toLowerCase() === 'admin'
-                      ? 'accent'
-                      : roleName.toLowerCase() === 'supervisor'
-                        ? 'info'
-                        : roleName.toLowerCase() === 'mason'
-                          ? 'warn'
-                          : 'muted';
+                  const id = member._id || member.id;
+                  const permCount = (member.permissions || []).length;
 
                   return (
                     <BtCard
-                      key={member._id || member.id}
-                      padding="18px 24px"
-                      style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'space-between',
-                        flexWrap: 'wrap',
-                        gap: 16,
-                      }}
+                      key={id}
+                      padding="16px 20px"
+                      style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 14 }}
                     >
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
-                        <div
-                          style={{
-                            width: 44,
-                            height: 44,
-                            borderRadius: '50%',
-                            background: 'var(--fill)',
-                            border: '1px solid var(--line)',
-                            display: 'grid',
-                            placeItems: 'center',
-                            fontSize: 16,
-                            fontWeight: 700,
-                            color: 'var(--ink)',
-                          }}
-                        >
-                          {member.name ? member.name.charAt(0).toUpperCase() : 'U'}
-                        </div>
-                        <div>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                            <span style={{ fontSize: 15, fontWeight: 700, color: 'var(--ink)' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 14, minWidth: 0, flex: '1 1 260px' }}>
+                        <Avatar name={member.name} />
+                        <div style={{ minWidth: 0 }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                            <span style={{ fontSize: 16, fontWeight: 600, color: 'var(--ink)' }}>
                               {member.name || 'Unnamed User'}
                             </span>
-                            <BtBadge tone={roleTone}>{roleName}</BtBadge>
+                            <BtBadge tone={roleTone(roleName)} label={roleName} showDot={false} />
                           </div>
-                          <div style={{ fontSize: 12.5, color: 'var(--ink-soft)', marginTop: 2 }}>
-                            {member.email} · {(member.permissions || []).length} permissions active
+                          <div style={{ fontSize: 13, color: 'var(--ink-3)', marginTop: 3, overflowWrap: 'anywhere' }}>
+                            {member.email} · {roleName.toLowerCase() === 'admin' ? 'Full access' : `${permCount} ${permCount === 1 ? 'permission' : 'permissions'} on`}
                           </div>
                         </div>
                       </div>
 
                       <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                        <button
-                          onClick={() => handleEditClick(member)}
-                          style={{
-                            display: 'inline-flex',
-                            alignItems: 'center',
-                            gap: 6,
-                            padding: '6px 14px',
-                            borderRadius: 'var(--r-btn, 12px)',
-                            background: '#FFFFFF',
-                            border: '1px solid var(--line)',
-                            fontSize: 12.5,
-                            fontWeight: 600,
-                            color: 'var(--ink)',
-                            cursor: 'pointer',
-                          }}
-                        >
-                          <Edit2 size={13} />
-                          <span>Edit</span>
-                        </button>
-
+                        <BtButton variant="secondary" size="small" icon={Pencil} onClick={() => handleEditClick(member)}>
+                          Edit
+                        </BtButton>
                         {member.role?.toLowerCase() !== 'admin' && (
-                          <button
-                            onClick={() => {
-                              if (window.confirm(`Are you sure you want to deactivate ${member.name}?`)) {
-                                authAPI
-                                  .deleteUser(member._id || member.id)
-                                  .then(() => {
-                                    setToast({ message: 'User deactivated successfully', type: 'info', key: Date.now() });
-                                    fetchAll();
-                                  })
-                                  .catch((err) =>
-                                    setToast({ message: err.friendlyMessage || 'Failed to delete user', type: 'error', key: Date.now() })
-                                  );
-                              }
-                            }}
-                            style={{
-                              display: 'inline-flex',
-                              alignItems: 'center',
-                              gap: 6,
-                              padding: '6px 12px',
-                              borderRadius: 'var(--r-btn, 12px)',
-                              background: '#FFFFFF',
-                              border: '1px solid var(--line)',
-                              fontSize: 12.5,
-                              fontWeight: 600,
-                              color: 'var(--danger)',
-                              cursor: 'pointer',
-                            }}
+                          <BtButton
+                            variant="destructive"
+                            size="small"
+                            icon={Trash2}
+                            loading={deactivating === id}
+                            onClick={() => handleDeactivate(member)}
                           >
-                            <Trash2 size={13} />
-                          </button>
+                            Deactivate
+                          </BtButton>
                         )}
                       </div>
                     </BtCard>

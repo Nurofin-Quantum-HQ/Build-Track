@@ -1,34 +1,52 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
-  ArrowLeft,
-  CheckCircle2,
   HelpCircle,
   Building2,
   Layers,
   ListTodo,
   UserCheck,
   ChevronRight,
-  AlertCircle,
   FileText,
-  Calendar,
+  HardHat,
+  Check,
 } from 'lucide-react';
 import { projectAPI, authAPI, taskAPI } from '../api';
 import ModuleTour from '../components/ModuleTour';
 import BtHero from '../components/ui/BtHero';
+import BtPageHeader from '../components/ui/BtPageHeader';
 import BtSheet from '../components/ui/BtSheet';
 import BtCard from '../components/ui/BtCard';
 import BtButton from '../components/ui/BtButton';
-import BtPressable from '../components/ui/BtPressable';
-import BtBadge from '../components/ui/BtBadge';
-import { Toast } from '../components/Toast';
+import BtIconButton from '../components/ui/BtIconButton';
+import BtField, { BtSelect, BtTextarea } from '../components/ui/BtField';
+import btToast from '../components/ui/BtToast';
+
+function SectionTitle({ icon: Icon, title, description }) {
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 20 }}>
+      <div
+        style={{
+          width: 38, height: 38, borderRadius: 'var(--r-tile)', background: 'var(--fill)', color: 'var(--ink)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+        }}
+      >
+        <Icon size={19} strokeWidth={1.85} />
+      </div>
+      <div>
+        <h2 style={{ margin: 0, fontSize: 16, fontWeight: 600, color: 'var(--ink)' }}>{title}</h2>
+        {description && <p style={{ margin: '2px 0 0', fontSize: 13, color: 'var(--ink-3)', lineHeight: 1.45 }}>{description}</p>}
+      </div>
+    </div>
+  );
+}
 
 export default function AssignTaskPage() {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
   const [fetching, setFetching] = useState(true);
   const [runTour, setRunTour] = useState(false);
-  const [toast, setToast] = useState(null);
+  const [errors, setErrors] = useState({});
 
   const tourSteps = [
     { target: '.tour-project', content: 'Select the project this task belongs to.' },
@@ -71,8 +89,11 @@ export default function AssignTaskPage() {
       });
   }, []);
 
+  const clearError = (field) => setErrors((prev) => (prev[field] ? { ...prev, [field]: undefined } : prev));
+
   const handleChange = (e) => {
     setFormData((prev) => ({ ...prev, [e.target.name]: e.target.value }));
+    clearError(e.target.name);
   };
 
   const handleProjectChange = (e) => {
@@ -86,6 +107,7 @@ export default function AssignTaskPage() {
       activityId: '',
       activityName: '',
     });
+    clearError('project');
   };
 
   const handleFloorChange = (e) => {
@@ -98,6 +120,7 @@ export default function AssignTaskPage() {
       activityId: '',
       activityName: '',
     });
+    clearError('floorId');
   };
 
   const handlePhaseChange = (e) => {
@@ -111,6 +134,7 @@ export default function AssignTaskPage() {
       activityId: '',
       activityName: '',
     });
+    clearError('phaseId');
   };
 
   const handleActivityChange = (e) => {
@@ -123,37 +147,34 @@ export default function AssignTaskPage() {
       activityId: aId,
       activityName: activity?.name || '',
     });
+    clearError('activityId');
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!formData.project || !formData.floorId || !formData.phaseId || !formData.activityId || !formData.title || !formData.assignedTo) {
-      setToast({
-        type: 'error',
-        message: 'Please fill all required fields: Project, Floor, Phase, Activity, Title, and Assignee.',
-        key: Date.now(),
-      });
+    const errs = {};
+    if (!formData.project) errs.project = 'Choose a project.';
+    if (!formData.floorId) errs.floorId = 'Choose a floor.';
+    if (!formData.phaseId) errs.phaseId = 'Choose a phase.';
+    if (!formData.activityId) errs.activityId = 'Choose an activity.';
+    if (!formData.title.trim()) errs.title = 'Give the task a short title.';
+    if (!formData.assignedTo) errs.assignedTo = 'Choose who is responsible.';
+    setErrors(errs);
+    if (Object.keys(errs).length) {
+      btToast('Please fill all required fields: Project, Floor, Phase, Activity, Title, and Assignee.', { error: true });
       return;
     }
 
     setLoading(true);
     try {
       await taskAPI.createTask(formData);
-      setToast({
-        type: 'success',
-        message: 'Task successfully assigned to worker!',
-        key: Date.now(),
-      });
+      btToast('Task successfully assigned to worker!');
       setTimeout(() => {
         navigate(-1);
       }, 700);
     } catch (error) {
       console.error(error);
-      setToast({
-        type: 'error',
-        message: error?.response?.data?.message || 'Failed to assign task. Please try again.',
-        key: Date.now(),
-      });
+      btToast(error?.response?.data?.message || 'Failed to assign task. Please try again.', { error: true });
     } finally {
       setLoading(false);
     }
@@ -165,249 +186,138 @@ export default function AssignTaskPage() {
   const selectedPhaseObj = phases.find((p) => (p._id || p.id) === formData.phaseId);
   const activities = selectedPhaseObj?.activities || [];
 
-  const inputStyle = {
-    width: '100%',
-    padding: '12px 14px',
-    borderRadius: 'var(--r-input, 12px)',
-    border: '1px solid var(--border)',
-    background: '#FFFFFF',
-    color: 'var(--ink)',
-    fontSize: 14,
-    fontWeight: 500,
-    outline: 'none',
-    transition: 'border-color 160ms ease, box-shadow 160ms ease',
-    boxSizing: 'border-box',
-    fontFamily: 'inherit',
-  };
-
-  const labelStyle = {
-    display: 'flex',
-    alignItems: 'center',
-    gap: 6,
-    marginBottom: 8,
-    fontWeight: 600,
-    fontSize: 13,
-    color: 'var(--ink)',
-    letterSpacing: '-0.01em',
-  };
-
   return (
-    <div style={{ minHeight: '100vh', background: 'var(--surface-ground)' }}>
-      {toast && <Toast key={toast.key} message={toast.message} type={toast.type} />}
+    <div style={{ minHeight: '100vh', background: 'var(--ground)' }}>
       <ModuleTour steps={tourSteps} run={runTour} setRun={setRunTour} moduleName="AssignTaskPage" />
 
-      {/* ── HERO BANNER (Blueprint Noir) ── */}
+      {/* ── HERO ── */}
       <BtHero>
-        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 16 }}>
-          <div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 }}>
-              <BtPressable
-                onClick={() => navigate(-1)}
-                style={{
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: 6,
-                  color: 'rgba(255, 255, 255, 0.72)',
-                  fontSize: 13,
-                  fontWeight: 600,
-                  cursor: 'pointer',
-                  background: 'none',
-                  border: 'none',
-                  padding: 0,
-                }}
-              >
-                <ArrowLeft size={16} />
-                <span>Back</span>
-              </BtPressable>
-              <span style={{ color: 'rgba(255, 255, 255, 0.25)' }}>/</span>
-              <span
-                style={{
-                  fontFamily: 'var(--font-mono)',
-                  fontSize: 11,
-                  letterSpacing: '0.12em',
-                  textTransform: 'uppercase',
-                  color: 'var(--gold-brass)',
-                  fontWeight: 700,
-                }}
-              >
-                WORKFORCE TASKING
-              </span>
-            </div>
-
-            <h1
-              style={{
-                fontFamily: 'var(--font-serif)',
-                fontSize: 32,
-                fontWeight: 700,
-                color: 'var(--bone)',
-                margin: '0 0 6px',
-                letterSpacing: '-0.02em',
-              }}
-            >
-              Assign Task
-            </h1>
-            <p
-              style={{
-                color: 'rgba(255, 255, 255, 0.65)',
-                margin: 0,
-                fontSize: 14,
-                maxWidth: 580,
-                lineHeight: 1.5,
-              }}
-            >
-              Dispatch daily tasks, floor activities, and responsibilities to on-site workforce.
-            </p>
-          </div>
-
-          <button
-            onClick={() => setRunTour(true)}
-            title="Help Tour"
-            style={{
-              width: 38,
-              height: 38,
-              borderRadius: 'var(--r-btn, 12px)',
-              background: 'rgba(255, 255, 255, 0.08)',
-              border: '1px solid rgba(255, 255, 255, 0.12)',
-              color: 'var(--bone)',
-              display: 'grid',
-              placeItems: 'center',
-              cursor: 'pointer',
-              flexShrink: 0,
-            }}
-          >
-            <HelpCircle size={17} />
-          </button>
-        </div>
+        <BtPageHeader
+          size="md"
+          back={{ label: 'Back', onClick: () => navigate(-1) }}
+          eyebrow="Workforce tasking"
+          title="Assign Task"
+          subtitle="Give a team member a task on a specific floor, phase and activity."
+          actions={<BtIconButton onDark icon={HelpCircle} label="Page tour" onClick={() => setRunTour(true)} />}
+        />
       </BtHero>
 
-      {/* ── MAIN SHEET ── */}
+      {/* ── SHEET ── */}
       <BtSheet overlap={26} padding="28px 32px 64px">
-        <div style={{ maxWidth: 760, margin: '0 auto' }}>
-          <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
+        <div style={{ maxWidth: 960, margin: '0 auto' }}>
+          <form onSubmit={handleSubmit} noValidate style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
 
-            {/* Scope / Location Card */}
-            <BtCard padding={24} style={{ border: '1px solid var(--border)' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 18, borderBottom: '1px solid var(--border-subtle)', paddingBottom: 12 }}>
-                <Building2 size={18} color="var(--ink)" />
-                <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: 'var(--ink)', letterSpacing: '-0.01em' }}>
-                  Location & Construction Scope
-                </h3>
-              </div>
+            {/* Scope */}
+            <BtCard padding="24px">
+              <SectionTitle icon={Building2} title="Where is the work?" description="Pick each step in order. The next one unlocks when you do." />
 
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-                {/* Project Selector */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
                 <div className="tour-project">
-                  <label style={labelStyle}>
-                    Project <span style={{ color: 'var(--rose-ember)' }}>*</span>
-                  </label>
-                  <select
+                  <BtSelect
+                    label="Project"
+                    required
+                    icon={Building2}
                     name="project"
                     value={formData.project}
                     onChange={handleProjectChange}
-                    style={inputStyle}
                     disabled={fetching}
+                    error={errors.project}
+                    helperText={fetching ? 'Loading projects…' : projects.length === 0 ? 'No projects yet. Create one first.' : undefined}
                   >
-                    <option value="">Select Project</option>
+                    <option value="">Select project</option>
                     {projects.map((p) => (
                       <option key={p._id || p.id} value={p._id || p.id}>
                         {p.projectName || p.name}
                       </option>
                     ))}
-                  </select>
+                  </BtSelect>
                 </div>
 
-                {/* Floor Selector */}
                 <div className="tour-floor">
-                  <label style={labelStyle}>
-                    Floor / Level <span style={{ color: 'var(--rose-ember)' }}>*</span>
-                  </label>
-                  <select
+                  <BtSelect
+                    label="Floor / Level"
+                    required
+                    icon={Layers}
                     name="floorId"
                     value={formData.floorId}
                     onChange={handleFloorChange}
-                    style={{
-                      ...inputStyle,
-                      background: !formData.project ? 'var(--surface-sunken)' : '#FFFFFF',
-                      cursor: !formData.project ? 'not-allowed' : 'default',
-                    }}
                     disabled={!formData.project}
+                    error={errors.floorId}
+                    helperText={
+                      !formData.project
+                        ? 'Choose a project first.'
+                        : floors.length === 0
+                          ? 'This project has no floors set up.'
+                          : undefined
+                    }
                   >
-                    <option value="">{formData.project ? 'Select Floor' : 'Select a project first'}</option>
+                    <option value="">{formData.project ? 'Select floor' : 'Choose a project first'}</option>
                     {floors.map((f, i) => (
                       <option key={i} value={f}>{f}</option>
                     ))}
-                  </select>
+                  </BtSelect>
                 </div>
 
-                {/* Phase & Activity Cascading Selectors */}
-                <div className="tour-phase-activity" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
-                  <div>
-                    <label style={labelStyle}>
-                      Phase <span style={{ color: 'var(--rose-ember)' }}>*</span>
-                    </label>
-                    <select
-                      name="phaseId"
-                      value={formData.phaseId}
-                      onChange={handlePhaseChange}
-                      style={{
-                        ...inputStyle,
-                        background: !formData.project ? 'var(--surface-sunken)' : '#FFFFFF',
-                        cursor: !formData.project ? 'not-allowed' : 'default',
-                      }}
-                      disabled={!formData.project}
-                    >
-                      <option value="">{formData.project ? 'Select Phase' : 'Select project first'}</option>
-                      {phases.map((p) => (
-                        <option key={p._id || p.id} value={p._id || p.id}>
-                          {p.phaseName || p.name}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
+                <div className="tour-phase-activity bt-grid-2" style={{ gap: 18 }}>
+                  <BtSelect
+                    label="Phase"
+                    required
+                    name="phaseId"
+                    value={formData.phaseId}
+                    onChange={handlePhaseChange}
+                    disabled={!formData.floorId}
+                    error={errors.phaseId}
+                    helperText={
+                      !formData.floorId
+                        ? 'Choose a floor first.'
+                        : phases.length === 0
+                          ? 'This project has no phases set up.'
+                          : undefined
+                    }
+                  >
+                    <option value="">{formData.floorId ? 'Select phase' : 'Choose a floor first'}</option>
+                    {phases.map((p) => (
+                      <option key={p._id || p.id} value={p._id || p.id}>
+                        {p.phaseName || p.name}
+                      </option>
+                    ))}
+                  </BtSelect>
 
-                  <div>
-                    <label style={labelStyle}>
-                      Activity <span style={{ color: 'var(--rose-ember)' }}>*</span>
-                    </label>
-                    <select
-                      name="activityId"
-                      value={formData.activityId}
-                      onChange={handleActivityChange}
-                      style={{
-                        ...inputStyle,
-                        background: !formData.phaseId ? 'var(--surface-sunken)' : '#FFFFFF',
-                        cursor: !formData.phaseId ? 'not-allowed' : 'default',
-                      }}
-                      disabled={!formData.phaseId}
-                    >
-                      <option value="">{formData.phaseId ? 'Select Activity' : 'Select phase first'}</option>
-                      {activities.map((a) => (
-                        <option key={a._id || a.id} value={a._id || a.id}>
-                          {a.name}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
+                  <BtSelect
+                    label="Activity"
+                    required
+                    name="activityId"
+                    value={formData.activityId}
+                    onChange={handleActivityChange}
+                    disabled={!formData.phaseId}
+                    error={errors.activityId}
+                    helperText={
+                      !formData.phaseId
+                        ? 'Choose a phase first.'
+                        : activities.length === 0
+                          ? 'This phase has no activities.'
+                          : undefined
+                    }
+                  >
+                    <option value="">{formData.phaseId ? 'Select activity' : 'Choose a phase first'}</option>
+                    {activities.map((a) => (
+                      <option key={a._id || a.id} value={a._id || a.id}>
+                        {a.name}
+                      </option>
+                    ))}
+                  </BtSelect>
                 </div>
 
                 {/* Scope breadcrumb summary */}
                 {formData.project && formData.floorId && formData.phaseName && (
                   <div
                     style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      flexWrap: 'wrap',
-                      gap: 6,
-                      padding: '10px 14px',
-                      borderRadius: 10,
-                      background: 'var(--surface-sunken)',
-                      border: '1px dashed var(--border)',
-                      fontSize: 12,
-                      color: 'var(--ink-secondary)',
-                      marginTop: 4,
+                      display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 6, padding: '10px 14px',
+                      borderRadius: 'var(--r-tile)', background: 'var(--bone)', border: '1px dashed var(--input-border)',
+                      fontSize: 13, color: 'var(--ink-2)',
                     }}
                   >
-                    <span style={{ fontWeight: 600, color: 'var(--ink)' }}>Selected Path:</span>
+                    <span style={{ fontWeight: 600, color: 'var(--ink)' }}>Selected path:</span>
                     <span>{selectedProject?.projectName || selectedProject?.name}</span>
                     <ChevronRight size={13} />
                     <span>{formData.floorId}</span>
@@ -424,118 +334,72 @@ export default function AssignTaskPage() {
               </div>
             </BtCard>
 
-            {/* Task Specification Card */}
-            <BtCard padding={24} style={{ border: '1px solid var(--border)' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 18, borderBottom: '1px solid var(--border-subtle)', paddingBottom: 12 }}>
-                <ListTodo size={18} color="var(--ink)" />
-                <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: 'var(--ink)', letterSpacing: '-0.01em' }}>
-                  Task Details
-                </h3>
-              </div>
+            {/* Task details */}
+            <BtCard padding="24px">
+              <SectionTitle icon={ListTodo} title="What needs doing?" description="A short title and any instructions for the person doing it." />
 
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
                 <div className="tour-title">
-                  <label style={labelStyle}>
-                    Task Title <span style={{ color: 'var(--rose-ember)' }}>*</span>
-                  </label>
-                  <input
+                  <BtField
+                    label="Task title"
+                    required
+                    icon={FileText}
                     name="title"
                     value={formData.title}
                     onChange={handleChange}
                     placeholder="e.g. Lay 400 AAC blocks on north perimeter wall"
-                    style={inputStyle}
+                    error={errors.title}
                   />
                 </div>
 
                 <div className="tour-desc">
-                  <label style={labelStyle}>
-                    Description / Instructions
-                  </label>
-                  <textarea
+                  <BtTextarea
+                    label="Description / instructions"
                     name="description"
                     value={formData.description}
                     onChange={handleChange}
-                    placeholder="Provide specific notes, safety checks, mortar ratio, or milestone targets..."
+                    placeholder="Add notes, safety checks, mortar ratio or milestone targets"
                     rows={4}
-                    style={{
-                      ...inputStyle,
-                      resize: 'vertical',
-                    }}
+                    helperText="Optional"
                   />
                 </div>
               </div>
             </BtCard>
 
-            {/* Assignee Card */}
-            <BtCard padding={24} style={{ border: '1px solid var(--border)' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 18, borderBottom: '1px solid var(--border-subtle)', paddingBottom: 12 }}>
-                <UserCheck size={18} color="var(--ink)" />
-                <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: 'var(--ink)', letterSpacing: '-0.01em' }}>
-                  Workforce Assignment
-                </h3>
-              </div>
+            {/* Assignee */}
+            <BtCard padding="24px">
+              <SectionTitle icon={UserCheck} title="Who is responsible?" />
 
               <div className="tour-assignee">
-                <label style={labelStyle}>
-                  Assign To <span style={{ color: 'var(--rose-ember)' }}>*</span>
-                </label>
-                <select
+                <BtSelect
+                  label="Assign to"
+                  required
+                  icon={HardHat}
                   name="assignedTo"
                   value={formData.assignedTo}
                   onChange={handleChange}
-                  style={inputStyle}
+                  disabled={fetching}
+                  error={errors.assignedTo}
                 >
-                  <option value="">Select Responsible Worker / Supervisor</option>
+                  <option value="">Select responsible worker or supervisor</option>
                   {users.map((u) => (
                     <option key={u._id || u.id} value={u._id || u.id}>
                       {u.name} — {u.role || 'Worker'} {u.email ? `(${u.email})` : ''}
                     </option>
                   ))}
-                </select>
+                </BtSelect>
               </div>
             </BtCard>
 
-            {/* Action Bar */}
-            <div
-              className="tour-submit"
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'flex-end',
-                gap: 12,
-                paddingTop: 8,
-              }}
-            >
-              <button
-                type="button"
-                onClick={() => navigate(-1)}
-                style={{
-                  height: 44,
-                  padding: '0 20px',
-                  borderRadius: 'var(--r-btn, 12px)',
-                  background: 'transparent',
-                  border: '1px solid var(--border)',
-                  color: 'var(--ink)',
-                  fontSize: 14,
-                  fontWeight: 600,
-                  cursor: 'pointer',
-                  transition: 'background 140ms ease',
-                }}
-              >
+            {/* Actions */}
+            <div className="tour-submit" style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 12, flexWrap: 'wrap' }}>
+              <BtButton variant="secondary" onClick={() => navigate(-1)} disabled={loading}>
                 Cancel
-              </button>
-
-              <BtButton
-                variant="primary"
-                size="lg"
-                type="submit"
-                loading={loading}
-                style={{ minWidth: 160 }}
-              >
-                {loading ? 'Assigning Task...' : 'Assign Task'}
+              </BtButton>
+              <BtButton variant="primary" type="submit" loading={loading} icon={Check} style={{ minWidth: 180 }}>
+                Assign task
               </BtButton>
             </div>
-
           </form>
         </div>
       </BtSheet>

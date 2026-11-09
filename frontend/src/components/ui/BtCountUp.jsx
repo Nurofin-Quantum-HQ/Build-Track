@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useRef } from 'react';
+import { isFullMotion } from '../../utils/motion';
 
 /**
  * Format Indian Rupee currency
@@ -38,7 +39,7 @@ export default function BtCountUp({
 
   useEffect(() => {
     // Check reduced motion
-    if (typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+    if (!isFullMotion()) {
       setDisplayValue(target);
       return;
     }

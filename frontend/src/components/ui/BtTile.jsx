@@ -52,21 +52,21 @@ export function BtTypeTile({ type, size = 42, style = {} }) {
 
   if (t.includes('labour') || t.includes('labor') || t.includes('wage')) {
     Icon = Users;
-    bg = 'var(--tone-green-bg)';
-    fg = 'var(--tone-green)';
+    bg = 'var(--type-labour-soft)';
+    fg = 'var(--type-labour)';
   } else if (t.includes('equip') || t.includes('machin') || t.includes('expense')) {
     Icon = Truck;
-    bg = 'var(--tone-amber-bg)';
-    fg = 'var(--tone-amber)';
+    bg = 'var(--type-equipment-soft)';
+    fg = 'var(--type-equipment)';
   } else if (t.includes('income') || t.includes('revenue')) {
     Icon = IndianRupee;
-    bg = 'var(--tone-green-bg)';
-    fg = 'var(--tone-green)';
+    bg = 'var(--type-income-soft)';
+    fg = 'var(--status-success)';
   } else {
     // material
     Icon = Package;
-    bg = 'var(--tone-brand-bg)';
-    fg = 'var(--tone-brand)';
+    bg = 'var(--type-material-soft)';
+    fg = 'var(--type-material)';
   }
 
   return <BtTile icon={Icon} bg={bg} fg={fg} size={size} style={style} />;
