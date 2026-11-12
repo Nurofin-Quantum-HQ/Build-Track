@@ -1,5 +1,6 @@
 import axios from "axios";
 import useAuthStore from "../stores/authStore";
+import { recordApiFailure } from "../utils/bugReportTrail";
 
 function normalizeOrigin(url) {
   if (!url) return "";
@@ -21,6 +22,7 @@ api.interceptors.response.use(
   (res) => res,
   (err) => {
     const status = err?.response?.status;
+    recordApiFailure(err?.config?.method, err?.config?.url, status); // "recent steps" for problem reports
     if (status === 401 && !window.location.pathname.startsWith("/login")) {
       localStorage.removeItem("bt_token");
       localStorage.removeItem("bt_user");
@@ -191,4 +193,9 @@ export default api;
 export const esignAPI = {
   requestSignature: (data) => api.post("/esign/request", data),
   checkStatus: (reqId) => api.get(`/esign/status/${reqId}`)
+};
+
+export const bugReportAPI = {
+  submit: (data) => api.post("/bug-reports", data),
+  mine:   ()     => api.get("/bug-reports/mine"),
 };

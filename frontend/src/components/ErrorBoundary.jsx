@@ -1,5 +1,6 @@
 import React from "react";
 import { AlertTriangle, RefreshCw, Home } from "lucide-react";
+import { openReportProblem } from "./ReportProblem/openReportProblem";
 
 export default class ErrorBoundary extends React.Component {
   constructor(props) {
@@ -27,6 +28,13 @@ export default class ErrorBoundary extends React.Component {
 
   handleGoHome = () => {
     window.location.href = "/";
+  };
+
+  handleReport = () => {
+    openReportProblem({
+      error: this.state.error,
+      hint: "Sorry about that. A few words about what you were doing will help us fix it.",
+    });
   };
 
   render() {
@@ -175,6 +183,25 @@ export default class ErrorBoundary extends React.Component {
                 <span>Go to Dashboard</span>
               </button>
             </div>
+
+            <button
+              type="button"
+              onClick={this.handleReport}
+              style={{
+                marginTop: "18px",
+                background: "none",
+                border: "none",
+                padding: 0,
+                fontSize: "13px",
+                fontWeight: 600,
+                color: "var(--ink-2, #525864)",
+                textDecoration: "underline",
+                textUnderlineOffset: "3px",
+                cursor: "pointer",
+              }}
+            >
+              Report this problem
+            </button>
           </div>
         </div>
       );

@@ -622,6 +622,11 @@ input.custom-input-field:active {
 .bt-icon-btn.on-dark:hover { background: rgba(255, 255, 255, 0.12) !important; color: var(--on-noir) !important; }
 .bt-icon-btn.on-light:hover { background: var(--fill) !important; color: var(--ink) !important; }
 
+/* Quiet "Report a problem" link at the foot of the sidebar */
+.bt-report-link { display: inline-flex; align-items: center; gap: 6px; margin: 10px 0 0 4px; padding: 2px 0; background: none; border: none; cursor: pointer; font-family: var(--font-ui); font-size: 12px; color: var(--on-noir-3); transition: color 150ms ease; }
+.bt-report-link:hover, .bt-report-link:focus-visible { color: var(--on-noir-2); }
+.bt-report-link:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; border-radius: 4px; }
+
 /* Responsive grids */
 .bt-grid-2, .bt-grid-3, .bt-grid-4 { display: grid; gap: 16px; }
 .bt-grid-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }

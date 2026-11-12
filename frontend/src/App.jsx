@@ -1,5 +1,5 @@
 import { useEffect, lazy, Suspense } from "react";
-import { Routes, Route, Navigate } from "react-router-dom";
+import { Routes, Route, Navigate, useLocation } from "react-router-dom";
 import DashboardLayout from "./layout/DashboardLayout";
 import AppProviders from "./contexts/AppProviders";
 import { useAuth } from "./contexts/AuthContext";
@@ -7,6 +7,7 @@ import RequireRole from "./components/RequireRole";
 import { applyAccent } from "./styles/designTokens";
 import ErrorBoundary from "./components/ErrorBoundary";
 import { BtPageLoader } from "./components/ui/BtBrickLoader";
+import { recordRoute, startTrail } from "./utils/bugReportTrail";
 
 import LoginPage       from "./pages/login_page";
 import SignUpPage      from "./pages/signup_page";
@@ -190,9 +191,21 @@ function AppRoutes() {
   applyAccent(saved);
 })();
 
+startTrail(); // window errors / unhandled rejections -> "recent steps" in problem reports
+
+// Records page changes (path only, never the query string) for problem reports
+function RouteTrail() {
+  const { pathname } = useLocation();
+  useEffect(() => {
+    recordRoute(pathname);
+  }, [pathname]);
+  return null;
+}
+
 export default function App() {
   return (
     <ErrorBoundary>
+      <RouteTrail />
       <AppProviders>
       <AppRoutes />
       </AppProviders>

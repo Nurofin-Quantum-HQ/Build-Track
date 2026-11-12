@@ -4,12 +4,13 @@ import { navItems, adminNavItems } from "../navItems";
 import BtIconButton from "./ui/BtIconButton";
 import { canAccessRoute, canAddEntries, canApprove } from "../utils/access";
 import { resolveImageUrl } from "../utils/imageUrl";
-import { LogOut, HelpCircle, Plus, Download } from "lucide-react";
+import { LogOut, HelpCircle, Plus, Download, LifeBuoy } from "lucide-react";
 import { useAuth } from "../contexts/AuthContext";
 import { preloadRoute } from "../App";
 import perfLogger from "../utils/performanceLogger";
 import useNotificationStore from "../stores/notificationStore";
 import { approvalAPI } from "../api";
+import { openReportProblem } from "./ReportProblem/openReportProblem";
 
 const FONT_FAMILY_MAP = {
   "Inter": "'Inter', sans-serif",
@@ -495,6 +496,20 @@ export default function Sidebar() {
             style={{ color: "var(--status-danger-bright)" }}
           />
         </div>
+
+        {/* Quiet help link: not a call to go looking for faults */}
+        <button
+          type="button"
+          className="bt-report-link"
+          onClick={() => {
+            const drawer = window.innerWidth < 1024;
+            if (drawer) window.dispatchEvent(new Event("bt-close-drawer"));
+            openReportProblem({ settleMs: drawer ? 300 : 0 });
+          }}
+        >
+          <LifeBuoy size={14} strokeWidth={1.8} />
+          <span>Report a problem</span>
+        </button>
       </div>
     </aside>
   );

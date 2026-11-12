@@ -142,7 +142,7 @@ const limiter = rateLimit({
   }
 });
 app.use("/api/", limiter);
-app.use(express.json({ limit: "50mb" }));
+app.use(express.json({ limit: "50mb", verify: (req, _res, buf) => { req.rawBody = buf; } }));
 app.use(express.urlencoded({ extended: true, limit: "50mb" }));
 app.use(morgan(isProd ? "combined" : "dev"));
 app.use("/uploads", express.static(path.join(process.cwd(), "uploads")));
@@ -213,6 +213,7 @@ app.use("/api/approvals",         require("./routes/approvalsRoutes"));
 app.use("/api/notifications",     require("./routes/notificationRoutes"));
 app.use("/api/analytics",         require("./routes/analyticsRoutes"));
 app.use("/api/subscriptions",     subscriptionRoutes);
+app.use("/api/bug-reports",       require("./routes/bugReportRoutes"));
 app.use((_req, res) => res.status(404).json({ success: false, message: "Route not found" }));
 app.use((err, _req, res, _next) => {
   if (!isProd) console.error(err.stack);
@@ -281,6 +282,7 @@ process.on("uncaughtException", (err) => {
     server = app.listen(PORT, () =>
       console.log(`🚀 Server running on port ${PORT} [${NODE_ENV}]`)
     );
+    require("./services/bugReportService").startSweeper(); // retries unsent problem reports; no-op under test
     setImmediate(async () => {
       try {
         if (process.env.SKIP_STARTUP_CLEANUP === "true") {

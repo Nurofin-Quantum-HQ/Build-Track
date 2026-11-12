@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { createRoot } from 'react-dom/client';
+import { hadRecentServerFailure } from '../../utils/bugReportTrail';
+import { openReportProblem } from '../ReportProblem/openReportProblem';
 
 export function BtToastComponent({
   message,
@@ -24,6 +26,7 @@ export function BtToastComponent({
     <div
       role={error ? 'alert' : 'status'}
       aria-live="polite"
+      data-bt-nocapture=""
       style={{
         position: 'fixed',
         bottom: '24px',
@@ -66,7 +69,8 @@ export function BtToastComponent({
             fontFamily: 'var(--font-ui)',
             fontSize: '14px',
             fontWeight: 700,
-            color: 'var(--accent)',
+            color: error ? 'var(--on-noir)' : 'var(--accent)',
+            textDecoration: error ? 'underline' : 'none',
             cursor: 'pointer',
             border: 'none',
             background: 'none',
@@ -84,6 +88,13 @@ export function BtToastComponent({
  * Imperative helper matching btToast(context, '...') in Flutter
  */
 export function btToast(message, { onUndo, undoLabel, error = false, duration = 3500 } = {}) {
+  // An error toast that follows a failed request (server error or no connection) offers a quiet "Report".
+  // Validation messages (4xx) and toasts that already carry an action are left alone.
+  if (error && !onUndo && hadRecentServerFailure()) {
+    onUndo = () => openReportProblem({ hint: 'Sorry about that. A few words about what you were doing will help us fix it.' });
+    undoLabel = 'Report';
+    duration = Math.max(duration, 6000);
+  }
   const container = document.createElement('div');
   document.body.appendChild(container);
   const root = createRoot(container);

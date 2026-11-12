@@ -30,6 +30,12 @@ export default function DashboardLayout() {
   }, [location.pathname]);
 
   useEffect(() => {
+    const close = () => setSidebarOpen(false);
+    window.addEventListener("bt-close-drawer", close);
+    return () => window.removeEventListener("bt-close-drawer", close);
+  }, []);
+
+  useEffect(() => {
     if (!sidebarOpen) return;
     const onKey = (e) => e.key === "Escape" && setSidebarOpen(false);
     window.addEventListener("keydown", onKey);
