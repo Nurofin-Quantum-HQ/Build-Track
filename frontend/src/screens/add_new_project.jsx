@@ -624,6 +624,7 @@ export default function NewProjectPage() {
     fd.append("progress", progress);
     fd.append("scope", scope);
     fd.append("retainedDocuments", JSON.stringify(documents));
+    if (removeExistingPhoto) fd.append("removePhoto", "true");
     if (photoFile) fd.append("photo", photoFile);
 
     documentFiles.forEach(file => {
@@ -672,7 +673,13 @@ export default function NewProjectPage() {
       setTimeout(() => navigate("/projects", { replace: true }), 600);
     } catch (err) {
       console.error("Save project error:", err);
-      setErrMsg(err.response?.data?.message || "Failed to save project.");
+      const serverMsg = err.response?.data?.message;
+      const status = err.response?.status;
+      if (status === 413) {
+        setErrMsg("File upload failed: files too large. Please upload files smaller than 25MB.");
+      } else {
+        setErrMsg(serverMsg || "Failed to save project.");
+      }
     } finally {
       setSaving(false);
     }

@@ -2,25 +2,40 @@ const multer = require("multer");
 const path   = require("path");
 const cloudinary = require("./cloudinary");
 const { CloudinaryStorage } = require("multer-storage-cloudinary");
+
 const storage = new CloudinaryStorage({
   cloudinary,
-  params: {
-    folder:          "buildtrack",
-    allowed_formats: ["jpg", "jpeg", "png", "webp", "gif", "pdf"],
-    transformation:  [{ quality: "auto", fetch_format: "auto" }],
+  params: async (_req, file) => {
+    const ext = path.extname(file.originalname || "").toLowerCase().replace(".", "");
+    const isImage = /^(jpe?g|png|webp|gif)$/i.test(ext);
+    if (!isImage) {
+      // PDF documents, blueprints, spreadsheets, docx
+      const rawBaseName = path.parse(file.originalname || "document").name.replace(/[^a-zA-Z0-9_-]/g, "_");
+      return {
+        folder: "buildtrack/documents",
+        resource_type: "raw",
+        public_id: `${Date.now()}-${rawBaseName}.${ext || "bin"}`,
+      };
+    }
+    return {
+      folder: "buildtrack",
+      allowed_formats: ["jpg", "jpeg", "png", "webp", "gif"],
+      transformation: [{ quality: "auto", fetch_format: "auto" }],
+    };
   },
 });
+
 const fileFilter = (_req, file, cb) => {
-  const allowedExt  = /\.(jpeg|jpg|png|webp|gif|pdf)$/i;
-  const allowedMime = /^(image\/(jpeg|png|webp|gif)|application\/pdf)$/;
-  const extOk  = allowedExt.test(path.extname(file.originalname));
-  const mimeOk = allowedMime.test(file.mimetype);
-  if (extOk && mimeOk) return cb(null, true);
-  cb(new Error("Only image files (jpg, png, webp, gif) or PDF documents are allowed"));
+  const allowedExt = /\.(jpe?g|png|webp|gif|pdf|docx?|xlsx?|csv|txt|rtf|dwg|dxf)$/i;
+  const extOk = allowedExt.test(path.extname(file.originalname || ""));
+  if (extOk) return cb(null, true);
+  cb(new Error("Allowed formats: images (JPG, PNG, WEBP, GIF), documents/blueprints (PDF, DOC, DOCX, DWG, DXF, TXT), or spreadsheets (XLS, XLSX, CSV)"));
 };
+
 const upload = multer({
   storage,
   fileFilter,
-  limits: { fileSize: 5 * 1024 * 1024 },
+  limits: { fileSize: 25 * 1024 * 1024 }, // 25 MB limit
 });
+
 module.exports = upload;

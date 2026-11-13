@@ -639,7 +639,14 @@ router.put("/:id", protect, async (req, res) => {
     if (body.mapAddress !== undefined) updateData.mapAddress = body.mapAddress;
     if (body.scope !== undefined) updateData.scope = body.scope;
     if (body.progress !== undefined) updateData.progress = Number(body.progress);
-    if (body.buildingType !== undefined) updateData.buildingType = safeParse(body.buildingType);
+    if (body.buildingType !== undefined) {
+      updateData.buildingType = safeParse(body.buildingType);
+    } else if (body.mainType !== undefined || body.subType !== undefined) {
+      updateData.buildingType = {
+        mainType: body.mainType || existing.buildingType?.mainType || "Residential",
+        subType: body.subType || existing.buildingType?.subType || "General",
+      };
+    }
     if (body.floors !== undefined) updateData.floors = safeParse(body.floors);
     if (body.landArea !== undefined) updateData.landArea = body.landArea;
     if (body.landUnit !== undefined) updateData.landUnit = body.landUnit;
@@ -788,7 +795,7 @@ router.put("/:id", protect, async (req, res) => {
       const msg = Object.values(err.errors).map((e) => e.message).join(", ");
       return res.status(400).json({ message: msg });
     }
-    res.status(500).json({ message: "Failed to update project" });
+    res.status(500).json({ message: err.message || "Failed to update project" });
   }
 });
 // Daily progress for ONE activity. Replaces sending the whole project (every
