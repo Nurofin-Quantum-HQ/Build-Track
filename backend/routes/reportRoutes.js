@@ -446,6 +446,8 @@ router.get("/ledger", requirePermission(["view_finances"]), async (req, res) => 
       rawRows.map((r) => ({
         id: String(r._id),
         date: r._d,
+        createdAt: r.createdAt || null,
+        rawDate: r.rawDate || null,
         projectId: r.project ? String(r.project) : null,
         projectName: r.project ? projName.get(String(r.project)) || "" : "",
         direction: r._dir,

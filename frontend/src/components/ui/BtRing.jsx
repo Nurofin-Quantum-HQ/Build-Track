@@ -10,7 +10,7 @@ export default function BtRing({
   size = 68,
   stroke = 7,
   color,
-  trackColor = 'var(--fill)',
+  trackColor,
   children,
   className = '',
   style = {},
@@ -20,11 +20,13 @@ export default function BtRing({
   const clamped = Math.max(0, Math.min(1, normalized));
 
   const center = size / 2;
-  const radius = center - stroke;
+  const radius = Math.max(0, (size - stroke) / 2);
   const circumference = 2 * Math.PI * radius;
   const strokeDashoffset = circumference - clamped * circumference;
 
   const ringColor = color || 'var(--accent)';
+  // Parity with Flutter app: Bt.ink with 10% opacity on light, white with 12% on dark
+  const ringTrack = trackColor || 'color-mix(in srgb, var(--ink) 12%, transparent)';
 
   return (
     <div
@@ -44,35 +46,42 @@ export default function BtRing({
       <svg
         width={size}
         height={size}
+        viewBox={`0 0 ${size} ${size}`}
         style={{
+          display: 'block',
+          width: size,
+          height: size,
           transform: 'rotate(-90deg)',
+          transformOrigin: '50% 50%',
           overflow: 'visible',
         }}
       >
-        {/* Background track */}
+        {/* Background track — always clearly visible */}
         <circle
           cx={center}
           cy={center}
           r={radius}
           fill="none"
-          stroke={trackColor}
+          stroke={ringTrack}
           strokeWidth={stroke}
         />
         {/* Animated Progress ring */}
-        <circle
-          cx={center}
-          cy={center}
-          r={radius}
-          fill="none"
-          stroke={ringColor}
-          strokeWidth={stroke}
-          strokeDasharray={circumference}
-          strokeDashoffset={strokeDashoffset}
-          strokeLinecap="round"
-          style={{
-            transition: 'stroke-dashoffset 1400ms cubic-bezier(0.16, 1, 0.3, 1)',
-          }}
-        />
+        {clamped > 0 && (
+          <circle
+            cx={center}
+            cy={center}
+            r={radius}
+            fill="none"
+            stroke={ringColor}
+            strokeWidth={stroke}
+            strokeDasharray={circumference}
+            strokeDashoffset={strokeDashoffset}
+            strokeLinecap="round"
+            style={{
+              transition: 'stroke-dashoffset 1400ms cubic-bezier(0.16, 1, 0.3, 1)',
+            }}
+          />
+        )}
       </svg>
 
       {children && (

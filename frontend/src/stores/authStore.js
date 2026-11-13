@@ -121,6 +121,7 @@ const useAuthStore = create(
       logout() {
         localStorage.removeItem("bt_token");
         localStorage.removeItem("bt_user");
+        localStorage.removeItem("bt_projects");
         set({ user: null, token: null, initialized: true });
       },
     }),

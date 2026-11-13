@@ -43,6 +43,48 @@ function formatDate(dateStr) {
   return d.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
 }
 
+function formatDateTime(dateStr, rawId = null) {
+  if (!dateStr) return '—';
+  let d = dateStr instanceof Date ? dateStr : new Date(dateStr);
+  if (isNaN(d.getTime())) return String(dateStr);
+
+  const isUtcMidnight =
+    (d.getUTCHours() === 0 && d.getUTCMinutes() === 0 && d.getUTCSeconds() === 0) ||
+    (typeof dateStr === "string" && (/^\d{4}-\d{2}-\d{2}$/.test(dateStr) || dateStr.endsWith("T00:00:00.000Z")));
+
+  const isLocalMidnight = d.getHours() === 0 && d.getMinutes() === 0 && d.getSeconds() === 0;
+
+  if ((isUtcMidnight || isLocalMidnight) && rawId && String(rawId).length === 24) {
+    try {
+      const ts = parseInt(String(rawId).substring(0, 8), 16) * 1000;
+      const fromId = new Date(ts);
+      if (!isNaN(fromId.getTime())) {
+        d = fromId;
+      }
+    } catch {}
+  }
+
+  const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  const day = String(d.getDate()).padStart(2, '0');
+  const month = months[d.getMonth()];
+  const year = d.getFullYear();
+
+  const isStillMidnight =
+    (d.getHours() === 0 && d.getMinutes() === 0 && d.getSeconds() === 0) ||
+    (d.getUTCHours() === 0 && d.getUTCMinutes() === 0 && d.getUTCSeconds() === 0) ||
+    (isUtcMidnight && !rawId);
+
+  if (isStillMidnight) {
+    return `${day} ${month} ${year}`;
+  }
+
+  let hrs = d.getHours();
+  const mins = String(d.getMinutes()).padStart(2, '0');
+  const ampm = hrs >= 12 ? 'PM' : 'AM';
+  hrs = hrs % 12 || 12;
+  return `${day} ${month} ${year}, ${String(hrs).padStart(2, '0')}:${mins} ${ampm}`;
+}
+
 function paymentTone(status) {
   const s = String(status || '').toLowerCase();
   if (s === 'paid' || s === 'fully paid') return 'success';
@@ -165,8 +207,10 @@ export default function EntryDetailPage({ entryData, onCloseModal, isModal = fal
   const paymentHistory = entry.paymentHistory || [];
   const projectName = entry.project?.projectName || entry.projectName || '';
 
+  const payDateVal = entry.paymentDate || (entry.paidAmount > 0 ? (paymentHistory[0]?.date || entry.date) : null);
+
   const fields = [
-    { icon: Calendar, label: 'Date', value: formatDate(entry.date) },
+    { icon: Calendar, label: 'Date', value: formatDateTime(entry.date, entryId) },
     { icon: Hash, label: 'Entry ID', value: entryId || '—', mono: true },
     { icon: Building2, label: 'Project', value: projectName || 'No project', dim: !projectName },
     { icon: MapPin, label: 'Location / site', value: entry.site || entry.location || '—' },
@@ -178,6 +222,8 @@ export default function EntryDetailPage({ entryData, onCloseModal, isModal = fal
     { icon: CreditCard, label: 'Rate', value: entry.rate ? formatInr(entry.rate) : '—' },
     { icon: IndianRupee, label: 'Total amount', value: formatInr(totalAmt), strong: true },
     { icon: CheckCircle, label: 'Payment status', value: entry.paymentStatus ? paymentLabel(entry.paymentStatus) : '—' },
+    ...(payDateVal ? [{ icon: Clock, label: 'Payment date & time', value: formatDateTime(payDateVal, entryId) }] : []),
+    ...(entry.paymentMode ? [{ icon: CreditCard, label: 'Payment mode', value: entry.paymentMode }] : []),
   ];
 
   const handleApprove = async () => {
@@ -348,7 +394,7 @@ export default function EntryDetailPage({ entryData, onCloseModal, isModal = fal
                     <span className="tnum" style={{ fontFamily: 'var(--font-display)', fontSize: 17, fontWeight: 700, color: 'var(--status-success)' }}>
                       +{formatInr(log.amount)}
                     </span>
-                    <span style={{ fontSize: 13, color: 'var(--ink-3)' }}>{formatDate(log.date)}</span>
+                    <span style={{ fontSize: 13, color: 'var(--ink-3)' }}>{formatDateTime(log.date || log.createdAt, log._id || log.id || entryId)}</span>
                   </div>
                   <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginTop: 6, flexWrap: 'wrap' }}>
                     <BtBadge tone="neutral" showDot={false} label={log.method || 'Cash'} />

@@ -2,6 +2,7 @@ import { createContext, useContext, useState, useEffect, useCallback, useMemo } 
 import { authAPI, projectAPI, transactionAPI } from '../api';
 import { hasPermission } from '../utils/access';
 import { loadMotionFor } from '../utils/motion';
+import useProjectStore from '../stores/projectStore';
 
 const AuthContext = createContext(null);
 
@@ -39,6 +40,7 @@ export function AuthProvider({ children }) {
             } catch (e) {}
           }
 
+          useProjectStore.getState().syncUser(userData);
           setUser(userData);
           localStorage.setItem('bt_user', JSON.stringify(userData));
 
@@ -48,6 +50,7 @@ export function AuthProvider({ children }) {
           }).catch(e => console.warn("Could not load/request firebase config", e));
         })
         .catch(() => {
+          useProjectStore.getState().reset();
           localStorage.removeItem('bt_token');
           localStorage.removeItem('bt_user');
           setToken(null);
@@ -93,7 +96,10 @@ export function AuthProvider({ children }) {
       } catch (e) {}
     }
 
-    if (u) localStorage.setItem('bt_user', JSON.stringify(u));
+    if (u) {
+      useProjectStore.getState().syncUser(u);
+      localStorage.setItem('bt_user', JSON.stringify(u));
+    }
     setToken(t);
     setUser(u);
     setLoading(false);
@@ -109,12 +115,14 @@ export function AuthProvider({ children }) {
 
   const register = useCallback(async (name, email, password) => {
     localStorage.clear(); // Clear any stale data from previous accounts
+    useProjectStore.getState().reset();
     const res = await authAPI.register({ name, email, password });
     const data = res.data;
     const t = data.token || data.accessToken;
     const u = data.user || data;
     localStorage.setItem('bt_token', t);
     localStorage.setItem('bt_user', JSON.stringify(u));
+    useProjectStore.getState().syncUser(u);
     setToken(t);
     setUser(u);
     setLoading(false);
@@ -129,6 +137,7 @@ export function AuthProvider({ children }) {
   }, []);
 
   const logout = useCallback(() => {
+    useProjectStore.getState().reset();
     localStorage.clear();
     sessionStorage.clear();
     window.location.href = '/login';

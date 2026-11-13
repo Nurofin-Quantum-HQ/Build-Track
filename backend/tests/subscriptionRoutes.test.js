@@ -302,15 +302,15 @@ describe('Callback processing logic', () => {
 
 describe('Plan configuration', () => {
   const PLAN_PRICES = {
-    starter:    2,
+    starter:    499,
     growth:     999,
     pro:       1499,
     business:  2499,
     enterprise: 4999,
   };
 
-  it('should have correct starter price (₹2 for testing)', () => {
-    expect(PLAN_PRICES.starter).toBe(2);
+  it('should have correct starter price (₹499)', () => {
+    expect(PLAN_PRICES.starter).toBe(499);
   });
 
   it('should reject unknown plan names', () => {

@@ -10,6 +10,8 @@ import {
   FileText,
   AlertCircle,
   CheckCircle2,
+  ArrowDownLeft,
+  ArrowUpRight,
 } from "lucide-react";
 import { transactionAPI, esignAPI } from "../api";
 import { BtButton, BtIconButton, BtChip, BtField, BtSelect, BtTextarea } from "./ui";
@@ -22,8 +24,9 @@ const PAYMENT_METHODS = [
   { value: "Cheque", icon: FileText },
 ];
 
-export default function AddRevenueModal({ open, projects, onClose, onSaved }) {
-  const [title, setTitle] = useState("Revenue Inflow");
+export default function AddRevenueModal({ open, projects, onClose, onSaved, initialProjectId }) {
+  const [isInflow, setIsInflow] = useState(true);
+  const [title, setTitle] = useState("");
   const [amount, setAmount] = useState("");
   const [selectedMethod, setSelectedMethod] = useState("Bank Transfer");
   const [projectId, setProjectId] = useState("");
@@ -49,10 +52,12 @@ export default function AddRevenueModal({ open, projects, onClose, onSaved }) {
 
   useEffect(() => {
     if (open) {
-      setTitle("Revenue Inflow");
+      setIsInflow(true);
+      setTitle("");
       setAmount("");
       setSelectedMethod("Bank Transfer");
-      setProjectId(projects?.[0]?._id || "");
+      const matched = projects?.find(p => (p._id || p.id) === initialProjectId);
+      setProjectId(matched ? (matched._id || matched.id) : (projects?.[0]?._id || ""));
       setNotes("");
       setReceiptFile(null);
       setErrorMsg(null);
@@ -66,7 +71,7 @@ export default function AddRevenueModal({ open, projects, onClose, onSaved }) {
       setEsignStatusText("");
       setEsignReqId(null);
     }
-  }, [open, projects]);
+  }, [open, projects, initialProjectId]);
 
   useEffect(() => {
     if (!open) return undefined;
@@ -97,7 +102,7 @@ export default function AddRevenueModal({ open, projects, onClose, onSaved }) {
     setErrorMsg(null);
 
     try {
-      const proj = projects.find(p => p._id === projectId);
+      const proj = projects.find(p => (p._id || p.id) === projectId);
       const meta = {
         amount: amt,
         projectName: proj ? proj.name || proj.projectName : "Project",
@@ -161,11 +166,15 @@ export default function AddRevenueModal({ open, projects, onClose, onSaved }) {
     
     try {
       let apiPaymentMode = selectedMethod;
+      const defaultTitle = isInflow ? "Revenue Inflow" : "Money Out";
+      const finalTitle = title.trim() || defaultTitle;
 
       const payload = {
-        title: title,
+        title: finalTitle,
         amount: amt,
-        type: "Income",
+        type: isInflow ? "Income" : "Expense",
+        category: isInflow ? "" : "Money Out",
+        ledgerCategory: isInflow ? "client_payment" : "money_out",
         project: projectId,
         date: new Date().toISOString(),
         notes: notes,
@@ -190,7 +199,7 @@ export default function AddRevenueModal({ open, projects, onClose, onSaved }) {
       onClose();
     } catch (err) {
       console.error(err);
-      setErrorMsg("Failed to add revenue");
+      setErrorMsg(err.response?.data?.message || err.message || "Failed to record payment");
     } finally {
       setSaving(false);
     }
@@ -258,22 +267,88 @@ export default function AddRevenueModal({ open, projects, onClose, onSaved }) {
                 color: "var(--ink)",
               }}
             >
-              Record revenue
+              {isInflow ? "Record Revenue Inflow" : "Record Revenue Outflow"}
             </h2>
           </div>
           <BtIconButton icon={X} label="Close" onClick={onClose} />
         </div>
 
         <div style={{ padding: 24, overflowY: "auto", flex: 1, display: "flex", flexDirection: "column", gap: 18 }}>
+          {/* Money Direction Toggle matching Mobile App */}
+          <div
+            style={{
+              padding: 4,
+              background: "var(--fill)",
+              borderRadius: "var(--r-card, 16px)",
+              display: "grid",
+              gridTemplateColumns: "1fr 1fr",
+              gap: 6,
+            }}
+          >
+            <button
+              type="button"
+              onClick={() => setIsInflow(true)}
+              style={{
+                height: 42,
+                borderRadius: 12,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                gap: 8,
+                cursor: "pointer",
+                fontFamily: "var(--font-ui)",
+                fontSize: 14,
+                fontWeight: 600,
+                border: "none",
+                background: isInflow ? "var(--status-success-soft)" : "transparent",
+                color: isInflow ? "var(--status-success)" : "var(--ink-2)",
+                boxShadow: isInflow ? "0 1px 3px rgba(0,0,0,0.06)" : "none",
+                transition: "all 140ms ease",
+              }}
+            >
+              <ArrowDownLeft size={17} />
+              <span>Money In</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setIsInflow(false)}
+              style={{
+                height: 42,
+                borderRadius: 12,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                gap: 8,
+                cursor: "pointer",
+                fontFamily: "var(--font-ui)",
+                fontSize: 14,
+                fontWeight: 600,
+                border: "none",
+                background: !isInflow ? "var(--ink)" : "transparent",
+                color: !isInflow ? "var(--on-noir)" : "var(--ink-2)",
+                boxShadow: !isInflow ? "0 1px 3px rgba(0,0,0,0.12)" : "none",
+                transition: "all 140ms ease",
+              }}
+            >
+              <ArrowUpRight size={17} />
+              <span>Money Out</span>
+            </button>
+          </div>
+
           <BtField
-            label="Title"
+            label="Payment title / milestone"
             value={title}
             onChange={(e) => setTitle(e.target.value)}
-            placeholder="e.g. Client payment"
+            placeholder={
+              isInflow
+                ? "e.g. Milestone 1 Payment, Advance Payment"
+                : "e.g. Client Refund, Material Return"
+            }
           />
 
           <BtField
-            label="Amount"
+            label={isInflow ? "Amount received" : "Amount sent"}
             required
             isCurrency
             type="number"
@@ -290,11 +365,14 @@ export default function AddRevenueModal({ open, projects, onClose, onSaved }) {
           />
 
           <BtSelect label="Project" value={projectId} onChange={(e) => setProjectId(e.target.value)}>
-            {projects?.map((p) => (
-              <option key={p._id} value={p._id}>
-                {p.projectName || p.name}
-              </option>
-            ))}
+            {projects?.map((p) => {
+              const pid = p._id || p.id;
+              return (
+                <option key={pid} value={pid}>
+                  {p.projectName || p.name}
+                </option>
+              );
+            })}
           </BtSelect>
 
           <div>

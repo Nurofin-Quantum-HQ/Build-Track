@@ -2,13 +2,14 @@ import React, { useState, useEffect, useCallback, useRef, useMemo } from "react"
 import { createPortal } from "react-dom";
 import { useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
-import { transactionAPI, userAPI } from "../api";
+import { transactionAPI, userAPI, reportAPI } from "../api";
 import useProjectStore from "../stores/projectStore";
 import useTransactionStore from "../stores/transactionStore";
 import perfLogger from "../utils/performanceLogger";
 import { jsPDF } from "jspdf";
 import autoTable from "jspdf-autotable";
 import RecordPaymentSheet from "../components/RecordPaymentSheet";
+import AddRevenueModal from "../components/AddRevenueModal";
 import CsvImport from "../components/CsvImport";
 import {
   Sparkles,
@@ -47,6 +48,10 @@ import {
   ChevronUp,
   ArrowUp,
   ArrowDown,
+  ArrowDownLeft,
+  ArrowUpRight,
+  Wallet,
+  Eye,
 } from "lucide-react";
 import ModuleTour from "../components/ModuleTour";
 import { SpendVsBudgetChart } from "../components/Charts";
@@ -102,18 +107,62 @@ function formatDateShort(d) {
   }
 }
 
-function formatDateLong(dt) {
-  if (!dt) return "-";
-  let dateObj = dt;
-  if (!(dt instanceof Date)) {
-    dateObj = new Date(dt);
+function formatTime(dStr, rawTxId) {
+  let d = null;
+  if (dStr) {
+    d = new Date(dStr);
+    const isMidnight =
+      !isNaN(d.getTime()) &&
+      ((d.getHours() === 0 && d.getMinutes() === 0 && d.getSeconds() === 0) ||
+       (d.getUTCHours() === 0 && d.getUTCMinutes() === 0 && d.getUTCSeconds() === 0) ||
+       d.toISOString().endsWith("T00:00:00.000Z"));
+    if (isMidnight && rawTxId && String(rawTxId).length === 24) {
+      try {
+        d = new Date(parseInt(String(rawTxId).substring(0, 8), 16) * 1000);
+      } catch {}
+    }
+  } else if (rawTxId && String(rawTxId).length === 24) {
+    try {
+      d = new Date(parseInt(String(rawTxId).substring(0, 8), 16) * 1000);
+    } catch {}
   }
+  if (!d || isNaN(d.getTime())) return "";
+  const isStillMidnight =
+    (d.getHours() === 0 && d.getMinutes() === 0 && d.getSeconds() === 0) ||
+    (d.getUTCHours() === 0 && d.getUTCMinutes() === 0 && d.getUTCSeconds() === 0);
+  if (isStillMidnight) return "";
+
+  let hrs = d.getHours();
+  const mins = String(d.getMinutes()).padStart(2, "0");
+  const ampm = hrs >= 12 ? "PM" : "AM";
+  hrs = hrs % 12 || 12;
+  return `${String(hrs).padStart(2, "0")}:${mins} ${ampm}`;
+}
+
+function formatDateLong(dt, rawId = null) {
+  if (!dt) return "—";
+  let dateObj = dt instanceof Date ? dt : new Date(dt);
   if (isNaN(dateObj.getTime())) return String(dt);
 
-  const isMidnightLocal =
-    dateObj.getHours() === 0 &&
-    dateObj.getMinutes() === 0 &&
-    dateObj.getSeconds() === 0;
+  // If dateObj is midnight UTC (e.g. 2026-11-13T00:00:00.000Z, which is 05:30 AM in IST)
+  // or a date string without time like "2026-11-13", extract real creation time from MongoDB ObjectId
+  const isUtcMidnight =
+    (dateObj.getUTCHours() === 0 && dateObj.getUTCMinutes() === 0 && dateObj.getUTCSeconds() === 0) ||
+    (typeof dt === "string" && (/^\d{4}-\d{2}-\d{2}$/.test(dt) || dt.endsWith("T00:00:00.000Z")));
+
+  const isLocalMidnight =
+    dateObj.getHours() === 0 && dateObj.getMinutes() === 0 && dateObj.getSeconds() === 0;
+
+  if ((isUtcMidnight || isLocalMidnight) && rawId && String(rawId).length === 24) {
+    try {
+      const ts = parseInt(String(rawId).substring(0, 8), 16) * 1000;
+      const fromId = new Date(ts);
+      if (!isNaN(fromId.getTime())) {
+        dateObj = fromId;
+      }
+    } catch {}
+  }
+
   const months = [
     "Jan", "Feb", "Mar", "Apr", "May", "Jun",
     "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
@@ -122,7 +171,14 @@ function formatDateLong(dt) {
   const month = months[dateObj.getMonth()];
   const year = dateObj.getFullYear();
 
-  if (isMidnightLocal) {
+  // If after checking rawId it is STILL midnight (or was midnight without an ObjectId timestamp),
+  // NEVER show 05:30 AM! Return clean date string without time.
+  const isStillMidnight =
+    (dateObj.getHours() === 0 && dateObj.getMinutes() === 0 && dateObj.getSeconds() === 0) ||
+    (dateObj.getUTCHours() === 0 && dateObj.getUTCMinutes() === 0 && dateObj.getUTCSeconds() === 0) ||
+    (isUtcMidnight && !rawId);
+
+  if (isStillMidnight) {
     return `${day} ${month} ${year}`;
   }
 
@@ -138,15 +194,20 @@ function formatDateLong(dt) {
 // "Created At": the saved timestamp, or the one embedded in the Mongo id.
 function formatCreatedAt(createdAt, rawId) {
   let d = createdAt ? new Date(createdAt) : null;
-  if (
-    (!d || isNaN(d.getTime()) || d.toISOString().endsWith("T00:00:00.000Z")) &&
-    rawId &&
-    String(rawId).length === 24
-  ) {
-    d = new Date(parseInt(String(rawId).substring(0, 8), 16) * 1000);
+  const isMidnight =
+    d &&
+    !isNaN(d.getTime()) &&
+    ((d.getHours() === 0 && d.getMinutes() === 0 && d.getSeconds() === 0) ||
+     (d.getUTCHours() === 0 && d.getUTCMinutes() === 0 && d.getUTCSeconds() === 0) ||
+     d.toISOString().endsWith("T00:00:00.000Z"));
+
+  if ((!d || isNaN(d.getTime()) || isMidnight) && rawId && String(rawId).length === 24) {
+    try {
+      d = new Date(parseInt(String(rawId).substring(0, 8), 16) * 1000);
+    } catch {}
   }
-  if (!d || isNaN(d.getTime())) return "\u2014";
-  return formatDateLong(d);
+  if (!d || isNaN(d.getTime())) return "—";
+  return formatDateLong(d, rawId);
 }
 
 const TYPE_LABELS = { material: "Material", labour: "Labour", equipment: "Equipment" };
@@ -161,8 +222,9 @@ const COLUMN_WIDTHS = {
   "Created At": 170,
   "Purchased Date": 124,
   "Payment Date": 124,
+  Date: 110,
   Project: 180,
-  Type: 118,
+  Type: 130,
   Description: 190,
   Material: 190,
   "Worker Type": 170,
@@ -174,12 +236,51 @@ const COLUMN_WIDTHS = {
   Unit: 84,
   Status: 128,
   Approval: 150,
+  "Money In": 120,
+  "Money Out": 120,
+  Balance: 120,
+  Paid: 104,
+  Remaining: 112,
+  Actions: 130,
 };
 
-const MONEY_COLS = new Set(["Amount", "Paid", "Remaining", "Rate", "Rate/Day", "Rent Rate"]);
+const LEDGER_CATEGORIES = {
+  client_payment: { label: "Client payment", isIn: true },
+  loan_received:  { label: "Loan received",  isIn: true },
+  loan_repayment: { label: "Loan repayment", isIn: false },
+  material:       { label: "Material",       isIn: false },
+  labour:         { label: "Labour",         isIn: false },
+  equipment:      { label: "Equipment",      isIn: false },
+  other:          { label: "Other",          isIn: null },
+};
+
+const getLedgerCategoryLabel = (key) =>
+  LEDGER_CATEGORIES[key]?.label ||
+  (key ? key.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase()) : "Other");
+
+const matchesMoneyType = (cat, type) => {
+  if (!type || type === "all") return true;
+  if (type === "loan") return cat === "loan_received" || cat === "loan_repayment";
+  return cat === type;
+};
+
+const MONEY_COLS = new Set(["Amount", "Paid", "Remaining", "Rate", "Rate/Day", "Rent Rate", "Money In", "Money Out", "Balance"]);
 const NUMBER_COLS = new Set(["Qty", "Days", "Duration"]);
 
 const DEFAULT_COLS = {
+  Finances: [
+    "Date",
+    "Description",
+    "Project",
+    "Type",
+    "Money In",
+    "Money Out",
+    "Balance",
+    "Paid",
+    "Remaining",
+    "Status",
+    "Actions",
+  ],
   All: [
     "Purchased Date",
     "Project",
@@ -237,6 +338,19 @@ const DEFAULT_COLS = {
 };
 
 const ALL_COLS = {
+  Finances: [
+    "Date",
+    "Description",
+    "Project",
+    "Type",
+    "Money In",
+    "Money Out",
+    "Balance",
+    "Paid",
+    "Remaining",
+    "Status",
+    "Actions",
+  ],
   All: [
     "Created At",
     "Purchased Date",
@@ -330,10 +444,7 @@ export default function FinancialReportPage() {
   const [viewMode, setViewMode] = useState("table"); // "table" | "cards"
 
   const [selectedProjectId, setSelectedProjectId] = useState(
-    () =>
-      sessionStorage.getItem("fr_proj") ||
-      useProjectStore.getState().selectedProject?._id ||
-      "all"
+    () => location.state?.projectId || "all"
   );
   const [selectedFloor, setSelectedFloor] = useState(
     () => sessionStorage.getItem("fr_floor") || ""
@@ -354,8 +465,18 @@ export default function FinancialReportPage() {
     () =>
       location.state?.activeTab ||
       sessionStorage.getItem("fr_tab") ||
-      "All"
+      "Finances"
   );
+
+  const [showAddRevenueModal, setShowAddRevenueModal] = useState(false);
+  const [changeCategoryItem, setChangeCategoryItem] = useState(null);
+  const [detailsMoneyRow, setDetailsMoneyRow] = useState(null);
+  const [ledgerRows, setLedgerRows] = useState([]);
+  const [ledgerSummary, setLedgerSummary] = useState({ moneyIn: 0, moneyOut: 0, net: 0, count: 0 });
+  const [ledgerLoading, setLedgerLoading] = useState(false);
+  const [ledgerError, setLedgerError] = useState(null);
+  const [moneyDirection, setMoneyDirection] = useState("all"); // "all" | "in" | "out"
+  const [moneyType, setMoneyType] = useState("all");
 
   const [searchQuery, setSearchQuery] = useState(
     () => sessionStorage.getItem("fr_search") || ""
@@ -497,15 +618,66 @@ export default function FinancialReportPage() {
     [storeFetchProjects, storeFetchTransactions]
   );
 
+  const fetchLedger = useCallback(async () => {
+    setLedgerLoading(true);
+    setLedgerError(null);
+    try {
+      const params = {
+        projectId: selectedProjectId === "all" ? "all" : selectedProjectId,
+        direction: "all",
+        groupBy: "none",
+      };
+      if (isValidDate(startDate)) params.from = startDate.toISOString().split("T")[0];
+      if (isValidDate(endDate)) params.to = endDate.toISOString().split("T")[0];
+      if (searchQuery.trim()) params.q = searchQuery.trim();
+
+      const res = await reportAPI.getLedger(params);
+      if (res.data) {
+        const rows = (res.data.rows || []).map((r) => {
+          const isIn = r.direction === "in";
+          const amt = Number(r.amount) || 0;
+          return {
+            ...r,
+            isIn,
+            moneyIn: isIn ? amt : 0,
+            moneyOut: isIn ? 0 : amt,
+          };
+        });
+        setLedgerRows(rows);
+        setLedgerSummary(res.data.summary || { moneyIn: 0, moneyOut: 0, net: 0, count: 0 });
+      }
+    } catch (err) {
+      if (err.response?.status === 403) {
+        setLedgerError("You do not have permission to view finances.");
+      } else {
+        setLedgerError("Failed to load money ledger.");
+      }
+    } finally {
+      setLedgerLoading(false);
+    }
+  }, [selectedProjectId, startDate, endDate, searchQuery]);
+
   useEffect(() => {
     loadData();
   }, [loadData]);
 
   useEffect(() => {
+    fetchLedger();
+  }, [fetchLedger]);
+
+  useEffect(() => {
     if (projStore) {
       setProjects(projStore);
+      if (selectedProjectId && selectedProjectId !== "all" && projStore.length > 0) {
+        const match = projStore.some(
+          (p) => String(p._id || p.id) === String(selectedProjectId)
+        );
+        if (!match) {
+          setSelectedProjectId("all");
+        }
+      }
     }
-  }, [projStore]);
+  }, [projStore, selectedProjectId]);
 
   useEffect(() => {
     if (txStore) {
@@ -539,8 +711,9 @@ export default function FinancialReportPage() {
 
   const getProjectName = useCallback(
     (id) => {
-      const match = projects.find((p) => String(p._id) === String(id));
-      return match ? match.projectName || match.name : "No project";
+      if (!id || id === "all") return "All projects";
+      const match = projects.find((p) => String(p._id || p.id) === String(id));
+      return match ? match.projectName || match.name : "All projects";
     },
     [projects]
   );
@@ -917,7 +1090,99 @@ export default function FinancialReportPage() {
     ];
   }, [selectedProject, projects, costSummary]);
 
-  const totalCount = sortedEntries.length;
+  const filteredMoneyRows = useMemo(() => {
+    return ledgerRows.filter((r) => {
+      if (moneyDirection === "in" && !r.isIn) return false;
+      if (moneyDirection === "out" && r.isIn) return false;
+
+      if (!matchesMoneyType(r.category, moneyType)) return false;
+
+      if (selectedPaymentStatus !== "All") {
+        const linked = transactions.find((t) => String(t._id || t.id) === String(r.id));
+        const rowStatus = linked ? getPaymentStatusLabel(linked.paymentStatus, linked) : (r.isIn ? "Fully Paid" : "Not Paid");
+        if (selectedPaymentStatus === "Fully Paid" && rowStatus !== "Fully Paid") return false;
+        if (selectedPaymentStatus === "Partial" && rowStatus !== "Partial") return false;
+        if (selectedPaymentStatus === "Not Paid" && rowStatus !== "Not Paid") return false;
+      }
+
+      if (selectedProjectId !== "all" && r.projectId && String(r.projectId) !== String(selectedProjectId)) {
+        return false;
+      }
+
+      return true;
+    });
+  }, [ledgerRows, moneyDirection, moneyType, selectedPaymentStatus, selectedProjectId, transactions]);
+
+  const moneyTotals = useMemo(() => {
+    let inn = 0;
+    let out = 0;
+    for (const r of filteredMoneyRows) {
+      if (r.isIn) inn += (Number(r.amount) || 0);
+      else out += (Number(r.amount) || 0);
+    }
+    return {
+      moneyIn: inn,
+      moneyOut: out,
+      net: inn - out,
+      count: filteredMoneyRows.length,
+    };
+  }, [filteredMoneyRows]);
+
+  const moneyTypeTotals = useMemo(() => {
+    const totals = { all: 0, client_payment: 0, loan: 0, material: 0, labour: 0, equipment: 0, other: 0 };
+    for (const r of ledgerRows) {
+      if (moneyDirection === "in" && !r.isIn) continue;
+      if (moneyDirection === "out" && r.isIn) continue;
+      const amt = Number(r.amount) || 0;
+      totals.all += amt;
+      if (r.category === "client_payment") totals.client_payment += amt;
+      else if (r.category === "loan_received" || r.category === "loan_repayment") totals.loan += amt;
+      else if (r.category === "material") totals.material += amt;
+      else if (r.category === "labour") totals.labour += amt;
+      else if (r.category === "equipment") totals.equipment += amt;
+      else totals.other += amt;
+    }
+    return totals;
+  }, [ledgerRows, moneyDirection]);
+
+  const sortedMoneyRows = useMemo(() => {
+    const list = filteredMoneyRows.map((r) => {
+      const linked = transactions.find((t) => String(t._id || t.id) === String(r.id));
+      const paid = linked ? Number(linked.paidAmount || 0) : (r.isIn ? Number(r.amount || 0) : (r.paymentStatus === "Paid" ? Number(r.amount || 0) : 0));
+      const rem = linked ? Math.max(0, (Number(linked.amount) || Number(r.amount) || 0) - paid) : (r.isIn ? 0 : (r.paymentStatus === "Paid" ? 0 : Number(r.amount || 0)));
+      return {
+        ...r,
+        description: r.title || (linked && linked.description) || "Revenue / Movement",
+        paidAmount: paid,
+        remainingAmount: rem,
+        rawTx: linked ? linked.rawTx : undefined,
+      };
+    });
+    list.sort((a, b) => {
+      let cmp = 0;
+      if (sortColumn === "date") {
+        const da = a.date ? new Date(a.date).getTime() : 0;
+        const db = b.date ? new Date(b.date).getTime() : 0;
+        cmp = da - db;
+      } else if (sortColumn === "amount") {
+        cmp = (Number(a.amount) || 0) - (Number(b.amount) || 0);
+      } else if (sortColumn === "project") {
+        cmp = (a.projectName || "").localeCompare(b.projectName || "");
+      } else if (sortColumn === "type") {
+        cmp = (a.category || "").localeCompare(b.category || "");
+      } else if (sortColumn === "title" || sortColumn === "description") {
+        cmp = (a.title || a.description || "").localeCompare(b.title || b.description || "");
+      } else {
+        const da = a.date ? new Date(a.date).getTime() : 0;
+        const db = b.date ? new Date(b.date).getTime() : 0;
+        cmp = da - db;
+      }
+      return sortAscending ? cmp : -cmp;
+    });
+    return list;
+  }, [filteredMoneyRows, sortColumn, sortAscending, transactions]);
+
+  const totalCount = activeTab === "Finances" ? sortedMoneyRows.length : sortedEntries.length;
   const totalPages = Math.ceil(totalCount / rowsPerPage) || 1;
   const safeCurrentPage = Math.max(1, Math.min(currentPage, totalPages));
 
@@ -925,6 +1190,11 @@ export default function FinancialReportPage() {
     const startIdx = (safeCurrentPage - 1) * rowsPerPage;
     return sortedEntries.slice(startIdx, startIdx + rowsPerPage);
   }, [sortedEntries, safeCurrentPage, rowsPerPage]);
+
+  const paginatedMoneyRows = useMemo(() => {
+    const startIdx = (safeCurrentPage - 1) * rowsPerPage;
+    return sortedMoneyRows.slice(startIdx, startIdx + rowsPerPage);
+  }, [sortedMoneyRows, safeCurrentPage, rowsPerPage]);
 
   const openCustomizeModal = () => {
     const all = (ALL_COLS && ALL_COLS[activeTab]) || ALL_COLS.All || [];
@@ -1005,6 +1275,167 @@ export default function FinancialReportPage() {
   const handleRecordPaymentClick = (entry) => {
     setPaymentItem(entry);
     setPaymentSheetOpen(true);
+  };
+
+  const handleExportMoneyCSV = () => {
+    if (sortedMoneyRows.length === 0) {
+      setToast({ msg: "No money entries to export.", type: "error" });
+      return;
+    }
+    try {
+      const headers = [
+        "Date",
+        "Description",
+        "Project",
+        "Type",
+        "In (INR)",
+        "Out (INR)",
+        "Balance (INR)",
+        "Paid (INR)",
+        "Remaining (INR)",
+        "Status",
+      ];
+      const escape = (val) => {
+        const s = String(val ?? "").replace(/"/g, '""');
+        return `"${s}"`;
+      };
+
+      const rows = sortedMoneyRows.map((r) => {
+        const linked = transactions.find((t) => String(t._id || t.id) === String(r.id));
+        const dt = r.date ? new Date(r.date).toLocaleDateString("en-IN") : "";
+        const desc = r.title || r.description || getLedgerCategoryLabel(r.category);
+        const proj = r.projectName || getProjectName(r.projectId);
+        const type = getLedgerCategoryLabel(r.category);
+        const inn = r.isIn ? Number(r.amount || 0).toFixed(2) : "";
+        const out = !r.isIn ? Number(r.amount || 0).toFixed(2) : "";
+        const bal = r.runningBalance != null ? Number(r.runningBalance).toFixed(2) : "";
+        const paid = linked ? Number(linked.paidAmount || 0).toFixed(2) : "";
+        const rem = linked ? Number(linked.remainingAmount || 0).toFixed(2) : "";
+        const stat = linked ? getPaymentStatusLabel(linked.paymentStatus, linked) : (r.isIn ? "Received" : "Paid");
+        return [dt, desc, proj, type, inn, out, bal, paid, rem, stat].map(escape).join(",");
+      });
+
+      const totalRow = ["", "Total", "", "", moneyTotals.moneyIn.toFixed(2), moneyTotals.moneyOut.toFixed(2), "", "", "", ""].map(escape).join(",");
+      const netRow = ["", "Net (In - Out)", "", "", "", "", moneyTotals.net.toFixed(2), "", "", ""].map(escape).join(",");
+
+      const csvContent = "\uFEFF" + [headers.map(escape).join(","), ...rows, totalRow, netRow].join("\r\n");
+      const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `BuildTrack_Finance_Report_${Date.now()}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      setToast({ msg: "CSV exported successfully!", type: "success" });
+    } catch (e) {
+      console.error("Export Money CSV error:", e);
+      setToast({ msg: "CSV Export failed", type: "error" });
+    }
+  };
+
+  const handleExportMoneyPDF = () => {
+    if (sortedMoneyRows.length === 0) {
+      setToast({ msg: "No money entries to export.", type: "error" });
+      return;
+    }
+    try {
+      const doc = new jsPDF({ orientation: "landscape", unit: "pt", format: "a4" });
+
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(16);
+      doc.setTextColor(17, 19, 23);
+      doc.text("BuildTrack - Financial Ledger Report", 40, 40);
+
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(9.5);
+      doc.setTextColor(100, 105, 115);
+      const projName = selectedProjectId === "all" ? "All Projects" : getProjectName(selectedProjectId);
+      const dirText = moneyDirection === "all" ? "Money In & Out" : moneyDirection === "in" ? "Money In Only" : "Money Out Only";
+      const dateText = datePreset || "All Time";
+      doc.text(
+        `Project: ${projName}  |  Period: ${dateText}  |  Showing: ${dirText}  |  Generated: ${new Date().toLocaleDateString("en-IN")}`,
+        40,
+        56
+      );
+
+      const tableData = sortedMoneyRows.map((r) => {
+        const linked = transactions.find((t) => String(t._id || t.id) === String(r.id));
+        const dt = r.date ? new Date(r.date).toLocaleDateString("en-IN", { day: "2-digit", month: "2-digit", year: "numeric" }) : "";
+        const desc = r.title || r.description || getLedgerCategoryLabel(r.category);
+        const proj = r.projectName || getProjectName(r.projectId);
+        const type = getLedgerCategoryLabel(r.category);
+        const inn = r.isIn ? formatINR(r.amount) : "";
+        const out = !r.isIn ? formatINR(r.amount) : "";
+        const bal = r.runningBalance != null ? formatINR(r.runningBalance) : "";
+        const paid = linked ? formatINR(linked.paidAmount || 0) : "";
+        const rem = linked ? formatINR(linked.remainingAmount || 0) : "";
+        const stat = linked ? getPaymentStatusLabel(linked.paymentStatus, linked) : (r.isIn ? "Received" : "Paid");
+        return [dt, desc, proj, type, inn, out, bal, paid, rem, stat];
+      });
+
+      tableData.push([
+        "",
+        "Total",
+        "",
+        "",
+        formatINR(moneyTotals.moneyIn),
+        formatINR(moneyTotals.moneyOut),
+        "",
+        "",
+        "",
+        "",
+      ]);
+      tableData.push([
+        "",
+        "Net (In - Out)",
+        "",
+        "",
+        "",
+        "",
+        formatINR(moneyTotals.net),
+        "",
+        "",
+        "",
+      ]);
+
+      autoTable(doc, {
+        head: [["Date", "Description", "Project", "Type", "In", "Out", "Balance", "Paid", "Remaining", "Status"]],
+        body: tableData,
+        startY: 72,
+        theme: "grid",
+        styles: { fontSize: 8.5, cellPadding: 5, overflow: "linebreak", font: "helvetica" },
+        headStyles: { fillColor: [17, 19, 23], textColor: [255, 255, 255], fontStyle: "bold" },
+        columnStyles: {
+          0: { cellWidth: 65 },
+          1: { cellWidth: "auto" },
+          2: { cellWidth: 100 },
+          3: { cellWidth: 80 },
+          4: { halign: "right", cellWidth: 70, textColor: [16, 185, 129] },
+          5: { halign: "right", cellWidth: 70 },
+          6: { halign: "right", cellWidth: 70 },
+          7: { halign: "right", cellWidth: 65 },
+          8: { halign: "right", cellWidth: 65 },
+          9: { halign: "center", cellWidth: 65 },
+        },
+        didParseCell: (data) => {
+          if (data.row.index >= sortedMoneyRows.length) {
+            data.cell.styles.fontStyle = "bold";
+            data.cell.styles.fillColor = [245, 245, 247];
+            if (data.row.index === sortedMoneyRows.length + 1 && data.column.index === 6) {
+              data.cell.styles.textColor = moneyTotals.net >= 0 ? [16, 185, 129] : [239, 68, 68];
+            }
+          }
+        },
+      });
+
+      doc.save(`BuildTrack_Finance_Report_${Date.now()}.pdf`);
+      setToast({ msg: "PDF exported successfully!", type: "success" });
+    } catch (e) {
+      console.error("Export Money PDF error:", e);
+      setToast({ msg: "PDF Export failed", type: "error" });
+    }
   };
 
   const handleExportCSV = (exportAll) => {
@@ -1378,7 +1809,8 @@ export default function FinancialReportPage() {
   ].filter(Boolean).length;
 
   const categoryTabOptions = [
-    { label: "All", value: "All" },
+    { label: "Money In & Out", value: "Finances" },
+    { label: "All Entries", value: "All" },
     { label: "Materials", value: "Materials" },
     { label: "Labour", value: "Labour" },
     { label: "Equipment", value: "Equipment" },
@@ -1415,9 +1847,13 @@ export default function FinancialReportPage() {
       ? "date"
       : colName === "Project"
         ? "project"
-        : colName === "Amount"
+        : colName === "Amount" || colName === "Money In" || colName === "Money Out" || colName === "Balance"
           ? "amount"
-          : null;
+          : colName === "Description" || colName === "Material"
+            ? "description"
+            : colName === "Type"
+              ? "type"
+              : null;
 
   const handleSortClick = (colName) => {
     const key = sortKeyForColumn(colName);
@@ -1520,13 +1956,44 @@ export default function FinancialReportPage() {
         return text(formatCreatedAt(entry.rawTx?.createdAt, entry.rawTx?._id));
       case "Purchased Date":
         return <td key={colName} style={{ minWidth: COLUMN_WIDTHS[colName] }}>{formatDateShort(entry.date)}</td>;
+      case "Date":
+        return <td key={colName} style={{ minWidth: COLUMN_WIDTHS[colName] }}>{formatDateShort(entry.date)}</td>;
       case "Payment Date":
         return (
           <td key={colName} style={{ minWidth: COLUMN_WIDTHS[colName] }}>
             {entry.paymentDate ? formatDateShort(entry.paymentDate) : none}
           </td>
         );
+      case "Money In":
+        return (
+          <td key={colName} className="num" style={{ fontWeight: 700, color: "var(--status-success)", minWidth: 120 }}>
+            {entry.moneyIn > 0 ? `+${formatINR(entry.moneyIn)}` : none}
+          </td>
+        );
+      case "Money Out":
+        return (
+          <td key={colName} className="num" style={{ fontWeight: 700, color: "var(--ink)", minWidth: 120 }}>
+            {entry.moneyOut > 0 ? formatINR(entry.moneyOut) : none}
+          </td>
+        );
+      case "Balance":
+        return (
+          <td
+            key={colName}
+            className="num"
+            style={{
+              fontWeight: 700,
+              color: (entry.runningBalance ?? 0) >= 0 ? "var(--status-success)" : "var(--status-danger)",
+              minWidth: 120,
+            }}
+          >
+            {(entry.runningBalance ?? 0) >= 0 ? "+" : ""}{formatINR(entry.runningBalance || 0)}
+          </td>
+        );
       case "Project": {
+        if (entry.projectName) {
+          return text(entry.projectName, { fontWeight: 600, color: "var(--ink)" });
+        }
         const { name, none: noProj } = projectLabel(entry);
         return text(name, {
           fontWeight: noProj ? 500 : 600,
@@ -1534,6 +2001,13 @@ export default function FinancialReportPage() {
         });
       }
       case "Type":
+        if (entry.category) {
+          return (
+            <td key={colName} style={{ minWidth: COLUMN_WIDTHS[colName] }}>
+              <BtBadge tone={entry.isIn ? "success" : "neutral"} label={getLedgerCategoryLabel(entry.category)} />
+            </td>
+          );
+        }
         return (
           <td key={colName} style={{ minWidth: COLUMN_WIDTHS[colName] }}>
             <BtBadge tone={entry.type} label={TYPE_LABELS[entry.type] || entry.type} />
@@ -1542,8 +2016,27 @@ export default function FinancialReportPage() {
       case "Description":
       case "Material":
       case "Worker Type":
-      case "Equipment":
-        return text(entry.description, { fontWeight: colName === "Description" ? 400 : 500 });
+      case "Equipment": {
+        const descText = entry.description || entry.title;
+        if (activeTab === "Finances" && (entry.payee || entry.notes)) {
+          return (
+            <td
+              key={colName}
+              className="txt"
+              style={{
+                minWidth: COLUMN_WIDTHS[colName],
+                maxWidth: Math.max(COLUMN_WIDTHS[colName] || 0, 260),
+              }}
+            >
+              <div style={{ fontWeight: 500, color: "var(--ink)" }}>{descText || none}</div>
+              <div style={{ fontSize: 12, color: "var(--ink-3)", marginTop: 2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                {[entry.payee, entry.notes].filter(Boolean).join(" • ")}
+              </div>
+            </td>
+          );
+        }
+        return text(descText, { fontWeight: colName === "Description" ? 400 : 500 });
+      }
       case "Brand":
         return text(entry.brand);
       case "Floor":
@@ -1555,6 +2048,15 @@ export default function FinancialReportPage() {
       case "Unit":
         return text(entry.unit);
       case "Status": {
+        if (activeTab === "Finances" || entry.category) {
+          const isRec = entry.isIn;
+          const statusLbl = isRec ? "Received" : getPaymentStatusLabel(entry.paymentStatus, { amount: entry.amount, paidAmount: entry.paidAmount });
+          return (
+            <td key={colName} style={{ minWidth: COLUMN_WIDTHS[colName] }}>
+              <BtBadge tone={statusTone(isRec ? "Fully Paid" : statusLbl)} label={statusLbl} />
+            </td>
+          );
+        }
         const label = getPaymentStatusLabel(entry.paymentStatus, {
           amount: entry.amount,
           paidAmount: entry.paidAmount,
@@ -1636,6 +2138,34 @@ export default function FinancialReportPage() {
         );
       }
       case "Actions":
+        if (activeTab === "Finances" || entry.category) {
+          return (
+            <td key={colName} className="fr-sr" style={{ paddingTop: 8, paddingBottom: 8 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                {!entry.isIn && (entry.remainingAmount || 0) > 0 && canRecordPayment && (
+                  <BtIconButton
+                    icon={CreditCard}
+                    label="Record payment"
+                    size={34}
+                    onClick={() => handleRecordPaymentClick(entry)}
+                  />
+                )}
+                <BtIconButton
+                  icon={SlidersHorizontal}
+                  label="Change category"
+                  size={34}
+                  onClick={() => setChangeCategoryItem(entry)}
+                />
+                <BtIconButton
+                  icon={Eye}
+                  label="View details"
+                  size={34}
+                  onClick={() => setDetailsMoneyRow(entry)}
+                />
+              </div>
+            </td>
+          );
+        }
         return (
           <td key={colName} className="fr-sr" style={{ paddingTop: 8, paddingBottom: 8 }}>
             {canAddEdit || canRecordPayment ? (
@@ -1822,8 +2352,16 @@ export default function FinancialReportPage() {
               <BtButton
                 variant="accent"
                 size="small"
+                icon={PlusCircle}
+                onClick={() => setShowAddRevenueModal(true)}
+              >
+                Add Revenue
+              </BtButton>
+              <BtButton
+                variant="onDark"
+                size="small"
                 icon={Download}
-                disabled={filteredEntries.length === 0}
+                disabled={activeTab === "Finances" ? sortedMoneyRows.length === 0 : filteredEntries.length === 0}
                 onClick={() => setShowExportModal(true)}
               >
                 Export
@@ -2104,8 +2642,185 @@ export default function FinancialReportPage() {
           </BtCard>
         )}
 
+        {/* ── Money In & Out Sub-Filters (When Finances tab active) ── */}
+        {activeTab === "Finances" && (
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              gap: 12,
+              flexWrap: "wrap",
+              marginBottom: 16,
+              padding: "12px 16px",
+              background: "var(--card)",
+              borderRadius: "var(--r-card)",
+              border: "1px solid var(--line)",
+            }}
+          >
+            <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+              <BtSegmented
+                options={[
+                  { label: "All Movements", value: "all" },
+                  { label: "Money In", value: "in" },
+                  { label: "Money Out", value: "out" },
+                ]}
+                value={moneyDirection}
+                onChange={(val) => {
+                  setMoneyDirection(val);
+                  setCurrentPage(1);
+                }}
+              />
+
+              <BtSelect
+                size="compact"
+                value={moneyType}
+                onChange={(e) => {
+                  setMoneyType(e.target.value);
+                  setCurrentPage(1);
+                }}
+                style={{ minWidth: 160 }}
+              >
+                <option value="all">All Types ({formatInr(moneyTypeTotals.all, { compact: true })})</option>
+                <option value="client_payment">Client Payment ({formatInr(moneyTypeTotals.client_payment, { compact: true })})</option>
+                <option value="loan">Loan ({formatInr(moneyTypeTotals.loan, { compact: true })})</option>
+                <option value="material">Material ({formatInr(moneyTypeTotals.material, { compact: true })})</option>
+                <option value="labour">Labour ({formatInr(moneyTypeTotals.labour, { compact: true })})</option>
+                <option value="equipment">Equipment ({formatInr(moneyTypeTotals.equipment, { compact: true })})</option>
+                <option value="other">Other ({formatInr(moneyTypeTotals.other, { compact: true })})</option>
+              </BtSelect>
+            </div>
+
+            <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+              <BtButton
+                variant="accent"
+                size="small"
+                icon={PlusCircle}
+                onClick={() => setShowAddRevenueModal(true)}
+              >
+                Record Revenue
+              </BtButton>
+              <BtButton
+                variant="secondary"
+                size="small"
+                icon={CreditCard}
+                onClick={() => {
+                  setPaymentItem(null);
+                  setPaymentSheetOpen(true);
+                }}
+              >
+                Record Payment
+              </BtButton>
+            </div>
+          </div>
+        )}
+
         {/* ── KPI strip ── */}
-        {isFirstLoad ? (
+        {activeTab === "Finances" ? (
+          ledgerLoading ? (
+            <div className="bt-grid-3" style={{ marginBottom: 20 }}>
+              {[0, 1, 2].map((i) => (
+                <BtSkeleton key={i} height="128px" borderRadius="var(--r-card)" />
+              ))}
+            </div>
+          ) : (
+            <div className="bt-grid-3" style={{ marginBottom: 20 }}>
+              <BtCard
+                padding="20px 24px"
+                style={{ background: "var(--noir)", color: "var(--on-noir)", border: "1px solid var(--noir-line)", minHeight: 128 }}
+              >
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                  <span className="bt-eyebrow" style={{ color: "var(--status-success)" }}>Total Money In</span>
+                  <span
+                    style={{
+                      width: 32,
+                      height: 32,
+                      borderRadius: 9,
+                      background: "rgba(16, 185, 129, 0.15)",
+                      color: "var(--status-success)",
+                      display: "grid",
+                      placeItems: "center",
+                    }}
+                  >
+                    <ArrowDownLeft size={18} />
+                  </span>
+                </div>
+                <div
+                  className="tnum"
+                  style={{ fontFamily: "var(--font-display)", fontSize: 32, fontWeight: 700, letterSpacing: "-0.03em", color: "var(--status-success)", marginTop: 8 }}
+                >
+                  +{formatINR(moneyTotals.moneyIn)}
+                </div>
+                <div style={{ fontSize: 13, color: "var(--on-noir-3)", marginTop: 6 }}>
+                  Client payments, loans received & revenue inflows
+                </div>
+              </BtCard>
+
+              <BtCard padding="20px 24px" style={{ minHeight: 128 }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                  <span className="bt-eyebrow" style={{ color: "var(--ink-3)" }}>Total Money Out</span>
+                  <span
+                    style={{
+                      width: 32,
+                      height: 32,
+                      borderRadius: 9,
+                      background: "var(--bone)",
+                      color: "var(--ink)",
+                      display: "grid",
+                      placeItems: "center",
+                    }}
+                  >
+                    <ArrowUpRight size={18} />
+                  </span>
+                </div>
+                <div
+                  className="tnum"
+                  style={{ fontFamily: "var(--font-display)", fontSize: 32, fontWeight: 700, letterSpacing: "-0.03em", color: "var(--ink)", marginTop: 8 }}
+                >
+                  {formatINR(moneyTotals.moneyOut)}
+                </div>
+                <div style={{ fontSize: 13, color: "var(--ink-2)", marginTop: 6 }}>
+                  Material purchases, labour wages, equipment & expenses
+                </div>
+              </BtCard>
+
+              <BtCard padding="20px 24px" style={{ minHeight: 128 }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                  <span className="bt-eyebrow" style={{ color: "var(--ink-3)" }}>Net Balance (In − Out)</span>
+                  <span
+                    style={{
+                      width: 32,
+                      height: 32,
+                      borderRadius: 9,
+                      background: moneyTotals.net >= 0 ? "var(--status-success-soft)" : "var(--status-danger-soft, #fee2e2)",
+                      color: moneyTotals.net >= 0 ? "var(--status-success)" : "var(--status-danger, #ef4444)",
+                      display: "grid",
+                      placeItems: "center",
+                    }}
+                  >
+                    <Wallet size={18} />
+                  </span>
+                </div>
+                <div
+                  className="tnum"
+                  style={{
+                    fontFamily: "var(--font-display)",
+                    fontSize: 32,
+                    fontWeight: 700,
+                    letterSpacing: "-0.03em",
+                    color: moneyTotals.net >= 0 ? "var(--status-success)" : "var(--status-danger, #ef4444)",
+                    marginTop: 8,
+                  }}
+                >
+                  {moneyTotals.net >= 0 ? "+" : ""}{formatINR(moneyTotals.net)}
+                </div>
+                <div style={{ fontSize: 13, color: "var(--ink-2)", marginTop: 6 }}>
+                  {moneyTotals.net >= 0 ? "Net revenue surplus" : "Net deficit (spending exceeds revenue)"}
+                </div>
+              </BtCard>
+            </div>
+          )
+        ) : isFirstLoad ? (
           <div className="bt-grid-3" style={{ marginBottom: 20 }}>
             {[0, 1, 2].map((i) => (
               <BtSkeleton key={i} height="128px" borderRadius="var(--r-card)" />
@@ -2324,7 +3039,7 @@ export default function FinancialReportPage() {
         </BtCard>
 
         {/* ── Entries ── */}
-        {isFirstLoad ? (
+        {(activeTab === "Finances" ? ledgerLoading : isFirstLoad) ? (
           <BtCard padding="20px">
             <div style={{ display: "flex", flexDirection: "column", gap: 12 }} aria-busy="true" aria-label="Loading entries">
               <BtSkeleton height="36px" borderRadius="var(--r-tile)" />
@@ -2333,7 +3048,16 @@ export default function FinancialReportPage() {
               ))}
             </div>
           </BtCard>
-        ) : viewMode === "table" && paginatedEntries.length === 0 ? (
+        ) : activeTab === "Finances" && ledgerError ? (
+          <BtCard padding="32px" style={{ textAlign: "center" }}>
+            <div style={{ color: "var(--status-danger)", fontWeight: 600, fontSize: 16 }}>{ledgerError}</div>
+            <div style={{ fontSize: 14, color: "var(--ink-2)", marginTop: 6 }}>
+              {ledgerError.includes("permission")
+                ? "Contact your administrator to request view_finances access."
+                : "Unable to retrieve the financial ledger."}
+            </div>
+          </BtCard>
+        ) : viewMode === "table" && (activeTab === "Finances" ? paginatedMoneyRows.length === 0 : paginatedEntries.length === 0) ? (
           <BtCard padding="8px">{emptyState}</BtCard>
         ) : viewMode === "table" ? (
           <BtCard padding="0" style={{ overflow: "hidden" }}>
@@ -2366,7 +3090,7 @@ export default function FinancialReportPage() {
                           }
                         >
                           <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
-                            {colName === "Amount" ? "Amount (INR)" : colName}
+                            {colName === "Amount" ? "Amount (INR)" : colName === "Money In" ? "Money In (INR)" : colName === "Money Out" ? "Money Out (INR)" : colName === "Balance" ? "Balance (INR)" : colName}
                             {isSorted && (sortAscending ? <ArrowUp size={12} /> : <ArrowDown size={12} />)}
                           </span>
                         </th>
@@ -2375,32 +3099,40 @@ export default function FinancialReportPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {                    paginatedEntries.map((entry, rowIdx) => {
-                      const globalRowIdx = (safeCurrentPage - 1) * rowsPerPage + rowIdx + 1;
-                      return (
-                        <tr
-                          key={entry.id || rowIdx}
-                          tabIndex={0}
-                          aria-label={`Open details for ${entry.description || "entry"}`}
-                          onClick={(e) => {
-                            if (e.target.closest("button")) return;
+                  {(activeTab === "Finances" ? paginatedMoneyRows : paginatedEntries).map((entry, rowIdx) => {
+                    const globalRowIdx = (safeCurrentPage - 1) * rowsPerPage + rowIdx + 1;
+                    return (
+                      <tr
+                        key={entry.id || rowIdx}
+                        tabIndex={0}
+                        aria-label={`Open details for ${entry.description || entry.title || "entry"}`}
+                        onClick={(e) => {
+                          if (e.target.closest("button")) return;
+                          if (activeTab === "Finances") {
+                            setDetailsMoneyRow(entry);
+                          } else {
                             setDetailsEntry(entry);
-                          }}
-                          onKeyDown={(e) => {
-                            if (e.target !== e.currentTarget) return;
-                            if (e.key === "Enter" || e.key === " ") {
-                              e.preventDefault();
+                          }
+                        }}
+                        onKeyDown={(e) => {
+                          if (e.target !== e.currentTarget) return;
+                          if (e.key === "Enter" || e.key === " ") {
+                            e.preventDefault();
+                            if (activeTab === "Finances") {
+                              setDetailsMoneyRow(entry);
+                            } else {
                               setDetailsEntry(entry);
                             }
-                          }}
-                        >
-                          <td className="fr-sl" style={{ fontFamily: "var(--font-mono)", fontSize: 12, fontWeight: 600, color: "var(--ink-3)" }}>
-                            {globalRowIdx}
-                          </td>
-                          {uiActiveCols.map((colName) => renderCell(colName, entry))}
-                        </tr>
-                      );
-                    })}
+                          }
+                        }}
+                      >
+                        <td className="fr-sl" style={{ fontFamily: "var(--font-mono)", fontSize: 12, fontWeight: 600, color: "var(--ink-3)" }}>
+                          {globalRowIdx}
+                        </td>
+                        {uiActiveCols.map((colName) => renderCell(colName, entry))}
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
@@ -2409,7 +3141,7 @@ export default function FinancialReportPage() {
         ) : (
           /* ── Cards view ── */
           <div>
-            {paginatedEntries.length === 0 ? (
+            {(activeTab === "Finances" ? paginatedMoneyRows.length === 0 : paginatedEntries.length === 0) ? (
               <BtCard padding="8px">{emptyState}</BtCard>
             ) : (
               <>
@@ -2420,95 +3152,230 @@ export default function FinancialReportPage() {
                     gap: 16,
                   }}
                 >
-                  {paginatedEntries.map((entry) => {
-                    const { name: projectName, none: noProj } = projectLabel(entry);
-                    const payStatus = getPaymentStatusLabel(entry.paymentStatus, {
-                      amount: entry.amount,
-                      paidAmount: entry.paidAmount,
-                    });
-                    const rem = Math.max(0, (entry.amount || 0) - (entry.paidAmount || 0));
-                    const typeKey = TYPE_LABELS[entry.type] ? entry.type : "material";
+                  {activeTab === "Finances" ? (
+                    paginatedMoneyRows.map((row) => {
+                      const isMoneyIn = row.isIn;
+                      const statusLbl = isMoneyIn ? "Received" : getPaymentStatusLabel(row.paymentStatus, { amount: row.amount, paidAmount: row.paidAmount });
+                      const rem = row.remainingAmount || 0;
 
-                    return (
-                      <BtCard
-                        key={entry.id}
-                        padding="18px 20px"
-                        className="bt-hover-card"
-                        role="button"
-                        tabIndex={0}
-                        aria-label={`Open details for ${entry.description || "entry"}`}
-                        onClick={() => setDetailsEntry(entry)}
-                        onKeyDown={(e) => {
-                          if (e.target !== e.currentTarget) return;
-                          if (e.key === "Enter" || e.key === " ") {
-                            e.preventDefault();
-                            setDetailsEntry(entry);
-                          }
-                        }}
-                        style={{ display: "flex", flexDirection: "column", gap: 12 }}
-                      >
-                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8 }}>
-                          <BtBadge tone={typeKey} label={TYPE_LABELS[typeKey]} />
-                          <BtBadge tone={statusTone(payStatus)} label={payStatus} />
-                        </div>
-
-                        <div style={{ minWidth: 0 }}>
-                          <div style={{ fontSize: 16, fontWeight: 600, color: "var(--ink)", overflowWrap: "anywhere" }}>
-                            {entry.description || "Entry"}
+                      return (
+                        <BtCard
+                          key={row.id}
+                          padding="18px 20px"
+                          className="bt-hover-card"
+                          role="button"
+                          tabIndex={0}
+                          aria-label={`Open details for ${row.description || row.title || "movement"}`}
+                          onClick={() => setDetailsMoneyRow(row)}
+                          onKeyDown={(e) => {
+                            if (e.target !== e.currentTarget) return;
+                            if (e.key === "Enter" || e.key === " ") {
+                              e.preventDefault();
+                              setDetailsMoneyRow(row);
+                            }
+                          }}
+                          style={{ display: "flex", flexDirection: "column", gap: 12 }}
+                        >
+                          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8 }}>
+                            <BtBadge tone={isMoneyIn ? "success" : "neutral"} label={getLedgerCategoryLabel(row.category)} />
+                            <BtBadge tone={statusTone(isMoneyIn ? "Fully Paid" : statusLbl)} label={statusLbl} />
                           </div>
-                          <div style={{ fontSize: 13, color: noProj ? "var(--ink-3)" : "var(--ink-2)", marginTop: 2 }}>
-                            {projectName}
-                          </div>
-                        </div>
 
-                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", gap: 12 }}>
-                          <div>
-                            <div className="bt-eyebrow" style={{ color: "var(--ink-3)" }}>Amount</div>
-                            <div className="tnum" style={{ fontFamily: "var(--font-display)", fontSize: 24, fontWeight: 700, letterSpacing: "-0.02em", color: "var(--ink)" }}>
-                              {formatInr(entry.amount)}
+                          <div style={{ minWidth: 0 }}>
+                            <div style={{ fontSize: 16, fontWeight: 600, color: "var(--ink)", overflowWrap: "anywhere" }}>
+                              {row.title || row.description || "Movement"}
                             </div>
+                            <div style={{ fontSize: 13, color: row.projectName ? "var(--ink-2)" : "var(--ink-3)", marginTop: 2 }}>
+                              {row.projectName || "No project"}
+                            </div>
+                            {row.payee && (
+                              <div style={{ fontSize: 12, color: "var(--ink-3)", marginTop: 2 }}>
+                                {row.payee}
+                              </div>
+                            )}
                           </div>
-                          {rem > 0 && (
-                            <div style={{ textAlign: "right" }}>
-                              <div className="bt-eyebrow" style={{ color: "var(--ink-3)" }}>Balance due</div>
-                              <div className="tnum" style={{ fontFamily: "var(--font-display)", fontSize: 17, fontWeight: 700, color: "var(--status-danger)" }}>
-                                {formatInr(rem)}
+
+                          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", gap: 12 }}>
+                            <div>
+                              <div className="bt-eyebrow" style={{ color: "var(--ink-3)" }}>
+                                {isMoneyIn ? "Money In" : "Money Out"}
+                              </div>
+                              <div
+                                className="tnum"
+                                style={{
+                                  fontFamily: "var(--font-display)",
+                                  fontSize: 24,
+                                  fontWeight: 700,
+                                  letterSpacing: "-0.02em",
+                                  color: isMoneyIn ? "var(--status-success)" : "var(--ink)",
+                                }}
+                              >
+                                {isMoneyIn ? `+${formatINR(row.amount)}` : formatINR(row.amount)}
                               </div>
                             </div>
-                          )}
-                        </div>
+                            <div style={{ textAlign: "right" }}>
+                              <div className="bt-eyebrow" style={{ color: "var(--ink-3)" }}>Balance</div>
+                              <div
+                                className="tnum"
+                                style={{
+                                  fontFamily: "var(--font-display)",
+                                  fontSize: 17,
+                                  fontWeight: 700,
+                                  color: (row.runningBalance ?? 0) >= 0 ? "var(--status-success)" : "var(--status-danger)",
+                                }}
+                              >
+                                {(row.runningBalance ?? 0) >= 0 ? "+" : ""}{formatINR(row.runningBalance || 0)}
+                              </div>
+                            </div>
+                          </div>
 
-                        <div
-                          style={{
-                            display: "flex",
-                            justifyContent: "space-between",
-                            alignItems: "center",
-                            gap: 8,
-                            borderTop: "1px solid var(--line)",
-                            paddingTop: 12,
-                            fontSize: 13,
-                            color: "var(--ink-3)",
-                            minHeight: 44,
+                          <div
+                            style={{
+                              display: "flex",
+                              justifyContent: "space-between",
+                              alignItems: "center",
+                              gap: 8,
+                              borderTop: "1px solid var(--line)",
+                              paddingTop: 12,
+                              fontSize: 13,
+                              color: "var(--ink-3)",
+                              minHeight: 44,
+                            }}
+                          >
+                            <span>
+                              {formatDateShort(row.date)}
+                              {(() => {
+                                const t = formatTime(row.createdAt || row.rawDate || row.date, row.id);
+                                return t ? ` · ${t}` : "";
+                              })()}
+                            </span>
+                            <div style={{ display: "flex", gap: 6 }}>
+                              <BtButton
+                                variant="secondary"
+                                size="compact"
+                                icon={SlidersHorizontal}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setChangeCategoryItem(row);
+                                }}
+                              >
+                                Category
+                              </BtButton>
+                              {!isMoneyIn && rem > 0 && canRecordPayment && (
+                                <BtButton
+                                  variant="secondary"
+                                  size="compact"
+                                  icon={CreditCard}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleRecordPaymentClick(row);
+                                  }}
+                                >
+                                  Payment
+                                </BtButton>
+                              )}
+                            </div>
+                          </div>
+                        </BtCard>
+                      );
+                    })
+                  ) : (
+                    paginatedEntries.map((entry) => {
+                      const { name: projectName, none: noProj } = projectLabel(entry);
+                      const payStatus = getPaymentStatusLabel(entry.paymentStatus, {
+                        amount: entry.amount,
+                        paidAmount: entry.paidAmount,
+                      });
+                      const rem = Math.max(0, (entry.amount || 0) - (entry.paidAmount || 0));
+                      const typeKey = TYPE_LABELS[entry.type] ? entry.type : "material";
+
+                      return (
+                        <BtCard
+                          key={entry.id}
+                          padding="18px 20px"
+                          className="bt-hover-card"
+                          role="button"
+                          tabIndex={0}
+                          aria-label={`Open details for ${entry.description || "entry"}`}
+                          onClick={() => setDetailsEntry(entry)}
+                          onKeyDown={(e) => {
+                            if (e.target !== e.currentTarget) return;
+                            if (e.key === "Enter" || e.key === " ") {
+                              e.preventDefault();
+                              setDetailsEntry(entry);
+                            }
                           }}
+                          style={{ display: "flex", flexDirection: "column", gap: 12 }}
                         >
-                          <span>{formatDateShort(entry.date)}</span>
-                          {canRecordPayment && rem > 0 && (
-                            <BtButton
-                              variant="secondary"
-                              size="compact"
-                              icon={CreditCard}
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleRecordPaymentClick(entry);
-                              }}
-                            >
-                              Record payment
-                            </BtButton>
-                          )}
-                        </div>
-                      </BtCard>
-                    );
-                  })}
+                          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8 }}>
+                            <BtBadge tone={typeKey} label={TYPE_LABELS[typeKey]} />
+                            <BtBadge tone={statusTone(payStatus)} label={payStatus} />
+                          </div>
+
+                          <div style={{ minWidth: 0 }}>
+                            <div style={{ fontSize: 16, fontWeight: 600, color: "var(--ink)", overflowWrap: "anywhere" }}>
+                              {entry.description || "Entry"}
+                            </div>
+                            <div style={{ fontSize: 13, color: noProj ? "var(--ink-3)" : "var(--ink-2)", marginTop: 2 }}>
+                              {projectName}
+                            </div>
+                          </div>
+
+                          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", gap: 12 }}>
+                            <div>
+                              <div className="bt-eyebrow" style={{ color: "var(--ink-3)" }}>Amount</div>
+                              <div className="tnum" style={{ fontFamily: "var(--font-display)", fontSize: 24, fontWeight: 700, letterSpacing: "-0.02em", color: "var(--ink)" }}>
+                                {formatInr(entry.amount)}
+                              </div>
+                            </div>
+                            {rem > 0 && (
+                              <div style={{ textAlign: "right" }}>
+                                <div className="bt-eyebrow" style={{ color: "var(--ink-3)" }}>Balance due</div>
+                                <div className="tnum" style={{ fontFamily: "var(--font-display)", fontSize: 17, fontWeight: 700, color: "var(--status-danger)" }}>
+                                  {formatInr(rem)}
+                                </div>
+                              </div>
+                            )}
+                          </div>
+
+                          <div
+                            style={{
+                              display: "flex",
+                              justifyContent: "space-between",
+                              alignItems: "center",
+                              gap: 8,
+                              borderTop: "1px solid var(--line)",
+                              paddingTop: 12,
+                              fontSize: 13,
+                              color: "var(--ink-3)",
+                              minHeight: 44,
+                            }}
+                          >
+                            <span>
+                              {formatDateShort(entry.date)}
+                              {(() => {
+                                const t = formatTime(entry.rawTx?.createdAt || entry.date, entry.rawTx?._id || entry.id);
+                                return t ? ` · ${t}` : "";
+                              })()}
+                            </span>
+                            {canRecordPayment && rem > 0 && (
+                              <BtButton
+                                variant="secondary"
+                                size="compact"
+                                icon={CreditCard}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleRecordPaymentClick(entry);
+                                }}
+                              >
+                                Record payment
+                              </BtButton>
+                            )}
+                          </div>
+                        </BtCard>
+                      );
+                    })
+                  )}
                 </div>
                 <BtCard padding="0" style={{ marginTop: 16 }}>{paginationBar}</BtCard>
               </>
@@ -2622,7 +3489,11 @@ export default function FinancialReportPage() {
               className="fr-option"
               onClick={() => {
                 setShowExportModal(false);
-                handleExportPDF();
+                if (activeTab === "Finances") {
+                  handleExportMoneyPDF();
+                } else {
+                  handleExportPDF();
+                }
               }}
             >
               <span style={{ width: 44, height: 44, borderRadius: "var(--r-tile)", background: "var(--ink)", color: "#FFFFFF", display: "grid", placeItems: "center", fontWeight: 700, fontSize: 12, flexShrink: 0 }}>
@@ -2639,7 +3510,11 @@ export default function FinancialReportPage() {
               className="fr-option"
               onClick={() => {
                 setShowExportModal(false);
-                handleExportCSV(false);
+                if (activeTab === "Finances") {
+                  handleExportMoneyCSV();
+                } else {
+                  handleExportCSV(false);
+                }
               }}
             >
               <span style={{ width: 44, height: 44, borderRadius: "var(--r-tile)", background: "var(--status-success-soft)", color: "var(--status-success)", display: "grid", placeItems: "center", fontWeight: 700, fontSize: 12, flexShrink: 0 }}>
@@ -2693,8 +3568,60 @@ export default function FinancialReportPage() {
             type: "success",
           });
           loadData();
+          fetchLedger();
         }}
       />
+
+      {/* Add Revenue Modal */}
+      {showAddRevenueModal && (
+        <AddRevenueModal
+          open={showAddRevenueModal}
+          projects={projects}
+          onClose={() => setShowAddRevenueModal(false)}
+          onSaved={() => {
+            loadData(true);
+            fetchLedger();
+            setToast({
+              msg: "Revenue entry recorded successfully",
+              type: "success",
+            });
+          }}
+        />
+      )}
+
+      {/* Change Ledger Category Modal */}
+      {changeCategoryItem && (
+        <ChangeCategoryModal
+          item={changeCategoryItem}
+          onClose={() => setChangeCategoryItem(null)}
+          onSaved={(newCat) => {
+            setToast({
+              msg: `Category updated to ${getLedgerCategoryLabel(newCat)}`,
+              type: "success",
+            });
+            fetchLedger();
+          }}
+        />
+      )}
+
+      {/* Money Movement Details Drawer */}
+      {detailsMoneyRow && (
+        <MoneyDetailsDrawer
+          row={detailsMoneyRow}
+          canRecordPayment={canRecordPayment}
+          onClose={() => setDetailsMoneyRow(null)}
+          onChangeCategory={() => {
+            const item = detailsMoneyRow;
+            setDetailsMoneyRow(null);
+            setChangeCategoryItem(item);
+          }}
+          onRecordPayment={() => {
+            const item = detailsMoneyRow;
+            setDetailsMoneyRow(null);
+            handleRecordPaymentClick(item);
+          }}
+        />
+      )}
     </div>
   );
 }
@@ -2788,20 +3715,41 @@ function DetailsDrawer({ entry, projectInfo, canAddEdit, canRecordPayment, onClo
   }, [onClose]);
 
   const total = Number(entry.rawTx?.amount || entry.amount || 0);
-  const paid = Number(entry.rawTx?.paidAmount || 0);
+  const paid = Number(entry.rawTx?.paidAmount || entry.paidAmount || 0);
   const balance = Number(entry.rawTx?.remainingAmount ?? total - paid);
-  const status = getPaymentStatusLabel(entry.paymentStatus, entry.rawTx);
+  const status = getPaymentStatusLabel(entry.paymentStatus || entry.rawTx?.paymentStatus, entry.rawTx || { amount: total, paidAmount: paid });
   const typeKey = TYPE_LABELS[entry.type] ? entry.type : "material";
-  const history = entry.rawTx?.paymentHistory || [];
+  const history = entry.rawTx?.paymentHistory || entry.paymentHistory || [];
+
+  const payDate = entry.rawTx?.paymentDate || entry.paymentDate || (history[0]?.date);
+  const payMode = entry.rawTx?.paymentMode || entry.paymentMode || (history[0]?.method);
+  const supplierParty = entry.rawTx?.supplier || entry.rawTx?.contractor || (typeof entry.rawTx?.worker === "object" ? entry.rawTx?.worker?.name : null) || entry.supplier || entry.worker;
+  const qty = entry.rawTx?.quantity ?? entry.quantity;
+  const rateVal = entry.rawTx?.rate ?? entry.rate;
+  const unitVal = entry.rawTx?.unit || entry.unit || "";
+  const qtyRate = (qty != null && rateVal != null && Number(qty) > 0)
+    ? `${qty} ${unitVal} @ ${formatInr(rateVal)}`
+    : null;
+  const gstDetails = entry.rawTx?.isWithGst
+    ? `${entry.rawTx?.gst || entry.rawTx?.gstPercentage || 18}% (₹${Number(entry.rawTx?.gstAmount || 0).toLocaleString("en-IN")})`
+    : null;
+  const notesText = entry.rawTx?.notes || entry.rawTx?.remarks || entry.notes;
 
   const rows = [
     { label: "Project", val: projectInfo.name, dim: projectInfo.none },
-    { label: "Date", val: formatDateLong(entry.date) },
+    { label: "Date & Time", val: formatDateLong(entry.rawTx?.createdAt || entry.date, entry.rawTx?._id || entry.id) },
+    { label: "Payment status", val: status },
+    ...(payDate || paid > 0 ? [{ label: "Payment Date", val: formatDateLong(payDate || entry.rawTx?.createdAt || entry.date, entry.rawTx?._id || entry.id) }] : []),
+    ...(payMode ? [{ label: "Payment Mode", val: payMode }] : []),
     { label: "Description", val: entry.description },
+    { label: "Party / Supplier", val: supplierParty },
+    { label: "Quantity & Rate", val: qtyRate },
+    { label: "GST", val: gstDetails },
     { label: "Brand", val: entry.brand },
     { label: "Floor", val: entry.floor },
     { label: "Phase", val: entry.phase },
     { label: "Unit", val: entry.unit },
+    { label: "Notes / Remarks", val: notesText },
     { label: "Rejection reason", val: entry.rejectionReason, danger: true },
   ].filter((r) => r.val);
 
@@ -2862,22 +3810,36 @@ function DetailsDrawer({ entry, projectInfo, canAddEdit, canRecordPayment, onClo
 
           {history.length > 0 && (
             <div style={{ marginTop: 20 }}>
-              <div className="bt-eyebrow" style={{ color: "var(--ink-3)", marginBottom: 10 }}>Payment history</div>
+              <div className="bt-eyebrow" style={{ color: "var(--ink-3)", marginBottom: 10 }}>Payment history ({history.length})</div>
               <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                {history.map((ph, idx) => (
-                  <div
-                    key={idx}
-                    style={{ padding: "10px 14px", borderRadius: "var(--r-tile)", background: "var(--bone)", border: "1px solid var(--line)", display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12 }}
-                  >
-                    <div>
-                      <div className="tnum" style={{ fontFamily: "var(--font-display)", fontSize: 16, fontWeight: 700 }}>
-                        {formatInr(ph.amount)}
+                {history.map((ph, idx) => {
+                  const phDateStr = formatDateLong(ph.date || ph.createdAt, ph._id || ph.id || entry.rawTx?._id || entry.id);
+                  return (
+                    <div
+                      key={idx}
+                      style={{ padding: "10px 14px", borderRadius: "var(--r-tile)", background: "var(--bone)", border: "1px solid var(--line)", display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12 }}
+                    >
+                      <div style={{ minWidth: 0 }}>
+                        <div className="tnum" style={{ fontFamily: "var(--font-display)", fontSize: 16, fontWeight: 700, color: "var(--status-success)" }}>
+                          +{formatInr(ph.amount)}
+                        </div>
+                        <div style={{ fontSize: 13, color: "var(--ink-3)", marginTop: 2 }}>{phDateStr}</div>
+                        {ph.note && <div style={{ fontSize: 12.5, color: "var(--ink-2)", marginTop: 2 }}>{ph.note}</div>}
+                        {ph.receipt && (
+                          <a
+                            href={ph.receipt}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            style={{ fontSize: 12.5, color: "var(--accent-ink)", textDecoration: "none", display: "inline-flex", alignItems: "center", gap: 4, marginTop: 4, fontWeight: 600 }}
+                          >
+                            <ExternalLink size={12} /> View receipt
+                          </a>
+                        )}
                       </div>
-                      <div style={{ fontSize: 13, color: "var(--ink-3)" }}>{formatDateLong(ph.date)}</div>
+                      <BtBadge tone="neutral" showDot={false} label={ph.method || ph.paymentMode || "Cash"} />
                     </div>
-                    <BtBadge tone="neutral" showDot={false} label={ph.method || "Cash"} />
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </div>
           )}
@@ -2902,6 +3864,235 @@ function DetailsDrawer({ entry, projectInfo, canAddEdit, canRecordPayment, onClo
             )}
           </div>
         )}
+      </div>
+    </div>
+  , document.body);
+}
+
+function ChangeCategoryModal({ item, onClose, onSaved }) {
+  const [selectedCat, setSelectedCat] = useState(item?.category || "other");
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState(null);
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setSaving(true);
+    setError(null);
+    try {
+      await reportAPI.updateLedgerCategory(item.id, selectedCat);
+      onSaved?.(selectedCat);
+      onClose();
+    } catch (err) {
+      setError(err.response?.data?.message || "Failed to update category");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const categories = Object.entries(LEDGER_CATEGORIES);
+
+  return (
+    <ModalShell
+      title="Change ledger category"
+      subtitle={item?.title || item?.description || "Transaction"}
+      onClose={onClose}
+      maxWidth={460}
+      zIndex={1200}
+    >
+      <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+        {error && (
+          <div style={{ padding: "8px 12px", background: "var(--status-danger-soft, #fee2e2)", color: "var(--status-danger, #ef4444)", borderRadius: "var(--r-tile)", fontSize: 13 }}>
+            {error}
+          </div>
+        )}
+
+        <div style={{ fontSize: 13, color: "var(--ink-2)" }}>
+          Pick how this transaction should be classified in your financial ledger and cash flow statements:
+        </div>
+
+        <div style={{ display: "flex", flexDirection: "column", gap: 8, maxHeight: 300, overflowY: "auto" }}>
+          {categories.map(([key, info]) => {
+            const isSelected = selectedCat === key;
+            return (
+              <label
+                key={key}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  padding: "10px 14px",
+                  borderRadius: "var(--r-tile)",
+                  border: isSelected ? "1.5px solid var(--accent, #6366f1)" : "1px solid var(--line)",
+                  background: isSelected ? "var(--bone)" : "var(--card)",
+                  cursor: "pointer",
+                }}
+              >
+                <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                  <input
+                    type="radio"
+                    name="ledgerCategory"
+                    value={key}
+                    checked={isSelected}
+                    onChange={() => setSelectedCat(key)}
+                    style={{ accentColor: "var(--accent, #6366f1)" }}
+                  />
+                  <div>
+                    <span style={{ fontWeight: 600, fontSize: 14, color: "var(--ink)" }}>{info.label}</span>
+                    <span style={{ fontSize: 12, color: "var(--ink-3)", marginLeft: 6 }}>
+                      {info.isIn === true ? "(Money In)" : info.isIn === false ? "(Money Out)" : "(Flexible)"}
+                    </span>
+                  </div>
+                </div>
+                <BtBadge tone={info.isIn ? "success" : "neutral"} showDot={false} label={info.isIn ? "In" : "Out"} />
+              </label>
+            );
+          })}
+        </div>
+
+        <div style={{ display: "flex", gap: 10, marginTop: 12 }}>
+          <BtButton variant="secondary" size="normal" type="button" onClick={onClose} style={{ flex: 1 }}>
+            Cancel
+          </BtButton>
+          <BtButton variant="primary" size="normal" type="submit" loading={saving} style={{ flex: 1 }}>
+            Save category
+          </BtButton>
+        </div>
+      </form>
+    </ModalShell>
+  );
+}
+
+function MoneyDetailsDrawer({ row, canRecordPayment, onClose, onChangeCategory, onRecordPayment }) {
+  useEffect(() => {
+    const onKey = (e) => {
+      if (e.key === "Escape") onClose?.();
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [onClose]);
+
+  const isMoneyIn = row.isIn;
+  const status = isMoneyIn ? "Received" : getPaymentStatusLabel(row.paymentStatus, { amount: row.amount, paidAmount: row.paidAmount });
+  const rem = row.remainingAmount || 0;
+  const payMode = row.paymentMode || row.method || row.rawTx?.paymentMode;
+  const payDate = row.paymentDate || row.rawTx?.paymentDate;
+  const history = row.rawTx?.paymentHistory || row.paymentHistory || [];
+
+  const detailRows = [
+    { label: "Date & Time", val: formatDateLong(row.createdAt || row.rawDate || row.date, row.id) },
+    { label: "Direction", val: isMoneyIn ? "Money In (Revenue / Inflow)" : "Money Out (Expense / Spending)" },
+    { label: "Category", val: getLedgerCategoryLabel(row.category) },
+    { label: "Project", val: row.projectName || "No project" },
+    { label: "Payee / Client / Party", val: row.payee },
+    ...(payMode ? [{ label: "Payment Mode", val: payMode }] : []),
+    ...(payDate ? [{ label: "Payment Date", val: formatDateLong(payDate, row.id) }] : []),
+    { label: "Original Type", val: row.type },
+    { label: "Approval", val: row.approvalStatus },
+    { label: "Notes / Remarks", val: row.notes },
+  ].filter((r) => r.val);
+
+  return createPortal(
+    <div
+      className="fr-scrim fr-drawer-scrim"
+      role="presentation"
+      style={{ zIndex: 900 }}
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onClose?.();
+      }}
+    >
+      <div role="dialog" aria-modal="true" aria-label="Transaction details" className="fr-drawer">
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, padding: "22px 24px 12px" }}>
+          <div>
+            <div className="bt-eyebrow" style={{ color: "var(--ink-3)" }}>
+              {isMoneyIn ? "Revenue / Inflow Details" : "Spending / Movement Details"}
+            </div>
+            <h2 style={{ margin: "4px 0 0", fontFamily: "var(--font-display)", fontSize: 22, fontWeight: 700, letterSpacing: "-0.02em", overflowWrap: "anywhere" }}>
+              {row.title || row.description || "Movement"}
+            </h2>
+          </div>
+          <BtIconButton icon={X} label="Close details" onClick={onClose} />
+        </div>
+
+        <div style={{ flex: 1, overflowY: "auto", padding: "4px 24px 16px" }}>
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 16 }}>
+            <BtBadge tone={isMoneyIn ? "success" : "neutral"} label={getLedgerCategoryLabel(row.category)} />
+            <BtBadge tone={statusTone(status)} label={status} />
+          </div>
+
+          <div className="bt-grid-3" style={{ gap: 10, marginBottom: 20 }}>
+            <div style={{ background: "var(--bone)", border: "1px solid var(--line)", borderRadius: "var(--r-tile)", padding: "10px 12px", minWidth: 0 }}>
+              <div className="bt-eyebrow" style={{ color: "var(--ink-3)" }}>{isMoneyIn ? "Money In" : "Money Out"}</div>
+              <div className="tnum" style={{ fontFamily: "var(--font-display)", fontSize: 17, fontWeight: 700, color: isMoneyIn ? "var(--status-success)" : "var(--ink)", marginTop: 2, overflowWrap: "anywhere" }}>
+                {isMoneyIn ? `+${formatINR(row.amount)}` : formatINR(row.amount)}
+              </div>
+            </div>
+
+            <div style={{ background: "var(--bone)", border: "1px solid var(--line)", borderRadius: "var(--r-tile)", padding: "10px 12px", minWidth: 0 }}>
+              <div className="bt-eyebrow" style={{ color: "var(--ink-3)" }}>Running Balance</div>
+              <div className="tnum" style={{ fontFamily: "var(--font-display)", fontSize: 17, fontWeight: 700, color: (row.runningBalance ?? 0) >= 0 ? "var(--status-success)" : "var(--status-danger)", marginTop: 2, overflowWrap: "anywhere" }}>
+                {(row.runningBalance ?? 0) >= 0 ? "+" : ""}{formatINR(row.runningBalance || 0)}
+              </div>
+            </div>
+
+            <div style={{ background: "var(--bone)", border: "1px solid var(--line)", borderRadius: "var(--r-tile)", padding: "10px 12px", minWidth: 0 }}>
+              <div className="bt-eyebrow" style={{ color: "var(--ink-3)" }}>Balance Due</div>
+              <div className="tnum" style={{ fontFamily: "var(--font-display)", fontSize: 17, fontWeight: 700, color: rem > 0 ? "var(--status-danger)" : "var(--status-success)", marginTop: 2, overflowWrap: "anywhere" }}>
+                {rem > 0 ? formatINR(rem) : "Cleared"}
+              </div>
+            </div>
+          </div>
+
+          <div style={{ display: "flex", flexDirection: "column" }}>
+            {detailRows.map((r) => (
+              <div
+                key={r.label}
+                style={{ display: "grid", gridTemplateColumns: "140px minmax(0, 1fr)", gap: 12, padding: "11px 0", borderTop: "1px solid var(--line)", fontSize: 14 }}
+              >
+                <span style={{ color: "var(--ink-3)" }}>{r.label}</span>
+                <span style={{ color: "var(--ink)", fontWeight: 500, overflowWrap: "anywhere" }}>
+                  {r.val}
+                </span>
+              </div>
+            ))}
+          </div>
+
+          {history.length > 0 && (
+            <div style={{ marginTop: 20 }}>
+              <div className="bt-eyebrow" style={{ color: "var(--ink-3)", marginBottom: 10 }}>Payment history ({history.length})</div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                {history.map((ph, idx) => {
+                  const phDateStr = formatDateLong(ph.date || ph.createdAt, ph._id || ph.id || row.rawTx?._id || row.id);
+                  return (
+                    <div
+                      key={idx}
+                      style={{ padding: "10px 14px", borderRadius: "var(--r-tile)", background: "var(--bone)", border: "1px solid var(--line)", display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12 }}
+                    >
+                      <div style={{ minWidth: 0 }}>
+                        <div className="tnum" style={{ fontFamily: "var(--font-display)", fontSize: 16, fontWeight: 700, color: "var(--status-success)" }}>
+                          +{formatInr(ph.amount)}
+                        </div>
+                        <div style={{ fontSize: 13, color: "var(--ink-3)", marginTop: 2 }}>{phDateStr}</div>
+                        {ph.note && <div style={{ fontSize: 12.5, color: "var(--ink-2)", marginTop: 2 }}>{ph.note}</div>}
+                      </div>
+                      <BtBadge tone="neutral" showDot={false} label={ph.method || ph.paymentMode || "Cash"} />
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+        </div>
+
+        <div style={{ display: "flex", gap: 8, padding: "14px 24px 20px", borderTop: "1px solid var(--line)", flexWrap: "wrap" }}>
+          <BtButton variant="secondary" size="small" icon={SlidersHorizontal} onClick={onChangeCategory} style={{ flex: "1 1 auto" }}>
+            Change category
+          </BtButton>
+          {!isMoneyIn && rem > 0 && canRecordPayment && (
+            <BtButton variant="primary" size="small" icon={CreditCard} onClick={onRecordPayment} style={{ flex: "1 1 auto" }}>
+              Record payment
+            </BtButton>
+          )}
+        </div>
       </div>
     </div>
   , document.body);

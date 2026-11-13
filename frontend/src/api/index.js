@@ -7,8 +7,12 @@ function normalizeOrigin(url) {
   return url.replace(/\/+$/, "");
 }
 
-const API_ORIGIN = import.meta.env.VITE_API_URL || "http://localhost:5001";
-const BASE = API_ORIGIN.endsWith("/api") ? API_ORIGIN : `${API_ORIGIN}/api`;
+const RAW_API_URL = import.meta.env.VITE_API_URL || "";
+// In development, route through Vite's dev proxy (/api) to avoid CORS and SSL certificate mismatch errors.
+// In production, use VITE_API_URL directly (or relative /api if served on same domain).
+const isDev = Boolean(import.meta.env.DEV);
+const API_ORIGIN = isDev ? "" : normalizeOrigin(RAW_API_URL || "http://localhost:5001");
+const BASE = isDev ? "/api" : (API_ORIGIN ? (API_ORIGIN.endsWith("/api") ? API_ORIGIN : `${API_ORIGIN}/api`) : "/api");
 
 const api = axios.create({ baseURL: BASE });
 
@@ -127,6 +131,8 @@ export const notificationAPI = {
 
 export const reportAPI = {
   getFinancial: (params) => api.get("/reports/financial", { params }),
+  getLedger:    (params) => api.get("/reports/ledger", { params }),
+  updateLedgerCategory: (id, category) => api.patch(`/transactions/${id}/ledger-category`, { ledgerCategory: category }),
   exportCSV:    (params) => api.get("/reports/financial/export-csv", { params, responseType: "blob" }),
   exportPDF:    (params) => api.get("/reports/financial/export-pdf", { params, responseType: "blob" }),
 };

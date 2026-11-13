@@ -25,8 +25,13 @@ export default function AddEntryPage() {
   const navigate = useNavigate();
   const location = useLocation();
   const { can, isAdmin } = useAuth();
-  const { selectedProject } = useProjectStore();
-  const project = location.state?.project || selectedProject || null;
+  const { selectedProject, projects } = useProjectStore();
+  const validSelectedProject = useMemo(() => {
+    if (!selectedProject) return null;
+    const selId = selectedProject._id || selectedProject.id;
+    return projects.some((p) => (p._id || p.id) === selId) ? selectedProject : null;
+  }, [selectedProject, projects]);
+  const project = location.state?.project || validSelectedProject || null;
 
   const [selectedType, setSelectedType] = useState('material');
   const [runTour, setRunTour] = useState(false);

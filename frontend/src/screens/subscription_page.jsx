@@ -50,7 +50,7 @@ const PLANS = [
   {
     id: "starter",
     title: "Starter",
-    price: 2,
+    price: 499,
     period: "/mo",
     tagline: "For small teams just getting started.",
     users: "5 users",

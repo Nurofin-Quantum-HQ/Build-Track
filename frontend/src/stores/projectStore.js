@@ -12,6 +12,41 @@ const useProjectStore = create(
       loading: false,
       error: null,
       stats: {},
+      userId: null,
+
+      syncUser(user) {
+        const uid = user?._id || user?.id || null;
+        const state = get();
+        if (uid && state.userId && state.userId !== uid) {
+          // Different user logged in — immediately wipe previous user's projects and selection
+          set({
+            projects: [],
+            contextProjects: [],
+            contextLoadedAt: 0,
+            selectedProject: null,
+            stats: {},
+            userId: uid,
+          });
+        } else if (uid && !state.userId) {
+          set({ userId: uid });
+        }
+      },
+
+      reset() {
+        set({
+          projects: [],
+          contextProjects: [],
+          contextLoadedAt: 0,
+          selectedProject: null,
+          stats: {},
+          userId: null,
+          loading: false,
+          error: null,
+        });
+        try {
+          localStorage.removeItem("bt_projects");
+        } catch {}
+      },
 
       async fetchContext(force = false) {
         const CONTEXT_TTL = 5 * 60 * 1000;
@@ -22,7 +57,14 @@ const useProjectStore = create(
         try {
           const { data } = await projectAPI.getContext();
           const list = data.projects || [];
-          set({ contextProjects: list, contextLoadedAt: Date.now() });
+          const curSel = get().selectedProject;
+          const selId = curSel?._id || curSel?.id;
+          const isValidSel = selId && list.some((p) => (p._id || p.id) === selId);
+          set({
+            contextProjects: list,
+            contextLoadedAt: Date.now(),
+            ...(curSel && !isValidSel ? { selectedProject: null } : {}),
+          });
           return list;
         } catch {
           return state.contextProjects || [];
@@ -34,7 +76,13 @@ const useProjectStore = create(
         if (state.projects.length > 0 && !force) {
           projectAPI.getAll(params).then(({ data }) => {
             const list = Array.isArray(data) ? data : data.projects || [];
-            set({ projects: list });
+            const curSel = get().selectedProject;
+            const selId = curSel?._id || curSel?.id;
+            const isValidSel = selId && list.some((p) => (p._id || p.id) === selId);
+            set({
+              projects: list,
+              ...(curSel && !isValidSel ? { selectedProject: null } : {}),
+            });
           }).catch(() => {});
           return state.projects;
         }
@@ -43,7 +91,14 @@ const useProjectStore = create(
         try {
           const { data } = await projectAPI.getAll(params);
           const list = Array.isArray(data) ? data : data.projects || [];
-          set({ projects: list, loading: false });
+          const curSel = get().selectedProject;
+          const selId = curSel?._id || curSel?.id;
+          const isValidSel = selId && list.some((p) => (p._id || p.id) === selId);
+          set({
+            projects: list,
+            loading: false,
+            ...(curSel && !isValidSel ? { selectedProject: null } : {}),
+          });
           return list;
         } catch (err) {
           set({ error: err.message || "Failed to load projects", loading: false });
@@ -132,6 +187,16 @@ const useProjectStore = create(
       },
 
       setSelectedProject(project) {
+        if (!project) {
+          set({ selectedProject: null });
+          return;
+        }
+        const pid = project._id || project.id;
+        const currentProjects = get().projects;
+        if (currentProjects.length > 0 && pid && !currentProjects.some((p) => (p._id || p.id) === pid)) {
+          // Do not select a project not in the user's project list
+          return;
+        }
         set({ selectedProject: project });
       },
 
@@ -144,6 +209,7 @@ const useProjectStore = create(
       partialize: (state) => ({
         projects: state.projects,
         selectedProject: state.selectedProject,
+        userId: state.userId,
       }),
     }
   )

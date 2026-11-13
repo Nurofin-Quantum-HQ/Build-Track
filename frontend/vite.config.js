@@ -10,12 +10,21 @@ export default defineConfig(({ mode }) => {
     // Ensure .env is read from the project root
     envDir: '.',
 
-    // Dev server proxy — avoids CORS in local development.
+    optimizeDeps: {
+      include: ['html-to-image'],
+    },
+
+    // Dev server proxy — avoids CORS and SSL certificate mismatch errors in local development.
     // Production uses VITE_API_URL directly (no proxy needed).
     server: {
       proxy: mode === 'development' ? {
         '/api': {
-          target: env.VITE_API_URL || 'http://localhost:5000',
+          target: env.VITE_API_URL || 'http://localhost:5001',
+          changeOrigin: true,
+          secure: false,
+        },
+        '/uploads': {
+          target: env.VITE_API_URL || 'http://localhost:5001',
           changeOrigin: true,
           secure: false,
         },

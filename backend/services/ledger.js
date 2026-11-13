@@ -246,6 +246,8 @@ function rowStages(limit) {
         type: 1,
         paymentStatus: 1,
         approvalStatus: 1,
+        createdAt: 1,
+        rawDate: "$date",
       },
     },
   ];

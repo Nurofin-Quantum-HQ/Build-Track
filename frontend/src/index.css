@@ -47,3 +47,28 @@ button {
   box-sizing: border-box;
   font-family: inherit;
 }
+
+/* ── Blueprint Noir Default Styles for Native Select & Form Elements ── */
+select {
+  background-color: var(--card);
+  color: var(--ink);
+  border: 1px solid var(--input-border, var(--line));
+  border-radius: var(--r-input);
+  font-family: var(--font-ui);
+  font-size: 14px;
+  padding: 8px 30px 8px 12px;
+  outline: none;
+  transition: border-color 150ms ease, box-shadow 150ms ease;
+}
+
+select:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-soft, rgba(42, 120, 214, 0.15));
+}
+
+option {
+  background-color: var(--card);
+  color: var(--ink);
+  font-family: var(--font-ui);
+  padding: 8px 12px;
+}

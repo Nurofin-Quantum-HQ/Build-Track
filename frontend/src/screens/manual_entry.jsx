@@ -19,7 +19,7 @@ import {
   showBtSuccess,
   btToast,
 } from '../components/ui';
-import { Building2, HelpCircle, X, Paperclip, Camera, Package, Users, Truck, Receipt, CreditCard, FileText, AlertCircle } from 'lucide-react';
+import { Building2, HelpCircle, X, Paperclip, Camera, Package, Users, Truck, Receipt, CreditCard, FileText, AlertCircle, Trash2 } from 'lucide-react';
 import ModuleTour from '../components/ModuleTour';
 import PayNowSheet from '../components/PayNowSheet';
 import { useAuth } from '../contexts/AuthContext';
@@ -34,6 +34,37 @@ const UNIT_OPTIONS = {
   material: ['Bags', 'Kg', 'Tonnes', 'Sq.Ft', 'Cubic Ft', 'Pieces', 'Liters', 'Unit'],
   labour: ['Day', 'Hour', 'Sq.Ft', 'Unit'],
   equipment: ['Day', 'Hour', 'Week', 'Month', 'Trip'],
+};
+
+const normalizeUnitForApi = (u) => {
+  if (!u) return 'unit';
+  const s = String(u).trim().toLowerCase();
+  if (s === 'bags' || s === 'bag') return 'bag';
+  if (s === 'kg' || s === 'kgs') return 'kg';
+  if (s === 'tonnes' || s === 'ton' || s === 'tons') return 'ton';
+  if (s === 'sq.ft' || s === 'sqft' || s === 'sq ft') return 'sqft';
+  if (s === 'cubic ft' || s === 'cft') return 'sqft';
+  if (s === 'day' || s === 'days') return 'day';
+  if (s === 'hour' || s === 'hours') return 'hour';
+  if (s === 'liters' || s === 'ltr' || s === 'ltrs') return 'ltr';
+  if (s === 'trip' || s === 'truck') return 'truck';
+  return 'unit';
+};
+
+const findMatchingUnitOption = (raw, type) => {
+  if (!raw) return (UNIT_OPTIONS[type] || [])[0] || 'Unit';
+  const list = UNIT_OPTIONS[type] || [];
+  const clean = String(raw).trim().toLowerCase();
+  const direct = list.find((opt) => opt.toLowerCase() === clean);
+  if (direct) return direct;
+  const singular = clean.replace(/s$/, '');
+  const match = list.find((opt) => opt.toLowerCase().replace(/s$/, '') === singular);
+  if (match) return match;
+  if (clean === 'bag' && list.includes('Bags')) return 'Bags';
+  if (clean === 'ton' && list.includes('Tonnes')) return 'Tonnes';
+  if (clean === 'sqft' && list.includes('Sq.Ft')) return 'Sq.Ft';
+  if (clean === 'truck' && list.includes('Trip')) return 'Trip';
+  return list[0] || 'Unit';
 };
 
 const GST_PERCENTAGES = [0, 5, 12, 18, 28];
@@ -63,6 +94,48 @@ const AUTOCOMPLETE_FIELDS = {
 };
 
 const money = (v) => '₹' + (Number(v) || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+function formatPaymentDateTime(dateStr, rawId = null) {
+  if (!dateStr) return '—';
+  let d = dateStr instanceof Date ? dateStr : new Date(dateStr);
+  if (isNaN(d.getTime())) return String(dateStr);
+
+  const isUtcMidnight =
+    (d.getUTCHours() === 0 && d.getUTCMinutes() === 0 && d.getUTCSeconds() === 0) ||
+    (typeof dateStr === "string" && (/^\d{4}-\d{2}-\d{2}$/.test(dateStr) || dateStr.endsWith("T00:00:00.000Z")));
+
+  const isLocalMidnight = d.getHours() === 0 && d.getMinutes() === 0 && d.getSeconds() === 0;
+
+  if ((isUtcMidnight || isLocalMidnight) && rawId && String(rawId).length === 24) {
+    try {
+      const ts = parseInt(String(rawId).substring(0, 8), 16) * 1000;
+      const fromId = new Date(ts);
+      if (!isNaN(fromId.getTime())) {
+        d = fromId;
+      }
+    } catch {}
+  }
+
+  const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  const day = String(d.getDate()).padStart(2, '0');
+  const month = months[d.getMonth()];
+  const year = d.getFullYear();
+
+  const isStillMidnight =
+    (d.getHours() === 0 && d.getMinutes() === 0 && d.getSeconds() === 0) ||
+    (d.getUTCHours() === 0 && d.getUTCMinutes() === 0 && d.getUTCSeconds() === 0) ||
+    (isUtcMidnight && !rawId);
+
+  if (isStillMidnight) {
+    return `${day} ${month} ${year}`;
+  }
+
+  let hrs = d.getHours();
+  const mins = String(d.getMinutes()).padStart(2, '0');
+  const ampm = hrs >= 12 ? 'PM' : 'AM';
+  hrs = hrs % 12 || 12;
+  return `${day} ${month} ${year}, ${String(hrs).padStart(2, '0')}:${mins} ${ampm}`;
+}
 
 const fileToDataUri = (file) =>
   new Promise((resolve, reject) => {
@@ -135,8 +208,28 @@ export default function ManualEntryPage() {
   const canMarkPaid = isAdmin || can('approve_payments') || can('mark_paid');
 
   const [entryType, setEntryType] = useState(() => (allowedTypes.length > 0 ? allowedTypes[0] : 'material'));
-  const [projects, setProjects] = useState([]);
-  const [selectedProject, setSelectedProject] = useState('');
+  const [projects, setProjects] = useState(() => {
+    return useProjectStore.getState().projects || [];
+  });
+  const [selectedProject, setSelectedProject] = useState(() => {
+    const initialProjects = useProjectStore.getState().projects || [];
+    const passed = location.state?.project;
+    if (passed) {
+      const pid = typeof passed === 'object' ? (passed._id || passed.id || '') : String(passed);
+      if (initialProjects.some((p) => (p._id || p.id) === pid)) {
+        return pid;
+      }
+    }
+    const qProject = new URLSearchParams(location.search).get('project');
+    if (qProject && initialProjects.some((p) => (p._id || p.id) === qProject)) {
+      return qProject;
+    }
+    const storeSel = useProjectStore.getState().selectedProject?._id;
+    if (storeSel && initialProjects.some((p) => (p._id || p.id) === storeSel)) {
+      return storeSel;
+    }
+    return '';
+  });
   const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
   const [values, setValues] = useState({});
   const [unit, setUnit] = useState('');
@@ -200,9 +293,19 @@ export default function ManualEntryPage() {
     useProjectStore
       .getState()
       .fetchContext()
-      .then((list) => setProjects(list || []))
+      .then((list) => {
+        const validList = list || [];
+        setProjects(validList);
+        const passed = location.state?.project;
+        const passedId = passed ? (typeof passed === 'object' ? (passed._id || passed.id || '') : String(passed)) : null;
+        if (passedId && validList.some((p) => (p._id || p.id) === passedId)) {
+          setSelectedProject(passedId);
+        } else {
+          setSelectedProject((prev) => (validList.some((p) => (p._id || p.id) === prev) ? prev : ''));
+        }
+      })
       .catch(() => {});
-  }, []);
+  }, [location.state]);
 
   useEffect(() => {
     if (allowedTypes.length === 0) {
@@ -227,7 +330,7 @@ export default function ManualEntryPage() {
         setDate(new Date(tx.date || tx.createdAt).toISOString().split('T')[0]);
       }
       setNotes(tx.notes || '');
-      setUnit(tx.unit || '');
+      setUnit(findMatchingUnitOption(tx.unit, eType));
       setSelectedFloor(tx.floor || '');
       setSelectedPhaseId(tx.phaseId || tx.phase || '');
       setSelectedActivityName(tx.activity || '');
@@ -297,7 +400,15 @@ export default function ManualEntryPage() {
 
       if (location.state?.project) {
         const proj = location.state.project;
-        setSelectedProject(proj._id || proj.id || '');
+        const pid = typeof proj === 'object' ? (proj._id || proj.id || '') : String(proj);
+        if (pid) {
+          setProjects((prev) => {
+            if (prev.some((p) => (p._id || p.id) === pid)) {
+              setSelectedProject(pid);
+            }
+            return prev;
+          });
+        }
       }
       if (location.state?.prefill) {
         const prefill = location.state.prefill;
@@ -402,7 +513,7 @@ export default function ManualEntryPage() {
         notes: notes || '',
         quantity: qty,
         rate: rate,
-        unit: unit,
+        unit: normalizeUnitForApi(unit),
       };
 
       if (entryType === 'material') {
@@ -428,13 +539,48 @@ export default function ManualEntryPage() {
         isWithGst: isWithGst,
         gstPercentage: isWithGst ? gstPercentage : 0,
         gstAmount: gstAmount,
+        amount: totalAmount,
         totalAmount: totalAmount,
         overtime: overtimeHours,
         overtimeAmount: overtimeAmount,
       });
 
       // Payment fields the server actually reads (paidAmount / paymentStatus / paymentMode / paymentDate).
-      if (paymentResult) {
+      if (isEditing) {
+        let currentHistory = [...paymentHistory];
+        if (paymentResult) {
+          currentHistory.push({
+            date: paymentResult.paymentDate || new Date().toISOString(),
+            method: paymentResult.apiMode || paymentResult.method || 'Cash',
+            amount: paidNow,
+            note: paymentResult.note || '',
+          });
+        }
+        const totalPaid = currentHistory.reduce((sum, p) => sum + (Number(p?.amount) || 0), 0);
+        payload.paymentHistory = currentHistory;
+        payload.paidAmount = totalPaid;
+        if (totalPaid >= totalAmount && totalAmount > 0) {
+          payload.paymentStatus = 'Paid';
+        } else if (totalPaid > 0) {
+          payload.paymentStatus = 'Partial';
+        } else {
+          payload.paymentStatus = 'Pending';
+        }
+        if (currentHistory.length > 0) {
+          const last = currentHistory[currentHistory.length - 1];
+          payload.paymentMode = last.method || paymentMethod;
+          payload.paymentDate = last.date;
+        } else {
+          payload.paymentMode = paymentMethod !== 'Credit' ? paymentMethod : 'Cash';
+        }
+        if (paymentResult?.requestEsign && paymentResult.clientEmail) {
+          payload.requestEsign = true;
+          payload.clientEmail = paymentResult.clientEmail;
+        }
+        if (paymentResult?.receiptFile) {
+          payload.paymentReceipt = await fileToDataUri(paymentResult.receiptFile);
+        }
+      } else if (paymentResult) {
         payload.paidAmount = alreadyPaid + paidNow;
         payload.paymentStatus = paymentResult.status;
         payload.paymentMode = paymentResult.apiMode;
@@ -461,7 +607,11 @@ export default function ManualEntryPage() {
       if (hasFiles) {
         const formData = new FormData();
         Object.keys(payload).forEach((key) => {
-          formData.append(key, payload[key]);
+          if (key === 'paymentHistory') {
+            formData.append(key, JSON.stringify(payload[key]));
+          } else {
+            formData.append(key, payload[key]);
+          }
         });
         attachments.forEach((file) => {
           formData.append('attachments', file);
@@ -798,6 +948,68 @@ export default function ManualEntryPage() {
               </div>
             </div>
 
+            {/* Existing payment records with option to delete payment (parity with Flutter application) */}
+            {paymentHistory.length > 0 && (
+              <div style={{ marginBottom: 18 }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+                  <Eyebrow>Payment records ({paymentHistory.length})</Eyebrow>
+                  <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--status-success)' }}>
+                    Total paid: {formatInr(alreadyPaid)}
+                  </span>
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  {paymentHistory.map((p, idx) => (
+                    <div
+                      key={p._id || idx}
+                      style={{
+                        padding: '12px 14px',
+                        borderRadius: 'var(--r-tile, 10px)',
+                        background: 'var(--fill)',
+                        border: '1px solid var(--line)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        gap: 12,
+                      }}
+                    >
+                      <div style={{ minWidth: 0, flex: 1 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                          <span style={{ fontFamily: 'var(--font-display)', fontSize: 16, fontWeight: 700, color: 'var(--status-success)' }}>
+                            +{formatInr(p.amount)}
+                          </span>
+                          <BtBadge tone="neutral" showDot={false} label={p.method || p.paymentMode || 'Cash'} />
+                        </div>
+                        <div style={{ fontSize: 12.5, color: 'var(--ink-3)', marginTop: 4 }}>
+                          {formatPaymentDateTime(p.date || p.paymentDate, p._id || p.id || editingId)}
+                        </div>
+                        {p.note && (
+                          <div style={{ fontSize: 13, color: 'var(--ink-2)', marginTop: 2 }}>{p.note}</div>
+                        )}
+                      </div>
+
+                      {canMarkPaid && (
+                        <BtIconButton
+                          icon={Trash2}
+                          label="Delete payment"
+                          size={32}
+                          onClick={() => {
+                            setPaymentHistory((prev) => prev.filter((_, i) => i !== idx));
+                            btToast('Payment record removed.');
+                          }}
+                          style={{
+                            color: 'var(--status-danger, #ef4444)',
+                            background: 'var(--status-danger-soft, #fee2e2)',
+                            borderColor: 'transparent',
+                            flexShrink: 0,
+                          }}
+                        />
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
             {canMarkPaid ? (
               <div
                 style={{
@@ -812,15 +1024,19 @@ export default function ManualEntryPage() {
                 }}
               >
                 <div style={{ minWidth: 0 }}>
-                  <div style={{ fontFamily: 'var(--font-ui)', fontSize: 15, fontWeight: 600, color: 'var(--ink)' }}>Settle now</div>
+                  <div style={{ fontFamily: 'var(--font-ui)', fontSize: 15, fontWeight: 600, color: 'var(--ink)' }}>
+                    {paymentHistory.length > 0 ? 'Add additional payment' : 'Settle now'}
+                  </div>
                   <div style={{ fontSize: 13, color: 'var(--ink-2)', marginTop: 2 }}>
                     {paymentResult
                       ? `${money(paymentResult.amount)} recorded as ${paymentResult.status.toLowerCase()} via ${paymentResult.method}`
+                      : paymentHistory.length > 0
+                      ? 'Record another payment installment or receipt for this entry'
                       : 'Record a payment, receipt or e-signature with this entry'}
                   </div>
                 </div>
                 <BtButton variant={paymentResult ? 'secondary' : 'primary'} size="small" onClick={openPayNow}>
-                  {paymentResult ? 'Edit payment' : 'Pay / settle'}
+                  {paymentResult ? 'Edit payment' : paymentHistory.length > 0 ? '+ Add payment' : 'Pay / settle'}
                 </BtButton>
               </div>
             ) : (

@@ -78,6 +78,20 @@ export default function LoginPage() {
   }, [navigate]);
 
   useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const err = params.get("error");
+    if (err === "google_failed") {
+      setServerErr("Google sign-in was unsuccessful or cancelled. Please try again or sign in with your email.");
+      setShake(true);
+      setTimeout(() => setShake(false), 400);
+    } else if (err) {
+      setServerErr(`Authentication failed (${err}). Please try again.`);
+      setShake(true);
+      setTimeout(() => setShake(false), 400);
+    }
+  }, []);
+
+  useEffect(() => {
     const handleResize = () => setVw(window.innerWidth);
     window.addEventListener("resize", handleResize);
     return () => window.removeEventListener("resize", handleResize);
@@ -514,7 +528,8 @@ export default function LoginPage() {
             variant="secondary"
             fullWidth
             onClick={() => {
-              window.location.href = `${API_ORIGIN}/api/auth/google`;
+              const origin = encodeURIComponent(window.location.origin);
+              window.location.href = `${API_ORIGIN}/api/auth/google?origin=${origin}`;
             }}
           >
             <span style={{ display: "inline-flex", alignItems: "center", gap: 10 }}>

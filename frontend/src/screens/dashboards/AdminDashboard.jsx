@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { createPortal } from 'react-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import {
   BtButton,
@@ -21,8 +22,10 @@ import {
   BtTypeTile,
   BtSectionHeader,
   BtPageLoader,
+  BtSkeleton,
+  btToast,
 } from '../../components/ui';
-import { dashboardAPI, workerAPI, approvalAPI } from '../../api';
+import { dashboardAPI, workerAPI, approvalAPI, transactionAPI } from '../../api';
 import perfLogger from '../../utils/performanceLogger';
 import {
   Clock,
@@ -43,7 +46,14 @@ import {
   TrendingUp,
   TrendingDown,
   ArrowUpRight,
+  ArrowDownLeft,
   IndianRupee,
+  X,
+  Receipt,
+  Share2,
+  Trash2,
+  ExternalLink,
+  RefreshCw,
 } from 'lucide-react';
 import useProjectStore from '../../stores/projectStore';
 import useTransactionStore from '../../stores/transactionStore';
@@ -65,6 +75,52 @@ function relativeTime(dateStr) {
   if (days === 1) return 'Yesterday';
   if (days < 7) return `${days}d ago`;
   return d.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
+}
+
+function formatReceiptDate(dateStr) {
+  if (!dateStr) return '—';
+  try {
+    const d = new Date(dateStr);
+    const day = String(d.getDate()).padStart(2, '0');
+    const month = d.toLocaleDateString('en-IN', { month: 'short' });
+    const year = d.getFullYear();
+    return `${day} ${month} ${year}`;
+  } catch {
+    return '—';
+  }
+}
+
+function formatReceiptTime(dateStr) {
+  if (!dateStr) return '';
+  try {
+    const d = new Date(dateStr);
+    let hrs = d.getHours();
+    const mins = String(d.getMinutes()).padStart(2, '0');
+    const ampm = hrs >= 12 ? 'PM' : 'AM';
+    hrs = hrs % 12 || 12;
+    return `${String(hrs).padStart(2, '0')}:${mins} ${ampm}`;
+  } catch {
+    return '';
+  }
+}
+
+function getProofUrl(tx) {
+  if (!tx) return null;
+  if (Array.isArray(tx.attachments) && tx.attachments.length > 0) {
+    const first = tx.attachments[0];
+    if (typeof first === 'string' && first.trim()) return first;
+    if (first && first.url) return first.url;
+  }
+  if (typeof tx.paymentReceipt === 'string' && tx.paymentReceipt.trim()) {
+    return tx.paymentReceipt;
+  }
+  if (typeof tx.paymentScreenshot === 'string' && tx.paymentScreenshot.trim()) {
+    return tx.paymentScreenshot;
+  }
+  if (typeof tx.receiptUrl === 'string' && tx.receiptUrl.trim()) {
+    return tx.receiptUrl;
+  }
+  return null;
 }
 
 function getGreeting() {
@@ -159,6 +215,15 @@ export default function AdminDashboard() {
   const [runTour, setRunTour] = useState(false);
   const [showTourPopup, setShowTourPopup] = useState(false);
 
+  // Parity with Flutter homescreen.dart: live revenue transactions & history
+  const [revenueEntries, setRevenueEntries] = useState([]);
+  const [loadingRevenue, setLoadingRevenue] = useState(false);
+  const [revenueError, setRevenueError] = useState(false);
+  const [showRevenueHistoryModal, setShowRevenueHistoryModal] = useState(false);
+  const [selectedRevenueDetail, setSelectedRevenueDetail] = useState(null);
+  const [entryToDelete, setEntryToDelete] = useState(null);
+  const [deletingEntry, setDeletingEntry] = useState(false);
+
   // Close the scope menu on outside click or Escape.
   useEffect(() => {
     if (!projectDropdownOpen) return undefined;
@@ -240,6 +305,60 @@ export default function AdminDashboard() {
     loadAll();
   }, [loadAll]);
 
+  const loadRevenue = useCallback(async (projId) => {
+    setLoadingRevenue(true);
+    setRevenueError(false);
+    try {
+      const isAll = !projId || projId === 'all';
+      const queryBase = isAll ? {} : { project: projId };
+
+      const [incomeRes, moneyOutRes] = await Promise.all([
+        transactionAPI.getAll({ ...queryBase, type: 'Income', limit: 1000 }).catch(() => ({ data: { transactions: [] } })),
+        transactionAPI.getAll({ ...queryBase, type: 'Expense', category: 'Money Out', limit: 1000 }).catch(() => ({ data: { transactions: [] } })),
+      ]);
+
+      const extractTx = (res) => {
+        if (!res || !res.data) return [];
+        if (Array.isArray(res.data)) return res.data;
+        if (Array.isArray(res.data.transactions)) return res.data.transactions;
+        if (Array.isArray(res.data.data)) return res.data.data;
+        if (res.data.data && Array.isArray(res.data.data.transactions)) return res.data.data.transactions;
+        return [];
+      };
+
+      const incomeList = extractTx(incomeRes).map((t) => ({
+        ...t,
+        amount: Math.abs(Number(t.amount || t.totalAmount || 0)),
+        isOutflow: false,
+      }));
+
+      const moneyOutList = extractTx(moneyOutRes)
+        .filter((t) => t.type === 'Expense' && (t.category === 'Money Out' || t.ledgerCategory === 'Money Out'))
+        .map((t) => ({
+          ...t,
+          amount: -Math.abs(Number(t.amount || t.totalAmount || 0)),
+          isOutflow: true,
+        }));
+
+      const combined = [...incomeList, ...moneyOutList].sort((a, b) => {
+        const da = new Date(a.date || a.createdAt || 0);
+        const db = new Date(b.date || b.createdAt || 0);
+        return db - da;
+      });
+
+      setRevenueEntries(combined);
+    } catch (err) {
+      console.error('Failed to load revenue transactions:', err);
+      setRevenueError(true);
+    } finally {
+      setLoadingRevenue(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadRevenue(selectedProjectId);
+  }, [selectedProjectId, loadRevenue]);
+
   useEffect(() => {
     if (!selectedProjectId) return;
     if (selectedProjectId === 'all') {
@@ -274,7 +393,24 @@ export default function AdminDashboard() {
   }, [projectTransactions]);
 
   const recentEntries = projectTransactions.slice(0, 5);
-  const incomeTransactions = projectTransactions.filter((t) => t.type === 'Income').slice(0, 3);
+
+  const moneyInSum = useMemo(() => {
+    return revenueEntries.reduce((sum, tx) => {
+      const amt = Number(tx.amount || 0);
+      return amt > 0 ? sum + amt : sum;
+    }, 0);
+  }, [revenueEntries]);
+
+  const moneyOutSum = useMemo(() => {
+    return revenueEntries.reduce((sum, tx) => {
+      const amt = Number(tx.amount || 0);
+      return amt < 0 ? sum + Math.abs(amt) : sum;
+    }, 0);
+  }, [revenueEntries]);
+
+  const totalRevenueSum = useMemo(() => {
+    return revenueEntries.reduce((sum, tx) => sum + Number(tx.amount || 0), 0);
+  }, [revenueEntries]);
 
   const progressRaw = selectedProject
     ? Number(selectedProject?.progress || 0)
@@ -287,11 +423,21 @@ export default function AdminDashboard() {
     ? Number(selectedProject?.spentAmount || 0)
     : projects.reduce((sum, p) => sum + Number(p.spentAmount || 0), 0);
 
-  const totalRevenue = selectedProject
-    ? Number(selectedProject?.totalIncome || 0)
-    : projects.reduce((sum, p) => sum + Number(p.totalIncome || 0), 0);
+  // Parity with Flutter: totalRevenue reflects live moneyInSum
+  const totalRevenue = revenueEntries.length > 0 || !loadingRevenue
+    ? moneyInSum
+    : (selectedProject
+        ? Number(selectedProject?.totalIncome || 0)
+        : projects.reduce((sum, p) => sum + Number(p.totalIncome || 0), 0));
 
-  const netCashflow = totalRevenue - totalCost;
+  // Parity with Flutter homescreen.dart:
+  // Global view: revenue - spent
+  // Project view: revenue - moneyOut - spent
+  const netCashflow = isGlobalView
+    ? totalRevenue - totalCost
+    : totalRevenue - moneyOutSum - totalCost;
+  const isLoss = netCashflow < 0;
+
   const budget = selectedProject
     ? Number(selectedProject?.totalBudget || selectedProject?.budget?.total || 0)
     : projects.reduce((sum, p) => sum + Number(p.totalBudget || p.budget?.total || 0), 0);
@@ -308,9 +454,32 @@ export default function AdminDashboard() {
 
   const firstName = (user?.name || 'Admin').split(' ')[0];
 
-  const refreshTransactions = () => {
-    if (selectedProjectId === 'all') fetchTransactions({});
-    else fetchTransactions({ project: selectedProjectId });
+  const refreshAll = useCallback(() => {
+    loadRevenue(selectedProjectId);
+    fetchProjects({}, true);
+    if (selectedProjectId === 'all') {
+      fetchTransactions({}, true);
+    } else {
+      fetchTransactions({ project: selectedProjectId }, true);
+    }
+  }, [loadRevenue, selectedProjectId, fetchProjects, fetchTransactions]);
+
+  const confirmDeleteEntry = async () => {
+    if (!entryToDelete) return;
+    setDeletingEntry(true);
+    try {
+      const id = entryToDelete._id || entryToDelete.id;
+      await transactionAPI.delete(id);
+      btToast('Revenue record deleted successfully');
+      setEntryToDelete(null);
+      setSelectedRevenueDetail(null);
+      refreshAll();
+    } catch (err) {
+      console.error('Failed to delete transaction:', err);
+      btToast('Failed to delete revenue record', { error: true });
+    } finally {
+      setDeletingEntry(false);
+    }
   };
 
   if (loading) {
@@ -680,83 +849,333 @@ export default function AdminDashboard() {
 
           {/* Work + client money */}
           <div className="bt-grid-2" style={{ alignItems: 'stretch' }}>
-            <BtCard padding="22px 24px" style={{ display: 'flex', flexDirection: 'column' }}>
+            <BtCard
+              padding="22px 24px"
+              style={{
+                display: 'flex',
+                flexDirection: 'column',
+                gap: 16,
+              }}
+            >
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, minHeight: 32 }}>
-                <span className="bt-eyebrow" style={{ color: 'var(--ink-3)' }}>
-                  Work progress
+                <span className="bt-eyebrow" style={{ color: 'var(--ink-3)', letterSpacing: '0.08em' }}>
+                  WORK PROGRESS
                 </span>
-                {selectedProject && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                   <BtBadge
-                    label={selectedProject.status || 'Active'}
-                    tone={selectedProject.status === 'Active' || !selectedProject.status ? 'success' : 'warning'}
+                    label={selectedProject ? (selectedProject.status || 'Active') : `${projects.length} Sites`}
+                    tone={selectedProject?.status === 'Completed' ? 'success' : 'info'}
                   />
-                )}
+                  <BtButton
+                    variant="secondary"
+                    size="compact"
+                    icon={TrendingUp}
+                    onClick={() => navigate('/update-progress')}
+                  >
+                    Update progress
+                  </BtButton>
+                </div>
               </div>
 
-              <div style={{ display: 'flex', alignItems: 'center', gap: 22, flex: 1, paddingTop: 12 }}>
-                <BtRing value={Math.min(Math.max(progress, 0), 1)} size={88} stroke={8} color="var(--accent)">
-                  <span
-                    className="tnum"
-                    style={{ fontFamily: 'var(--font-display)', fontSize: 20, fontWeight: 700, color: 'var(--ink)' }}
-                  >
-                    {(progress * 100).toFixed(0)}%
-                  </span>
-                </BtRing>
+              {/* Progress Headline Box matching Client Money KPI box */}
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 18,
+                  padding: '14px 16px',
+                  background: 'var(--fill)',
+                  borderRadius: 'var(--r-card)',
+                }}
+              >
+                <div style={{ flexShrink: 0 }}>
+                  <BtRing value={Math.min(Math.max(progress, 0), 1)} size={68} stroke={7} color="var(--accent)">
+                    <span
+                      className="tnum"
+                      style={{ fontFamily: 'var(--font-display)', fontSize: 16, fontWeight: 700, color: 'var(--ink)' }}
+                    >
+                      {(progress * 100).toFixed(0)}%
+                    </span>
+                  </BtRing>
+                </div>
 
-                <div style={{ minWidth: 0 }}>
-                  <div style={{ fontFamily: 'var(--font-display)', fontSize: 20, fontWeight: 700, color: 'var(--ink)' }}>
-                    Work done
+                <div style={{ minWidth: 0, flex: 1 }}>
+                  <div style={{ fontFamily: 'var(--font-ui)', fontSize: 12, fontWeight: 500, color: 'var(--ink-2)', marginBottom: 2 }}>
+                    Overall completion
                   </div>
                   <div
                     style={{
-                      fontFamily: 'var(--font-ui)',
-                      fontSize: 14,
-                      color: 'var(--ink-2)',
-                      marginTop: 2,
+                      fontFamily: 'var(--font-display)',
+                      fontSize: 18,
+                      fontWeight: 700,
+                      color: 'var(--ink)',
                       overflow: 'hidden',
                       textOverflow: 'ellipsis',
                       whiteSpace: 'nowrap',
                     }}
                   >
-                    {isGlobalView ? 'Average across all projects' : selectedName}
+                    {isGlobalView ? 'All Projects Combined' : selectedName}
                   </div>
-                  {selectedProject?.location && (
+                  {selectedProject?.location ? (
                     <div
                       style={{
                         fontFamily: 'var(--font-ui)',
-                        fontSize: 13,
+                        fontSize: 12,
                         color: 'var(--ink-3)',
-                        marginTop: 4,
+                        marginTop: 2,
                         display: 'flex',
                         alignItems: 'center',
                         gap: 4,
                       }}
                     >
-                      <Building2 size={13} />
-                      {selectedProject.location}
+                      <Building2 size={12} />
+                      <span>{selectedProject.location}</span>
+                    </div>
+                  ) : (
+                    <div style={{ fontFamily: 'var(--font-ui)', fontSize: 12, color: 'var(--ink-3)', marginTop: 2 }}>
+                      Portfolio average
                     </div>
                   )}
                 </div>
               </div>
+
+              {/* Milestones / Phase breakdown list */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 10, flex: 1 }}>
+                <div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                    <span style={{ fontFamily: 'var(--font-ui)', fontSize: 13, fontWeight: 600, color: 'var(--ink)' }}>
+                      Execution progress
+                    </span>
+                    <span className="tnum" style={{ fontFamily: 'var(--font-mono)', fontSize: 12, fontWeight: 600, color: 'var(--accent)' }}>
+                      {(progress * 100).toFixed(1)}% done
+                    </span>
+                  </div>
+                  <BtBricks value={Math.min(Math.max(progress, 0), 1)} />
+                </div>
+
+                {/* Sub-metrics rows */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 4 }}>
+                  {selectedProject ? (
+                    <>
+                      <div
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          padding: '8px 10px',
+                          background: 'var(--card)',
+                          borderRadius: 8,
+                          border: '1px solid var(--line)',
+                        }}
+                      >
+                        <span style={{ fontFamily: 'var(--font-ui)', fontSize: 13, color: 'var(--ink-2)' }}>
+                          Construction phases
+                        </span>
+                        <span style={{ fontFamily: 'var(--font-ui)', fontSize: 13, fontWeight: 600, color: 'var(--ink)' }}>
+                          {selectedProject.selectedPhases?.length || 0} active phases
+                        </span>
+                      </div>
+
+                      <div
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          padding: '8px 10px',
+                          background: 'var(--card)',
+                          borderRadius: 8,
+                          border: '1px solid var(--line)',
+                        }}
+                      >
+                        <span style={{ fontFamily: 'var(--font-ui)', fontSize: 13, color: 'var(--ink-2)' }}>
+                          Budget utilization
+                        </span>
+                        <span
+                          className="tnum"
+                          style={{
+                            fontFamily: 'var(--font-ui)',
+                            fontSize: 13,
+                            fontWeight: 600,
+                            color: over ? 'var(--status-danger)' : 'var(--ink)',
+                          }}
+                        >
+                          {(usedPct * 100).toFixed(0)}% used
+                        </span>
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      <div
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          padding: '8px 10px',
+                          background: 'var(--card)',
+                          borderRadius: 8,
+                          border: '1px solid var(--line)',
+                        }}
+                      >
+                        <span style={{ fontFamily: 'var(--font-ui)', fontSize: 13, color: 'var(--ink-2)' }}>
+                          Active sites
+                        </span>
+                        <span style={{ fontFamily: 'var(--font-ui)', fontSize: 13, fontWeight: 600, color: 'var(--ink)' }}>
+                          {projects.filter((p) => (p.status || '').toLowerCase() !== 'completed').length} in progress
+                        </span>
+                      </div>
+
+                      <div
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          padding: '8px 10px',
+                          background: 'var(--card)',
+                          borderRadius: 8,
+                          border: '1px solid var(--line)',
+                        }}
+                      >
+                        <span style={{ fontFamily: 'var(--font-ui)', fontSize: 13, color: 'var(--ink-2)' }}>
+                          Completed sites
+                        </span>
+                        <span style={{ fontFamily: 'var(--font-ui)', fontSize: 13, fontWeight: 600, color: 'var(--status-success)' }}>
+                          {projects.filter((p) => (p.status || '').toLowerCase() === 'completed' || Number(p.progress || 0) >= 100).length} completed
+                        </span>
+                      </div>
+                    </>
+                  )}
+                </div>
+              </div>
+
+              {/* Footer link to match Client Money card */}
+              <div
+                style={{
+                  borderTop: '1px solid var(--line)',
+                  paddingTop: 12,
+                  marginTop: 'auto',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                }}
+              >
+                <button
+                  type="button"
+                  onClick={() => navigate('/update-progress')}
+                  style={{
+                    background: 'none',
+                    border: 'none',
+                    padding: 0,
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 6,
+                    fontFamily: 'var(--font-ui)',
+                    fontSize: 13,
+                    fontWeight: 600,
+                    color: 'var(--accent)',
+                  }}
+                >
+                  Update site progress ›
+                </button>
+              </div>
             </BtCard>
 
-            <BtCard padding="22px 24px" style={{ display: 'flex', flexDirection: 'column' }}>
+            <BtCard
+              padding="22px 24px"
+              style={{
+                display: 'flex',
+                flexDirection: 'column',
+                gap: 16,
+              }}
+            >
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, minHeight: 32 }}>
-                <span className="bt-eyebrow" style={{ color: 'var(--ink-3)' }}>
-                  Client money
+                <span className="bt-eyebrow" style={{ color: 'var(--ink-3)', letterSpacing: '0.08em' }}>
+                  CLIENT MONEY
                 </span>
                 <BtButton
                   variant="secondary"
                   size="compact"
                   icon={Plus}
-                  onClick={() => setAddRevenueModalOpen(true)}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setAddRevenueModalOpen(true);
+                  }}
                 >
                   Record revenue
                 </BtButton>
               </div>
 
-              {incomeTransactions.length === 0 ? (
-                <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 14, paddingTop: 12 }}>
+              {/* Headline KPIs (Parity with Flutter CLIENT MONEY card) */}
+              <div
+                style={{
+                  display: 'grid',
+                  gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))',
+                  gap: 14,
+                  padding: '14px 16px',
+                  background: 'var(--fill)',
+                  borderRadius: 'var(--r-card)',
+                }}
+              >
+                <div>
+                  <div style={{ fontFamily: 'var(--font-ui)', fontSize: 12, fontWeight: 500, color: 'var(--ink-2)', marginBottom: 4 }}>
+                    Total revenue
+                  </div>
+                  <div
+                    className="tnum"
+                    style={{
+                      fontFamily: 'var(--font-display)',
+                      fontSize: 22,
+                      fontWeight: 700,
+                      color: 'var(--status-success)',
+                    }}
+                  >
+                    {loadingRevenue && revenueEntries.length === 0 ? (
+                      <BtSkeleton height={24} width={90} />
+                    ) : (
+                      `+${formatInr(totalRevenue, { compact: true })}`
+                    )}
+                  </div>
+                </div>
+
+                <div>
+                  <div style={{ fontFamily: 'var(--font-ui)', fontSize: 12, fontWeight: 500, color: 'var(--ink-2)', marginBottom: 4 }}>
+                    {isLoss ? 'Net cash flow · loss' : 'Net cash flow · profit'}
+                  </div>
+                  <div
+                    className="tnum"
+                    style={{
+                      fontFamily: 'var(--font-display)',
+                      fontSize: 22,
+                      fontWeight: 700,
+                      color: isLoss ? 'var(--status-danger)' : 'var(--status-success)',
+                    }}
+                  >
+                    {loadingRevenue && revenueEntries.length === 0 ? (
+                      <BtSkeleton height={24} width={90} />
+                    ) : (
+                      `${netCashflow >= 0 ? '+' : '-'}${formatInr(Math.abs(netCashflow), { compact: true })}`
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* Status / Preview / Empty state */}
+              {loadingRevenue && revenueEntries.length === 0 ? (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 10, padding: '8px 0' }}>
+                  <BtSkeleton height={38} radius={10} />
+                  <BtSkeleton height={38} radius={10} />
+                </div>
+              ) : revenueError ? (
+                <div style={{ padding: '10px 0', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <span style={{ fontFamily: 'var(--font-ui)', fontSize: 13, color: 'var(--status-danger)' }}>
+                    Couldn&apos;t load revenue records
+                  </span>
+                  <BtButton variant="ghost" size="compact" icon={RefreshCw} onClick={() => loadRevenue(selectedProjectId)}>
+                    Retry
+                  </BtButton>
+                </div>
+              ) : revenueEntries.length === 0 ? (
+                <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 14, padding: '10px 0' }}>
                   <span
                     style={{
                       width: 44,
@@ -773,61 +1192,142 @@ export default function AdminDashboard() {
                     <IndianRupee size={20} strokeWidth={1.85} />
                   </span>
                   <div>
-                    <div style={{ fontFamily: 'var(--font-ui)', fontSize: 15, fontWeight: 600, color: 'var(--ink)' }}>
+                    <div style={{ fontFamily: 'var(--font-ui)', fontSize: 14, fontWeight: 600, color: 'var(--ink)' }}>
                       No payments recorded yet
                     </div>
-                    <div style={{ fontFamily: 'var(--font-ui)', fontSize: 14, color: 'var(--ink-3)', marginTop: 2 }}>
-                      Money you receive from the client shows here.
+                    <div style={{ fontFamily: 'var(--font-ui)', fontSize: 13, color: 'var(--ink-3)', marginTop: 2 }}>
+                      Money received from or sent to the client shows here.
                     </div>
                   </div>
                 </div>
               ) : (
-                <div style={{ display: 'flex', flexDirection: 'column', marginTop: 8 }}>
-                  {incomeTransactions.map((t, idx) => (
-                    <div
-                      key={t._id || t.id || idx}
-                      style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: 12,
-                        padding: '10px 0',
-                        borderTop: idx === 0 ? 'none' : '1px solid var(--line)',
-                      }}
-                    >
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <div
-                          style={{
-                            fontFamily: 'var(--font-ui)',
-                            fontSize: 15,
-                            fontWeight: 600,
-                            color: 'var(--ink)',
-                            overflow: 'hidden',
-                            textOverflow: 'ellipsis',
-                            whiteSpace: 'nowrap',
-                          }}
-                        >
-                          {t.title || 'Revenue'}
-                        </div>
-                        <div style={{ fontFamily: 'var(--font-ui)', fontSize: 13, color: 'var(--ink-3)' }}>
-                          {relativeTime(t.date || t.createdAt)}
-                        </div>
-                      </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                  {revenueEntries.slice(0, 3).map((t, idx) => {
+                    const isOutflow = Number(t.amount || 0) < 0;
+                    const absAmt = Math.abs(Number(t.amount || 0));
+                    const proof = getProofUrl(t);
+                    return (
                       <div
-                        className="tnum"
+                        key={t._id || t.id || idx}
+                        onClick={() => setSelectedRevenueDetail(t)}
+                        className="bt-hover-row"
                         style={{
-                          fontFamily: 'var(--font-display)',
-                          fontSize: 16,
-                          fontWeight: 700,
-                          color: 'var(--status-success)',
-                          flexShrink: 0,
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: 12,
+                          padding: '10px 8px',
+                          borderRadius: 8,
+                          cursor: 'pointer',
+                          transition: 'background 120ms ease',
                         }}
                       >
-                        +{formatInr(Math.abs(Number(t.amount || t.totalAmount || 0)))}
+                        <span
+                          style={{
+                            width: 32,
+                            height: 32,
+                            borderRadius: 'var(--r-tile)',
+                            background: isOutflow ? 'var(--fill)' : 'var(--status-success-soft)',
+                            color: isOutflow ? 'var(--ink-2)' : 'var(--status-success)',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            flexShrink: 0,
+                          }}
+                        >
+                          {isOutflow ? <ArrowUpRight size={16} /> : <ArrowDownLeft size={16} />}
+                        </span>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div
+                            style={{
+                              fontFamily: 'var(--font-ui)',
+                              fontSize: 14,
+                              fontWeight: 600,
+                              color: 'var(--ink)',
+                              overflow: 'hidden',
+                              textOverflow: 'ellipsis',
+                              whiteSpace: 'nowrap',
+                            }}
+                          >
+                            {t.title || (isOutflow ? 'Money Out' : 'Revenue Inflow')}
+                          </div>
+                          <div
+                            style={{
+                              fontFamily: 'var(--font-ui)',
+                              fontSize: 12,
+                              color: 'var(--ink-3)',
+                              overflow: 'hidden',
+                              textOverflow: 'ellipsis',
+                              whiteSpace: 'nowrap',
+                            }}
+                          >
+                            {formatReceiptDate(t.date || t.createdAt)} · via {t.paymentMode || 'Cash'}
+                          </div>
+                        </div>
+                        {proof && (
+                          <img
+                            src={proof}
+                            alt="Receipt proof"
+                            style={{
+                              width: 30,
+                              height: 30,
+                              borderRadius: 6,
+                              objectFit: 'cover',
+                              border: '1px solid var(--line)',
+                              flexShrink: 0,
+                            }}
+                          />
+                        )}
+                        <div
+                          className="tnum"
+                          style={{
+                            fontFamily: 'var(--font-display)',
+                            fontSize: 15,
+                            fontWeight: 700,
+                            color: isOutflow ? 'var(--ink)' : 'var(--status-success)',
+                            flexShrink: 0,
+                          }}
+                        >
+                          {isOutflow ? `-${formatInr(absAmt)}` : `+${formatInr(absAmt)}`}
+                        </div>
                       </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               )}
+
+              {/* Parity with Flutter: Footer link to view full revenue history */}
+              <div
+                style={{
+                  borderTop: '1px solid var(--line)',
+                  paddingTop: 12,
+                  marginTop: 'auto',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                }}
+              >
+                <button
+                  type="button"
+                  onClick={() => setShowRevenueHistoryModal(true)}
+                  style={{
+                    background: 'none',
+                    border: 'none',
+                    padding: 0,
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 6,
+                    fontFamily: 'var(--font-ui)',
+                    fontSize: 13,
+                    fontWeight: 600,
+                    color: 'var(--accent)',
+                  }}
+                >
+                  {revenueEntries.length === 0
+                    ? 'View revenue timeline ›'
+                    : `${revenueEntries.length} payment${revenueEntries.length === 1 ? '' : 's'} · History ›`}
+                </button>
+              </div>
             </BtCard>
           </div>
 
@@ -923,9 +1423,708 @@ export default function AdminDashboard() {
       <AddRevenueModal
         open={addRevenueModalOpen}
         projects={projects}
+        initialProjectId={selectedProjectId}
         onClose={() => setAddRevenueModalOpen(false)}
-        onSaved={refreshTransactions}
+        onSaved={refreshAll}
+      />
+
+      <RevenueHistoryModal
+        open={showRevenueHistoryModal}
+        projectName={selectedName}
+        revenueEntries={revenueEntries}
+        totalBalance={totalRevenueSum}
+        onClose={() => setShowRevenueHistoryModal(false)}
+        onRecordPayment={() => setAddRevenueModalOpen(true)}
+        onSelectEntry={(entry) => setSelectedRevenueDetail(entry)}
+      />
+
+      <RevenueDetailModal
+        entry={selectedRevenueDetail}
+        projectName={selectedName}
+        onClose={() => setSelectedRevenueDetail(null)}
+        onDelete={(entry) => setEntryToDelete(entry)}
+      />
+
+      <ConfirmDialog
+        message={
+          entryToDelete
+            ? `Are you sure you want to delete this ${
+                Number(entryToDelete.amount || 0) < 0 ? 'outflow' : 'revenue inflow'
+              } record? This action cannot be undone.`
+            : ''
+        }
+        confirmLabel={deletingEntry ? 'Deleting…' : 'Delete'}
+        cancelLabel="Cancel"
+        danger
+        onConfirm={confirmDeleteEntry}
+        onCancel={() => setEntryToDelete(null)}
       />
     </div>
+  );
+}
+
+function RevenueHistoryModal({
+  open,
+  projectName,
+  revenueEntries,
+  totalBalance,
+  onClose,
+  onRecordPayment,
+  onSelectEntry,
+}) {
+  if (!open) return null;
+
+  // Month groups (entries are already newest-first)
+  const groups = {};
+  for (const tx of revenueEntries) {
+    let d = new Date();
+    if (tx.date || tx.createdAt) {
+      try {
+        d = new Date(tx.date || tx.createdAt);
+      } catch {}
+    }
+    const month = d.toLocaleDateString('en-IN', { month: 'short' }).toUpperCase();
+    const year = d.getFullYear();
+    const key = `${month} ${year}`;
+    if (!groups[key]) groups[key] = [];
+    groups[key].push(tx);
+  }
+
+  const balanceText =
+    totalBalance === 0
+      ? '₹0'
+      : totalBalance < 0
+      ? `-${formatInr(Math.abs(totalBalance))}`
+      : `+${formatInr(totalBalance)}`;
+
+  const balanceColor =
+    totalBalance > 0
+      ? 'var(--status-success-bright)'
+      : totalBalance < 0
+      ? 'var(--status-danger-bright)'
+      : 'var(--bone)';
+
+  return createPortal(
+    <div
+      onMouseDown={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
+      style={{
+        position: 'fixed',
+        inset: 0,
+        background: 'var(--scrim)',
+        zIndex: 9999,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: 16,
+        boxSizing: 'border-box',
+        animation: 'fadeIn 160ms ease',
+      }}
+    >
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="revenue-history-title"
+        style={{
+          background: 'var(--ground)',
+          width: '100%',
+          maxWidth: 580,
+          borderRadius: 'var(--r-sheet)',
+          maxHeight: 'calc(100dvh - 40px)',
+          display: 'flex',
+          flexDirection: 'column',
+          boxShadow: 'var(--shadow-raised)',
+          border: '1px solid var(--line)',
+          overflow: 'hidden',
+          animation: 'fadeUp 240ms var(--ease)',
+        }}
+      >
+        {/* Header */}
+        <div
+          style={{
+            padding: '20px 24px 16px',
+            borderBottom: '1px solid var(--line)',
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'flex-start',
+            gap: 12,
+            background: 'var(--card)',
+          }}
+        >
+          <div>
+            <h2
+              id="revenue-history-title"
+              style={{
+                fontFamily: 'var(--font-display)',
+                fontSize: 22,
+                fontWeight: 700,
+                color: 'var(--ink)',
+                margin: 0,
+                letterSpacing: '-0.02em',
+              }}
+            >
+              Revenue History
+            </h2>
+            <div
+              style={{
+                fontFamily: 'var(--font-ui)',
+                fontSize: 13,
+                color: 'var(--ink-3)',
+                marginTop: 2,
+              }}
+            >
+              {projectName}
+            </div>
+          </div>
+          <BtIconButton icon={X} label="Close" onClick={onClose} />
+        </div>
+
+        {/* Content */}
+        <div
+          style={{
+            padding: '16px 20px 24px',
+            overflowY: 'auto',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: 16,
+          }}
+        >
+          {/* Ink Card: Total Balance Banner */}
+          <div
+            style={{
+              padding: '18px 20px',
+              borderRadius: 'var(--r-card)',
+              background: 'var(--ink)',
+              color: 'var(--on-noir)',
+              border: '1px solid var(--noir-line)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              gap: 16,
+            }}
+          >
+            <div>
+              <div
+                style={{
+                  fontFamily: 'var(--font-mono)',
+                  fontSize: 11,
+                  letterSpacing: '0.08em',
+                  color: 'var(--on-noir-2)',
+                  textTransform: 'uppercase',
+                  marginBottom: 4,
+                }}
+              >
+                TOTAL BALANCE
+              </div>
+              <div
+                className="tnum"
+                style={{
+                  fontFamily: 'var(--font-display)',
+                  fontSize: 26,
+                  fontWeight: 700,
+                  color: balanceColor,
+                  letterSpacing: '-0.02em',
+                }}
+              >
+                {balanceText}
+              </div>
+            </div>
+
+            <BtButton
+              variant="accent"
+              size="small"
+              icon={Plus}
+              onClick={() => {
+                onClose();
+                onRecordPayment();
+              }}
+            >
+              Record Payment
+            </BtButton>
+          </div>
+
+          {/* List or Empty State */}
+          {revenueEntries.length === 0 ? (
+            <div style={{ padding: '24px 0' }}>
+              <BtEmpty
+                icon={Receipt}
+                title="No payments recorded yet"
+                message="Money received from or sent to the client shows here."
+              />
+            </div>
+          ) : (
+            Object.entries(groups).map(([monthKey, list]) => (
+              <div key={monthKey} style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                <div
+                  style={{
+                    fontFamily: 'var(--font-mono)',
+                    fontSize: 11,
+                    letterSpacing: '0.08em',
+                    color: 'var(--ink-3)',
+                    paddingLeft: 4,
+                  }}
+                >
+                  {monthKey}
+                </div>
+                <BtGroup>
+                  {list.map((tx, idx) => {
+                    const isOutflow = Number(tx.amount || 0) < 0;
+                    const absAmt = Math.abs(Number(tx.amount || 0));
+                    const dateStr = formatReceiptDate(tx.date || tx.createdAt);
+                    const timeStr = formatReceiptTime(tx.date || tx.createdAt);
+                    const paymentMode = tx.paymentMode || 'Cash';
+                    const proof = getProofUrl(tx);
+
+                    return (
+                      <div
+                        key={tx._id || tx.id || idx}
+                        onClick={() => onSelectEntry(tx)}
+                        className="bt-hover-row"
+                        role="button"
+                        tabIndex={0}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' || e.key === ' ') {
+                            e.preventDefault();
+                            onSelectEntry(tx);
+                          }
+                        }}
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: 14,
+                          padding: '12px 14px',
+                          cursor: 'pointer',
+                          background: 'var(--card)',
+                          borderRadius: 'var(--r-tile)',
+                          transition: 'background 120ms ease',
+                        }}
+                      >
+                        <span
+                          style={{
+                            width: 38,
+                            height: 38,
+                            borderRadius: 'var(--r-tile)',
+                            background: isOutflow ? 'var(--fill)' : 'var(--status-success-soft)',
+                            color: isOutflow ? 'var(--ink-2)' : 'var(--status-success)',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            flexShrink: 0,
+                          }}
+                        >
+                          {isOutflow ? <ArrowUpRight size={18} /> : <ArrowDownLeft size={18} />}
+                        </span>
+
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div
+                            style={{
+                              fontFamily: 'var(--font-ui)',
+                              fontSize: 14,
+                              fontWeight: 600,
+                              color: 'var(--ink)',
+                              overflow: 'hidden',
+                              textOverflow: 'ellipsis',
+                              whiteSpace: 'nowrap',
+                            }}
+                          >
+                            {tx.title || (isOutflow ? 'Money Out' : 'Revenue Inflow')}
+                          </div>
+                          <div
+                            style={{
+                              fontFamily: 'var(--font-ui)',
+                              fontSize: 12,
+                              color: 'var(--ink-3)',
+                              marginTop: 2,
+                            }}
+                          >
+                            {dateStr} · via {paymentMode} {timeStr ? `· ${timeStr}` : ''}
+                          </div>
+                        </div>
+
+                        {proof && (
+                          <img
+                            src={proof}
+                            alt="Receipt proof"
+                            style={{
+                              width: 36,
+                              height: 36,
+                              borderRadius: 8,
+                              objectFit: 'cover',
+                              border: '1px solid var(--line)',
+                              flexShrink: 0,
+                            }}
+                          />
+                        )}
+
+                        <div
+                          className="tnum"
+                          style={{
+                            fontFamily: 'var(--font-display)',
+                            fontSize: 16,
+                            fontWeight: 700,
+                            color: isOutflow ? 'var(--ink)' : 'var(--status-success)',
+                            flexShrink: 0,
+                          }}
+                        >
+                          {isOutflow ? `-${formatInr(absAmt)}` : `+${formatInr(absAmt)}`}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </BtGroup>
+              </div>
+            ))
+          )}
+        </div>
+      </div>
+    </div>,
+    document.body
+  );
+}
+
+function RevenueDetailModal({
+  entry,
+  projectName,
+  onClose,
+  onDelete,
+}) {
+  if (!entry) return null;
+
+  const isOutflow = Number(entry.amount || 0) < 0;
+  const absAmt = Math.abs(Number(entry.amount || 0));
+  const formattedAmt = formatInr(absAmt);
+  const title = entry.title || (isOutflow ? 'Money Out' : 'Revenue Inflow');
+  const paymentMode = entry.paymentMode || 'Cash';
+  const paymentStatus = entry.paymentStatus || 'Paid';
+  const rawId = String(entry._id || entry.id || '');
+  const refId = rawId ? rawId.toUpperCase() : 'N/A';
+  const dateStr = formatReceiptDate(entry.date || entry.createdAt);
+  const timeStr = formatReceiptTime(entry.date || entry.createdAt);
+  const proofUrl = getProofUrl(entry);
+  const isEsign = proofUrl && (entry.paymentReceipt || entry.eSignature);
+  const notes = entry.notes ? String(entry.notes).trim() : '';
+
+  const handleShare = () => {
+    const typeLabel = isOutflow ? 'Money Out (Expense)' : 'Revenue Received (Inflow)';
+    const amountPrefix = isOutflow ? '-₹' : '+₹';
+    const textLines = [
+      '📊 BuildTrack Transaction Receipt',
+      '================================',
+      `Type: ${typeLabel}`,
+      `Title: ${title}`,
+      `Amount: ${amountPrefix}${formattedAmt}`,
+      `Project: ${projectName}`,
+      `Payment Method: ${paymentMode}`,
+      `Date: ${dateStr}`,
+      ...(timeStr ? [`Time: ${timeStr}`] : []),
+      `Reference ID: ${refId}`,
+      `Status: ${paymentStatus.toUpperCase()}`,
+      ...(notes ? [`Notes: ${notes}`] : []),
+      '================================',
+      'Generated via BuildTrack',
+      ...(proofUrl && proofUrl.startsWith('http') ? [`Proof of Payment: ${proofUrl}`] : []),
+    ];
+    const text = textLines.join('\n');
+
+    if (navigator.clipboard) {
+      navigator.clipboard.writeText(text).then(() => {
+        btToast('Receipt summary copied to clipboard!');
+      }).catch(() => {
+        btToast('Failed to copy receipt');
+      });
+    } else {
+      btToast('Clipboard unavailable');
+    }
+  };
+
+  return createPortal(
+    <div
+      onMouseDown={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
+      style={{
+        position: 'fixed',
+        inset: 0,
+        background: 'var(--scrim)',
+        zIndex: 10000,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: 16,
+        boxSizing: 'border-box',
+        animation: 'fadeIn 160ms ease',
+      }}
+    >
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="revenue-detail-title"
+        style={{
+          background: 'var(--card)',
+          width: '100%',
+          maxWidth: 480,
+          borderRadius: 'var(--r-sheet)',
+          maxHeight: 'calc(100dvh - 40px)',
+          display: 'flex',
+          flexDirection: 'column',
+          boxShadow: 'var(--shadow-raised)',
+          border: '1px solid var(--line)',
+          overflow: 'hidden',
+          animation: 'fadeUp 240ms var(--ease)',
+        }}
+      >
+        {/* Top Header Row with Close button */}
+        <div
+          style={{
+            padding: '16px 20px 8px',
+            display: 'flex',
+            justifyContent: 'flex-end',
+          }}
+        >
+          <BtIconButton icon={X} label="Close" onClick={onClose} />
+        </div>
+
+        {/* Scrollable Receipt Body */}
+        <div
+          style={{
+            padding: '0 24px 24px',
+            overflowY: 'auto',
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+          }}
+        >
+          {/* Centered Check Circle Icon */}
+          <div
+            style={{
+              width: 64,
+              height: 64,
+              borderRadius: '50%',
+              background: isOutflow ? 'var(--status-danger-soft)' : 'var(--status-success-soft)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              marginBottom: 14,
+            }}
+          >
+            {isOutflow ? (
+              <XCircle size={36} color="var(--status-danger)" />
+            ) : (
+              <CheckCircle2 size={36} color="var(--status-success)" />
+            )}
+          </div>
+
+          <div
+            id="revenue-detail-title"
+            style={{
+              fontFamily: 'var(--font-display)',
+              fontSize: 22,
+              fontWeight: 700,
+              color: 'var(--ink)',
+              textAlign: 'center',
+            }}
+          >
+            {isOutflow ? 'Payment Sent' : 'Revenue Received'}
+          </div>
+
+          <div
+            style={{
+              fontFamily: 'var(--font-ui)',
+              fontSize: 14,
+              color: 'var(--ink-2)',
+              marginTop: 4,
+              textAlign: 'center',
+            }}
+          >
+            {title}
+          </div>
+
+          <div
+            className="tnum"
+            style={{
+              fontFamily: 'var(--font-display)',
+              fontSize: 32,
+              fontWeight: 800,
+              color: isOutflow ? 'var(--status-danger)' : 'var(--status-success)',
+              margin: '14px 0 18px',
+              letterSpacing: '-0.02em',
+            }}
+          >
+            {isOutflow ? `-${formattedAmt}` : `+${formattedAmt}`}
+          </div>
+
+          {/* Dashed Separator */}
+          <div
+            style={{
+              width: '100%',
+              borderBottom: '1.5px dashed var(--line)',
+              marginBottom: 16,
+            }}
+          />
+
+          {/* Key-Value Rows */}
+          <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: 12 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--ink-3)', letterSpacing: '0.06em' }}>
+                PROJECT
+              </span>
+              <span style={{ fontFamily: 'var(--font-ui)', fontSize: 13, fontWeight: 600, color: 'var(--ink)' }}>
+                {projectName}
+              </span>
+            </div>
+
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--ink-3)', letterSpacing: '0.06em' }}>
+                PAYMENT METHOD
+              </span>
+              <span style={{ fontFamily: 'var(--font-ui)', fontSize: 13, fontWeight: 600, color: 'var(--ink)' }}>
+                {paymentMode}
+              </span>
+            </div>
+
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--ink-3)', letterSpacing: '0.06em' }}>
+                {isOutflow ? 'DATE SENT' : 'DATE RECEIVED'}
+              </span>
+              <span style={{ fontFamily: 'var(--font-ui)', fontSize: 13, fontWeight: 600, color: 'var(--ink)' }}>
+                {dateStr}
+              </span>
+            </div>
+
+            {timeStr && (
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--ink-3)', letterSpacing: '0.06em' }}>
+                  TIME RECEIVED
+                </span>
+                <span style={{ fontFamily: 'var(--font-ui)', fontSize: 13, fontWeight: 600, color: 'var(--ink)' }}>
+                  {timeStr}
+                </span>
+              </div>
+            )}
+
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--ink-3)', letterSpacing: '0.06em' }}>
+                REFERENCE ID
+              </span>
+              <span style={{ fontFamily: 'var(--font-mono)', fontSize: 12, fontWeight: 600, color: 'var(--ink-2)' }}>
+                {refId}
+              </span>
+            </div>
+
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--ink-3)', letterSpacing: '0.06em' }}>
+                STATUS
+              </span>
+              <BtBadge
+                label={paymentStatus.toUpperCase()}
+                tone={paymentStatus.toLowerCase() === 'paid' ? 'success' : 'warning'}
+              />
+            </div>
+
+            {/* Notes Section */}
+            {notes && (
+              <div
+                style={{
+                  marginTop: 6,
+                  padding: '12px 14px',
+                  background: 'var(--fill)',
+                  borderRadius: 'var(--r-card)',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: 4,
+                }}
+              >
+                <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--ink-3)', letterSpacing: '0.06em' }}>
+                  NOTES / REMARKS
+                </span>
+                <span style={{ fontFamily: 'var(--font-ui)', fontSize: 13, color: 'var(--ink)', lineHeight: 1.4 }}>
+                  {notes}
+                </span>
+              </div>
+            )}
+
+            {/* Proof Section */}
+            {proofUrl && (
+              <div
+                style={{
+                  marginTop: 6,
+                  padding: '12px 14px',
+                  background: 'var(--fill)',
+                  borderRadius: 'var(--r-card)',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: 8,
+                }}
+              >
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--ink-3)', letterSpacing: '0.06em' }}>
+                    {isEsign ? 'CLIENT E-SIGNATURE' : 'PROOF OF PAYMENT'}
+                  </span>
+                  <a
+                    href={proofUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    style={{
+                      fontFamily: 'var(--font-ui)',
+                      fontSize: 12,
+                      fontWeight: 600,
+                      color: 'var(--accent)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 4,
+                      textDecoration: 'none',
+                    }}
+                  >
+                    <span>View full</span>
+                    <ExternalLink size={12} />
+                  </a>
+                </div>
+
+                <div
+                  style={{
+                    position: 'relative',
+                    width: '100%',
+                    height: 150,
+                    borderRadius: 10,
+                    overflow: 'hidden',
+                    background: 'var(--card)',
+                    border: '1px solid var(--line)',
+                  }}
+                >
+                  <img
+                    src={proofUrl}
+                    alt="Proof"
+                    style={{ width: '100%', height: '100%', objectFit: 'contain' }}
+                  />
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Action Buttons */}
+          <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: 10, marginTop: 22 }}>
+            <BtButton
+              variant="secondary"
+              icon={Share2}
+              onClick={handleShare}
+              style={{ width: '100%' }}
+            >
+              Share Receipt Summary
+            </BtButton>
+
+            <BtButton
+              variant="destructive"
+              icon={Trash2}
+              onClick={() => onDelete(entry)}
+              style={{ width: '100%' }}
+            >
+              {isOutflow ? 'Delete Outflow…' : 'Delete Inflow…'}
+            </BtButton>
+          </div>
+        </div>
+      </div>
+    </div>,
+    document.body
   );
 }

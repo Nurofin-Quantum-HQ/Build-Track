@@ -1,4 +1,6 @@
-const API_ORIGIN = (import.meta.env.VITE_API_URL || "").replace(/\/+$/, "");
+const API_ORIGIN = import.meta.env.DEV
+  ? ""
+  : (import.meta.env.VITE_API_URL || "").replace(/\/+$/, "");
 
 export function resolveImageUrl(photo) {
   if (!photo) return "";

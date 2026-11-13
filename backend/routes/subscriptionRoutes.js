@@ -23,7 +23,7 @@ const { applyRenewal, syncRenewalsFromAirpay } = require('../services/subscripti
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 const PLAN_PRICES = {
-  starter:    2,
+  starter:    499,
   growth:     999,
   pro:       1499,
   business:  2499,

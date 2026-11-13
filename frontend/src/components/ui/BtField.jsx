@@ -1,5 +1,6 @@
-import React, { useId } from 'react';
-import { AlertCircle, ChevronDown } from 'lucide-react';
+import React, { useState, useEffect, useRef, useId, useMemo, useCallback, Children, isValidElement } from 'react';
+import { createPortal } from 'react-dom';
+import { AlertCircle, ChevronDown, Check } from 'lucide-react';
 
 /**
  * Blueprint Noir form controls. All three share one look:
@@ -169,6 +170,8 @@ export function BtSelect({
   value,
   onChange,
   children,
+  options: optionsProp,
+  placeholder = 'Select…',
   error,
   helperText,
   icon: Icon,
@@ -178,35 +181,271 @@ export function BtSelect({
   className = '',
   style = {},
   id: idProp,
+  name,
   ...props
 }) {
   const autoId = useId();
   const id = idProp || autoId;
+  const [isOpen, setIsOpen] = useState(false);
+  const containerRef = useRef(null);
+  const menuRef = useRef(null);
+
+  // Parse options from options prop or <option> children
+  const parsedOptions = useMemo(() => {
+    if (Array.isArray(optionsProp)) {
+      return optionsProp.map((opt) =>
+        typeof opt === 'object' && opt !== null
+          ? {
+              value: String(opt.value ?? ''),
+              label: opt.label ?? opt.name ?? String(opt.value ?? ''),
+              disabled: !!opt.disabled,
+            }
+          : { value: String(opt), label: String(opt), disabled: false }
+      );
+    }
+    const list = [];
+    Children.forEach(children, (child) => {
+      if (isValidElement(child)) {
+        if (child.type === 'option') {
+          list.push({
+            value: String(child.props.value ?? ''),
+            label: child.props.children ?? String(child.props.value ?? ''),
+            disabled: !!child.props.disabled,
+          });
+        } else if (child.props?.children) {
+          Children.forEach(child.props.children, (subChild) => {
+            if (isValidElement(subChild) && subChild.type === 'option') {
+              list.push({
+                value: String(subChild.props.value ?? ''),
+                label: subChild.props.children ?? String(subChild.props.value ?? ''),
+                disabled: !!subChild.props.disabled,
+              });
+            }
+          });
+        }
+      }
+    });
+    return list;
+  }, [children, optionsProp]);
+
+  // Find currently selected option
+  const selectedOption = parsedOptions.find((opt) => String(opt.value) === String(value ?? ''));
+  const isMongoId = typeof value === 'string' && /^[0-9a-fA-F]{24}$/.test(value);
+  const isPlaceholder = !selectedOption || selectedOption.value === '';
+  const displayText = selectedOption
+    ? selectedOption.label
+    : (value && !isMongoId)
+      ? String(value)
+      : placeholder;
+
+  const [coords, setCoords] = useState({ top: 0, left: 0, width: 0, openUpward: false });
+
+  const updatePosition = useCallback(() => {
+    if (!containerRef.current) return;
+    const rect = containerRef.current.getBoundingClientRect();
+    const menuMaxHeight = 260;
+    const spaceBelow = window.innerHeight - rect.bottom;
+    const openUpward = spaceBelow < menuMaxHeight && rect.top > menuMaxHeight;
+
+    setCoords({
+      top: openUpward ? rect.top - 6 : rect.bottom + 6,
+      left: rect.left,
+      width: rect.width,
+      openUpward,
+    });
+  }, []);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    updatePosition();
+
+    const handleScrollOrResize = () => {
+      updatePosition();
+    };
+
+    window.addEventListener('resize', handleScrollOrResize);
+    window.addEventListener('scroll', handleScrollOrResize, true);
+
+    return () => {
+      window.removeEventListener('resize', handleScrollOrResize);
+      window.removeEventListener('scroll', handleScrollOrResize, true);
+    };
+  }, [isOpen, updatePosition]);
+
+  // Close on outside click or Escape
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleClickOutside = (e) => {
+      if (
+        containerRef.current &&
+        !containerRef.current.contains(e.target) &&
+        (!menuRef.current || !menuRef.current.contains(e.target))
+      ) {
+        setIsOpen(false);
+      }
+    };
+    const handleKey = (e) => {
+      if (e.key === 'Escape') setIsOpen(false);
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    document.addEventListener('keydown', handleKey);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('keydown', handleKey);
+    };
+  }, [isOpen]);
+
+  const handleSelect = (optVal) => {
+    if (disabled) return;
+    setIsOpen(false);
+    if (onChange) {
+      onChange({
+        target: {
+          value: optVal,
+          name: name || id,
+        },
+      });
+    }
+  };
+
+  const handleKeyDown = (e) => {
+    if (disabled) return;
+    if (e.key === 'Enter' || e.key === ' ' || e.key === 'ArrowDown') {
+      e.preventDefault();
+      setIsOpen(true);
+    }
+  };
 
   return (
     <FieldFrame id={id} label={label} required={required} error={error} helperText={helperText} className={className} style={style}>
-      <div className="bt-field-shell" style={shellStyle({ error, disabled, height: HEIGHT[size] || HEIGHT.normal })}>
-        {Icon && <Icon size={17} color="var(--ink-3)" style={{ marginRight: 10, flexShrink: 0 }} />}
-        <select
+      <div ref={containerRef} style={{ position: 'relative', width: '100%' }}>
+        <button
+          type="button"
           id={id}
-          value={value}
-          onChange={onChange}
-          disabled={disabled}
-          required={required}
+          role="combobox"
+          aria-expanded={isOpen}
+          aria-haspopup="listbox"
           aria-invalid={error ? true : undefined}
+          disabled={disabled}
+          onClick={() => !disabled && setIsOpen((prev) => !prev)}
+          onKeyDown={handleKeyDown}
+          className="bt-field-shell"
           style={{
-            ...controlStyle,
-            appearance: 'none',
-            WebkitAppearance: 'none',
-            paddingRight: 26,
+            ...shellStyle({ error, disabled, height: HEIGHT[size] || HEIGHT.normal }),
+            width: '100%',
+            textAlign: 'left',
             cursor: disabled ? 'not-allowed' : 'pointer',
-            color: value === '' || value == null ? 'var(--placeholder)' : 'var(--ink)',
+            borderColor: isOpen ? 'var(--accent)' : error ? 'var(--status-danger)' : 'var(--input-border)',
+            boxShadow: isOpen ? '0 0 0 3px var(--accent-soft, rgba(42, 120, 214, 0.15))' : error ? '0 0 0 3px var(--status-danger-soft)' : 'none',
+            transition: 'border-color 140ms ease, box-shadow 140ms ease',
           }}
           {...props}
         >
-          {children}
-        </select>
-        <ChevronDown size={16} color="var(--ink-3)" style={{ position: 'absolute', right: 14, pointerEvents: 'none' }} />
+          {Icon && <Icon size={17} color="var(--ink-3)" style={{ marginRight: 10, flexShrink: 0 }} />}
+          <span
+            style={{
+              ...controlStyle,
+              display: 'flex',
+              alignItems: 'center',
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              whiteSpace: 'nowrap',
+              color: isPlaceholder ? 'var(--placeholder)' : 'var(--ink)',
+              fontWeight: isPlaceholder ? 400 : 500,
+              paddingRight: 24,
+            }}
+          >
+            {displayText}
+          </span>
+          <ChevronDown
+            size={16}
+            color="var(--ink-3)"
+            style={{
+              position: 'absolute',
+              right: 14,
+              pointerEvents: 'none',
+              transform: isOpen ? 'rotate(180deg)' : 'none',
+              transition: 'transform 180ms ease',
+            }}
+          />
+        </button>
+
+        {isOpen && !disabled && typeof document !== 'undefined' && createPortal(
+          <div
+            ref={menuRef}
+            role="listbox"
+            tabIndex={-1}
+            style={{
+              position: 'fixed',
+              ...(coords.openUpward
+                ? { bottom: window.innerHeight - coords.top, top: 'auto' }
+                : { top: coords.top, bottom: 'auto' }),
+              left: coords.left,
+              width: coords.width,
+              background: 'var(--card)',
+              borderRadius: 'var(--r-card)',
+              border: '1px solid var(--line)',
+              boxShadow: '0 12px 32px rgba(0, 0, 0, 0.24), 0 2px 6px rgba(0, 0, 0, 0.08)',
+              zIndex: 999999,
+              padding: 6,
+              maxHeight: 260,
+              overflowY: 'auto',
+              animation: 'fadeIn 120ms ease',
+              boxSizing: 'border-box',
+            }}
+          >
+            {parsedOptions.length === 0 ? (
+              <div style={{ padding: '10px 12px', fontSize: 13, color: 'var(--ink-3)', fontFamily: 'var(--font-ui)' }}>
+                No options available
+              </div>
+            ) : (
+              parsedOptions.map((opt, idx) => {
+                const isSelected = String(opt.value) === String(value ?? '');
+                return (
+                  <button
+                    key={`${opt.value}-${idx}`}
+                    type="button"
+                    role="option"
+                    aria-selected={isSelected}
+                    disabled={opt.disabled}
+                    onClick={() => handleSelect(opt.value)}
+                    style={{
+                      width: '100%',
+                      padding: '9px 12px',
+                      borderRadius: 8,
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      gap: 8,
+                      cursor: opt.disabled ? 'not-allowed' : 'pointer',
+                      border: 'none',
+                      textAlign: 'left',
+                      fontFamily: 'var(--font-ui)',
+                      fontSize: 14,
+                      fontWeight: isSelected ? 600 : 400,
+                      background: isSelected ? 'var(--accent-soft, rgba(42, 120, 214, 0.1))' : 'transparent',
+                      color: isSelected ? 'var(--accent)' : 'var(--ink)',
+                      transition: 'background 100ms ease, color 100ms ease',
+                      opacity: opt.disabled ? 0.5 : 1,
+                    }}
+                    onMouseEnter={(e) => {
+                      if (!isSelected && !opt.disabled) e.currentTarget.style.background = 'var(--fill)';
+                    }}
+                    onMouseLeave={(e) => {
+                      if (!isSelected && !opt.disabled) e.currentTarget.style.background = 'transparent';
+                    }}
+                  >
+                    <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {opt.label}
+                    </span>
+                    {isSelected && <Check size={15} color="var(--accent)" style={{ flexShrink: 0 }} />}
+                  </button>
+                );
+              })
+            )}
+          </div>,
+          document.body
+        )}
       </div>
     </FieldFrame>
   );

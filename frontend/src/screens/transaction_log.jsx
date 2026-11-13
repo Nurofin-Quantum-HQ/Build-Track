@@ -43,7 +43,8 @@ const ITEMS_PER_PAGE = 10;
 const TYPE_STYLES = {
   Materials: { tone: "material", label: "Material", color: "var(--type-material)", bg: "var(--type-material-soft)", icon: Package },
   Wages: { tone: "labour", label: "Labour", color: "var(--type-labour)", bg: "var(--type-labour-soft)", icon: Users },
-  Expense: { tone: "equipment", label: "Equipment", color: "var(--type-equipment)", bg: "var(--type-equipment-soft)", icon: Wrench },
+  Equipment: { tone: "equipment", label: "Equipment", color: "var(--type-equipment)", bg: "var(--type-equipment-soft)", icon: Wrench },
+  Expense: { tone: "warning", label: "Expense", color: "var(--status-warning, #D97706)", bg: "var(--status-warning-soft, rgba(217, 119, 6, 0.12))", icon: ArrowDownRight },
   Income: { tone: "income", label: "Income", color: "var(--type-income)", bg: "var(--type-income-soft)", icon: TrendingUp },
 };
 
@@ -51,9 +52,26 @@ const FILTERS = [
   { label: "All", value: "All" },
   { label: "Materials", value: "Materials" },
   { label: "Labour", value: "Wages" },
-  { label: "Equipment", value: "Expense" },
+  { label: "Equipment", value: "Equipment" },
+  { label: "Expenses", value: "Expense" },
   { label: "Income", value: "Income" },
 ];
+
+function resolveEntryType(t) {
+  if (!t) return "Expense";
+  if (t.type === "Materials") return "Materials";
+  if (t.type === "Wages" || t.type === "Labour") return "Wages";
+  if (t.type === "Income" || t.type === "Revenue") return "Income";
+  // Outflows are explicit expenses
+  if (t.category === "Money Out" || t.ledgerCategory === "money_out") return "Expense";
+  const str = `${t.title || ""} ${t.category || ""} ${t.subType || ""} ${t.equipmentName || ""}`.toLowerCase();
+  const isEquip =
+    t.type === "Equipment" ||
+    t.subType === "Equipment" ||
+    Boolean(t.equipmentName) ||
+    /jcb|crane|mixer|truck|tractor|excavator|machine|equipment|generator|compressor|dumper|loader|roller|vibrator|tanker/i.test(str);
+  return isEquip ? "Equipment" : "Expense";
+}
 
 function resolveProjectName(project) {
   if (!project) return "";
@@ -183,8 +201,15 @@ export default function TransactionLog() {
         const desc = (t.title || "").toLowerCase();
         const proj = resolveProjectName(t.project).toLowerCase();
         const matchSearch = !q || desc.includes(q) || proj.includes(q);
-        if (filter === "All") return matchSearch;
-        return matchSearch && t.type === filter;
+        if (!matchSearch) return false;
+        if (filter === "All") return true;
+        const resolved = resolveEntryType(t);
+        if (filter === "Materials") return resolved === "Materials";
+        if (filter === "Wages") return resolved === "Wages";
+        if (filter === "Equipment") return resolved === "Equipment";
+        if (filter === "Expense") return resolved === "Expense";
+        if (filter === "Income") return resolved === "Income";
+        return t.type === filter;
       }),
     [transactions, search, filter]
   );
@@ -399,7 +424,8 @@ export default function TransactionLog() {
                   <div className="bt-eyebrow" style={{ color: "var(--ink-3)", margin: "0 4px 8px" }}>{g.label}</div>
                   <BtCard padding="0" style={{ overflow: "hidden" }}>
                     {g.items.map((t, i) => {
-                      const st = TYPE_STYLES[t.type] || TYPE_STYLES.Expense;
+                      const resolvedType = resolveEntryType(t);
+                      const st = TYPE_STYLES[resolvedType] || TYPE_STYLES.Expense;
                       const pName = resolveProjectName(t.project);
                       const isIncome = t.type === "Income";
                       const TypeIcon = st.icon || IndianRupee;

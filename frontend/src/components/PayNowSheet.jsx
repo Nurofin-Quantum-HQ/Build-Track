@@ -191,7 +191,12 @@ export default function PayNowSheet({
       note: notes.trim(),
       requestEsign,
       clientEmail: clientEmail.trim(),
-      paymentDate: paymentDate && !isNaN(new Date(paymentDate).getTime()) ? new Date(paymentDate).toISOString() : new Date().toISOString(),
+      paymentDate: (() => {
+        if (!paymentDate) return new Date().toISOString();
+        const [y, m, d] = paymentDate.split("-");
+        const now = new Date();
+        return new Date(y, m - 1, d, now.getHours(), now.getMinutes(), now.getSeconds()).toISOString();
+      })(),
       status: statusStr,
       receiptFile: receiptFile || null,
     });
