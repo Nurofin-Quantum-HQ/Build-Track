@@ -285,9 +285,14 @@ router.post("/verify-registration-otp", (req, res) => {
   return res.status(200).json({ success: true, message: "Email verified successfully" });
 });
 
-router.post("/register", async (req, res) => {
+router.post("/register", upload.single("companyLogo"), async (req, res) => {
   try {
-    const { name, email, password, projectId, phone, companyName, companyFontStyle, companyLogo, client } = req.body;
+    const body = req.body || {};
+    const { name, email, password, projectId, phone, companyName, companyFontStyle, client } = body;
+    let companyLogo = body.companyLogo || null;
+    if (req.file) {
+      companyLogo = getFileUrl(req.file);
+    }
     console.log(`[Auth] Register request received for email: ${email}`);
     if (!name || !email || !password || !phone) {
       return res
