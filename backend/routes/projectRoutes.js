@@ -17,6 +17,33 @@ const upload = require("../config/multer");
 const { getFileUrl, deleteFile } = require("../config/fileHelpers");
 const Subscription = require("../models/Subscription");
 const { buildProjectInsights } = require("../services/projectInsights");
+const processDocUpload = async (docStr) => {
+  if (typeof docStr === "string" && docStr.startsWith("data:")) {
+    try {
+      const cloudinary = require("../config/cloudinary");
+      let publicId;
+      if (docStr.includes(";name=")) {
+        const rawName = docStr.split(";name=")[1].split(";")[0];
+        publicId = decodeURIComponent(rawName).replace(/[^a-zA-Z0-9._-]/g, "_");
+      }
+      let cleanDoc = docStr;
+      if (docStr.includes(";name=")) {
+        cleanDoc = docStr.replace(/;name=[^;]+;/, ";");
+      }
+      const options = { folder: "buildtrack/documents", resource_type: "auto" };
+      if (publicId) {
+        options.public_id = `${Date.now()}-${publicId}`;
+      }
+      const r = await cloudinary.uploader.upload(cleanDoc, options);
+      return r.secure_url;
+    } catch (err) {
+      console.error("Cloudinary document upload error:", err.message);
+      return docStr;
+    }
+  }
+  return docStr;
+};
+
 router.use(protect);
 const normalizeProjectBudget = (project) => {
   if (!project) return project;
@@ -536,7 +563,11 @@ router.post("/", requirePermission(["create_project", "manage_team"]), async (re
     let finalDocs = (req.files?.filter((f) => f.fieldname === "documents") || []).map(getFileUrl).filter(Boolean);
     const parsedBodyDocs = safeParse(body.documents);
     if (Array.isArray(parsedBodyDocs) && parsedBodyDocs.length > 0) {
-      finalDocs = [...finalDocs, ...parsedBodyDocs.filter((d) => typeof d === "string")];
+      for (const d of parsedBodyDocs) {
+        if (typeof d === "string" && d.trim()) {
+          finalDocs.push(await processDocUpload(d));
+        }
+      }
     }
     const project = await Project.create({
       createdBy: req.user.id,
@@ -796,7 +827,12 @@ router.put("/:id", protect, async (req, res) => {
     } else if (body.documents !== undefined) {
       const parsedDocs = safeParse(body.documents);
       if (Array.isArray(parsedDocs)) {
-        currentDocs = parsedDocs.filter((d) => typeof d === "string");
+        currentDocs = [];
+        for (const d of parsedDocs) {
+          if (typeof d === "string" && d.trim()) {
+            currentDocs.push(await processDocUpload(d));
+          }
+        }
       }
     }
     const newDocFiles = req.files?.filter((f) => f.fieldname === "documents") || [];

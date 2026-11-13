@@ -1071,8 +1071,40 @@ export default function ManageSitePage() {
 
               {hasPhoto && (
                 <BtCard padding="20px">
-                  <BtSectionHeader title="Site photo" caption />
-                  <div style={{ borderRadius: 'var(--r-input)', overflow: 'hidden', maxHeight: 340 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
+                    <BtSectionHeader title="Site photo" caption />
+                    <button
+                      type="button"
+                      onClick={() => window.open(imgSrc, '_blank', 'noopener,noreferrer')}
+                      style={{
+                        background: 'var(--fill)',
+                        border: '1px solid var(--line)',
+                        borderRadius: 'var(--r-chip)',
+                        padding: '4px 10px',
+                        fontSize: 12,
+                        fontWeight: 600,
+                        color: 'var(--ink)',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 6,
+                      }}
+                    >
+                      <Eye size={13} /> Open full size
+                    </button>
+                  </div>
+                  <div
+                    onClick={() => window.open(imgSrc, '_blank', 'noopener,noreferrer')}
+                    style={{
+                      borderRadius: 'var(--r-input)',
+                      overflow: 'hidden',
+                      maxHeight: 340,
+                      cursor: 'pointer',
+                      border: '1px solid var(--line)',
+                      position: 'relative',
+                    }}
+                    title="Click to view full photo"
+                  >
                     <img src={imgSrc} alt="Site preview" style={{ width: '100%', maxHeight: 340, objectFit: 'cover', display: 'block' }} />
                   </div>
                 </BtCard>
@@ -1094,10 +1126,14 @@ export default function ManageSitePage() {
                     {p.documents.map((doc, idx) => {
                       const fileUrl = resolveImageUrl(doc);
                       const fileName = doc.split('/').pop() || `Document ${idx + 1}`;
-                      const isImage = /\.(jpg|jpeg|png|gif|webp)$/i.test(fileName);
+                      const isImage = /\.(jpg|jpeg|png|gif|webp)$/i.test(fileName) || doc.startsWith('data:image/');
                       return (
                         <div key={idx} style={{ border: '1px solid var(--line)', borderRadius: 'var(--r-input)', overflow: 'hidden', background: 'var(--card)' }}>
-                          <div style={{ height: 110, background: 'var(--fill)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                          <div
+                            onClick={() => window.open(fileUrl, '_blank', 'noopener,noreferrer')}
+                            style={{ height: 110, background: 'var(--fill)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}
+                            title="Click to open"
+                          >
                             {isImage ? (
                               <img src={fileUrl} alt={fileName} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                             ) : (
@@ -1111,7 +1147,7 @@ export default function ManageSitePage() {
                             <a
                               href={fileUrl}
                               target="_blank"
-                              rel="noreferrer"
+                              rel="noopener noreferrer"
                               style={{ fontSize: 13, fontWeight: 700, color: 'var(--accent-ink)', textDecoration: 'none', padding: '8px 4px' }}
                             >
                               View

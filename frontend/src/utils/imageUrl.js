@@ -5,5 +5,6 @@ const API_ORIGIN = import.meta.env.DEV
 export function resolveImageUrl(photo) {
   if (!photo) return "";
   if (photo.startsWith("http://") || photo.startsWith("https://") || photo.startsWith("data:")) return photo;
-  return `${API_ORIGIN}/uploads/${photo}`;
+  const clean = photo.replace(/^\/+/, '').replace(/^uploads\//, '');
+  return `${API_ORIGIN}/uploads/${clean}`;
 }
