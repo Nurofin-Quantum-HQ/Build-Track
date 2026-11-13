@@ -519,6 +519,25 @@ router.post("/", requirePermission(["create_project", "manage_team"]), async (re
       const n = parseInt(v, 10);
       return isNaN(n) || n < 0 ? null : n;
     };
+    let finalPhoto = getFileUrl(req.files?.find((f) => f.fieldname === "photo"));
+    if (!finalPhoto && body.photo && typeof body.photo === "string") {
+      if (body.photo.startsWith("data:image/")) {
+        try {
+          const cloudinary = require("../config/cloudinary");
+          const r = await cloudinary.uploader.upload(body.photo, { folder: "buildtrack" });
+          finalPhoto = r.secure_url;
+        } catch (uploadErr) {
+          console.error("Cloudinary base64 photo upload error:", uploadErr.message);
+        }
+      } else if (body.photo.startsWith("http")) {
+        finalPhoto = body.photo;
+      }
+    }
+    let finalDocs = (req.files?.filter((f) => f.fieldname === "documents") || []).map(getFileUrl).filter(Boolean);
+    const parsedBodyDocs = safeParse(body.documents);
+    if (Array.isArray(parsedBodyDocs) && parsedBodyDocs.length > 0) {
+      finalDocs = [...finalDocs, ...parsedBodyDocs.filter((d) => typeof d === "string")];
+    }
     const project = await Project.create({
       createdBy: req.user.id,
       projectName: body.projectName.trim(),
@@ -566,8 +585,8 @@ router.post("/", requirePermission(["create_project", "manage_team"]), async (re
       status: backendStatus,
       projectStatus: uiProjectStatus,
       progress: Number(body.progress || 0),
-      photo: getFileUrl(req.files?.find((f) => f.fieldname === "photo")) || null,
-      documents: (req.files?.filter((f) => f.fieldname === "documents") || []).map(getFileUrl).filter(Boolean),
+      photo: finalPhoto || null,
+      documents: finalDocs,
       selectedPhaseNames: safeParse(body.selectedPhaseNames) || [],
       trackedActivityKeys: safeParse(body.trackedActivityKeys) || [],
       completedActivityKeys: safeParse(body.completedActivityKeys) || [],
@@ -747,17 +766,42 @@ router.put("/:id", protect, async (req, res) => {
     if (photoFile) {
       if (existing.photo) await deleteFile(existing.photo);
       updateData.photo = getFileUrl(photoFile);
-    } else if (body.removePhoto === "true" || body.removePhoto === true) {
+    } else if (
+      body.removePhoto === "true" ||
+      body.removePhoto === true ||
+      body.photo === null ||
+      body.photo === "" ||
+      body.photo === "remove" ||
+      body.photo === "delete"
+    ) {
       if (existing?.photo) await deleteFile(existing.photo);
       updateData.photo = null;
+    } else if (body.photo !== undefined && typeof body.photo === "string") {
+      if (body.photo.startsWith("data:image/")) {
+        if (existing?.photo) await deleteFile(existing.photo);
+        try {
+          const cloudinary = require("../config/cloudinary");
+          const r = await cloudinary.uploader.upload(body.photo, { folder: "buildtrack" });
+          updateData.photo = r.secure_url;
+        } catch (uploadErr) {
+          console.error("Cloudinary base64 photo upload error:", uploadErr.message);
+        }
+      } else if (body.photo.startsWith("http")) {
+        updateData.photo = body.photo;
+      }
     }
     let currentDocs = existing.documents || [];
     if (body.retainedDocuments !== undefined) {
       currentDocs = safeParse(body.retainedDocuments) || [];
+    } else if (body.documents !== undefined) {
+      const parsedDocs = safeParse(body.documents);
+      if (Array.isArray(parsedDocs)) {
+        currentDocs = parsedDocs.filter((d) => typeof d === "string");
+      }
     }
     const newDocFiles = req.files?.filter((f) => f.fieldname === "documents") || [];
     const newDocUrls = newDocFiles.map(getFileUrl).filter(Boolean);
-    if (body.retainedDocuments !== undefined || newDocUrls.length > 0) {
+    if (body.retainedDocuments !== undefined || body.documents !== undefined || newDocUrls.length > 0) {
       updateData.documents = [...currentDocs, ...newDocUrls];
     }
     const project = await Project.findOneAndUpdate(
