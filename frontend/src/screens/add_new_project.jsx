@@ -955,10 +955,10 @@ export default function NewProjectPage() {
           <Section title="Building Type" icon={Building2} defaultOpen className="tour-building-type">
             <div style={grid2}>
               <BtSelect label="Main type" value={mainType} onChange={e => { setMainType(e.target.value); setSubType("Select Sub Type"); }}>
-                {Object.keys(buildingTypes).map(t => <option key={t}>{t}</option>)}
+                {Object.keys(buildingTypes).map(t => <option key={t} value={t}>{t}</option>)}
               </BtSelect>
               <BtSelect label="Sub type" value={showSubTypeCustom ? "Other (Custom)" : subType} onChange={e => setSubType(e.target.value)}>
-                {subTypes.map(t => <option key={t}>{t}</option>)}
+                {subTypes.map(t => <option key={t} value={t}>{t}</option>)}
               </BtSelect>
             </div>
             {showSubTypeCustom && (
@@ -973,7 +973,7 @@ export default function NewProjectPage() {
               <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 2fr) minmax(0, 1fr)", gap: 12 }}>
                 <BtField label="Total land area" type="number" inputMode="decimal" min="0" value={landArea} onChange={e => setLandArea(e.target.value)} placeholder="2400" />
                 <BtSelect label="Unit" value={landUnit} onChange={e => setLandUnit(e.target.value)}>
-                  {landUnits.map(u => <option key={u}>{u}</option>)}
+                  {landUnits.map(u => <option key={u} value={u}>{u}</option>)}
                 </BtSelect>
               </div>
               <div className="tour-floors">

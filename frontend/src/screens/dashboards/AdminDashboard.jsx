@@ -213,7 +213,6 @@ export default function AdminDashboard() {
   const [pendingApprovals, setPendingApprovals] = useState(0);
   const [addRevenueModalOpen, setAddRevenueModalOpen] = useState(false);
   const [runTour, setRunTour] = useState(false);
-  const [showTourPopup, setShowTourPopup] = useState(false);
 
   // Parity with Flutter homescreen.dart: live revenue transactions & history
   const [revenueEntries, setRevenueEntries] = useState([]);
@@ -278,12 +277,6 @@ export default function AdminDashboard() {
       approvalAPI.getHistory().catch(() => ({ data: [] })),
     ])
       .then(([projList, , , pendRes]) => {
-        if (projList && projList.length === 0) {
-          if (!localStorage.getItem('appTourPrompted')) {
-            setShowTourPopup(true);
-          }
-        }
-
         const extractArray = (res) => {
           if (!res || !res.data) return [];
           if (Array.isArray(res.data)) return res.data;
@@ -506,24 +499,6 @@ export default function AdminDashboard() {
   return (
     <div style={{ width: '100%', minHeight: '100%', display: 'flex', flexDirection: 'column' }}>
       <ModuleTour steps={tourSteps} run={runTour} setRun={setRunTour} moduleName="admin_dashboard" />
-
-      {showTourPopup && (
-        <ConfirmDialog
-          message="Welcome to BuildTrack! Do you want an app tour to help you get started?"
-          confirmLabel="Yes"
-          cancelLabel="No"
-          onConfirm={() => {
-            localStorage.setItem('appTourPrompted', 'true');
-            localStorage.setItem('globalTourActive', 'true');
-            setShowTourPopup(false);
-            setRunTour(true);
-          }}
-          onCancel={() => {
-            localStorage.setItem('appTourPrompted', 'true');
-            setShowTourPopup(false);
-          }}
-        />
-      )}
 
       {/* HERO: who, which scope, and the one number that matters (cost so far) */}
       <BtHero padding="24px clamp(16px, 4vw, 28px) 56px">

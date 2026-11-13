@@ -207,17 +207,25 @@ export function BtSelect({
     Children.forEach(children, (child) => {
       if (isValidElement(child)) {
         if (child.type === 'option') {
+          const rawVal = child.props.value !== undefined ? child.props.value : child.props.children;
+          const label = child.props.children != null && typeof child.props.children === 'string'
+            ? child.props.children
+            : String(rawVal ?? '');
           list.push({
-            value: String(child.props.value ?? ''),
-            label: child.props.children ?? String(child.props.value ?? ''),
+            value: String(rawVal ?? ''),
+            label: label,
             disabled: !!child.props.disabled,
           });
         } else if (child.props?.children) {
           Children.forEach(child.props.children, (subChild) => {
             if (isValidElement(subChild) && subChild.type === 'option') {
+              const rawVal = subChild.props.value !== undefined ? subChild.props.value : subChild.props.children;
+              const label = subChild.props.children != null && typeof subChild.props.children === 'string'
+                ? subChild.props.children
+                : String(rawVal ?? '');
               list.push({
-                value: String(subChild.props.value ?? ''),
-                label: subChild.props.children ?? String(subChild.props.value ?? ''),
+                value: String(rawVal ?? ''),
+                label: label,
                 disabled: !!subChild.props.disabled,
               });
             }

@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import { authAPI, API_ORIGIN } from "../api";
 import { useAuth } from "../contexts/AuthContext";
 import {
@@ -46,6 +46,7 @@ const GoogleIcon = () => (
 
 export default function LoginPage() {
   const navigate = useNavigate();
+  const location = useLocation();
   const { login } = useAuth();
 
   const [email, setEmail] = useState("");
@@ -57,6 +58,7 @@ export default function LoginPage() {
   const [emailErr, setEmailErr] = useState("");
   const [passErr, setPassErr] = useState("");
   const [serverErr, setServerErr] = useState("");
+  const [successMsg, setSuccessMsg] = useState("");
 
   const [showForgot, setShowForgot] = useState(false);
   const [forgotEmail, setForgotEmail] = useState("");
@@ -70,6 +72,15 @@ export default function LoginPage() {
   const [resetLoading, setResetLoading] = useState(false);
 
   const [vw, setVw] = useState(window.innerWidth);
+
+  useEffect(() => {
+    if (location.state?.registered) {
+      setSuccessMsg("Account created successfully! Please sign in to continue.");
+      if (location.state.email) {
+        setEmail(location.state.email);
+      }
+    }
+  }, [location.state]);
 
   useEffect(() => {
     if (localStorage.getItem("bt_token")) {
@@ -349,6 +360,25 @@ export default function LoginPage() {
             </h2>
             <p style={{ margin: 0, fontSize: 15, color: "var(--ink-2)" }}>Sign in to your BuildTrack workspace.</p>
           </div>
+
+          {successMsg && (
+            <div
+              role="status"
+              style={{
+                background: "var(--status-success-soft, #ECFDF5)",
+                border: "1px solid var(--status-success-border, #A7F3D0)",
+                borderRadius: "var(--r-chip, 10px)",
+                padding: "12px 14px",
+                marginBottom: 18,
+                display: "flex",
+                alignItems: "flex-start",
+                gap: 10,
+              }}
+            >
+              <CheckCircle2 size={17} color="var(--status-success, #059669)" style={{ marginTop: 1, flexShrink: 0 }} />
+              <span style={{ fontSize: 14, color: "var(--status-success, #059669)", fontWeight: 500, lineHeight: 1.45 }}>{successMsg}</span>
+            </div>
+          )}
 
           {serverErr && (
             <div
