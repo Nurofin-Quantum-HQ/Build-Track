@@ -276,7 +276,7 @@ export default function Sidebar() {
                 key={item.label}
                 to={item.path}
                 end={item.path === "/"}
-                className="bt-nav-item"
+                className={`bt-nav-item${item.tour ? ` ${item.tour}` : ""}`}
                 onPointerDown={() => preloadRoute(item.path)}
                 onClick={() => perfLogger.startRoute(item.path)}
                 onMouseEnter={(e) => {
@@ -352,7 +352,7 @@ export default function Sidebar() {
                 <NavLink
                   key={item.label}
                   to={item.path}
-                  className="bt-nav-item"
+                  className={`bt-nav-item${item.tour ? ` ${item.tour}` : ""}`}
                 onPointerDown={() => preloadRoute(item.path)}
                   onClick={() => perfLogger.startRoute(item.path)}
                   onMouseEnter={(e) => {
@@ -467,13 +467,15 @@ export default function Sidebar() {
             </div>
           </div>
 
-          <BtIconButton
-            icon={HelpCircle}
-            label="Replay app tour"
-            size={30}
-            onDark
-            onClick={() => window.dispatchEvent(new Event("replay-app-tour"))}
-          />
+          <span className="tour-replay" style={{ display: "inline-flex" }}>
+            <BtIconButton
+              icon={HelpCircle}
+              label="Replay app tour"
+              size={30}
+              onDark
+              onClick={() => window.dispatchEvent(new Event("replay-app-tour"))}
+            />
+          </span>
           <BtIconButton
             icon={Download}
             label="Get the mobile app"

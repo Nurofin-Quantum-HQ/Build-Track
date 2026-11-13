@@ -145,14 +145,16 @@ export default function DashboardLayout() {
           }}
         >
           {isMobile ? (
-            <BtIconButton
-              icon={Menu}
-              label="Open menu"
-              onDark
-              size={38}
-              onClick={() => setSidebarOpen(true)}
-              aria-expanded={sidebarOpen}
-            />
+            <span className="tour-menu" style={{ display: "inline-flex" }}>
+              <BtIconButton
+                icon={Menu}
+                label="Open menu"
+                onDark
+                size={38}
+                onClick={() => setSidebarOpen(true)}
+                aria-expanded={sidebarOpen}
+              />
+            </span>
           ) : (
             <span className="bt-eyebrow" style={{ color: "var(--on-noir-3)" }}>
               {section ? section.label : "BuildTrack"}
