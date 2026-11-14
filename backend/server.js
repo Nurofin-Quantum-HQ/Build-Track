@@ -1,3 +1,5 @@
+const dns = require("dns");
+try { dns.setServers(["8.8.8.8", "8.8.4.4"]); } catch (e) {}
 require("dotenv").config();
 console.log('AirPay Merchant ID loaded:', !!process.env.AIRPAY_MERCHANT_ID);
 console.log('🔍 Startup check — FRONTEND_URL:', process.env.FRONTEND_URL || '(not set)');

@@ -98,20 +98,25 @@ export default function DashboardLayout() {
         />
       )}
 
-      {/* ── Sidebar (Fixed Desktop or Drawer Mobile) ── */}
+      {/* ── Mobile Sidebar (Drawer) ── */}
       {isMobile ? (
         <div
+          role="dialog"
+          aria-modal="true"
+          aria-label="Navigation drawer"
           style={{
             position: "fixed",
             top: 0,
             left: 0,
             bottom: 0,
+            width: "min(280px, 85vw)",
             zIndex: 50,
             transform: sidebarOpen ? "translateX(0)" : "translateX(-100%)",
             transition: "transform 220ms cubic-bezier(0.16, 1, 0.3, 1)",
+            boxShadow: sidebarOpen ? "var(--shadow-raised)" : "none",
           }}
         >
-          <Sidebar />
+          <Sidebar isMobileDrawer onClose={() => setSidebarOpen(false)} />
         </div>
       ) : (
         <Sidebar />
@@ -124,6 +129,8 @@ export default function DashboardLayout() {
           display: "flex",
           flexDirection: "column",
           minWidth: 0,
+          width: "100%",
+          maxWidth: "100vw",
           overflow: "hidden",
           position: "relative",
         }}
@@ -138,14 +145,16 @@ export default function DashboardLayout() {
             display: "flex",
             alignItems: "center",
             justifyContent: "space-between",
-            padding: isMobile ? "0 16px" : "0 28px",
+            padding: isMobile ? "0 clamp(10px, 3vw, 16px)" : "0 28px",
             zIndex: 30,
             flexShrink: 0,
             boxSizing: "border-box",
+            width: "100%",
+            gap: "8px",
           }}
         >
           {isMobile ? (
-            <span className="tour-menu" style={{ display: "inline-flex" }}>
+            <span className="tour-menu" style={{ display: "inline-flex", flexShrink: 0 }}>
               <BtIconButton
                 icon={Menu}
                 label="Open menu"
@@ -156,68 +165,73 @@ export default function DashboardLayout() {
               />
             </span>
           ) : (
-            <span className="bt-eyebrow" style={{ color: "var(--on-noir-3)" }}>
+            <span className="bt-eyebrow" style={{ color: "var(--on-noir-3)", whiteSpace: "nowrap" }}>
               {section ? section.label : "BuildTrack"}
             </span>
           )}
 
-          <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: "clamp(6px, 1.5vw, 10px)", minWidth: 0 }}>
             {/* ── Brand Badge ── */}
             <button
               type="button"
               aria-label="BuildTrack home"
               onClick={() => navigate("/")}
+              className="bt-header-brand-btn"
               style={{
                 height: "38px",
-                padding: "0 14px",
+                padding: "0 clamp(8px, 2vw, 14px)",
                 borderRadius: "12px",
                 background: "rgba(255, 255, 255, 0.06)",
                 border: "1px solid rgba(255, 255, 255, 0.12)",
                 display: "flex",
                 alignItems: "center",
-                gap: "10px",
+                gap: "clamp(4px, 1.5vw, 10px)",
                 cursor: "pointer",
                 userSelect: "none",
                 transition: "background 140ms ease",
+                flexShrink: 1,
+                minWidth: 0,
               }}
               onMouseEnter={(e) => (e.currentTarget.style.background = "rgba(255, 255, 255, 0.10)")}
               onMouseLeave={(e) => (e.currentTarget.style.background = "rgba(255, 255, 255, 0.06)")}
             >
-              <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: "6px", flexShrink: 0 }}>
                 <img
                   src="/buildtrack-logo.png"
                   alt="BuildTrack"
-                  style={{ width: "20px", height: "20px", borderRadius: "5px" }}
+                  style={{ width: "20px", height: "20px", borderRadius: "5px", flexShrink: 0 }}
                 />
                 <span
+                  className="bt-header-brand-text"
                   style={{
                     fontFamily: "var(--font-display)",
                     fontSize: "14px",
                     fontWeight: 700,
                     color: "var(--bone)",
                     letterSpacing: "-0.3px",
+                    whiteSpace: "nowrap",
                   }}
                 >
                   BuildTrack
                 </span>
               </div>
 
-              <div style={{ width: "1px", height: "14px", background: "rgba(255, 255, 255, 0.16)" }} />
+              <div className="bt-header-brand-divider" style={{ width: "1px", height: "14px", background: "rgba(255, 255, 255, 0.16)", flexShrink: 0 }} />
 
-              <div style={{ display: "flex", alignItems: "center", gap: "5px" }}>
-                <span style={{ fontSize: "11px", color: "var(--on-noir-3, rgba(246, 244, 239, 0.5))", fontFamily: "var(--font-ui)" }}>
+              <div className="bt-header-brand-by" style={{ display: "flex", alignItems: "center", gap: "5px", flexShrink: 0 }}>
+                <span style={{ fontSize: "11px", color: "var(--on-noir-3, rgba(246, 244, 239, 0.5))", fontFamily: "var(--font-ui)", whiteSpace: "nowrap" }}>
                   by
                 </span>
                 <img
                   src={nurofinLogo}
                   alt="Nurofin"
-                  style={{ height: "13px", filter: "brightness(0) invert(1)" }}
+                  style={{ height: "13px", filter: "brightness(0) invert(1)", flexShrink: 0 }}
                 />
               </div>
             </button>
 
             {/* ── Notifications Bell ── */}
-            <div style={{ position: "relative" }}>
+            <div style={{ position: "relative", flexShrink: 0 }}>
               <BtIconButton
                 icon={Bell}
                 label={totalAlertCount > 0 ? `Notifications, ${totalAlertCount} unread` : "Notifications"}

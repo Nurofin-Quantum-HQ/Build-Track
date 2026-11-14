@@ -42,7 +42,7 @@ export default function BtPageHeader({
           flexWrap: 'wrap',
         }}
       >
-        <div style={{ minWidth: 0, flex: '1 1 320px' }}>
+        <div style={{ minWidth: 0, flex: '1 1 min(100%, 280px)' }}>
           {(back || eyebrow) && (
             <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12, flexWrap: 'wrap' }}>
               {back && (

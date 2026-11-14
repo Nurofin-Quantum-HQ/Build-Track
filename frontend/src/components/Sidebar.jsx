@@ -4,7 +4,7 @@ import { navItems, adminNavItems } from "../navItems";
 import BtIconButton from "./ui/BtIconButton";
 import { canAccessRoute, canAddEntries, canApprove } from "../utils/access";
 import { resolveImageUrl } from "../utils/imageUrl";
-import { LogOut, HelpCircle, Plus, Download, LifeBuoy } from "lucide-react";
+import { LogOut, HelpCircle, Plus, Download, LifeBuoy, X } from "lucide-react";
 import { useAuth } from "../contexts/AuthContext";
 import { preloadRoute } from "../App";
 import perfLogger from "../utils/performanceLogger";
@@ -23,7 +23,7 @@ const FONT_FAMILY_MAP = {
   "Caveat": "'Caveat', cursive",
 };
 
-export default function Sidebar() {
+export default function Sidebar({ isMobileDrawer = false, onClose }) {
   const location = useLocation();
   const navigate = useNavigate();
   const { user: authUser, logout } = useAuth();
@@ -108,15 +108,16 @@ export default function Sidebar() {
     <aside
       className="bt-float-nav"
       style={{
-        width: 252,
-        minWidth: 252,
+        width: isMobileDrawer ? "100%" : 252,
+        minWidth: isMobileDrawer ? 0 : 252,
+        maxWidth: isMobileDrawer ? "100%" : 252,
         display: "flex",
         flexDirection: "column",
-        height: "calc(100vh - 24px)",
-        position: "sticky",
-        top: 12,
-        margin: 12,
-        borderRadius: "var(--r-sheet)",
+        height: isMobileDrawer ? "100%" : "calc(100vh - 24px)",
+        position: isMobileDrawer ? "relative" : "sticky",
+        top: isMobileDrawer ? 0 : 12,
+        margin: isMobileDrawer ? 0 : 12,
+        borderRadius: isMobileDrawer ? 0 : "var(--r-sheet)",
         zIndex: 30,
         overflow: "hidden",
         boxSizing: "border-box",
@@ -124,20 +125,38 @@ export default function Sidebar() {
     >
       {/* ── Brand Header ── */}
       <div
-        role="link"
-        tabIndex={0}
-        aria-label="Go to dashboard"
-        onClick={() => navigate("/")}
-        onKeyDown={(e) => e.key === "Enter" && navigate("/")}
         style={{
           display: "flex",
           alignItems: "center",
-          gap: 10,
-          padding: "18px 18px 12px",
-          minWidth: 0,
-          cursor: "pointer",
+          justifyContent: "space-between",
+          padding: "16px 14px 12px",
+          gap: 8,
+          borderBottom: isMobileDrawer ? "1px solid var(--noir-line)" : "none",
         }}
       >
+        <div
+          role="link"
+          tabIndex={0}
+          aria-label="Go to dashboard"
+          onClick={() => {
+            if (isMobileDrawer && onClose) onClose();
+            navigate("/");
+          }}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") {
+              if (isMobileDrawer && onClose) onClose();
+              navigate("/");
+            }
+          }}
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 10,
+            minWidth: 0,
+            flex: 1,
+            cursor: "pointer",
+          }}
+        >
         {user?.companyLogo ? (
           <img
             src={resolveImageUrl(user.companyLogo)}
@@ -200,6 +219,18 @@ export default function Sidebar() {
             Powered by Nurofin
           </div>
         </div>
+        </div>
+
+        {isMobileDrawer && (
+          <BtIconButton
+            icon={X}
+            label="Close menu"
+            onDark
+            size={36}
+            onClick={onClose}
+            style={{ flexShrink: 0 }}
+          />
+        )}
       </div>
 
       {/* ── Prominent '+ New entry' Ink Button (Section 5) ── */}
@@ -278,7 +309,10 @@ export default function Sidebar() {
                 end={item.path === "/"}
                 className={`bt-nav-item${item.tour ? ` ${item.tour}` : ""}`}
                 onPointerDown={() => preloadRoute(item.path)}
-                onClick={() => perfLogger.startRoute(item.path)}
+                onClick={() => {
+                  if (isMobileDrawer && onClose) onClose();
+                  perfLogger.startRoute(item.path);
+                }}
                 onMouseEnter={(e) => {
                   preloadRoute(item.path);
                   if (!active) e.currentTarget.style.background = "rgba(255, 255, 255, 0.07)";
@@ -290,7 +324,8 @@ export default function Sidebar() {
                   display: "flex",
                   alignItems: "center",
                   gap: "10px",
-                  padding: "8px 12px",
+                  padding: "10px 12px",
+                  minHeight: "44px",
                   borderRadius: "12px",
                   textDecoration: "none",
                   fontSize: "14px",
@@ -354,7 +389,10 @@ export default function Sidebar() {
                   to={item.path}
                   className={`bt-nav-item${item.tour ? ` ${item.tour}` : ""}`}
                 onPointerDown={() => preloadRoute(item.path)}
-                  onClick={() => perfLogger.startRoute(item.path)}
+                  onClick={() => {
+                    if (isMobileDrawer && onClose) onClose();
+                    perfLogger.startRoute(item.path);
+                  }}
                   onMouseEnter={(e) => {
                     preloadRoute(item.path);
                     if (!active) e.currentTarget.style.background = "rgba(255, 255, 255, 0.07)";
@@ -366,7 +404,8 @@ export default function Sidebar() {
                     display: "flex",
                     alignItems: "center",
                     gap: "10px",
-                    padding: "8px 12px",
+                    padding: "10px 12px",
+                    minHeight: "44px",
                     borderRadius: "12px",
                     textDecoration: "none",
                     fontSize: "14px",
