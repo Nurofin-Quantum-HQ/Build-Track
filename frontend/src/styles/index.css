@@ -825,3 +825,25 @@ h3, .bt-h3 {
 
 /* Keep focus rings visible on the dark surfaces */
 aside :focus-visible, header :focus-visible, .bt-hero-content :focus-visible { outline-color: var(--accent); }
+
+/* ── Mobile Drawer Layout & Safe Area Docking (< 1024px) ── */
+@media (max-width: 1023px) {
+  aside.bt-float-nav {
+    margin: 0 !important;
+    top: 0 !important;
+    left: 0 !important;
+    height: 100% !important;
+    height: 100dvh !important;
+    max-height: 100dvh !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    border-radius: 0 22px 22px 0 !important;
+    position: relative !important;
+  }
+  .bt-sidebar-header {
+    padding-top: max(16px, env(safe-area-inset-top, 16px)) !important;
+  }
+  .bt-sidebar-footer {
+    padding-bottom: max(24px, env(safe-area-inset-bottom, 24px)) !important;
+  }
+}

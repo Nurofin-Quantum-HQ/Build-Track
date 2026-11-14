@@ -114,10 +114,11 @@ export default function Sidebar({ isMobileDrawer = false, onClose }) {
         display: "flex",
         flexDirection: "column",
         height: isMobileDrawer ? "100%" : "calc(100vh - 24px)",
+        maxHeight: isMobileDrawer ? "100dvh" : undefined,
         position: isMobileDrawer ? "relative" : "sticky",
         top: isMobileDrawer ? 0 : 12,
         margin: isMobileDrawer ? 0 : 12,
-        borderRadius: isMobileDrawer ? 0 : "var(--r-sheet)",
+        borderRadius: isMobileDrawer ? "0 22px 22px 0" : "var(--r-sheet)",
         zIndex: 30,
         overflow: "hidden",
         boxSizing: "border-box",
@@ -125,13 +126,17 @@ export default function Sidebar({ isMobileDrawer = false, onClose }) {
     >
       {/* ── Brand Header ── */}
       <div
+        className="bt-sidebar-header"
         style={{
           display: "flex",
           alignItems: "center",
           justifyContent: "space-between",
-          padding: "16px 14px 12px",
+          padding: isMobileDrawer
+            ? "max(16px, env(safe-area-inset-top, 16px)) 16px 12px"
+            : "16px 14px 12px",
           gap: 8,
           borderBottom: isMobileDrawer ? "1px solid var(--noir-line)" : "none",
+          flexShrink: 0,
         }}
       >
         <div
@@ -447,10 +452,14 @@ export default function Sidebar({ isMobileDrawer = false, onClose }) {
 
       {/* ── User & Utilities Footer ── */}
       <div
+        className="bt-sidebar-footer"
         style={{
           borderTop: "1px solid var(--noir-line)",
-          padding: "12px 12px 12px 14px",
-          background: "transparent",
+          padding: isMobileDrawer
+            ? "12px 14px max(24px, env(safe-area-inset-bottom, 24px))"
+            : "12px 12px 12px 14px",
+          background: "var(--noir-2)",
+          flexShrink: 0,
         }}
       >
         <div style={{ display: "flex", alignItems: "center", gap: 4 }}>

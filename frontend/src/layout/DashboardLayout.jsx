@@ -76,7 +76,8 @@ export default function DashboardLayout() {
     <div
       style={{
         display: "flex",
-        height: "100vh",
+        height: "100dvh",
+        maxHeight: "100dvh",
         overflow: "hidden",
         background: "var(--noir)",
       }}
@@ -109,11 +110,15 @@ export default function DashboardLayout() {
             top: 0,
             left: 0,
             bottom: 0,
-            width: "min(280px, 85vw)",
+            height: "100dvh",
+            maxHeight: "100dvh",
+            width: "min(300px, 86vw)",
             zIndex: 50,
             transform: sidebarOpen ? "translateX(0)" : "translateX(-100%)",
-            transition: "transform 220ms cubic-bezier(0.16, 1, 0.3, 1)",
-            boxShadow: sidebarOpen ? "var(--shadow-raised)" : "none",
+            transition: "transform 240ms cubic-bezier(0.16, 1, 0.3, 1)",
+            boxShadow: sidebarOpen ? "0 0 50px rgba(0,0,0,0.75)" : "none",
+            display: "flex",
+            flexDirection: "column",
           }}
         >
           <Sidebar isMobileDrawer onClose={() => setSidebarOpen(false)} />
