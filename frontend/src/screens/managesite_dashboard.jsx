@@ -267,10 +267,10 @@ export default function ManageSitePage() {
   const [budgetDialogActivity, setBudgetDialogActivity] = useState(null);
   const [budgetForm, setBudgetForm] = useState({ material: 0, labour: 0, equipment: 0 });
   const [savingBudget, setSavingBudget] = useState(false);
-  const [isNarrow, setIsNarrow] = useState(() => typeof window !== 'undefined' && window.matchMedia('(max-width: 640px)').matches);
+  const [isNarrow, setIsNarrow] = useState(() => typeof window !== 'undefined' && window.matchMedia('(max-width: 860px)').matches);
 
   useEffect(() => {
-    const mq = window.matchMedia('(max-width: 640px)');
+    const mq = window.matchMedia('(max-width: 860px)');
     const onChange = (e) => setIsNarrow(e.matches);
     mq.addEventListener('change', onChange);
     return () => mq.removeEventListener('change', onChange);

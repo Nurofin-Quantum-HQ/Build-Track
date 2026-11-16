@@ -25,6 +25,14 @@ const PAYMENT_METHODS = [
 ];
 
 export default function AddRevenueModal({ open, projects, onClose, onSaved, initialProjectId }) {
+  const [isMobile, setIsMobile] = useState(typeof window !== "undefined" ? window.innerWidth < 640 : false);
+
+  useEffect(() => {
+    const onResize = () => setIsMobile(window.innerWidth < 640);
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
+  }, []);
+
   const [isInflow, setIsInflow] = useState(true);
   const [title, setTitle] = useState("");
   const [amount, setAmount] = useState("");
@@ -216,9 +224,9 @@ export default function AddRevenueModal({ open, projects, onClose, onSaved, init
         background: "var(--scrim)",
         zIndex: 9999,
         display: "flex",
-        alignItems: "center",
+        alignItems: isMobile ? "flex-end" : "center",
         justifyContent: "center",
-        padding: 16,
+        padding: isMobile ? 0 : 16,
         boxSizing: "border-box",
         animation: "fadeIn 160ms ease",
       }}
@@ -230,20 +238,32 @@ export default function AddRevenueModal({ open, projects, onClose, onSaved, init
         style={{
           background: "var(--card)",
           width: "100%",
-          maxWidth: 520,
-          borderRadius: "var(--r-sheet)",
-          maxHeight: "calc(100dvh - 32px)",
+          maxWidth: isMobile ? "100%" : 520,
+          borderRadius: isMobile ? "24px 24px 0 0" : "var(--r-sheet)",
+          maxHeight: isMobile ? "90dvh" : "calc(100dvh - 32px)",
           display: "flex",
           flexDirection: "column",
           boxShadow: "var(--shadow-raised)",
           border: "1px solid var(--line)",
           overflow: "hidden",
-          animation: "fadeUp 240ms var(--ease)",
+          animation: isMobile ? "slideUp 240ms var(--ease)" : "fadeUp 240ms var(--ease)",
         }}
       >
+        {isMobile && (
+          <div
+            style={{
+              width: 38,
+              height: 4,
+              borderRadius: 2,
+              background: "var(--input-border)",
+              margin: "10px auto 2px",
+              flexShrink: 0,
+            }}
+          />
+        )}
         <div
           style={{
-            padding: "20px 24px 16px",
+            padding: isMobile ? "14px 18px 12px" : "20px 24px 16px",
             borderBottom: "1px solid var(--line)",
             display: "flex",
             justifyContent: "space-between",
@@ -556,7 +576,7 @@ export default function AddRevenueModal({ open, projects, onClose, onSaved, init
 
         <div
           style={{
-            padding: "16px 24px 20px",
+            padding: isMobile ? "14px 18px calc(18px + env(safe-area-inset-bottom, 0px))" : "16px 24px 20px",
             borderTop: "1px solid var(--line)",
             flexShrink: 0,
             background: "var(--card)",

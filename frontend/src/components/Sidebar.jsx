@@ -29,6 +29,13 @@ export default function Sidebar({ isMobileDrawer = false, onClose }) {
   const { user: authUser, logout } = useAuth();
   const [user, setUser] = useState(authUser);
   const [pendingApprovalsCount, setPendingApprovalsCount] = useState(0);
+  const [isMobile, setIsMobile] = useState(() => (typeof window !== "undefined" ? window.innerWidth < 1024 : false));
+
+  useEffect(() => {
+    const onResize = () => setIsMobile(window.innerWidth < 1024);
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
+  }, []);
 
   const totalAlertCount = useNotificationStore((state) =>
     state.systemNotifications ? state.systemNotifications.filter((n) => !n.read).length : 0
@@ -459,107 +466,265 @@ export default function Sidebar({ isMobileDrawer = false, onClose }) {
             ? "12px 14px max(24px, env(safe-area-inset-bottom, 24px))"
             : "12px 12px 12px 14px",
           background: "var(--noir-2)",
+          display: "flex",
+          flexDirection: "column",
+          gap: isMobile ? 12 : 8,
           flexShrink: 0,
         }}
       >
-        <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
-          <div
-            style={{
-              width: 34,
-              height: 34,
-              marginRight: 4,
-              borderRadius: "50%",
-              background: "var(--noir-3)",
-              overflow: "hidden",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              fontSize: 14,
-              fontWeight: 700,
-              color: "var(--on-noir-2)",
-              flexShrink: 0,
-              border: "1px solid var(--noir-line)",
-            }}
-          >
-            {photoUrl ? (
-              <img src={photoUrl} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-            ) : (
-              user?.name?.charAt(0)?.toUpperCase() || "U"
-            )}
-          </div>
+        {isMobile ? (
+          <>
+            {/* User row on mobile */}
+            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+              <div
+                style={{
+                  width: 38,
+                  height: 38,
+                  borderRadius: "50%",
+                  background: "var(--noir-3)",
+                  overflow: "hidden",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  fontSize: 15,
+                  fontWeight: 700,
+                  color: "var(--on-noir-2)",
+                  flexShrink: 0,
+                  border: "1px solid var(--noir-line)",
+                }}
+              >
+                {photoUrl ? (
+                  <img src={photoUrl} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                ) : (
+                  user?.name?.charAt(0)?.toUpperCase() || "U"
+                )}
+              </div>
 
-          <div style={{ minWidth: 0, flex: 1 }}>
-            <div
-              title={user?.name || "User"}
+              <div style={{ minWidth: 0, flex: 1 }}>
+                <div
+                  title={user?.name || "User"}
+                  style={{
+                    fontSize: 14,
+                    fontWeight: 600,
+                    color: "var(--on-noir)",
+                    overflow: "hidden",
+                    textOverflow: "ellipsis",
+                    whiteSpace: "nowrap",
+                    fontFamily: "var(--font-ui)",
+                  }}
+                >
+                  {user?.name || "User"}
+                </div>
+                <div
+                  style={{
+                    fontSize: 12,
+                    color: "var(--on-noir-3)",
+                    textTransform: "capitalize",
+                    fontFamily: "var(--font-ui)",
+                  }}
+                >
+                  {user?.role || "Member"}
+                </div>
+              </div>
+
+              <BtIconButton
+                icon={HelpCircle}
+                label="Replay app tour"
+                size={34}
+                onDark
+                onClick={() => {
+                  window.dispatchEvent(new Event("bt-close-drawer"));
+                  window.dispatchEvent(new Event("replay-app-tour"));
+                }}
+              />
+              <BtIconButton
+                icon={LogOut}
+                label="Sign out"
+                size={34}
+                onDark
+                onClick={handleLogout}
+                style={{ color: "var(--status-danger-bright)" }}
+              />
+            </div>
+
+            {/* Mobile Dedicated Download APK button */}
+            <button
+              type="button"
+              onClick={() => {
+                window.dispatchEvent(new Event("bt-close-drawer"));
+                window.open(
+                  "https://github.com/Nurofin-Quantum-HQ/Build-Track-App/releases/latest/download/app-release.apk",
+                  "_blank",
+                  "noopener"
+                );
+              }}
               style={{
-                fontSize: 13.5,
-                fontWeight: 600,
+                width: "100%",
+                height: 40,
+                padding: "0 12px",
+                borderRadius: "10px",
+                background: "rgba(255, 255, 255, 0.06)",
+                border: "1px solid rgba(255, 255, 255, 0.12)",
                 color: "var(--on-noir)",
-                overflow: "hidden",
-                textOverflow: "ellipsis",
-                whiteSpace: "nowrap",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                fontSize: "13px",
+                fontWeight: 600,
                 fontFamily: "var(--font-ui)",
+                cursor: "pointer",
+                transition: "background 140ms ease",
               }}
+              onMouseEnter={(e) => (e.currentTarget.style.background = "rgba(255, 255, 255, 0.10)")}
+              onMouseLeave={(e) => (e.currentTarget.style.background = "rgba(255, 255, 255, 0.06)")}
             >
-              {user?.name || "User"}
-            </div>
-            <div
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <Download size={16} color="var(--accent)" />
+                <span>Get Mobile App</span>
+              </div>
+              <span
+                style={{
+                  fontSize: "10px",
+                  fontWeight: 700,
+                  color: "var(--accent)",
+                  fontFamily: "var(--font-mono)",
+                  background: "rgba(224, 169, 59, 0.16)",
+                  padding: "2px 6px",
+                  borderRadius: 4,
+                  letterSpacing: "0.04em",
+                }}
+              >
+                .APK
+              </span>
+            </button>
+
+            {/* Mobile Report a Problem button */}
+            <button
+              type="button"
+              className="bt-report-link"
+              onClick={() => {
+                window.dispatchEvent(new Event("bt-close-drawer"));
+                openReportProblem({ settleMs: 300 });
+              }}
               style={{
-                fontSize: 11.5,
-                color: "var(--on-noir-3)",
-                textTransform: "capitalize",
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 8,
+                height: 34,
+                padding: "0 4px",
+                background: "none",
+                border: "none",
+                cursor: "pointer",
                 fontFamily: "var(--font-ui)",
+                fontSize: "13px",
+                color: "var(--on-noir-3)",
+                transition: "color 150ms ease",
               }}
             >
-              {user?.role || "Member"}
+              <LifeBuoy size={16} strokeWidth={1.8} />
+              <span>Report a problem</span>
+            </button>
+          </>
+        ) : (
+          <>
+            <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+              <div
+                style={{
+                  width: 34,
+                  height: 34,
+                  marginRight: 4,
+                  borderRadius: "50%",
+                  background: "var(--noir-3)",
+                  overflow: "hidden",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  fontSize: 14,
+                  fontWeight: 700,
+                  color: "var(--on-noir-2)",
+                  flexShrink: 0,
+                  border: "1px solid var(--noir-line)",
+                }}
+              >
+                {photoUrl ? (
+                  <img src={photoUrl} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                ) : (
+                  user?.name?.charAt(0)?.toUpperCase() || "U"
+                )}
+              </div>
+
+              <div style={{ minWidth: 0, flex: 1 }}>
+                <div
+                  title={user?.name || "User"}
+                  style={{
+                    fontSize: 13.5,
+                    fontWeight: 600,
+                    color: "var(--on-noir)",
+                    overflow: "hidden",
+                    textOverflow: "ellipsis",
+                    whiteSpace: "nowrap",
+                    fontFamily: "var(--font-ui)",
+                  }}
+                >
+                  {user?.name || "User"}
+                </div>
+                <div
+                  style={{
+                    fontSize: 11.5,
+                    color: "var(--on-noir-3)",
+                    textTransform: "capitalize",
+                    fontFamily: "var(--font-ui)",
+                  }}
+                >
+                  {user?.role || "Member"}
+                </div>
+              </div>
+
+              <span className="tour-replay" style={{ display: "inline-flex" }}>
+                <BtIconButton
+                  icon={HelpCircle}
+                  label="Replay app tour"
+                  size={30}
+                  onDark
+                  onClick={() => window.dispatchEvent(new Event("replay-app-tour"))}
+                />
+              </span>
+              <BtIconButton
+                icon={Download}
+                label="Get the mobile app"
+                size={30}
+                onDark
+                onClick={() =>
+                  window.open(
+                    "https://github.com/Nurofin-Quantum-HQ/Build-Track-App/releases/latest/download/app-release.apk",
+                    "_blank",
+                    "noopener"
+                  )
+                }
+              />
+              <BtIconButton
+                icon={LogOut}
+                label="Sign out"
+                size={30}
+                onDark
+                onClick={handleLogout}
+                style={{ color: "var(--status-danger-bright)" }}
+              />
             </div>
-          </div>
 
-          <span className="tour-replay" style={{ display: "inline-flex" }}>
-            <BtIconButton
-              icon={HelpCircle}
-              label="Replay app tour"
-              size={30}
-              onDark
-              onClick={() => window.dispatchEvent(new Event("replay-app-tour"))}
-            />
-          </span>
-          <BtIconButton
-            icon={Download}
-            label="Get the mobile app"
-            size={30}
-            onDark
-            onClick={() =>
-              window.open(
-                "https://github.com/Nurofin-Quantum-HQ/Build-Track-App/releases/latest/download/app-release.apk",
-                "_blank",
-                "noopener"
-              )
-            }
-          />
-          <BtIconButton
-            icon={LogOut}
-            label="Sign out"
-            size={30}
-            onDark
-            onClick={handleLogout}
-            style={{ color: "var(--status-danger-bright)" }}
-          />
-        </div>
-
-        {/* Quiet help link: not a call to go looking for faults */}
-        <button
-          type="button"
-          className="bt-report-link"
-          onClick={() => {
-            const drawer = window.innerWidth < 1024;
-            if (drawer) window.dispatchEvent(new Event("bt-close-drawer"));
-            openReportProblem({ settleMs: drawer ? 300 : 0 });
-          }}
-        >
-          <LifeBuoy size={14} strokeWidth={1.8} />
-          <span>Report a problem</span>
-        </button>
+            {/* Quiet help link: not a call to go looking for faults */}
+            <button
+              type="button"
+              className="bt-report-link"
+              onClick={() => {
+                openReportProblem({ settleMs: 0 });
+              }}
+            >
+              <LifeBuoy size={14} strokeWidth={1.8} />
+              <span>Report a problem</span>
+            </button>
+          </>
+        )}
       </div>
     </aside>
   );

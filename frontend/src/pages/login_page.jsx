@@ -110,17 +110,18 @@ export default function LoginPage() {
 
   const isDesktop = vw >= 1024;
 
-  const validateEmail = (v) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v);
+  const validateEmail = (v) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(v || "").trim());
 
   const handleLogin = async (e) => {
     if (e?.preventDefault) e.preventDefault();
 
+    const cleanEmail = email.trim();
     let valid = true;
     setEmailErr("");
     setPassErr("");
     setServerErr("");
 
-    if (!validateEmail(email)) {
+    if (!validateEmail(cleanEmail)) {
       setEmailErr("Please enter a valid email address.");
       valid = false;
     }
@@ -137,13 +138,15 @@ export default function LoginPage() {
 
     setLoading(true);
     try {
-      await login(email.trim(), password);
+      await login(cleanEmail.toLowerCase(), password);
       navigate("/", { replace: true });
     } catch (err) {
       const msg =
-        err.friendlyMessage ||
         err.response?.data?.message ||
-        "Invalid email or password. Please try again.";
+        err.friendlyMessage ||
+        (err.response?.status === 401
+          ? "Invalid email or password. Please try again."
+          : "Unable to sign in. Please check your network connection or try again.");
       setServerErr(msg);
       setShake(true);
       setTimeout(() => setShake(false), 400);
@@ -154,7 +157,8 @@ export default function LoginPage() {
 
   const handleForgotSubmit = async (e) => {
     if (e?.preventDefault) e.preventDefault();
-    if (!validateEmail(forgotEmail)) {
+    const cleanForgot = forgotEmail.trim();
+    if (!validateEmail(cleanForgot)) {
       setForgotErr("Please enter a valid email address.");
       return;
     }
@@ -162,7 +166,7 @@ export default function LoginPage() {
     setForgotErr("");
     setForgotMsg("");
     try {
-      const { data } = await authAPI.forgotPassword({ email: forgotEmail.trim() });
+      const { data } = await authAPI.forgotPassword({ email: cleanForgot.toLowerCase() });
       setForgotMsg(data.message || "Password reset instructions sent to your email.");
     } catch (err) {
       setForgotErr(err.response?.data?.message || "Failed to send reset link. Try again.");
@@ -410,6 +414,7 @@ export default function LoginPage() {
                 setEmailErr("");
                 setServerErr("");
               }}
+              onBlur={() => setEmail((v) => v.trim())}
               error={emailErr}
               autoComplete="email"
             />

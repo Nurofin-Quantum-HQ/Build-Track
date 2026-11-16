@@ -40,7 +40,14 @@ export default function ReportProblemModal({ context, onClose }) {
   const [error, setError] = useState("");
   const [needText, setNeedText] = useState(false);
   const [doneCode, setDoneCode] = useState(null);
+  const [isMobile, setIsMobile] = useState(typeof window !== "undefined" ? window.innerWidth < 640 : false);
   const textRef = useRef(null);
+
+  useEffect(() => {
+    const onResize = () => setIsMobile(window.innerWidth < 640);
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
+  }, []);
 
   const dirty = description.trim() !== "" || tryingTo.trim() !== "";
   const stepsCount = useMemo(() => getBreadcrumbs().length, []);
@@ -123,9 +130,9 @@ export default function ReportProblemModal({ context, onClose }) {
         backdropFilter: "blur(4px)",
         WebkitBackdropFilter: "blur(4px)",
         display: "flex",
-        alignItems: "center",
+        alignItems: isMobile ? "flex-end" : "center",
         justifyContent: "center",
-        padding: 16,
+        padding: isMobile ? 0 : 16,
         animation: "fadeIn 160ms ease",
       }}
     >
@@ -136,16 +143,29 @@ export default function ReportProblemModal({ context, onClose }) {
         style={{
           background: "var(--card)",
           border: "1px solid var(--line)",
-          borderRadius: "var(--r-card)",
+          borderRadius: isMobile ? "24px 24px 0 0" : "var(--r-card)",
           boxShadow: "var(--shadow-raised)",
           width: "100%",
-          maxWidth: 520,
-          maxHeight: "calc(100vh - 32px)",
+          maxWidth: isMobile ? "100%" : 520,
+          maxHeight: isMobile ? "92dvh" : "calc(100vh - 32px)",
           display: "flex",
           flexDirection: "column",
-          animation: "fadeUp 260ms var(--ease)",
+          animation: isMobile ? "slideUp 260ms var(--ease)" : "fadeUp 260ms var(--ease)",
+          boxSizing: "border-box",
         }}
       >
+        {isMobile && (
+          <div
+            style={{
+              width: 38,
+              height: 4,
+              borderRadius: 2,
+              background: "var(--input-border)",
+              margin: "10px auto 2px",
+              flexShrink: 0,
+            }}
+          />
+        )}
         {doneCode !== null ? (
           <div style={{ padding: "36px 28px 28px", textAlign: "center" }}>
             <div
@@ -281,7 +301,7 @@ export default function ReportProblemModal({ context, onClose }) {
               )}
             </div>
 
-            <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, padding: "12px 24px 20px" }}>
+            <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, padding: isMobile ? "12px 18px calc(18px + env(safe-area-inset-bottom, 0px))" : "12px 24px 20px" }}>
               <BtButton variant="secondary" size="small" onClick={onClose} disabled={sending}>Cancel</BtButton>
               <BtButton size="small" onClick={send} loading={sending}>{error ? "Try again" : "Send"}</BtButton>
             </div>

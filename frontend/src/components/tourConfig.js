@@ -12,6 +12,37 @@ export const TOUR_OPTIONS = {
   primaryColor: '#111317',
   zIndex: 10000,
   targetWaitTimeout: 600, // don't hang on a step whose target isn't on screen
+  styles: {
+    options: {
+      primaryColor: '#111317',
+      textColor: '#111317',
+      zIndex: 10000,
+      width: typeof window !== 'undefined' ? Math.min(window.innerWidth - 32, 380) : 360,
+    },
+    tooltip: {
+      borderRadius: 16,
+      fontSize: 14,
+      padding: '16px 18px',
+      boxShadow: '0 12px 36px rgba(0, 0, 0, 0.22)',
+    },
+    buttonNext: {
+      borderRadius: 10,
+      padding: '8px 14px',
+      fontWeight: 600,
+      fontSize: 13,
+    },
+    buttonBack: {
+      borderRadius: 10,
+      padding: '8px 14px',
+      fontWeight: 600,
+      fontSize: 13,
+      marginRight: 6,
+    },
+    buttonSkip: {
+      color: '#6F7582',
+      fontSize: 13,
+    },
+  },
 };
 
 export const TOUR_LOCALE = { skip: 'Skip', next: 'Next', back: 'Back', last: 'Finish' };

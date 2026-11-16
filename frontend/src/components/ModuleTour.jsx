@@ -44,18 +44,20 @@ export default function ModuleTour({ steps, run, setRun, moduleName }) {
         onClick={endTour}
         style={{
           position: 'fixed',
-          right: 20,
-          bottom: 20,
+          right: 16,
+          bottom: typeof window !== 'undefined' && window.innerWidth < 1024
+            ? 'calc(74px + env(safe-area-inset-bottom, 0px))'
+            : 20,
           zIndex: 10050,
           display: 'flex',
           alignItems: 'center',
           gap: 8,
-          padding: '10px 16px',
+          padding: '9px 15px',
           borderRadius: 12,
           border: 'none',
           background: '#DC2626',
           color: '#fff',
-          fontSize: 14,
+          fontSize: 13,
           fontWeight: 600,
           fontFamily: "'Inter', 'Segoe UI', system-ui, sans-serif",
           cursor: 'pointer',

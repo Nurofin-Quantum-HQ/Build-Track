@@ -383,7 +383,7 @@ export default function TransactionLog() {
               }}
               style={{ maxWidth: 440 }}
             />
-            <div role="tablist" aria-label="Entry type" style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+            <div role="tablist" aria-label="Entry type" className="mobile-scroll-x" style={{ display: "flex", gap: 8 }}>
               {FILTERS.map((f) => (
                 <BtChip
                   key={f.value}

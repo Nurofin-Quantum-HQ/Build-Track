@@ -355,7 +355,7 @@ export default function ProjectsPage() {
         <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
           {/* Filters + search + refresh */}
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12 }}>
-            <div className="tour-tabs" role="tablist" aria-label="Filter by status" style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+            <div className="tour-tabs mobile-scroll-x" role="tablist" aria-label="Filter by status" style={{ display: 'flex', gap: 8 }}>
               {TABS.map((tab) => (
                 <BtChip
                   key={tab}

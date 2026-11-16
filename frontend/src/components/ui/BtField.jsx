@@ -137,6 +137,7 @@ export default function BtField({
         <input
           id={id}
           type={type}
+          inputMode={props.inputMode || (type === 'number' || isCurrency ? 'decimal' : undefined)}
           value={value}
           onChange={onChange}
           placeholder={placeholder}

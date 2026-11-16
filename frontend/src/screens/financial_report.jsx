@@ -441,7 +441,7 @@ export default function FinancialReportPage() {
   const [showImportModal, setShowImportModal] = useState(false);
   const [showFiltersDrawer, setShowFiltersDrawer] = useState(false);
   const [showChart, setShowChart] = useState(false);
-  const [viewMode, setViewMode] = useState("table"); // "table" | "cards"
+  const [viewMode, setViewMode] = useState(() => (typeof window !== "undefined" && window.innerWidth < 768 ? "cards" : "table"));
 
   const [selectedProjectId, setSelectedProjectId] = useState(
     () => location.state?.projectId || "all"

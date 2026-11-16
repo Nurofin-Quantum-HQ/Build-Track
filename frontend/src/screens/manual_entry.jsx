@@ -1117,8 +1117,8 @@ export default function ManualEntryPage() {
             </div>
           </BtCard>
 
-          {/* ── Submit ── */}
-          <div className="tour-save-btn" style={{ display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap', justifyContent: 'space-between' }}>
+          {/* ── Submit (Sticky on Mobile) ── */}
+          <div className="tour-save-btn mobile-sticky-submit-bar" style={{ display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap', justifyContent: 'space-between', padding: '14px 18px', borderRadius: 'var(--r-card)', background: 'var(--card)', border: '1px solid var(--line)', boxShadow: 'var(--shadow-raised)' }}>
             <div className="tnum" style={{ fontFamily: 'var(--font-ui)', fontSize: 14, color: 'var(--ink-2)' }}>
               Total <strong style={{ color: 'var(--ink)', fontFamily: 'var(--font-display)', fontSize: 18 }}>{money(totalAmount)}</strong>
               {paymentResult && <BtBadge tone={paymentResult.status === 'Paid' ? 'success' : paymentResult.status === 'Partial' ? 'warning' : 'neutral'} label={paymentResult.status} style={{ marginLeft: 10 }} />}

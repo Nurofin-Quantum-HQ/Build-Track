@@ -47,7 +47,40 @@ const AppTour = () => {
   }, [user, updateUser]);
 
   const buildSteps = (isReplay) => {
+    const isMobile = typeof window !== 'undefined' && window.innerWidth < 1024;
     const onboarding = user?.onboarding || {};
+
+    if (isMobile) {
+      const mobileSteps = [
+        {
+          target: 'body',
+          placement: 'center',
+          content: "Welcome to BuildTrack! Here's a quick tour of your mobile workspace.",
+        },
+        {
+          target: '.tour-bottom-home',
+          content: 'Home: Quick overview of your projects, expenses and recent activity.',
+        },
+        {
+          target: '.tour-bottom-projects',
+          content: 'Projects: View all your build sites, floor progress, and budgets.',
+        },
+        {
+          target: '.tour-bottom-add',
+          content: 'Quick Add: Tap the plus button to quickly log material, labour, or equipment on site.',
+        },
+        {
+          target: '.tour-bottom-ledger',
+          content: 'Ledger: Every transaction and payment entry in one scrollable feed.',
+        },
+        {
+          target: '.tour-bottom-menu',
+          content: 'Menu: Open the drawer for Reports, Inventory, Voice logging, APK download, and Settings.',
+        },
+      ];
+      return visibleSteps(mobileSteps);
+    }
+
     const all = [
       {
         target: 'body',
@@ -137,18 +170,20 @@ const AppTour = () => {
           onClick={endTour}
           style={{
             position: 'fixed',
-            right: 20,
-            bottom: 20,
+            right: 16,
+            bottom: typeof window !== 'undefined' && window.innerWidth < 1024
+              ? 'calc(74px + env(safe-area-inset-bottom, 0px))'
+              : 20,
             zIndex: 10050,
             display: 'flex',
             alignItems: 'center',
             gap: 8,
-            padding: '10px 16px',
+            padding: '9px 15px',
             borderRadius: 12,
             border: 'none',
             background: '#DC2626',
             color: '#fff',
-            fontSize: 14,
+            fontSize: 13,
             fontWeight: 600,
             fontFamily: "'Inter', 'Segoe UI', system-ui, sans-serif",
             cursor: 'pointer',

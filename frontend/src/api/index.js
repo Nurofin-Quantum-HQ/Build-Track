@@ -35,6 +35,11 @@ api.interceptors.response.use(
     if (status === 429) {
       err.friendlyMessage =
         "Too many requests to the server. Please wait a few seconds and try again.";
+    } else if (status >= 500) {
+      err.friendlyMessage =
+        typeof err.response?.data?.message === "string"
+          ? err.response.data.message
+          : "Server error or connection failed. Please ensure the backend server is reachable.";
     } else if (!err.response) {
       err.friendlyMessage =
         "Cannot reach the server. Check your internet connection or try again later.";

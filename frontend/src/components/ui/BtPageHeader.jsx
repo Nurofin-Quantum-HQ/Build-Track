@@ -29,16 +29,16 @@ export default function BtPageHeader({
   children,
   style = {},
 }) {
-  const titleSize = size === 'md' ? 'clamp(26px, 3vw, 32px)' : 'clamp(30px, 3.6vw, 40px)';
+  const titleSize = size === 'md' ? 'clamp(21px, 5vw, 32px)' : 'clamp(24px, 6vw, 40px)';
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 20, ...style }}>
+    <div className="bt-page-header" style={{ display: 'flex', flexDirection: 'column', gap: 18, ...style }}>
       <div
         style={{
           display: 'flex',
           alignItems: 'flex-start',
           justifyContent: 'space-between',
-          gap: 16,
+          gap: 12,
           flexWrap: 'wrap',
         }}
       >

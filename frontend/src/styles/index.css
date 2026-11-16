@@ -847,3 +847,109 @@ aside :focus-visible, header :focus-visible, .bt-hero-content :focus-visible { o
     padding-bottom: max(24px, env(safe-area-inset-bottom, 24px)) !important;
   }
 }
+
+/* ── Mobile Layout Utilities & Responsive Adaptations ── */
+.mobile-only {
+  display: none !important;
+}
+
+@media (max-width: 768px) {
+  .mobile-only {
+    display: block !important;
+  }
+  .mobile-only-flex {
+    display: flex !important;
+  }
+  .desktop-only {
+    display: none !important;
+  }
+  .mobile-sticky-submit-bar {
+    position: sticky !important;
+    bottom: calc(64px + env(safe-area-inset-bottom, 0px)) !important;
+    z-index: 30 !important;
+    border-radius: 16px !important;
+    backdrop-filter: blur(12px) !important;
+    background: rgba(255, 255, 255, 0.95) !important;
+  }
+}
+
+/* Horizontal scroll container for chips, tabs, and filters on mobile */
+.mobile-scroll-x {
+  display: flex;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  gap: 8px;
+  padding-bottom: 4px;
+}
+.mobile-scroll-x::-webkit-scrollbar {
+  display: none;
+}
+
+/* Responsive Table Wrapper */
+.bt-table-responsive {
+  width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  border-radius: var(--r-card);
+}
+
+/* KPI Tiles strip on mobile */
+@media (max-width: 480px) {
+  .tour-kpis {
+    display: flex !important;
+    overflow-x: auto !important;
+    -webkit-overflow-scrolling: touch !important;
+    scrollbar-width: none !important;
+    gap: 10px !important;
+    padding-bottom: 4px !important;
+  }
+  .tour-kpis::-webkit-scrollbar {
+    display: none;
+  }
+  .tour-kpis > * {
+    min-width: 135px !important;
+    flex: 0 0 auto !important;
+  }
+}
+
+/* Mobile adjustments for BtSheet and BtCard */
+@media (max-width: 640px) {
+  .bt-sheet {
+    padding-left: clamp(12px, 4vw, 18px) !important;
+    padding-right: clamp(12px, 4vw, 18px) !important;
+    border-top-left-radius: 20px !important;
+    border-top-right-radius: 20px !important;
+  }
+
+  .bt-card:not([style*="padding: 0"]):not([style*="padding:0"]) {
+    padding: clamp(14px, 3.5vw, 18px) !important;
+  }
+
+  /* Safe tap target defaults for mobile inputs */
+  input[type="text"],
+  input[type="number"],
+  input[type="date"],
+  select {
+    min-height: 42px;
+    font-size: 15px !important; /* Prevents auto-zoom on iOS */
+  }
+}
+
+/* ── Responsive Joyride Tour Tooltips ── */
+.__floater__body {
+  max-width: calc(100vw - 28px) !important;
+}
+.react-joyride__tooltip {
+  max-width: calc(100vw - 28px) !important;
+  box-sizing: border-box !important;
+  border-radius: 16px !important;
+  font-family: var(--font-ui) !important;
+}
+@media (max-width: 640px) {
+  .react-joyride__tooltip {
+    padding: 14px 16px !important;
+    font-size: 13.5px !important;
+  }
+}
