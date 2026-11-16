@@ -423,12 +423,8 @@ export default function AdminDashboard() {
         ? Number(selectedProject?.totalIncome || 0)
         : projects.reduce((sum, p) => sum + Number(p.totalIncome || 0), 0));
 
-  // Parity with Flutter homescreen.dart:
-  // Global view: revenue - spent
-  // Project view: revenue - moneyOut - spent
-  const netCashflow = isGlobalView
-    ? totalRevenue - totalCost
-    : totalRevenue - moneyOutSum - totalCost;
+  // Net cash flow: Revenue Inflow - Money Out - Site Cost Spent
+  const netCashflow = totalRevenue - moneyOutSum - totalCost;
   const isLoss = netCashflow < 0;
 
   const budget = selectedProject

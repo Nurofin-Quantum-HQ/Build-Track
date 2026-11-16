@@ -69,19 +69,18 @@ const normalizeProjectBudget = (project) => {
 const getProjectSpentAmount = async (projectId) => {
   try {
     const result = await Transaction.aggregate([
-      { $match: { project: new mongoose.Types.ObjectId(projectId) } },
+      {
+        $match: {
+          project: new mongoose.Types.ObjectId(projectId),
+          type: { $in: ["Expense", "Wages", "Materials", "Equipment"] },
+          category: { $ne: "Money Out" },
+          ledgerCategory: { $ne: "Money Out" },
+        },
+      },
       {
         $group: {
           _id: null,
-          totalSpent: {
-            $sum: {
-              $cond: [
-                { $in: ["$type", ["Expense", "Wages", "Materials", "Equipment"]] },
-                "$amount",
-                0,
-              ],
-            },
-          },
+          totalSpent: { $sum: "$amount" },
         },
       },
     ]);
@@ -249,23 +248,42 @@ router.get("/mine", requirePermission(VIEW_PROJECTS), async (req, res) => {
   try {
     const projects = await Project.find(ownedByCurrentUserFilter(req)).sort({ createdAt: -1 });
     const projectIds = projects.map(p => p._id);
-    const [spentList, incomeList] = await Promise.all([
+    const [spentList, incomeList, moneyOutList] = await Promise.all([
       Transaction.aggregate([
-        { $match: { project: { $in: projectIds }, type: { $in: ["Expense", "Wages", "Materials", "Equipment"] } } },
-        { $group: { _id: "$project", totalSpent: { $sum: "$amount" } } }
+        {
+          $match: {
+            project: { $in: projectIds },
+            type: { $in: ["Expense", "Wages", "Materials", "Equipment"] },
+            category: { $ne: "Money Out" },
+            ledgerCategory: { $ne: "Money Out" },
+          },
+        },
+        { $group: { _id: "$project", totalSpent: { $sum: "$amount" } } },
       ]),
       Transaction.aggregate([
         { $match: { project: { $in: projectIds }, type: "Income" } },
-        { $group: { _id: "$project", totalIncome: { $sum: "$amount" } } }
-      ])
+        { $group: { _id: "$project", totalIncome: { $sum: "$amount" } } },
+      ]),
+      Transaction.aggregate([
+        {
+          $match: {
+            project: { $in: projectIds },
+            type: "Expense",
+            $or: [{ category: "Money Out" }, { ledgerCategory: "Money Out" }],
+          },
+        },
+        { $group: { _id: "$project", totalMoneyOut: { $sum: "$amount" } } },
+      ]),
     ]);
-    const spentMap = new Map(spentList.map(s => [s._id.toString(), s.totalSpent]));
-    const incomeMap = new Map(incomeList.map(i => [i._id.toString(), i.totalIncome]));
-    const normalizedProjects = projects.map(p => {
+    const spentMap = new Map(spentList.map((s) => [s._id.toString(), s.totalSpent]));
+    const incomeMap = new Map(incomeList.map((i) => [i._id.toString(), i.totalIncome]));
+    const moneyOutMap = new Map(moneyOutList.map((m) => [m._id.toString(), m.totalMoneyOut]));
+    const normalizedProjects = projects.map((p) => {
       const normalized = normalizeProjectBudget(p);
       const idStr = p._id.toString();
       normalized.spentAmount = spentMap.get(idStr) || 0;
       normalized.totalIncome = incomeMap.get(idStr) || 0;
+      normalized.totalMoneyOut = moneyOutMap.get(idStr) || 0;
       return normalized;
     });
     return res.status(200).json({ projects: normalizedProjects });
@@ -304,23 +322,42 @@ router.get("/", protect, async (req, res) => {
     }
     const projects = await Project.find(query).sort({ createdAt: -1 });
     const projectIds = projects.map(p => p._id);
-    const [spentList, incomeList] = await Promise.all([
+    const [spentList, incomeList, moneyOutList] = await Promise.all([
       Transaction.aggregate([
-        { $match: { project: { $in: projectIds }, type: { $in: ["Expense", "Wages", "Materials", "Equipment"] } } },
-        { $group: { _id: "$project", totalSpent: { $sum: "$amount" } } }
+        {
+          $match: {
+            project: { $in: projectIds },
+            type: { $in: ["Expense", "Wages", "Materials", "Equipment"] },
+            category: { $ne: "Money Out" },
+            ledgerCategory: { $ne: "Money Out" },
+          },
+        },
+        { $group: { _id: "$project", totalSpent: { $sum: "$amount" } } },
       ]),
       Transaction.aggregate([
         { $match: { project: { $in: projectIds }, type: "Income" } },
-        { $group: { _id: "$project", totalIncome: { $sum: "$amount" } } }
-      ])
+        { $group: { _id: "$project", totalIncome: { $sum: "$amount" } } },
+      ]),
+      Transaction.aggregate([
+        {
+          $match: {
+            project: { $in: projectIds },
+            type: "Expense",
+            $or: [{ category: "Money Out" }, { ledgerCategory: "Money Out" }],
+          },
+        },
+        { $group: { _id: "$project", totalMoneyOut: { $sum: "$amount" } } },
+      ]),
     ]);
-    const spentMap = new Map(spentList.map(s => [s._id.toString(), s.totalSpent]));
-    const incomeMap = new Map(incomeList.map(i => [i._id.toString(), i.totalIncome]));
-    const normalizedProjects = projects.map(p => {
+    const spentMap = new Map(spentList.map((s) => [s._id.toString(), s.totalSpent]));
+    const incomeMap = new Map(incomeList.map((i) => [i._id.toString(), i.totalIncome]));
+    const moneyOutMap = new Map(moneyOutList.map((m) => [m._id.toString(), m.totalMoneyOut]));
+    const normalizedProjects = projects.map((p) => {
       const normalized = normalizeProjectBudget(p);
       const idStr = p._id.toString();
       normalized.spentAmount = spentMap.get(idStr) || 0;
       normalized.totalIncome = incomeMap.get(idStr) || 0;
+      normalized.totalMoneyOut = moneyOutMap.get(idStr) || 0;
       return normalized;
     });
     res.json({ projects: normalizedProjects });
@@ -403,7 +440,13 @@ router.get("/:id/stats", requirePermission(VIEW_PROJECTS), async (req, res) => {
           totalSpent: {
             $sum: {
               $cond: [
-                { $in: ["$type", ["Expense", "Wages", "Materials", "Equipment"]] },
+                {
+                  $and: [
+                    { $in: ["$type", ["Expense", "Wages", "Materials", "Equipment"]] },
+                    { $ne: ["$category", "Money Out"] },
+                    { $ne: ["$ledgerCategory", "Money Out"] },
+                  ],
+                },
                 "$amount",
                 0,
               ],
@@ -414,10 +457,29 @@ router.get("/:id/stats", requirePermission(VIEW_PROJECTS), async (req, res) => {
               $cond: [{ $eq: ["$type", "Income"] }, "$amount", 0],
             },
           },
+          totalMoneyOut: {
+            $sum: {
+              $cond: [
+                {
+                  $and: [
+                    { $eq: ["$type", "Expense"] },
+                    {
+                      $or: [
+                        { $eq: ["$category", "Money Out"] },
+                        { $eq: ["$ledgerCategory", "Money Out"] },
+                      ],
+                    },
+                  ],
+                },
+                "$amount",
+                0,
+              ],
+            },
+          },
         },
       },
     ]);
-    const { totalSpent = 0, totalIncome = 0 } = result[0] || {};
+    const { totalSpent = 0, totalIncome = 0, totalMoneyOut = 0 } = result[0] || {};
     const normalized = normalizeProjectBudget(project);
     const totalBudget = normalized.budget.total;
     const remainingBudget = totalBudget - totalSpent;
@@ -425,6 +487,7 @@ router.get("/:id/stats", requirePermission(VIEW_PROJECTS), async (req, res) => {
       totalBudget,
       totalSpent,
       totalIncome,
+      totalMoneyOut,
       remainingBudget,
       projectName: project.projectName,
     });

@@ -102,7 +102,14 @@ router.get("/financial", async (req, res) => {
       const pTransactions = transactions.filter(
         (t) => t.project?._id?.toString() === p._id.toString()
       );
-      const spent = pTransactions.reduce((sum, t) => sum + Number(t.amount || 0), 0);
+      const spent = pTransactions
+        .filter(
+          (t) =>
+            t.type !== "Income" &&
+            t.category !== "Money Out" &&
+            t.ledgerCategory !== "Money Out"
+        )
+        .reduce((sum, t) => sum + Number(t.amount || 0), 0);
       const totalBudget = Number(p.budget?.total || 0);
       const remaining = totalBudget - spent;
       const utilization =
