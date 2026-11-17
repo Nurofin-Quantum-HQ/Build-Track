@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
-import useHelpStore from "./helpStore";
 import { HELP_CATEGORIES, HELP_TOPICS, searchHelpTopics } from "./helpKnowledgeBase";
 import {
   X,
@@ -11,7 +10,11 @@ import {
   Sparkles,
   Compass,
   Lightbulb,
+  Globe,
 } from "lucide-react";
+import useHelpStore, { SUPPORTED_LANGUAGES, LANGUAGE_LOCALES } from "./helpStore";
+import { getLocalizedTopic } from "./helpTranslations";
+import { openReportProblem } from "../ReportProblem/openReportProblem";
 import BtIconButton from "../ui/BtIconButton";
 import SupportAgentIcon from "../ui/SupportAgentIcon";
 
@@ -23,13 +26,16 @@ export default function HelpAssistantModal() {
     messages,
     selectedCategory,
     setSelectedCategory,
+    selectedLanguage,
+    setSelectedLanguage,
     searchQuery,
     setSearchQuery,
     selectTopicById,
     askQuestion,
     resetChat,
-    replayVisualTour,
   } = useHelpStore();
+
+  const currentLocale = LANGUAGE_LOCALES[selectedLanguage] || LANGUAGE_LOCALES.en;
 
   const [inputVal, setInputVal] = useState("");
   const messagesEndRef = useRef(null);
@@ -121,7 +127,7 @@ export default function HelpAssistantModal() {
             flexShrink: 0,
           }}
         >
-          <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: "12px", minWidth: 0, flex: 1, overflow: "hidden" }}>
             <div
               style={{
                 width: "38px",
@@ -133,13 +139,14 @@ export default function HelpAssistantModal() {
                 justifyContent: "center",
                 boxShadow: "0 2px 8px color-mix(in srgb, var(--accent, #e0a93b) 35%, transparent)",
                 color: "var(--on-accent, #0c0e12)",
+                flexShrink: 0,
               }}
             >
               <SupportAgentIcon size={22} color="currentColor" />
             </div>
-            <div>
-              <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                <span style={{ fontSize: "15px", fontWeight: 700, letterSpacing: "-0.2px" }}>
+            <div style={{ minWidth: 0, flex: 1, overflow: "hidden" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "nowrap" }}>
+                <span style={{ fontSize: "15px", fontWeight: 700, letterSpacing: "-0.2px", whiteSpace: "nowrap" }}>
                   BuildTrack Assistant
                 </span>
                 <span
@@ -152,42 +159,29 @@ export default function HelpAssistantModal() {
                     background: "color-mix(in srgb, var(--accent, #e0a93b) 18%, transparent)",
                     color: "var(--accent, #e0a93b)",
                     border: "1px solid color-mix(in srgb, var(--accent, #e0a93b) 30%, transparent)",
+                    whiteSpace: "nowrap",
+                    flexShrink: 0,
                   }}
                 >
                   Interactive Help
                 </span>
               </div>
-              <span style={{ fontSize: "12px", color: "rgba(246, 244, 239, 0.55)" }}>
-                Step-by-step guides for all features
+              <span
+                style={{
+                  fontSize: "12px",
+                  color: "rgba(246, 244, 239, 0.55)",
+                  whiteSpace: "nowrap",
+                  overflow: "hidden",
+                  textOverflow: "ellipsis",
+                  display: "block",
+                }}
+              >
+                {currentLocale.subtitle}
               </span>
             </div>
           </div>
 
-          <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-            <button
-              type="button"
-              onClick={replayVisualTour}
-              title="Replay Visual Spotlight Tour"
-              style={{
-                background: "rgba(255, 255, 255, 0.06)",
-                border: "1px solid rgba(255, 255, 255, 0.12)",
-                borderRadius: "8px",
-                padding: "6px 10px",
-                display: "flex",
-                alignItems: "center",
-                gap: "5px",
-                fontSize: "12px",
-                color: "var(--accent, #e0a93b)",
-                cursor: "pointer",
-                transition: "all 140ms ease",
-              }}
-              onMouseEnter={(e) => (e.currentTarget.style.background = "rgba(255, 255, 255, 0.12)")}
-              onMouseLeave={(e) => (e.currentTarget.style.background = "rgba(255, 255, 255, 0.06)")}
-            >
-              <Compass size={14} />
-              <span className="hidden sm:inline">Visual Tour</span>
-            </button>
-
+          <div style={{ display: "flex", alignItems: "center", gap: "8px", flexShrink: 0 }}>
             <button
               type="button"
               onClick={resetChat}
@@ -196,20 +190,23 @@ export default function HelpAssistantModal() {
                 background: "rgba(255, 255, 255, 0.06)",
                 border: "1px solid rgba(255, 255, 255, 0.12)",
                 borderRadius: "8px",
-                padding: "6px 10px",
-                display: "flex",
+                padding: "6px 12px",
+                display: "inline-flex",
                 alignItems: "center",
-                gap: "5px",
+                gap: "6px",
                 fontSize: "12px",
-                color: "rgba(246, 244, 239, 0.7)",
+                fontWeight: 600,
+                color: "rgba(246, 244, 239, 0.8)",
                 cursor: "pointer",
+                whiteSpace: "nowrap",
+                flexShrink: 0,
                 transition: "all 140ms ease",
               }}
               onMouseEnter={(e) => (e.currentTarget.style.background = "rgba(255, 255, 255, 0.12)")}
               onMouseLeave={(e) => (e.currentTarget.style.background = "rgba(255, 255, 255, 0.06)")}
             >
-              <RotateCcw size={13} />
-              <span className="hidden sm:inline">Reset</span>
+              <RotateCcw size={13} style={{ flexShrink: 0 }} />
+              <span style={{ whiteSpace: "nowrap", display: "inline-block" }}>Reset</span>
             </button>
 
             <BtIconButton
@@ -221,6 +218,81 @@ export default function HelpAssistantModal() {
             />
           </div>
         </header>
+
+        {/* ── Small Language Switcher Option at Top ── */}
+        <div
+          style={{
+            padding: "8px 16px",
+            background: "#0c0e12",
+            borderBottom: "1px solid rgba(255, 255, 255, 0.08)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            gap: "10px",
+            flexShrink: 0,
+          }}
+        >
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: "6px",
+              fontSize: "12px",
+              color: "rgba(246, 244, 239, 0.65)",
+              fontWeight: 600,
+              flexShrink: 0,
+            }}
+          >
+            <Globe size={14} style={{ color: "var(--accent, #e0a93b)" }} />
+            <span>Language:</span>
+          </div>
+
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: "5px",
+              overflowX: "auto",
+              scrollbarWidth: "none",
+            }}
+          >
+            {SUPPORTED_LANGUAGES.map((lang) => {
+              const active = selectedLanguage === lang.code;
+              return (
+                <button
+                  key={lang.code}
+                  type="button"
+                  onClick={() => setSelectedLanguage(lang.code)}
+                  title={`${lang.name} (${lang.nativeName})`}
+                  style={{
+                    padding: "3px 9px",
+                    borderRadius: "14px",
+                    fontSize: "11.5px",
+                    fontWeight: active ? 700 : 500,
+                    whiteSpace: "nowrap",
+                    background: active
+                      ? "color-mix(in srgb, var(--accent, #e0a93b) 22%, transparent)"
+                      : "rgba(255, 255, 255, 0.05)",
+                    color: active ? "var(--accent, #e0a93b)" : "rgba(246, 244, 239, 0.75)",
+                    border: active
+                      ? "1px solid var(--accent, #e0a93b)"
+                      : "1px solid rgba(255, 255, 255, 0.1)",
+                    cursor: "pointer",
+                    transition: "all 140ms ease",
+                  }}
+                  onMouseEnter={(e) => {
+                    if (!active) e.currentTarget.style.background = "rgba(255, 255, 255, 0.10)";
+                  }}
+                  onMouseLeave={(e) => {
+                    if (!active) e.currentTarget.style.background = "rgba(255, 255, 255, 0.05)";
+                  }}
+                >
+                  {lang.nativeName}
+                </button>
+              );
+            })}
+          </div>
+        </div>
 
         {/* ── Category Filters Carousel ── */}
         <div
@@ -445,7 +517,11 @@ export default function HelpAssistantModal() {
                           type="button"
                           onClick={() => {
                             closeHelp();
-                            navigate(msg.topic.route);
+                            if (msg.topic.id === "report_problem") {
+                              openReportProblem({ settleMs: 150 });
+                            } else {
+                              navigate(msg.topic.route);
+                            }
                           }}
                           style={{
                             marginTop: "4px",
@@ -552,38 +628,41 @@ export default function HelpAssistantModal() {
               scrollbarWidth: "none",
             }}
           >
-            {filteredTopics.slice(0, 8).map((topic) => (
-              <button
-                key={topic.id}
-                type="button"
-                onClick={() => selectTopicById(topic.id)}
-                style={{
-                  fontSize: "12px",
-                  padding: "6px 12px",
-                  borderRadius: "16px",
-                  background: "rgba(255, 255, 255, 0.06)",
-                  border: "1px solid rgba(255, 255, 255, 0.1)",
-                  color: "rgba(246, 244, 239, 0.85)",
-                  cursor: "pointer",
-                  whiteSpace: "nowrap",
-                  display: "flex",
-                  alignItems: "center",
-                  gap: "6px",
-                  transition: "all 140ms ease",
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.background = "color-mix(in srgb, var(--accent, #e0a93b) 18%, transparent)";
-                  e.currentTarget.style.borderColor = "color-mix(in srgb, var(--accent, #e0a93b) 35%, transparent)";
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.background = "rgba(255, 255, 255, 0.06)";
-                  e.currentTarget.style.borderColor = "rgba(255, 255, 255, 0.1)";
-                }}
-              >
-                <Sparkles size={12} color="var(--accent, #e0a93b)" />
-                <span>{topic.title}</span>
-              </button>
-            ))}
+            {filteredTopics.slice(0, 8).map((topic) => {
+              const loc = getLocalizedTopic(topic, selectedLanguage) || topic;
+              return (
+                <button
+                  key={topic.id}
+                  type="button"
+                  onClick={() => selectTopicById(topic.id)}
+                  style={{
+                    fontSize: "12px",
+                    padding: "6px 12px",
+                    borderRadius: "16px",
+                    background: "rgba(255, 255, 255, 0.06)",
+                    border: "1px solid rgba(255, 255, 255, 0.1)",
+                    color: "rgba(246, 244, 239, 0.85)",
+                    cursor: "pointer",
+                    whiteSpace: "nowrap",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "6px",
+                    transition: "all 140ms ease",
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.background = "color-mix(in srgb, var(--accent, #e0a93b) 18%, transparent)";
+                    e.currentTarget.style.borderColor = "color-mix(in srgb, var(--accent, #e0a93b) 35%, transparent)";
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.background = "rgba(255, 255, 255, 0.06)";
+                    e.currentTarget.style.borderColor = "rgba(255, 255, 255, 0.1)";
+                  }}
+                >
+                  <Sparkles size={12} color="var(--accent, #e0a93b)" />
+                  <span>{loc.title}</span>
+                </button>
+              );
+            })}
           </div>
 
           {/* ── Input Box & Send ── */}
@@ -616,7 +695,7 @@ export default function HelpAssistantModal() {
                 type="text"
                 value={inputVal}
                 onChange={(e) => setInputVal(e.target.value)}
-                placeholder="Ask anything (e.g. 'how to upload csv', 'where are my charts')..."
+                placeholder={currentLocale.placeholder}
                 className="bt-help-chat-input"
                 style={{
                   flex: 1,

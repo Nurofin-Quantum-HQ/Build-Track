@@ -3,6 +3,7 @@
  * Contains step-by-step instructions, navigation paths, and direct action routes
  * for every feature across the entire platform.
  */
+import { TOPIC_TRANSLATIONS } from "./helpTranslations.js";
 
 export const HELP_CATEGORIES = [
   { id: "all", label: "All Topics" },
@@ -645,6 +646,40 @@ export const HELP_TOPICS = [
       "Click 'Next' to walk through each screen element at your own pace."
     ],
     tips: "You can dismiss the tour at any time by pressing 'Skip' or hitting Escape."
+  },
+  {
+    id: "report_problem",
+    category: "account",
+    title: "How to report a problem, bug, or glitch",
+    keywords: [
+      "report problem",
+      "report a problem",
+      "report issue",
+      "report bug",
+      "problem",
+      "bug",
+      "glitch",
+      "error",
+      "feedback",
+      "support",
+      "app not working",
+      "something not working",
+      "contact support",
+      "shake to report",
+      "crash"
+    ],
+    summary: "Encountered a bug, calculation error, or visual glitch? Submit a report with instant automatic screenshots.",
+    route: "/settings",
+    actionLabel: "Report a Problem Now",
+    breadcrumbs: "Sidebar / Profile > Report a Problem",
+    steps: [
+      "On Web Portal: Click the 'Report a problem' link located at the bottom of the left sidebar navigation.",
+      "On Mobile App: Tap your 'Profile' avatar at top right, then tap 'Report a problem' (or simply shake your phone if Shake to Report is enabled).",
+      "Select the issue category (e.g. Calculation error, Visual glitch, Crashing, Sync failure).",
+      "Describe what happened, what you expected, and optionally attach photos or receipt screenshots.",
+      "Click 'Send Report'. You can track status and developer replies anytime in 'Your Reports'."
+    ],
+    tips: "On mobile devices, shaking your phone on any screen will automatically capture what went wrong without losing your work."
   }
 ];
 
@@ -694,6 +729,33 @@ export function searchHelpTopics(query, category = "all") {
     topic.steps.forEach((step) => {
       if (step.toLowerCase().includes(normalized)) score += 5;
     });
+
+    // Regional language translations match (Kannada, Hindi, Telugu, Tamil, Malayalam)
+    if (typeof TOPIC_TRANSLATIONS === "object" && TOPIC_TRANSLATIONS) {
+      for (const lang of Object.keys(TOPIC_TRANSLATIONS)) {
+        const loc = TOPIC_TRANSLATIONS[lang]?.[topic.id];
+        if (!loc) continue;
+
+        const locTitle = (loc.title || "").toLowerCase();
+        const locSummary = (loc.summary || "").toLowerCase();
+
+        if (locTitle.includes(normalized)) score += 50;
+        if (locSummary.includes(normalized)) score += 20;
+
+        tokens.forEach((tok) => {
+          if (locTitle.includes(tok)) score += 15;
+          if (locSummary.includes(tok)) score += 8;
+          if (Array.isArray(loc.steps)) {
+            for (const step of loc.steps) {
+              if (step.toLowerCase().includes(tok)) {
+                score += 5;
+                break;
+              }
+            }
+          }
+        });
+      }
+    }
 
     return { topic, score };
   });
