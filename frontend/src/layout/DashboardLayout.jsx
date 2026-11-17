@@ -2,9 +2,13 @@ import React, { useState, useEffect } from "react";
 import { Outlet, useNavigate, useLocation } from "react-router-dom";
 import Sidebar from "../components/Sidebar";
 import AppTour from "../components/AppTour";
+import HelpAssistantModal from "../components/help/HelpAssistantModal";
+import useHelpStore from "../components/help/helpStore";
 import {
   Bell,
   Settings,
+  HelpCircle,
+  Bot,
   Menu,
   LayoutDashboard,
   Building2,
@@ -24,6 +28,7 @@ export default function DashboardLayout() {
 
   const navigate = useNavigate();
   const location = useLocation();
+  const openHelp = useHelpStore((s) => s.openHelp);
   const fetchAll = useNotificationStore((s) => s.fetchAll);
   const totalAlertCount = useNotificationStore((s) =>
     s.systemNotifications ? s.systemNotifications.filter((n) => !n.read).length : 0
@@ -92,6 +97,7 @@ export default function DashboardLayout() {
       }}
     >
       <AppTour />
+      <HelpAssistantModal />
 
       {/* ── Mobile Sidebar Backdrop ── */}
       {isMobile && sidebarOpen && (
@@ -283,6 +289,19 @@ export default function DashboardLayout() {
                 </span>
               )}
             </div>
+
+            <BtIconButton
+              icon={Bot}
+              label="Help Assistant"
+              onDark
+              size={38}
+              style={{
+                color: "var(--accent, #e0a93b)",
+                background: "color-mix(in srgb, var(--accent, #e0a93b) 12%, transparent)",
+                border: "1px solid color-mix(in srgb, var(--accent, #e0a93b) 25%, transparent)",
+              }}
+              onClick={() => openHelp()}
+            />
 
             <BtIconButton
               icon={Settings}

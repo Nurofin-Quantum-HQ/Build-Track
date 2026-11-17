@@ -4,13 +4,14 @@ import { navItems, adminNavItems } from "../navItems";
 import BtIconButton from "./ui/BtIconButton";
 import { canAccessRoute, canAddEntries, canApprove } from "../utils/access";
 import { resolveImageUrl } from "../utils/imageUrl";
-import { LogOut, HelpCircle, Plus, Download, LifeBuoy, X } from "lucide-react";
+import { LogOut, HelpCircle, Bot, Plus, Download, LifeBuoy, X } from "lucide-react";
 import { useAuth } from "../contexts/AuthContext";
 import { preloadRoute } from "../App";
 import perfLogger from "../utils/performanceLogger";
 import useNotificationStore from "../stores/notificationStore";
 import { approvalAPI } from "../api";
 import { openReportProblem } from "./ReportProblem/openReportProblem";
+import useHelpStore from "./help/helpStore";
 
 const FONT_FAMILY_MAP = {
   "Inter": "'Inter', sans-serif",
@@ -538,6 +539,20 @@ export default function Sidebar({ isMobileDrawer = false, onClose }) {
                 }}
               />
               <BtIconButton
+                icon={Bot}
+                label="Help Assistant"
+                size={34}
+                onDark
+                style={{
+                  color: "var(--accent, #e0a93b)",
+                  background: "color-mix(in srgb, var(--accent, #e0a93b) 12%, transparent)",
+                }}
+                onClick={() => {
+                  window.dispatchEvent(new Event("bt-close-drawer"));
+                  useHelpStore.getState().openHelp();
+                }}
+              />
+              <BtIconButton
                 icon={LogOut}
                 label="Sign out"
                 size={34}
@@ -689,6 +704,17 @@ export default function Sidebar({ isMobileDrawer = false, onClose }) {
                   onClick={() => window.dispatchEvent(new Event("replay-app-tour"))}
                 />
               </span>
+              <BtIconButton
+                icon={Bot}
+                label="Help Assistant"
+                size={30}
+                onDark
+                style={{
+                  color: "var(--accent, #e0a93b)",
+                  background: "color-mix(in srgb, var(--accent, #e0a93b) 12%, transparent)",
+                }}
+                onClick={() => useHelpStore.getState().openHelp()}
+              />
               <BtIconButton
                 icon={Download}
                 label="Get the mobile app"
