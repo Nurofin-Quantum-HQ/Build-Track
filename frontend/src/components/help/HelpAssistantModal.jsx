@@ -3,7 +3,6 @@ import { useNavigate } from "react-router-dom";
 import useHelpStore from "./helpStore";
 import { HELP_CATEGORIES, HELP_TOPICS, searchHelpTopics } from "./helpKnowledgeBase";
 import {
-  Bot,
   X,
   RotateCcw,
   Send,
@@ -14,6 +13,7 @@ import {
   Lightbulb,
 } from "lucide-react";
 import BtIconButton from "../ui/BtIconButton";
+import SupportAgentIcon from "../ui/SupportAgentIcon";
 
 export default function HelpAssistantModal() {
   const navigate = useNavigate();
@@ -135,7 +135,7 @@ export default function HelpAssistantModal() {
                 color: "var(--on-accent, #0c0e12)",
               }}
             >
-              <Bot size={20} color="currentColor" />
+              <SupportAgentIcon size={22} color="currentColor" />
             </div>
             <div>
               <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
@@ -301,7 +301,7 @@ export default function HelpAssistantModal() {
                       marginTop: "2px",
                     }}
                   >
-                    <Bot size={16} color="var(--accent, #e0a93b)" />
+                    <SupportAgentIcon size={18} color="var(--accent, #e0a93b)" />
                   </div>
                 )}
 

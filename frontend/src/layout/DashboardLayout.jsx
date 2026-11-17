@@ -8,7 +8,6 @@ import {
   Bell,
   Settings,
   HelpCircle,
-  Bot,
   Menu,
   LayoutDashboard,
   Building2,
@@ -19,6 +18,7 @@ import nurofinLogo from "../assets/nurofin-black.svg";
 import useNotificationStore from "../stores/notificationStore";
 import ErrorBoundary from "../components/ErrorBoundary";
 import BtIconButton from "../components/ui/BtIconButton";
+import SupportAgentIcon from "../components/ui/SupportAgentIcon";
 import { navItems, adminNavItems } from "../navItems";
 import { preloadRoute } from "../App";
 
@@ -291,14 +291,16 @@ export default function DashboardLayout() {
             </div>
 
             <BtIconButton
-              icon={Bot}
-              label="Help Assistant"
+              icon={SupportAgentIcon}
+              label="Help Assistant Chatbot"
               onDark
               size={38}
               style={{
+                borderRadius: "50%",
                 color: "var(--accent, #e0a93b)",
-                background: "color-mix(in srgb, var(--accent, #e0a93b) 12%, transparent)",
-                border: "1px solid color-mix(in srgb, var(--accent, #e0a93b) 25%, transparent)",
+                background: "color-mix(in srgb, var(--accent, #e0a93b) 16%, transparent)",
+                border: "1px solid color-mix(in srgb, var(--accent, #e0a93b) 32%, transparent)",
+                transition: "all 140ms ease",
               }}
               onClick={() => openHelp()}
             />

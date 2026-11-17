@@ -2,9 +2,10 @@ import React, { useState, useEffect } from "react";
 import { NavLink, useLocation, useNavigate } from "react-router-dom";
 import { navItems, adminNavItems } from "../navItems";
 import BtIconButton from "./ui/BtIconButton";
+import SupportAgentIcon from "./ui/SupportAgentIcon";
 import { canAccessRoute, canAddEntries, canApprove } from "../utils/access";
 import { resolveImageUrl } from "../utils/imageUrl";
-import { LogOut, HelpCircle, Bot, Plus, Download, LifeBuoy, X } from "lucide-react";
+import { LogOut, HelpCircle, Plus, Download, LifeBuoy, X } from "lucide-react";
 import { useAuth } from "../contexts/AuthContext";
 import { preloadRoute } from "../App";
 import perfLogger from "../utils/performanceLogger";
@@ -539,13 +540,15 @@ export default function Sidebar({ isMobileDrawer = false, onClose }) {
                 }}
               />
               <BtIconButton
-                icon={Bot}
-                label="Help Assistant"
+                icon={SupportAgentIcon}
+                label="Help Assistant Chatbot"
                 size={34}
                 onDark
                 style={{
+                  borderRadius: "50%",
                   color: "var(--accent, #e0a93b)",
-                  background: "color-mix(in srgb, var(--accent, #e0a93b) 12%, transparent)",
+                  background: "color-mix(in srgb, var(--accent, #e0a93b) 16%, transparent)",
+                  border: "1px solid color-mix(in srgb, var(--accent, #e0a93b) 32%, transparent)",
                 }}
                 onClick={() => {
                   window.dispatchEvent(new Event("bt-close-drawer"));
@@ -705,13 +708,15 @@ export default function Sidebar({ isMobileDrawer = false, onClose }) {
                 />
               </span>
               <BtIconButton
-                icon={Bot}
-                label="Help Assistant"
+                icon={SupportAgentIcon}
+                label="Help Assistant Chatbot"
                 size={30}
                 onDark
                 style={{
+                  borderRadius: "50%",
                   color: "var(--accent, #e0a93b)",
-                  background: "color-mix(in srgb, var(--accent, #e0a93b) 12%, transparent)",
+                  background: "color-mix(in srgb, var(--accent, #e0a93b) 16%, transparent)",
+                  border: "1px solid color-mix(in srgb, var(--accent, #e0a93b) 32%, transparent)",
                 }}
                 onClick={() => useHelpStore.getState().openHelp()}
               />

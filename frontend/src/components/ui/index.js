@@ -37,3 +37,4 @@ export { default as BtSkeleton } from './BtSkeleton';
 export { default as btToast, BtToastComponent } from './BtToast';
 export { default as BtTile, BtTypeTile } from './BtTile';
 export { default as BtSectionHeader } from './BtSectionHeader';
+export { default as SupportAgentIcon } from './SupportAgentIcon';
