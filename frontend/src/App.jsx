@@ -13,6 +13,8 @@ import LoginPage       from "./pages/login_page";
 import SignUpPage      from "./pages/signup_page";
 import OAuthCallback   from "./pages/oauth_callback";
 
+const PrivacyPolicyPage = lazy(() => import("./pages/PrivacyPolicyPage"));
+
 const Dashboard        = lazy(() => import("./screens/dashboard_page"));
 const VoiceAssistant   = lazy(() => import("./screens/voice_assistant"));
 const TransactionLog   = lazy(() => import("./screens/transaction_log"));
@@ -62,6 +64,8 @@ export const routePreloaders = {
   "/project-report": () => import("./screens/project_report_page"),
   "/project-insights": () => import("./screens/insights/ProjectInsightsPage"),
   "/insights": () => import("./screens/insights/ProjectInsightsPage"),
+  "/privacy": () => import("./pages/PrivacyPolicyPage"),
+  "/privacy-policy": () => import("./pages/PrivacyPolicyPage"),
 };
 
 export function preloadRoute(path) {
@@ -82,6 +86,21 @@ function RequireAuth({ children }) {
   return isAuthenticated ? children : <Navigate to="/login" replace />;
 }
 
+function PrivacyRoute() {
+  const { isAuthenticated, loading } = useAuth();
+  if (loading) {
+    return <BtPageLoader />;
+  }
+  if (isAuthenticated) {
+    return (
+      <DashboardLayout>
+        <PrivacyPolicyPage isEmbedded={true} />
+      </DashboardLayout>
+    );
+  }
+  return <PrivacyPolicyPage isEmbedded={false} />;
+}
+
 function AppRoutes() {
   return (
     <Suspense fallback={<PageLoader />}>
@@ -89,6 +108,8 @@ function AppRoutes() {
         <Route path="/login"          element={<LoginPage />} />
         <Route path="/signup"         element={<SignUpPage />} />
         <Route path="/oauth/callback" element={<OAuthCallback />} />
+        <Route path="/privacy"        element={<PrivacyRoute />} />
+        <Route path="/privacy-policy" element={<PrivacyRoute />} />
 
         <Route element={<RequireAuth><DashboardLayout /></RequireAuth>}>
           <Route path="/"            element={<Dashboard />} />

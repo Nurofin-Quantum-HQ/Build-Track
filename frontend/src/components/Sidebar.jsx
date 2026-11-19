@@ -5,7 +5,7 @@ import BtIconButton from "./ui/BtIconButton";
 import SupportAgentIcon from "./ui/SupportAgentIcon";
 import { canAccessRoute, canAddEntries, canApprove } from "../utils/access";
 import { resolveImageUrl } from "../utils/imageUrl";
-import { LogOut, HelpCircle, Plus, Download, LifeBuoy, X } from "lucide-react";
+import { LogOut, HelpCircle, Plus, Download, LifeBuoy, X, Shield } from "lucide-react";
 import { useAuth } from "../contexts/AuthContext";
 import { preloadRoute } from "../App";
 import perfLogger from "../utils/performanceLogger";
@@ -616,32 +616,59 @@ export default function Sidebar({ isMobileDrawer = false, onClose }) {
               </span>
             </button>
 
-            {/* Mobile Report a Problem button */}
-            <button
-              type="button"
-              className="bt-report-link"
-              onClick={() => {
-                window.dispatchEvent(new Event("bt-close-drawer"));
-                openReportProblem({ settleMs: 300 });
-              }}
-              style={{
-                display: "inline-flex",
-                alignItems: "center",
-                gap: 8,
-                height: 34,
-                padding: "0 4px",
-                background: "none",
-                border: "none",
-                cursor: "pointer",
-                fontFamily: "var(--font-ui)",
-                fontSize: "13px",
-                color: "var(--on-noir-3)",
-                transition: "color 150ms ease",
-              }}
-            >
-              <LifeBuoy size={16} strokeWidth={1.8} />
-              <span>Report a problem</span>
-            </button>
+            {/* Mobile Report a Problem & Privacy buttons */}
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
+              <button
+                type="button"
+                className="bt-report-link"
+                onClick={() => {
+                  window.dispatchEvent(new Event("bt-close-drawer"));
+                  openReportProblem({ settleMs: 300 });
+                }}
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: 8,
+                  height: 34,
+                  padding: "0 4px",
+                  background: "none",
+                  border: "none",
+                  cursor: "pointer",
+                  fontFamily: "var(--font-ui)",
+                  fontSize: "13px",
+                  color: "var(--on-noir-3)",
+                  transition: "color 150ms ease",
+                }}
+              >
+                <LifeBuoy size={16} strokeWidth={1.8} />
+                <span>Report a problem</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  window.dispatchEvent(new Event("bt-close-drawer"));
+                  navigate("/privacy");
+                }}
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: 6,
+                  height: 34,
+                  padding: "0 6px",
+                  background: "none",
+                  border: "none",
+                  cursor: "pointer",
+                  fontFamily: "var(--font-ui)",
+                  fontSize: "13px",
+                  color: location.pathname === "/privacy" ? "var(--accent)" : "var(--on-noir-3)",
+                  transition: "color 150ms ease",
+                }}
+              >
+                <Shield size={15} strokeWidth={1.8} />
+                <span>Privacy</span>
+              </button>
+            </div>
           </>
         ) : (
           <>
@@ -743,17 +770,42 @@ export default function Sidebar({ isMobileDrawer = false, onClose }) {
               />
             </div>
 
-            {/* Quiet help link: not a call to go looking for faults */}
-            <button
-              type="button"
-              className="bt-report-link"
-              onClick={() => {
-                openReportProblem({ settleMs: 0 });
-              }}
-            >
-              <LifeBuoy size={14} strokeWidth={1.8} />
-              <span>Report a problem</span>
-            </button>
+            {/* Quiet help & privacy links */}
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", paddingTop: 2 }}>
+              <button
+                type="button"
+                className="bt-report-link"
+                onClick={() => {
+                  openReportProblem({ settleMs: 0 });
+                }}
+              >
+                <LifeBuoy size={14} strokeWidth={1.8} />
+                <span>Report a problem</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => navigate("/privacy")}
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: 5,
+                  background: "none",
+                  border: "none",
+                  cursor: "pointer",
+                  fontFamily: "var(--font-ui)",
+                  fontSize: "12px",
+                  color: location.pathname === "/privacy" ? "var(--accent)" : "var(--on-noir-3)",
+                  padding: "2px 4px",
+                  transition: "color 150ms ease",
+                }}
+                onMouseEnter={(e) => (e.currentTarget.style.color = "var(--on-noir)")}
+                onMouseLeave={(e) => (e.currentTarget.style.color = location.pathname === "/privacy" ? "var(--accent)" : "var(--on-noir-3)")}
+              >
+                <Shield size={13} strokeWidth={1.8} />
+                <span>Privacy</span>
+              </button>
+            </div>
           </>
         )}
       </div>

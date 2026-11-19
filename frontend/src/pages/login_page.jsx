@@ -233,7 +233,7 @@ export default function LoginPage() {
               <img
                 src="/buildtrack-logo.png"
                 alt="BuildTrack"
-                style={{ width: 52, height: 52, borderRadius: "var(--r-tile)", objectFit: "contain" }}
+                style={{ width: 48, height: 48, borderRadius: "10px", objectFit: "contain" }}
               />
               <span
                 style={{
@@ -341,7 +341,7 @@ export default function LoginPage() {
               <img
                 src="/buildtrack-logo.png"
                 alt="BuildTrack"
-                style={{ width: 40, height: 40, borderRadius: "var(--r-chip)", objectFit: "contain" }}
+                style={{ width: 40, height: 40, borderRadius: "8px", objectFit: "contain" }}
               />
               <span style={{ fontFamily: "var(--font-display)", fontSize: 24, fontWeight: 700, letterSpacing: "-0.02em" }}>
                 BuildTrack
@@ -582,6 +582,17 @@ export default function LoginPage() {
             >
               Create an account
             </button>
+          </div>
+
+          <div style={{ textAlign: "center", marginTop: 16, fontSize: 12.5, color: "var(--ink-3)" }}>
+            <a
+              href="/privacy"
+              target="_blank"
+              rel="noreferrer"
+              style={{ color: "var(--ink-3)", textDecoration: "underline" }}
+            >
+              Privacy Policy
+            </a>
           </div>
         </div>
       </main>

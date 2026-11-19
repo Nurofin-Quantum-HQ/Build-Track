@@ -1103,6 +1103,12 @@ export default function SettingsPage() {
               Sign out all
             </BtButton>
           </SettingRow>
+
+          <SettingRow title="Privacy Policy & Data Rights" description="BuildTrack operates in full compliance with India's DPDPA 2023. Review data collection, retention, and Grievance Officer details.">
+            <BtButton variant="secondary" size="small" icon={Shield} onClick={() => navigate('/privacy')}>
+              View privacy policy
+            </BtButton>
+          </SettingRow>
         </div>
       </SectionCard>
 
@@ -1234,6 +1240,17 @@ export default function SettingsPage() {
         <span className="bt-eyebrow" style={{ color: 'var(--ink-3)' }}>
           BuildTrack version 2.4.0 (2024) · Blueprint Noir v2
         </span>
+      </div>
+
+      <div style={{ textAlign: 'center', paddingTop: 8, paddingBottom: 16 }}>
+        <a
+          href="/privacy"
+          target="_blank"
+          rel="noreferrer"
+          style={{ fontSize: 13, color: 'var(--ink-2)', textDecoration: 'underline' }}
+        >
+          BuildTrack Privacy Policy
+        </a>
       </div>
     </div>
   );

@@ -258,7 +258,7 @@ export default function SignUpPage() {
                 <img
                   src="/buildtrack-logo.png"
                   alt="BuildTrack"
-                  style={{ width: 52, height: 52, borderRadius: "var(--r-tile)", objectFit: "contain" }}
+                  style={{ width: 48, height: 48, borderRadius: "10px", objectFit: "contain" }}
                 />
                 <span
                   style={{
@@ -366,7 +366,7 @@ export default function SignUpPage() {
               <img
                 src="/buildtrack-logo.png"
                 alt="BuildTrack"
-                style={{ width: 40, height: 40, borderRadius: "var(--r-chip)", objectFit: "contain" }}
+                style={{ width: 40, height: 40, borderRadius: "8px", objectFit: "contain" }}
               />
               <span style={{ fontFamily: "var(--font-display)", fontSize: 24, fontWeight: 700, letterSpacing: "-0.02em" }}>
                 BuildTrack
@@ -700,7 +700,15 @@ export default function SignUpPage() {
                     <span style={{ fontSize: 14, color: "var(--ink-2)", lineHeight: 1.5 }}>
                       By creating an account, you agree to our{" "}
                       <strong style={{ color: "var(--ink)" }}>Terms</strong> and{" "}
-                      <strong style={{ color: "var(--ink)" }}>Privacy Policy</strong>.
+                      <a
+                        href="/privacy"
+                        target="_blank"
+                        rel="noreferrer"
+                        style={{ color: "var(--ink)", fontWeight: 700, textDecoration: "underline" }}
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        Privacy Policy
+                      </a>.
                     </span>
                   </label>
                   {errors.agreed && (

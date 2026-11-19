@@ -22,7 +22,7 @@ import SupportAgentIcon from "../components/ui/SupportAgentIcon";
 import { navItems, adminNavItems } from "../navItems";
 import { preloadRoute } from "../App";
 
-export default function DashboardLayout() {
+export default function DashboardLayout({ children }) {
   const [isMobile, setIsMobile] = useState(window.innerWidth < 1024);
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
@@ -220,7 +220,7 @@ export default function DashboardLayout() {
                   src="/buildtrack-logo.png"
                   alt="BuildTrack"
                   className="header-brand-logo"
-                  style={{ width: "20px", height: "20px", borderRadius: "5px", flexShrink: 0 }}
+                  style={{ width: "22px", height: "22px", borderRadius: "5px", objectFit: "contain", flexShrink: 0 }}
                 />
                 <span
                   className="bt-header-brand-text header-brand-name"
@@ -330,7 +330,7 @@ export default function DashboardLayout() {
         >
           <ErrorBoundary inline fallbackMessage="An unexpected issue occurred while rendering this section. You can refresh or switch tabs.">
             <div key={location.pathname} className="bt-route" style={{ display: "flex", flexDirection: "column", flex: 1, minHeight: 0 }}>
-              <Outlet />
+              {children || <Outlet />}
             </div>
           </ErrorBoundary>
         </main>
