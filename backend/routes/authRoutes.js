@@ -595,15 +595,17 @@ router.post("/forgot-password", async (req, res) => {
   try {
     const { email } = req.body;
     if (!email) return res.status(400).json({ message: "Email is required" });
-    const user = await User.findOne({ email: String(email).toLowerCase().trim() });
+    const cleanEmail = String(email).toLowerCase().trim();
+    const user = await User.findOne({ email: cleanEmail });
     if (!user || !user.password) {
       return res.json({ message: "If that email is registered, a reset link has been sent." });
     }
-    const token = Math.floor(100000 + Math.random() * 900000).toString();
-    user.resetPasswordToken = token;
-    user.resetPasswordExpires = new Date(Date.now() + 30 * 60 * 1000);
+    const rawToken = crypto.randomBytes(32).toString('hex');
+    const tokenHash = crypto.createHash('sha256').update(rawToken).digest('hex');
+    user.resetPasswordToken = tokenHash;
+    user.resetPasswordExpires = new Date(Date.now() + 15 * 60 * 1000);
     await user.save();
-    const resetUrl = `${FRONTEND}/login?resetToken=${token}`;
+    const resetUrl = `${FRONTEND}/login?resetToken=${rawToken}&email=${encodeURIComponent(cleanEmail)}`;
     let emailSent = false;
     if (process.env.AWS_ACCESS_KEY_ID && process.env.SES_FROM_EMAIL) {
       try {
@@ -620,15 +622,15 @@ router.post("/forgot-password", async (req, res) => {
                 <p style="color: #555; line-height: 1.5;">
                   We received a request to reset your BuildTrack password.
                   Click the link below or use the token in the app to set a new password.
-                  This token expires in <strong>30 minutes</strong>.
+                  This token expires in <strong>15 minutes</strong>.
                 </p>
                 <div style="margin: 24px 0; text-align: center;">
                   <a href="${resetUrl}" style="background-color: #4F46E5; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold; display: inline-block;">Reset Password</a>
                 </div>
                 <div style="background: #f0eeff; border: 1px solid #ddd; border-radius: 8px; padding: 16px; margin: 20px 0; text-align: center;">
                   <p style="margin: 0 0 8px 0; color: #888; font-size: 13px;">Your reset token</p>
-                  <p style="margin: 0; font-size: 18px; font-weight: bold; color: #4F46E5; word-break: break-all; letter-spacing: 0.5px;">
-                    ${token}
+                  <p style="margin: 0; font-size: 14px; font-weight: bold; color: #4F46E5; word-break: break-all; letter-spacing: 0.5px;">
+                    ${rawToken}
                   </p>
                 </div>
                 <p style="color: #888; font-size: 13px;">
@@ -652,7 +654,7 @@ router.post("/forgot-password", async (req, res) => {
       }
     }
     if (!emailSent && process.env.NODE_ENV !== "production") {
-      console.log(`[DEV] PASSWORD RESET TOKEN: ${token}`);
+      console.log(`[DEV] PASSWORD RESET TOKEN: ${rawToken}`);
       console.log(`PASSWORD RESET LINK: ${resetUrl}`);
     }
     return res.json({ message: "If that email is registered, a reset link has been sent." });
@@ -663,17 +665,25 @@ router.post("/forgot-password", async (req, res) => {
 });
 router.post("/reset-password", async (req, res) => {
   try {
-    const { token, password } = req.body;
+    const { email, token, password } = req.body;
     if (!token || !password) {
       return res.status(400).json({ message: "Token and new password are required" });
     }
     if (String(password).length < 8) {
       return res.status(400).json({ message: "Password must be at least 8 characters" });
     }
-    const user = await User.findOne({
-      resetPasswordToken: token,
+    const rawToken = String(token).trim();
+    const tokenHash = crypto.createHash('sha256').update(rawToken).digest('hex');
+
+    const query = {
+      resetPasswordToken: tokenHash,
       resetPasswordExpires: { $gt: new Date() },
-    });
+    };
+    if (email) {
+      query.email = String(email).toLowerCase().trim();
+    }
+
+    const user = await User.findOne(query);
     if (!user) {
       return res.status(400).json({ message: "Invalid or expired reset token" });
     }

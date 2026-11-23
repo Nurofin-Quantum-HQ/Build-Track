@@ -100,6 +100,14 @@ export default function LoginPage() {
       setShake(true);
       setTimeout(() => setShake(false), 400);
     }
+    const tokenParam = params.get("resetToken");
+    const emailParam = params.get("email");
+    if (tokenParam) {
+      setResetToken(tokenParam);
+      setShowForgot(true);
+      setShowReset(true);
+      if (emailParam) setForgotEmail(emailParam);
+    }
   }, []);
 
   useEffect(() => {
@@ -199,10 +207,22 @@ export default function LoginPage() {
   );
 
   const handleReset = async () => {
+    if (!forgotEmail) {
+      setForgotErr("Please enter your email address.");
+      return;
+    }
+    if (!resetToken) {
+      setForgotErr("Please enter the reset token.");
+      return;
+    }
     setResetLoading(true);
     setForgotErr("");
     try {
-      const { data } = await authAPI.resetPassword({ token: resetToken, password: newPassword });
+      const { data } = await authAPI.resetPassword({
+        email: forgotEmail.trim(),
+        token: resetToken.trim(),
+        password: newPassword,
+      });
       setForgotMsg(data.message || "Password reset successful!");
       setShowReset(false);
       setShowForgot(false);
