@@ -345,10 +345,18 @@ router.post("/register", upload.single("companyLogo"), async (req, res) => {
     
     verifiedEmails.delete(cleanEmail);
 
+    const token = makeToken(user);
+    res.cookie("bt_auth_token", token, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "lax",
+      maxAge: 7 * 24 * 60 * 60 * 1000,
+    });
+
     return res.status(201).json({
       success: true,
       message: "Account created successfully",
-      token: makeToken(user),
+      token,
       user: safeUser(user),
     });
   } catch (err) {
@@ -517,6 +525,12 @@ router.post("/login", async (req, res) => {
       await user.save();
     }
     const token = makeToken(user);
+    res.cookie("bt_auth_token", token, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "lax",
+      maxAge: 7 * 24 * 60 * 60 * 1000,
+    });
     console.log(`[Auth] Login successful for user: ${user._id}`);
     return res.status(200).json({
       success: true,
@@ -528,6 +542,14 @@ router.post("/login", async (req, res) => {
     console.error("[Auth] Login error:", err.message);
     return res.status(500).json({ success: false, message: "Server error during login" });
   }
+});
+router.post("/logout", (req, res) => {
+  res.clearCookie("bt_auth_token", {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "lax",
+  });
+  return res.json({ success: true, message: "Logged out successfully" });
 });
 router.get("/me", protect, (req, res) => {
   return res.json({ user: safeUser(req.user) });

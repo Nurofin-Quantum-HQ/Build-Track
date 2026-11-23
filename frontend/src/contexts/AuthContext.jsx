@@ -136,7 +136,10 @@ export function AuthProvider({ children }) {
     return u;
   }, []);
 
-  const logout = useCallback(() => {
+  const logout = useCallback(async () => {
+    try {
+      await authAPI.logout();
+    } catch (_) {}
     useProjectStore.getState().reset();
     localStorage.clear();
     sessionStorage.clear();

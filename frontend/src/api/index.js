@@ -50,6 +50,7 @@ api.interceptors.response.use(
 
 export const authAPI = {
   login:          (data) => api.post("/auth/login",    data),
+  logout:         ()     => api.post("/auth/logout"),
   register:       (data) => api.post("/auth/register", data),
   sendRegistrationOtp: (data) => api.post("/auth/send-registration-otp", data),
   verifyRegistrationOtp: (data) => api.post("/auth/verify-registration-otp", data),

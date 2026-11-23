@@ -129,7 +129,6 @@ const useAuthStore = create(
       name: "bt_auth",
       partialize: (state) => ({
         user: state.user,
-        token: state.token,
       }),
       onRehydrateStorage: () => (state) => {
         useAuthStore.setState({ initialized: true });
