@@ -8,3 +8,10 @@ coverage/
 *.log
 *.lnk
 .DS_Store
+
+# Guide assets and documentation generation
+guide_assets/
+*.pdf
+generate_guide.py
+make_assets.py
+
