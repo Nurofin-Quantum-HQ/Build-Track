@@ -20,20 +20,22 @@ export default function OAuthCallback() {
           return;
         }
 
-        if (!token) {
-          setStatus("No access token received. Redirecting to login…");
-          setTimeout(() => navigate("/login"), 1500);
-          return;
+        if (token) {
+          localStorage.setItem("bt_token", token);
         }
-
-        localStorage.setItem("bt_token", token);
 
         try {
           const { data } = await authAPI.me();
           const userData = data?.user || data;
           localStorage.setItem("bt_user", JSON.stringify(userData));
           window.dispatchEvent(new Event("userUpdated"));
-        } catch {}
+        } catch (err) {
+          if (!token) {
+            setStatus("Authentication failed. Redirecting to login…");
+            setTimeout(() => navigate("/login"), 1500);
+            return;
+          }
+        }
 
         setStatus("Success! Taking you to your dashboard…");
 

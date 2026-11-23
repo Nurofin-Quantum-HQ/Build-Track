@@ -588,7 +588,13 @@ router.get(
   },
   (req, res) => {
     const token = makeToken(req.user);
-    return res.redirect(`${FRONTEND}/oauth/callback?token=${token}`);
+    res.cookie("bt_auth_token", token, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "lax",
+      maxAge: 7 * 24 * 60 * 60 * 1000,
+    });
+    return res.redirect(`${FRONTEND}/oauth/callback`);
   }
 );
 router.post("/forgot-password", async (req, res) => {

@@ -105,9 +105,25 @@ app.use(
     allowedHeaders: isProd
       ? ["Content-Type", "Authorization", "X-Request-ID"]
       : ["Content-Type", "Authorization", "X-Request-ID", "ngrok-skip-browser-warning"],
-    credentials: false,
+    credentials: true,
   })
 );
+app.use((req, res, next) => {
+  req.cookies = req.cookies || {};
+  if (req.headers.cookie) {
+    req.headers.cookie.split(";").forEach((cookie) => {
+      const [k, ...v] = cookie.trim().split("=");
+      if (k) {
+        try {
+          req.cookies[k] = decodeURIComponent(v.join("="));
+        } catch (_) {
+          req.cookies[k] = v.join("=");
+        }
+      }
+    });
+  }
+  next();
+});
 const loginLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: isProd ? 300 : 1000,
