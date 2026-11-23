@@ -306,8 +306,11 @@ router.post("/register", upload.single("companyLogo"), async (req, res) => {
       });
     }
     const cleanEmail = String(email).toLowerCase().trim();
-    if (client !== 'mobile' && !verifiedEmails.has(cleanEmail)) {
-      return res.status(400).json({ success: false, message: "Email not verified. Please verify your email first." });
+    if (!verifiedEmails.has(cleanEmail)) {
+      return res.status(400).json({
+        success: false,
+        message: "Email not verified. Please verify your email via OTP first.",
+      });
     }
     const cleanName = String(name).trim();
     const cleanCompanyName = String(companyName).trim();
