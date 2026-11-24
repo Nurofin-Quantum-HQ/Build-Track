@@ -1324,13 +1324,29 @@ router.put("/:id/approve", requirePermission(["approve_payments", "approve_updat
   try {
     const tx = await Transaction.findById(req.params.id).session(session);
     if (!tx) { await session.abortTransaction(); return res.status(404).json({ message: 'Transaction not found' }); }
+    
+    const adminId = await getAdminId(req.user);
+    let belongsToTenant = false;
+    if (tx.project) {
+      const projectExists = await Project.exists({ _id: tx.project, createdBy: adminId });
+      if (projectExists) belongsToTenant = true;
+    }
+    if (!belongsToTenant && tx.createdBy) {
+      const isTenantUser = await User.exists({ _id: tx.createdBy, $or: [{ _id: adminId }, { createdBy: adminId }] });
+      if (isTenantUser) belongsToTenant = true;
+    }
+    if (!belongsToTenant) {
+      await session.abortTransaction();
+      return res.status(403).json({ message: "Access denied: Transaction does not belong to your organization" });
+    }
+
     if (tx.approvalStatus === "Approved") {
+      await session.abortTransaction();
       return res.status(400).json({ message: "Transaction is already approved" });
     }
     tx.approvalStatus = "Approved";
     tx.approvedBy = req.user._id;
     tx.approvedAt = new Date();
-    const adminId = await getAdminId(req.user);
     if ((tx.type === "Materials" || tx.type === "Wages" || tx.type === "Expense") && tx.quantity > 0 && tx.project) {
       const materialType = normalizeMaterialType(tx.materialType, tx.subType);
       const inventoryDelta = (tx.type === "Materials" && materialType === "usage") ? -tx.quantity : tx.quantity;
@@ -1380,6 +1396,21 @@ router.put("/:id/reject", requirePermission(["approve_payments", "approve_update
     const { rejectionReason } = req.body;
     const tx = await Transaction.findById(req.params.id);
     if (!tx) return res.status(404).json({ message: 'Transaction not found' });
+    
+    const adminId = await getAdminId(req.user);
+    let belongsToTenant = false;
+    if (tx.project) {
+      const projectExists = await Project.exists({ _id: tx.project, createdBy: adminId });
+      if (projectExists) belongsToTenant = true;
+    }
+    if (!belongsToTenant && tx.createdBy) {
+      const isTenantUser = await User.exists({ _id: tx.createdBy, $or: [{ _id: adminId }, { createdBy: adminId }] });
+      if (isTenantUser) belongsToTenant = true;
+    }
+    if (!belongsToTenant) {
+      return res.status(403).json({ message: "Access denied: Transaction does not belong to your organization" });
+    }
+
     if (tx.approvalStatus === "Approved") {
       return res.status(400).json({ message: "Cannot reject an already approved transaction" });
     }
@@ -1451,12 +1482,16 @@ router.post("/bulk", requirePermission(["manage_expenses", "add_entries"]), asyn
   let skippedCount = 0;
 
   for (const t of transactions) {
-    if (t.rowStatus && t.rowStatus.trim().toLowerCase() === 'unchanged') {
+    const rawStatus = (t.rowStatus || (t.raw && (t.raw["Row Status"] || t.raw["Action"])) || "").trim().toLowerCase();
+    if (rawStatus === 'unchanged' || rawStatus === 'summary' || rawStatus === 'skip' || rawStatus === 'skipped') {
       skippedCount++;
       continue;
     }
-    if (t.transactionId && t.transactionId.trim() !== '') {
-      txMap.set(t.transactionId.trim(), t);
+    const rawTxId = t.transactionId || t._id || (t.raw && (t.raw["Transaction ID"] || t.raw["transactionId"]));
+    const trimmedId = rawTxId ? String(rawTxId).trim() : '';
+    if (trimmedId !== '') {
+      t.transactionId = trimmedId;
+      txMap.set(trimmedId, t);
     } else {
       uniqueTransactions.push(t); // No transactionId, always insert
     }
@@ -1465,14 +1500,19 @@ router.post("/bulk", requirePermission(["manage_expenses", "add_entries"]), asyn
     uniqueTransactions.push(t);
   }
 
-  // Pre-fetch related workers and projects to avoid N+1
+  // Pre-fetch related workers, projects, and tenant users to establish strict tenant boundaries
   const projectsList = await Project.find({ createdBy: adminId }).lean();
   const workersList = await Worker.find({ createdBy: adminId }).lean();
+  const tenantUsers = await User.find({ $or: [{ _id: adminId }, { createdBy: adminId }] }).select('_id').lean();
+  const tenantUserIds = new Set(tenantUsers.map(u => u._id.toString()));
 
   const projectCache = {};
   const projectNameCache = {};
+  const tenantProjectIdSet = new Set();
   for (const p of projectsList) {
-    projectCache[p._id.toString()] = p;
+    const pIdStr = p._id.toString();
+    projectCache[pIdStr] = p;
+    tenantProjectIdSet.add(pIdStr);
     if (p.projectName) projectNameCache[p.projectName.trim().toLowerCase()] = p;
   }
 
@@ -1483,16 +1523,34 @@ router.post("/bulk", requirePermission(["manage_expenses", "add_entries"]), asyn
     if (w.name) workerNameCache[w.name.trim().toLowerCase()] = w;
   }
 
-  // Pre-fetch existing transactions by transactionId to know which ones will update
+  // Pre-fetch existing transactions by transactionId or _id to enforce tenant ownership and prevent cross-tenant overwrites
   const incomingTxIds = Array.from(txMap.keys());
+  const validObjectIds = incomingTxIds
+    .filter(id => mongoose.Types.ObjectId.isValid(id))
+    .map(id => new mongoose.Types.ObjectId(id));
+
+  const existingTxQuery = {
+    $or: [
+      { transactionId: { $in: incomingTxIds } },
+      ...(validObjectIds.length > 0 ? [{ _id: { $in: validObjectIds } }] : [])
+    ]
+  };
+
   const existingTransactions = incomingTxIds.length > 0 
-    ? await Transaction.find({ transactionId: { $in: incomingTxIds } }, { transactionId: 1 }).lean()
+    ? await Transaction.find(existingTxQuery).lean()
     : [];
-  const existingTxIdSet = new Set(existingTransactions.map(t => t.transactionId));
+
+  const existingTxMap = new Map();
+  for (const doc of existingTransactions) {
+    if (doc._id) existingTxMap.set(doc._id.toString(), doc);
+    if (doc.transactionId) existingTxMap.set(doc.transactionId, doc);
+  }
 
   const operations = [];
   const inventoryOps = [];
   const projectOps = [];
+  const createdIds = [];
+  const updatedSnapshots = [];
 
   let createdCount = 0;
   let updatedCount = 0;
@@ -1597,34 +1655,78 @@ router.post("/bulk", requirePermission(["manage_expenses", "add_entries"]), asyn
       }
       txData.paymentHistory = finalHistory;
 
-      if (validTxId) {
+      const existingTx = validTxId ? existingTxMap.get(validTxId) : null;
+
+      if (existingTx) {
+        // Enforce strict multi-tenant boundary check:
+        // The transaction must belong to a project or user within the same organization.
+        const txProjId = existingTx.project ? existingTx.project.toString() : null;
+        const txCreatorId = existingTx.createdBy ? existingTx.createdBy.toString() : null;
+        const belongsToTenant = (txProjId && tenantProjectIdSet.has(txProjId)) ||
+                                (txCreatorId && tenantUserIds.has(txCreatorId));
+        if (!belongsToTenant) {
+          throw new Error("Access denied: transaction does not belong to your organization");
+        }
+
+        // Enforce role-based integrity: Non-admins cannot modify details of approved transactions
+        if (req.user.role !== "Admin" && existingTx.approvalStatus === "Approved") {
+          const num = (v) => Number(v) || 0;
+          const txt = (v) => String(v ?? "").trim().toLowerCase();
+          const differs = (incoming, current, norm) =>
+            incoming !== undefined && incoming !== null && norm(incoming) !== norm(current);
+          const incomingProject = projectId ? String(projectId) : null;
+          const directAmountEntry = existingTx.type === "Expense" || (num(existingTx.quantity) === 0 && num(existingTx.rate) === 0);
+
+          const changed = [
+            differs(title, existingTx.title, txt) && "title",
+            differs(type, existingTx.type, txt) && "type",
+            incomingProject && incomingProject !== String(existingTx.project || "") && "project",
+            differs(quantity, existingTx.quantity, num) && "quantity",
+            differs(rate, existingTx.rate, num) && "rate",
+            differs(overtime, existingTx.overtime, num) && "overtime",
+            differs(gst, existingTx.gst, num) && "gst",
+            differs(isWithGst, existingTx.isWithGst, Boolean) && "isWithGst",
+            differs(resolvedCategory, existingTx.category, txt) && "category",
+            differs(unit, existingTx.unit, (v) => normalizeUnit(v)) && "unit",
+            directAmountEntry && rawAmount !== undefined && Math.abs(num(rawAmount) - num(existingTx.amount)) > 0.01 && "amount",
+          ].filter(Boolean);
+
+          if (changed.length > 0) {
+            throw new Error(`This entry is approved. Only an Admin can change its details (${changed.join(', ')}).`);
+          }
+
+          // Preserve existing approval status and approver metadata
+          txData.approvalStatus = existingTx.approvalStatus;
+          txData.approvedBy = existingTx.approvedBy;
+          txData.approvedAt = existingTx.approvedAt;
+        }
+
         operations.push({
-            updateOne: {
-              filter: mongoose.Types.ObjectId.isValid(validTxId) ? { _id: validTxId } : { transactionId: validTxId },
-              update: { $set: txData, $setOnInsert: { createdBy: req.user._id } },
-            upsert: true
+          updateOne: {
+            filter: { _id: existingTx._id },
+            update: { $set: txData },
+            upsert: false
           }
         });
-        if (existingTxIdSet.has(validTxId)) {
-          updatedCount++;
-        } else {
-          createdCount++;
-        }
+        updatedCount++;
+        updatedSnapshots.push(existingTx);
       } else {
+        const newTxId = new mongoose.Types.ObjectId();
         operations.push({
           insertOne: {
-            document: { createdBy: req.user._id, approvalStatus: txApprovalStatus, approvedBy, approvedAt, ...txData }
+            document: { _id: newTxId, createdBy: req.user._id, approvalStatus: txApprovalStatus, approvedBy, approvedAt, ...txData }
           }
         });
         createdCount++;
+        createdIds.push(newTxId);
       }
       
-      if (!validTxId && (type === "Materials" || type === "Wages" || type === "Expense") && qty > 0 && projectId && txApprovalStatus === "Approved") {
+      if (!existingTx && (type === "Materials" || type === "Wages" || type === "Expense") && qty > 0 && projectId && txApprovalStatus === "Approved") {
         const inventoryDelta = (type === "Materials" && normalizedMaterialType === "usage") ? -qty : qty;
         inventoryOps.push({ adminId, projectId, category: resolvedCategory || title, unit: txData.unit, delta: inventoryDelta, type });
       }
       
-      if (!validTxId && projectId && phaseId && activityId && txApprovalStatus === "Approved") {
+      if (!existingTx && projectId && phaseId && activityId && txApprovalStatus === "Approved") {
         projectOps.push({ projectId, phaseId, activityId, type, finalAmount });
       }
 
@@ -1655,7 +1757,7 @@ router.post("/bulk", requirePermission(["manage_expenses", "add_entries"]), asyn
           const txTitle = op && op.insertOne ? op.insertOne.document.title : (op && op.updateOne ? op.updateOne.update.$set.title : 'Unknown');
           results.failures.push({ row: "Bulk Write", title: txTitle, error: we.errmsg });
           
-          if (op && op.updateOne && existingTxIdSet.has(op.updateOne.filter.transactionId)) {
+          if (op && op.updateOne) {
             updatedCount = Math.max(0, updatedCount - 1);
           } else {
             createdCount = Math.max(0, createdCount - 1);
@@ -1685,6 +1787,18 @@ router.post("/bulk", requirePermission(["manage_expenses", "add_entries"]), asyn
   ]);
 
   if (results.successCount > 0) {
+    if (createdIds.length > 0 || updatedSnapshots.length > 0) {
+      try {
+        await CsvBackup.create({
+          userId: req.user._id,
+          timestamp: new Date(),
+          updatedTransactions: updatedSnapshots,
+          createdIds: createdIds,
+        });
+      } catch (bErr) {
+        console.warn("CsvBackup record creation warning:", bErr);
+      }
+    }
     await User.findByIdAndUpdate(req.user._id, {
       $set: { "onboarding.hasUsedBulkCSV": true }
     }).catch(() => {});
@@ -1854,50 +1968,106 @@ router.post("/rename/restore", async (req, res) => {
 });
 router.post("/backup-csv", requirePermission(["manage_expenses", "add_entries"]), async (req, res) => {
   try {
-    const transactions = await Transaction.find({ createdBy: req.user._id }).lean();
+    const adminId = await getAdminId(req.user);
+    const tenantUsers = await User.find({ $or: [{ _id: adminId }, { createdBy: adminId }] }).select('_id').lean();
+    const tenantUserIds = tenantUsers.map(u => u._id);
+    const transactions = await Transaction.find({ createdBy: { $in: tenantUserIds } }).lean();
+
+    // 1. Dual-Engine: Save snapshot to MongoDB Atlas CsvBackup collection
+    try {
+      await CsvBackup.findOneAndUpdate(
+        { userId: req.user._id },
+        {
+          userId: req.user._id,
+          timestamp: new Date(),
+          updatedTransactions: transactions,
+          createdIds: [],
+        },
+        { upsert: true, returnDocument: 'after' }
+      );
+    } catch (dbErr) {
+      console.warn("MongoDB CsvBackup save warning in backup-csv:", dbErr);
+    }
+
+    // 2. Dual-Engine: Save snapshot to local disk file as well
     const fs = require('fs');
     const path = require('path');
     const backupPath = path.join(__dirname, '..', 'backups');
     if (!fs.existsSync(backupPath)) {
-      fs.mkdirSync(backupPath);
+      fs.mkdirSync(backupPath, { recursive: true });
     }
     const userBackupFile = path.join(backupPath, `backup_${req.user._id}.json`);
     fs.writeFileSync(userBackupFile, JSON.stringify(transactions));
-    res.json({ message: "Backup successful" });
+
+    res.json({ message: "Backup successful", count: transactions.length });
   } catch (error) {
     console.error("Backup error:", error);
-    res.status(500).json({ message: "Backup failed" });
+    res.status(500).json({ message: "Backup failed: " + error.message });
   }
 });
 
 router.post("/revert-csv", requirePermission(["manage_expenses", "add_entries"]), async (req, res) => {
   try {
-    const fs = require('fs');
-    const path = require('path');
-    const userBackupFile = path.join(__dirname, '..', 'backups', `backup_${req.user._id}.json`);
-    if (!fs.existsSync(userBackupFile)) {
-      return res.status(404).json({ message: "No backup found to revert" });
-    }
-    const backupData = JSON.parse(fs.readFileSync(userBackupFile, 'utf8'));
-    
-    const session = await mongoose.startSession();
-    session.startTransaction();
-    try {
-      await Transaction.deleteMany({ createdBy: req.user._id }).session(session);
-      if (backupData.length > 0) {
-        await Transaction.insertMany(backupData, { session });
+    let reverted = false;
+    let deletedCount = 0;
+    let restoredCount = 0;
+
+    // 1. Try restoring from MongoDB CsvBackup first (atomic batch rollback)
+    const backup = await CsvBackup.findOne({ userId: req.user._id }).sort({ timestamp: -1 });
+    if (backup && (backup.createdIds?.length > 0 || backup.updatedTransactions?.length > 0)) {
+      if (backup.createdIds && backup.createdIds.length > 0) {
+        const delRes = await Transaction.deleteMany({ _id: { $in: backup.createdIds } });
+        deletedCount = delRes.deletedCount || 0;
       }
-      await session.commitTransaction();
-      res.json({ message: "Revert successful" });
-    } catch (e) {
-      await session.abortTransaction();
-      throw e;
-    } finally {
-      session.endSession();
+      if (backup.updatedTransactions && backup.updatedTransactions.length > 0) {
+        for (const origDoc of backup.updatedTransactions) {
+          if (origDoc && origDoc._id) {
+            const { _id, ...rest } = origDoc;
+            await Transaction.findByIdAndUpdate(_id, { $set: rest }, { upsert: true });
+            restoredCount++;
+          }
+        }
+      }
+      await CsvBackup.deleteOne({ _id: backup._id });
+      reverted = true;
     }
+
+    // 2. Fallback to local disk backup if DB backup didn't exist or was empty
+    if (!reverted) {
+      const fs = require('fs');
+      const path = require('path');
+      const userBackupFile = path.join(__dirname, '..', 'backups', `backup_${req.user._id}.json`);
+      if (fs.existsSync(userBackupFile)) {
+        const backupData = JSON.parse(fs.readFileSync(userBackupFile, 'utf8'));
+        if (Array.isArray(backupData) && backupData.length > 0) {
+          const adminId = await getAdminId(req.user);
+          const tenantUsers = await User.find({ $or: [{ _id: adminId }, { createdBy: adminId }] }).select('_id').lean();
+          const tenantUserIds = tenantUsers.map(u => u._id);
+          const existingIds = new Set(backupData.map(d => String(d._id)));
+          await Transaction.deleteMany({ createdBy: { $in: tenantUserIds }, _id: { $nin: Array.from(existingIds) } });
+          for (const doc of backupData) {
+            const { _id, ...rest } = doc;
+            await Transaction.findByIdAndUpdate(_id, { $set: rest }, { upsert: true });
+          }
+          fs.unlinkSync(userBackupFile);
+          reverted = true;
+          restoredCount = backupData.length;
+        }
+      }
+    }
+
+    if (!reverted) {
+      return res.status(404).json({ message: "No CSV backup found to revert. Please import a file first." });
+    }
+
+    res.json({
+      message: "Revert successful",
+      deletedCount,
+      restoredCount
+    });
   } catch (error) {
     console.error("Revert error:", error);
-    res.status(500).json({ message: "Revert failed" });
+    res.status(500).json({ message: "Revert failed: " + error.message });
   }
 });
 // -----------------------------

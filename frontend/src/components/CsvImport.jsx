@@ -37,8 +37,27 @@ const CSV_COLUMNS = [
   'Payment Status', 'Notes'
 ];
 
+const COMMON_ID_MAPPINGS = {
+  "Transaction ID": "transactionId",
+  "transactionId": "transactionId",
+  "TransactionId": "transactionId",
+  "transaction_id": "transactionId",
+  "Action": "action",
+  "action": "action",
+  "Row Status": "action",
+  "RowStatus": "action",
+  "rowStatus": "action",
+  "Amount (INR)": "amount",
+  "In (INR)": "inAmount",
+  "Out (INR)": "outAmount",
+  "Paid (INR)": "paidAmount",
+  "Balance (INR)": "balance",
+  "Remaining (INR)": "remainingAmount",
+};
+
 const COLUMN_MAPPINGS = {
   material: {
+    ...COMMON_ID_MAPPINGS,
     "Material / Item": "title",
     "Material Name": "title",
     "Item Name": "title",
@@ -66,6 +85,7 @@ const COLUMN_MAPPINGS = {
     "notes": "notes",
   },
   labour: {
+    ...COMMON_ID_MAPPINGS,
     "Labour Type": "title",
     "Worker Name": "title",
     "Name": "title",
@@ -88,6 +108,7 @@ const COLUMN_MAPPINGS = {
     "notes": "notes",
   },
   equipment: {
+    ...COMMON_ID_MAPPINGS,
     "Equipment Name": "title",
     "Name": "title",
     "Unit": "unit",
@@ -114,9 +135,8 @@ const COLUMN_MAPPINGS = {
     "notes": "notes",
   },
   all: {
+    ...COMMON_ID_MAPPINGS,
     "Amount": "amount",
-    
-    
     "amount": "amount",
     "Total Amount": "amount",
     "Paid Amount": "paidAmount",
@@ -304,8 +324,30 @@ function resolveActivity(activityName, project, phaseId) {
 function mapRowToPayload(row, detectedType, columnMapping, projects) {
   const payload = {};
   
-  if (row["Transaction ID"]) {
-    payload._id = row["Transaction ID"];
+  const txId = (
+    row["Transaction ID"] ||
+    row["transactionId"] ||
+    row["TransactionId"] ||
+    row["transaction_id"] ||
+    row["_id"] ||
+    row["id"] ||
+    ""
+  ).trim();
+  if (txId) {
+    payload._id = txId;
+    payload.transactionId = txId;
+  }
+
+  const rawAction = (
+    row["Action"] ||
+    row["action"] ||
+    row["Row Status"] ||
+    row["RowStatus"] ||
+    row["rowStatus"] ||
+    ""
+  ).trim();
+  if (rawAction) {
+    payload.rowStatus = rawAction;
   }
 
   for (const [csvCol, dbField] of Object.entries(columnMapping)) {
@@ -327,7 +369,7 @@ function mapRowToPayload(row, detectedType, columnMapping, projects) {
       case "paymentStatus":
         {
           const clean = val.trim().toLowerCase();
-          if (clean === "fully paid" || clean === "paid") {
+          if (clean === "fully paid" || clean === "paid" || clean === "received") {
             payload[dbField] = "Paid";
           } else if (clean === "partial" || clean === "partially paid") {
             payload[dbField] = "Partial";
@@ -340,6 +382,22 @@ function mapRowToPayload(row, detectedType, columnMapping, projects) {
         break;
       default:
         payload[dbField] = val;
+    }
+  }
+
+  // Handle revenue / finance specific amount columns
+  if (payload.amount === undefined || payload.amount === 0) {
+    const inAmt = Number(row["In (INR)"] || row["In"] || 0);
+    const outAmt = Number(row["Out (INR)"] || row["Out"] || 0);
+    const amtInr = Number(row["Amount (INR)"] || 0);
+    if (inAmt > 0) {
+      payload.amount = inAmt;
+      if (!payload.type) payload.type = "Income";
+    } else if (outAmt > 0) {
+      payload.amount = outAmt;
+      if (!payload.type) payload.type = "Expense";
+    } else if (amtInr > 0) {
+      payload.amount = amtInr;
     }
   }
 
@@ -609,11 +667,28 @@ export default function CsvImport({ onComplete }) {
     }
     const columnMapping = COLUMN_MAPPINGS[selectedTemplate] || COLUMN_MAPPINGS.all;
     const resolved = preview.rows.map((row) => {
-      const rowStatus = row["Row Status"] || row["RowStatus"] || row["Action"] || row["action"] || "";
-      const statusLower = rowStatus.trim().toLowerCase();
-      if (statusLower === "unchanged") {
+      const rowStatus = (row["Row Status"] || row["RowStatus"] || row["Action"] || row["action"] || "").trim().toLowerCase();
+      if (rowStatus === "unchanged" || rowStatus === "summary" || rowStatus === "skip" || rowStatus === "skipped") {
         return { skipped: true, raw: row };
       }
+
+      // Automatically skip summary/total rows (e.g. from finance/revenue export)
+      const titleCandidate = (row["Description"] || row["Title"] || row["Name"] || row["Material"] || row["Worker Name"] || row["Equipment Name"] || "").trim().toLowerCase();
+      if (
+        titleCandidate === "total" ||
+        titleCandidate === "net (in - out)" ||
+        titleCandidate === "net" ||
+        titleCandidate.startsWith("total ")
+      ) {
+        return { skipped: true, raw: row, isSummary: true };
+      }
+
+      // Also skip completely empty rows
+      const hasAnyContent = (row["Description"] || row["Title"] || row["Name"] || row["Project"] || row["Amount"] || row["In (INR)"] || row["Out (INR)"] || "").trim();
+      if (!hasAnyContent) {
+        return { skipped: true, raw: row, isSummary: true };
+      }
+
       const payload = mapRowToPayload(row, selectedTemplate, columnMapping, projects);
       return { raw: row, payload };
     });
@@ -752,6 +827,7 @@ export default function CsvImport({ onComplete }) {
         return {
           _id: payload._id,
           transactionId: payload._id || payload.transactionId,
+          rowStatus: payload.rowStatus || "",
           title: payload.title || "Item",
           type: payload.type || "Expense",
           project: payload.project,

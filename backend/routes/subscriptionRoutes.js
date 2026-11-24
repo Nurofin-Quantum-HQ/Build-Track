@@ -23,7 +23,7 @@ const { applyRenewal, syncRenewalsFromAirpay } = require('../services/subscripti
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 const PLAN_PRICES = {
-  starter:    499,
+  starter:    1, // Temporarily set to 1 rupee for AirPay live testing (original: 499)
   growth:     999,
   pro:       1499,
   business:  2499,
@@ -451,22 +451,38 @@ router.all('/browser-return', async (req, res) => {
       }
     }
 
-    // Check both req.body and req.query for callback data in case Airpay did a GET or form POST redirect
-    const callbackData = (req.body?.response || req.body?.TRANSACTIONSTATUS)
+    // Check both req.body and req.query for callback data ONLY if encrypted response is present
+    const callbackData = req.body?.response
       ? req.body
-      : ((req.query?.response || req.query?.TRANSACTIONSTATUS) ? req.query : null);
+      : (req.query?.response ? req.query : null);
 
-    // If still PENDING and we received response/TRANSACTIONSTATUS in browser return,
-    // verify and activate right here!
-    if (payment && payment.status === 'PENDING' && callbackData) {
+    // If still PENDING and we received encrypted response in browser return,
+    // verify cryptographic signature and activate right here!
+    // NEVER accept unverified or unencrypted query/body parameters.
+    if (payment && payment.status === 'PENDING' && callbackData?.response) {
       try {
-        console.log('[AirPay Return] IPN pending, processing callback payload from browser return...');
-        let txnData = null;
-        if (callbackData.response) {
-          const decrypted = verifyAndDecryptCallbackData(callbackData);
-          txnData = decrypted.data;
-        } else {
-          txnData = callbackData;
+        console.log('[AirPay Return] IPN pending, verifying and decrypting callback payload from browser return...');
+        const decrypted = verifyAndDecryptCallbackData(callbackData);
+        const txnData = decrypted.data;
+
+        // Verify Merchant ID
+        const configuredMid = (process.env.AIRPAY_MERCHANT_ID || '').trim();
+        const receivedMid = String(txnData.merchant_id || txnData.MERCHANT_ID || '').trim();
+        const allowedMids = new Set([configuredMid, '20053', '366377'].filter(Boolean));
+        if (receivedMid && !allowedMids.has(receivedMid)) {
+          throw new Error(`Merchant ID mismatch: expected one of [${Array.from(allowedMids).join(', ')}] got=${receivedMid}`);
+        }
+
+        // Verify Amount
+        const receivedAmt = Number(txnData.amount || txnData.AMOUNT || 0);
+        if (Math.abs(receivedAmt - payment.amount) > 0.01) {
+          throw new Error(`Amount mismatch: expected=${payment.amount} got=${receivedAmt}`);
+        }
+
+        // Verify Order ID matches
+        const callbackOrderId = String(txnData.orderid || txnData.TRANSACTIONID || txnData.order_id || '').trim();
+        if (callbackOrderId && callbackOrderId !== String(payment.orderId)) {
+          throw new Error(`Order ID mismatch: expected=${payment.orderId} got=${callbackOrderId}`);
         }
 
         const paymentStatus = (txnData.transaction_status || txnData.TRANSACTIONSTATUS || '').toString().trim().toUpperCase();
@@ -509,10 +525,10 @@ router.all('/browser-return', async (req, res) => {
             }
           );
           payment.status = 'PAID';
-          console.log(`[AirPay Return] ✅ Subscription activated via browser return for orderId=${orderid}`);
+          console.log(`[AirPay Return] ✅ Subscription activated via verified browser return for orderId=${orderid}`);
         }
       } catch (inlineErr) {
-        console.warn('[AirPay Return] Inline processing failed:', inlineErr.message);
+        console.warn('[AirPay Return] Inline verification/processing failed:', inlineErr.message);
       }
     }
 

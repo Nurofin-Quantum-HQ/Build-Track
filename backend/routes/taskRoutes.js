@@ -35,6 +35,10 @@ router.get("/users", async (req, res) => {
 });
 router.get("/project/:projectId", async (req, res) => {
   try {
+    const projectDoc = await Project.findOne(canAccessProjectFilter(req, req.params.projectId));
+    if (!projectDoc) {
+      return res.status(403).json({ message: "Access denied to this project" });
+    }
     const tasks = await Task.find({ project: req.params.projectId })
       .populate("assignedTo", "name role profilePhoto")
       .populate("createdBy", "name")

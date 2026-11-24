@@ -153,11 +153,17 @@ export default function ProjectReportPage() {
   };
 
   const exportCsv = () => {
-    const headers = ["Date", "Description", "Type", "Category", "Amount", "Payment"];
+    const headers = ["Transaction ID", "Action", "Date", "Description", "Project", "Type", "Category", "Amount", "Payment"];
     const rows = transactions.map(t => [
+      t._id || t.id || "",
+      "unchanged",
       t.date && !isNaN(new Date(t.date).getTime()) ? new Date(t.date).toISOString().split("T")[0] : (t.date || ""),
-      t.title || "", t.type || "", t.category || "",
-      t.amount || 0, t.paymentStatus || "",
+      t.title || "",
+      project.projectName || project.name || "",
+      t.type || "",
+      t.category || "",
+      t.amount || 0,
+      t.paymentStatus || "",
     ]);
     const csv = [headers, ...rows].map(r => r.map(c => `"${c}"`).join(",")).join("\n");
     const blob = new Blob([csv], { type: "text/csv" });

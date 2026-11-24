@@ -80,31 +80,30 @@ const canAccessProjectFilter = (req, projectId = null) => {
   const objectIds = assignedIds
     .filter((id) => mongoose.Types.ObjectId.isValid(id))
     .map((id) => new mongoose.Types.ObjectId(id));
-  const adminId = user.createdBy;
+  const adminId = user.createdBy
+    ? (typeof user.createdBy === "object" && user.createdBy._id ? user.createdBy._id : user.createdBy)
+    : null;
 
+  const userPermissions = Array.isArray(user.permissions) ? user.permissions : [];
+  const hasViewAll = userPermissions.includes("view_all_projects");
+
+  // If user has view_all_projects permission, allow all projects within their organization
+  if (hasViewAll && adminId) {
+    if (projectId) return { _id: projectId, createdBy: adminId };
+    return { createdBy: adminId };
+  }
+
+  // Otherwise, strictly restrict to explicitly assigned projects
   if (projectId) {
     const pidStr = projectId.toString();
     const isAssigned = assignedIds.includes(pidStr);
     if (isAssigned) {
       return { _id: projectId };
     }
-    if (adminId) {
-      return { _id: projectId, createdBy: adminId };
-    }
     return { _id: new mongoose.Types.ObjectId(), __never: true };
   }
 
-  const conditions = [];
-  if (objectIds.length > 0) {
-    conditions.push({ _id: { $in: objectIds } });
-  }
-  if (adminId) {
-    conditions.push({ createdBy: adminId });
-  }
-  if (conditions.length === 1) return conditions[0];
-  if (conditions.length > 1) return { $or: conditions };
-
-  return { _id: { $in: [] } };
+  return { _id: { $in: objectIds } };
 };
 const canManageProjectFilter = (req, projectId = null) => {
   const user = req.user;

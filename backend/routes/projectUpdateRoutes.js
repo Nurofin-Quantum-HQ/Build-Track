@@ -66,7 +66,7 @@ router.post("/", requirePermission(["submit_daily_update", "add_entries", "edit_
     if (parsedCompletedTasks && parsedCompletedTasks.length > 0) {
       const Task = require("../models/Task");
       await Task.updateMany(
-        { _id: { $in: parsedCompletedTasks } },
+        { _id: { $in: parsedCompletedTasks }, project: existing._id },
         { $set: { status: "Completed" } }
       );
     }

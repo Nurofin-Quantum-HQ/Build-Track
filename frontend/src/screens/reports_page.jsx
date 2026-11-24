@@ -209,7 +209,7 @@ export default function ReportsPage() {
     const rows = filtered.map(t => {
       const baseRow = [
         t._id || t.id || "",
-        "", // Action column left empty by default
+        "unchanged", // Action column defaults to unchanged so re-importing without edits skips or updates safely
         formatLocal(t.date),
         t.title || "", t.type || "", t.category || "", t.amount || 0,
         t.approvalStatus || "", t.paymentStatus || ""

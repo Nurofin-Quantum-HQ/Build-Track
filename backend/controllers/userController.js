@@ -1,4 +1,5 @@
 const User = require("../models/User");
+const { getAdminId } = require("../middleware/auth");
 const safeUser = (user) => ({
   id:               user._id || user.id,
   _id:              user._id || user.id,
@@ -183,9 +184,10 @@ const assignOversightRoles = async (req, res) => {
     if (!Array.isArray(overseesRoles)) {
       return res.status(400).json({ message: "overseesRoles must be an array" });
     }
-    const user = await User.findById(id);
+    const adminId = await getAdminId(req.user);
+    const user = await User.findOne({ _id: id, createdBy: adminId });
     if (!user) {
-      return res.status(404).json({ message: "User not found" });
+      return res.status(404).json({ message: "User not found or access denied" });
     }
     user.overseesRoles = overseesRoles;
     await user.save();

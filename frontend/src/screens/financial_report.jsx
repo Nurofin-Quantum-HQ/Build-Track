@@ -1284,10 +1284,13 @@ export default function FinancialReportPage() {
     }
     try {
       const headers = [
+        "Transaction ID",
+        "Action",
         "Date",
         "Description",
         "Project",
         "Type",
+        "Amount",
         "In (INR)",
         "Out (INR)",
         "Balance (INR)",
@@ -1302,21 +1305,23 @@ export default function FinancialReportPage() {
 
       const rows = sortedMoneyRows.map((r) => {
         const linked = transactions.find((t) => String(t._id || t.id) === String(r.id));
+        const txId = linked?._id || r.id || "";
         const dt = r.date ? new Date(r.date).toLocaleDateString("en-IN") : "";
         const desc = r.title || r.description || getLedgerCategoryLabel(r.category);
         const proj = r.projectName || getProjectName(r.projectId);
         const type = getLedgerCategoryLabel(r.category);
-        const inn = r.isIn ? Number(r.amount || 0).toFixed(2) : "";
-        const out = !r.isIn ? Number(r.amount || 0).toFixed(2) : "";
+        const amount = Number(r.amount || 0).toFixed(2);
+        const inn = r.isIn ? amount : "";
+        const out = !r.isIn ? amount : "";
         const bal = r.runningBalance != null ? Number(r.runningBalance).toFixed(2) : "";
         const paid = linked ? Number(linked.paidAmount || 0).toFixed(2) : "";
         const rem = linked ? Number(linked.remainingAmount || 0).toFixed(2) : "";
         const stat = linked ? getPaymentStatusLabel(linked.paymentStatus, linked) : (r.isIn ? "Received" : "Paid");
-        return [dt, desc, proj, type, inn, out, bal, paid, rem, stat].map(escape).join(",");
+        return [txId, "unchanged", dt, desc, proj, type, amount, inn, out, bal, paid, rem, stat].map(escape).join(",");
       });
 
-      const totalRow = ["", "Total", "", "", moneyTotals.moneyIn.toFixed(2), moneyTotals.moneyOut.toFixed(2), "", "", "", ""].map(escape).join(",");
-      const netRow = ["", "Net (In - Out)", "", "", "", "", moneyTotals.net.toFixed(2), "", "", ""].map(escape).join(",");
+      const totalRow = ["", "summary", "", "Total", "", "", "", moneyTotals.moneyIn.toFixed(2), moneyTotals.moneyOut.toFixed(2), "", "", "", ""].map(escape).join(",");
+      const netRow = ["", "summary", "", "Net (In - Out)", "", "", "", "", "", moneyTotals.net.toFixed(2), "", "", ""].map(escape).join(",");
 
       const csvContent = "\uFEFF" + [headers.map(escape).join(","), ...rows, totalRow, netRow].join("\r\n");
       const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
