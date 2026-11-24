@@ -14,7 +14,7 @@ const isDev = Boolean(import.meta.env.DEV);
 const API_ORIGIN = isDev ? "" : normalizeOrigin(RAW_API_URL || "http://localhost:5001");
 const BASE = isDev ? "/api" : (API_ORIGIN ? (API_ORIGIN.endsWith("/api") ? API_ORIGIN : `${API_ORIGIN}/api`) : "/api");
 
-const api = axios.create({ baseURL: BASE });
+const api = axios.create({ baseURL: BASE, withCredentials: true });
 
 api.interceptors.request.use((config) => {
   const token = localStorage.getItem("bt_token");
@@ -50,6 +50,7 @@ api.interceptors.response.use(
 
 export const authAPI = {
   login:          (data) => api.post("/auth/login",    data),
+  logout:         ()     => api.post("/auth/logout"),
   register:       (data) => api.post("/auth/register", data),
   sendRegistrationOtp: (data) => api.post("/auth/send-registration-otp", data),
   verifyRegistrationOtp: (data) => api.post("/auth/verify-registration-otp", data),

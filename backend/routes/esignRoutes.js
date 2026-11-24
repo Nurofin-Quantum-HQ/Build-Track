@@ -77,7 +77,11 @@ router.post("/request", protect, async (req, res) => {
 });
 router.get("/details/:token", async (req, res) => {
   try {
-    const esignReq = await esignService.findActiveByToken(req.params.token);
+    const rawToken = String(req.params.token || '').trim();
+    if (!/^[a-fA-F0-9]{64}$/.test(rawToken)) {
+      return res.status(400).json({ message: "Invalid signature token format" });
+    }
+    const esignReq = await esignService.findActiveByToken(rawToken);
     if (!esignReq) {
       return res.status(404).json({ message: "Invalid or expired token" });
     }
@@ -198,7 +202,11 @@ router.post("/submit", async (req, res) => {
 });
 router.get("/sign/:token", async (req, res) => {
   try {
-    const esignReq = await esignService.findActiveByToken(req.params.token);
+    const rawToken = String(req.params.token || '').trim();
+    if (!/^[a-fA-F0-9]{64}$/.test(rawToken)) {
+      return res.status(400).send("Invalid signature token format");
+    }
+    const esignReq = await esignService.findActiveByToken(rawToken);
     if (!esignReq) {
       return res.status(404).send(`
         <html><head><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>Error</title></head>
@@ -343,7 +351,7 @@ router.get("/sign/:token", async (req, res) => {
         <button class="btn" id="submit">I Authorize & Sign</button>
       </div>
       <script>
-        const token = "${req.params.token}";
+        const token = ${JSON.stringify(rawToken)};
         const i18n = {
           en: {
             title: "CASH RECEIPT",
